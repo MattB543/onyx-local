@@ -20,6 +20,7 @@ from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from fastapi_users_db_sqlalchemy.access_token import SQLAlchemyBaseAccessTokenTableUUID
 from fastapi_users_db_sqlalchemy.generics import TIMESTAMPAware
 from sqlalchemy import Boolean
+from sqlalchemy import Computed
 from sqlalchemy import DateTime
 from sqlalchemy import desc
 from sqlalchemy import Enum
@@ -4238,7 +4239,7 @@ class CrmSettings(Base):
     __tablename__ = "crm_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tier2_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
@@ -4287,7 +4288,17 @@ class CrmOrganization(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+    search_tsv: Mapped[str | None] = mapped_column(
+        postgresql.TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(name, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(website, '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(sector, '')), 'C') || "
+            "setweight(to_tsvector('english', coalesce(notes, '')), 'D')",
+            persisted=True,
+        ),
+        nullable=True,
+    )
 
 
 class CrmContact(Base):
@@ -4335,7 +4346,18 @@ class CrmContact(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+    search_tsv: Mapped[str | None] = mapped_column(
+        postgresql.TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(first_name, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(last_name, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(email, '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(title, '')), 'C') || "
+            "setweight(to_tsvector('english', coalesce(notes, '')), 'D')",
+            persisted=True,
+        ),
+        nullable=True,
+    )
 
 
 class CrmInteraction(Base):
@@ -4375,7 +4397,15 @@ class CrmInteraction(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+    search_tsv: Mapped[str | None] = mapped_column(
+        postgresql.TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(summary, '')), 'B')",
+            persisted=True,
+        ),
+        nullable=True,
+    )
 
 
 class CrmInteractionAttendee(Base):
