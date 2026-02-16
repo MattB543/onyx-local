@@ -26,7 +26,7 @@ def _get_trimmed_key(key: str) -> bytes:
         valid_lengths = [16, 24, 32]
         key = key[: min(valid_lengths, key=lambda x: abs(x - key_length))]
 
-    return encoded_key
+    return key.encode()
 
 
 def _encrypt_string(input_str: str) -> bytes:
