@@ -49,6 +49,11 @@ def _decrypt_bytes(input_bytes: bytes) -> str:
     if not ENCRYPTION_KEY_SECRET:
         return input_bytes.decode()
 
+    # AES-CBC ciphertext is always at least 32 bytes (16-byte IV + 16-byte block).
+    # Shorter data was stored before encryption was enabled — return as plain text.
+    if len(input_bytes) < 32:
+        return input_bytes.decode()
+
     key = _get_trimmed_key(ENCRYPTION_KEY_SECRET)
     iv = input_bytes[:16]
     encrypted_data = input_bytes[16:]
