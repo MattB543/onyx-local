@@ -59,6 +59,11 @@ from onyx.db.enums import (
     AccessType,
     ArtifactType,
     BuildSessionStatus,
+    CrmAttendeeRole,
+    CrmContactSource,
+    CrmContactStatus,
+    CrmInteractionType,
+    CrmOrganizationType,
     EmbeddingPrecision,
     HierarchyNodeType,
     IndexingMode,
@@ -4227,6 +4232,226 @@ class UserProject(Base):
         "ChatSession", back_populates="project", lazy="selectin"
     )
     instructions: Mapped[str] = mapped_column(String)
+
+
+class CrmSettings(Base):
+    __tablename__ = "crm_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    tier2_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    tier3_deals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    tier3_custom_fields: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    updated_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class CrmOrganization(Base):
+    __tablename__ = "crm_organization"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    website: Mapped[str | None] = mapped_column(String, nullable=True)
+    type: Mapped[CrmOrganizationType | None] = mapped_column(
+        Enum(CrmOrganizationType, native_enum=False),
+        nullable=True,
+    )
+    sector: Mapped[str | None] = mapped_column(String, nullable=True)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    size: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+
+
+class CrmContact(Base):
+    __tablename__ = "crm_contact"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    first_name: Mapped[str] = mapped_column(String, nullable=False)
+    last_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    organization_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_organization.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    owner_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source: Mapped[CrmContactSource | None] = mapped_column(
+        Enum(CrmContactSource, native_enum=False),
+        nullable=True,
+    )
+    status: Mapped[CrmContactStatus] = mapped_column(
+        Enum(CrmContactStatus, native_enum=False),
+        nullable=False,
+        default=CrmContactStatus.LEAD,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+
+
+class CrmInteraction(Base):
+    __tablename__ = "crm_interaction"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    contact_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    organization_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_organization.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    logged_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    type: Mapped[CrmInteractionType] = mapped_column(
+        Enum(CrmInteractionType, native_enum=False),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    occurred_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    search_tsv: Mapped[str | None] = mapped_column(postgresql.TSVECTOR, nullable=True)
+
+
+class CrmInteractionAttendee(Base):
+    __tablename__ = "crm_interaction_attendee"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    interaction_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_interaction.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contact_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    role: Mapped[CrmAttendeeRole] = mapped_column(
+        Enum(CrmAttendeeRole, native_enum=False),
+        nullable=False,
+        default=CrmAttendeeRole.ATTENDEE,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CrmTag(Base):
+    __tablename__ = "crm_tag"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    color: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CrmContact__Tag(Base):
+    __tablename__ = "crm_contact__tag"
+
+    contact_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_tag.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CrmOrganization__Tag(Base):
+    __tablename__ = "crm_organization__tag"
+
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_organization.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_tag.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class UserDocument(str, Enum):

@@ -169,3 +169,27 @@ export function createPythonToolDeltaPacket(
     file_ids: fileIds,
   });
 }
+
+// CRM Tool helpers
+export function createCrmToolStartPacket(
+  type:
+    | PacketType.CRM_SEARCH_TOOL_START
+    | PacketType.CRM_CREATE_TOOL_START
+    | PacketType.CRM_UPDATE_TOOL_START
+    | PacketType.CRM_LOG_INTERACTION_TOOL_START,
+  placement: Partial<Placement> = {}
+): Packet {
+  return createPacket(type, placement);
+}
+
+export function createCrmToolDeltaPacket(
+  type:
+    | PacketType.CRM_SEARCH_TOOL_DELTA
+    | PacketType.CRM_CREATE_TOOL_DELTA
+    | PacketType.CRM_UPDATE_TOOL_DELTA
+    | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+  payload: Record<string, unknown>,
+  placement: Partial<Placement> = {}
+): Packet {
+  return createPacket(type, placement, { payload });
+}

@@ -30,6 +30,15 @@ export enum PacketType {
   // Custom tool packets
   CUSTOM_TOOL_START = "custom_tool_start",
   CUSTOM_TOOL_DELTA = "custom_tool_delta",
+  // CRM tool packets
+  CRM_SEARCH_TOOL_START = "crm_search_tool_start",
+  CRM_SEARCH_TOOL_DELTA = "crm_search_tool_delta",
+  CRM_CREATE_TOOL_START = "crm_create_tool_start",
+  CRM_CREATE_TOOL_DELTA = "crm_create_tool_delta",
+  CRM_UPDATE_TOOL_START = "crm_update_tool_start",
+  CRM_UPDATE_TOOL_DELTA = "crm_update_tool_delta",
+  CRM_LOG_INTERACTION_TOOL_START = "crm_log_interaction_tool_start",
+  CRM_LOG_INTERACTION_TOOL_DELTA = "crm_log_interaction_tool_delta",
 
   // File reader tool packets
   FILE_READER_START = "file_reader_start",
@@ -177,6 +186,43 @@ export interface CustomToolDelta extends BaseObj {
   file_ids?: string[] | null;
 }
 
+// CRM Tool Packets
+export interface CrmSearchToolStart extends BaseObj {
+  type: "crm_search_tool_start";
+}
+
+export interface CrmSearchToolDelta extends BaseObj {
+  type: "crm_search_tool_delta";
+  payload: Record<string, unknown>;
+}
+
+export interface CrmCreateToolStart extends BaseObj {
+  type: "crm_create_tool_start";
+}
+
+export interface CrmCreateToolDelta extends BaseObj {
+  type: "crm_create_tool_delta";
+  payload: Record<string, unknown>;
+}
+
+export interface CrmUpdateToolStart extends BaseObj {
+  type: "crm_update_tool_start";
+}
+
+export interface CrmUpdateToolDelta extends BaseObj {
+  type: "crm_update_tool_delta";
+  payload: Record<string, unknown>;
+}
+
+export interface CrmLogInteractionToolStart extends BaseObj {
+  type: "crm_log_interaction_tool_start";
+}
+
+export interface CrmLogInteractionToolDelta extends BaseObj {
+  type: "crm_log_interaction_tool_delta";
+  payload: Record<string, unknown>;
+}
+
 // File Reader Packets
 export interface FileReaderStart extends BaseObj {
   type: "file_reader_start";
@@ -307,6 +353,17 @@ export type CustomToolObj =
   | CustomToolDelta
   | SectionEnd
   | PacketError;
+export type CrmToolObj =
+  | CrmSearchToolStart
+  | CrmSearchToolDelta
+  | CrmCreateToolStart
+  | CrmCreateToolDelta
+  | CrmUpdateToolStart
+  | CrmUpdateToolDelta
+  | CrmLogInteractionToolStart
+  | CrmLogInteractionToolDelta
+  | SectionEnd
+  | PacketError;
 export type FileReaderToolObj =
   | FileReaderStart
   | FileReaderResult
@@ -324,6 +381,7 @@ export type NewToolObj =
   | PythonToolObj
   | FetchToolObj
   | CustomToolObj
+  | CrmToolObj
   | FileReaderToolObj
   | MemoryToolObj;
 
@@ -418,6 +476,11 @@ export interface FetchToolPacket {
 export interface CustomToolPacket {
   placement: Placement;
   obj: CustomToolObj;
+}
+
+export interface CrmToolPacket {
+  placement: Placement;
+  obj: CrmToolObj;
 }
 
 export interface FileReaderToolPacket {

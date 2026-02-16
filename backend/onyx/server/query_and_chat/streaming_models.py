@@ -34,6 +34,14 @@ class StreamingType(Enum):
     PYTHON_TOOL_DELTA = "python_tool_delta"
     CUSTOM_TOOL_START = "custom_tool_start"
     CUSTOM_TOOL_DELTA = "custom_tool_delta"
+    CRM_SEARCH_TOOL_START = "crm_search_tool_start"
+    CRM_SEARCH_TOOL_DELTA = "crm_search_tool_delta"
+    CRM_CREATE_TOOL_START = "crm_create_tool_start"
+    CRM_CREATE_TOOL_DELTA = "crm_create_tool_delta"
+    CRM_UPDATE_TOOL_START = "crm_update_tool_start"
+    CRM_UPDATE_TOOL_DELTA = "crm_update_tool_delta"
+    CRM_LOG_INTERACTION_TOOL_START = "crm_log_interaction_tool_start"
+    CRM_LOG_INTERACTION_TOOL_DELTA = "crm_log_interaction_tool_delta"
     FILE_READER_START = "file_reader_start"
     FILE_READER_RESULT = "file_reader_result"
     REASONING_START = "reasoning_start"
@@ -259,6 +267,50 @@ class CustomToolDelta(BaseObj):
     file_ids: list[str] | None = None
 
 
+class CrmSearchToolStart(BaseObj):
+    type: Literal["crm_search_tool_start"] = StreamingType.CRM_SEARCH_TOOL_START.value
+
+
+class CrmSearchToolDelta(BaseObj):
+    type: Literal["crm_search_tool_delta"] = StreamingType.CRM_SEARCH_TOOL_DELTA.value
+
+    payload: dict[str, Any]
+
+
+class CrmCreateToolStart(BaseObj):
+    type: Literal["crm_create_tool_start"] = StreamingType.CRM_CREATE_TOOL_START.value
+
+
+class CrmCreateToolDelta(BaseObj):
+    type: Literal["crm_create_tool_delta"] = StreamingType.CRM_CREATE_TOOL_DELTA.value
+
+    payload: dict[str, Any]
+
+
+class CrmUpdateToolStart(BaseObj):
+    type: Literal["crm_update_tool_start"] = StreamingType.CRM_UPDATE_TOOL_START.value
+
+
+class CrmUpdateToolDelta(BaseObj):
+    type: Literal["crm_update_tool_delta"] = StreamingType.CRM_UPDATE_TOOL_DELTA.value
+
+    payload: dict[str, Any]
+
+
+class CrmLogInteractionToolStart(BaseObj):
+    type: Literal["crm_log_interaction_tool_start"] = (
+        StreamingType.CRM_LOG_INTERACTION_TOOL_START.value
+    )
+
+
+class CrmLogInteractionToolDelta(BaseObj):
+    type: Literal["crm_log_interaction_tool_delta"] = (
+        StreamingType.CRM_LOG_INTERACTION_TOOL_DELTA.value
+    )
+
+    payload: dict[str, Any]
+
+
 ################################################
 # File Reader Packets
 ################################################
@@ -367,6 +419,14 @@ PacketObj = Union[
     PythonToolDelta,
     CustomToolStart,
     CustomToolDelta,
+    CrmSearchToolStart,
+    CrmSearchToolDelta,
+    CrmCreateToolStart,
+    CrmCreateToolDelta,
+    CrmUpdateToolStart,
+    CrmUpdateToolDelta,
+    CrmLogInteractionToolStart,
+    CrmLogInteractionToolDelta,
     FileReaderStart,
     FileReaderResult,
     MemoryToolStart,

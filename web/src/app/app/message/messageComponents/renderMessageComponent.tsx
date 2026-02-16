@@ -21,6 +21,7 @@ import CustomToolRenderer from "./renderers/CustomToolRenderer";
 import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
 import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
 import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
+import { CrmToolRenderer } from "./timeline/renderers/crm/CrmToolRenderer";
 import { DeepResearchPlanRenderer } from "./timeline/renderers/deepresearch/DeepResearchPlanRenderer";
 import { ResearchAgentRenderer } from "./timeline/renderers/deepresearch/ResearchAgentRenderer";
 import { WebSearchToolRenderer } from "./timeline/renderers/search/WebSearchToolRenderer";
@@ -60,6 +61,15 @@ function isPythonToolPacket(packet: Packet) {
 
 function isCustomToolPacket(packet: Packet) {
   return packet.obj.type === PacketType.CUSTOM_TOOL_START;
+}
+
+function isCrmToolPacket(packet: Packet) {
+  return (
+    packet.obj.type === PacketType.CRM_SEARCH_TOOL_START ||
+    packet.obj.type === PacketType.CRM_CREATE_TOOL_START ||
+    packet.obj.type === PacketType.CRM_UPDATE_TOOL_START ||
+    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_START
+  );
 }
 
 function isFileReaderToolPacket(packet: Packet) {
@@ -137,6 +147,9 @@ export function findRenderer(
   }
   if (groupedPackets.packets.some((packet) => isFileReaderToolPacket(packet))) {
     return FileReaderToolRenderer;
+  }
+  if (groupedPackets.packets.some((packet) => isCrmToolPacket(packet))) {
+    return CrmToolRenderer;
   }
   if (groupedPackets.packets.some((packet) => isCustomToolPacket(packet))) {
     return CustomToolRenderer;

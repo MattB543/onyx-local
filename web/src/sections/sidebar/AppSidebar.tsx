@@ -32,6 +32,7 @@ import {
 import SidebarSection from "@/sections/sidebar/SidebarSection";
 import useChatSessions from "@/hooks/useChatSessions";
 import { useProjects } from "@/lib/hooks/useProjects";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useAgents, useCurrentAgent, usePinnedAgents } from "@/hooks/useAgents";
 import { useAppSidebarContext } from "@/providers/AppSidebarProvider";
 import ProjectFolderButton from "@/sections/sidebar/ProjectFolderButton";
@@ -66,6 +67,7 @@ import {
   SvgOnyxOctagon,
   SvgSearchMenu,
   SvgSettings,
+  SvgUser,
 } from "@opal/icons";
 import BuildModeIntroBackground from "@/app/craft/components/IntroBackground";
 import BuildModeIntroContent from "@/app/craft/components/IntroContent";
@@ -161,6 +163,7 @@ const MemoizedAppSidebarInner = memo(
       refreshChatSessions,
       isLoading: isLoadingChatSessions,
     } = useChatSessions();
+    const { crmSettings } = useCrmSettings();
     const {
       projects,
       refreshProjects,
@@ -493,6 +496,22 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded]
     );
+    const isCrmEnabled = crmSettings?.enabled === true;
+    const crmButton = useMemo(
+      () => (
+        <div data-testid="AppSidebar/crm">
+          <SidebarTab
+            leftIcon={SvgUser}
+            folded={folded}
+            href="/app/crm"
+            transient={activeSidebarTab.isCrm()}
+          >
+            CRM
+          </SidebarTab>
+        </div>
+      ),
+      [folded, activeSidebarTab]
+    );
     const moreAgentsButton = useMemo(
       () => (
         <div data-testid="AppSidebar/more-agents">
@@ -639,6 +658,7 @@ const MemoizedAppSidebarInner = memo(
               <div className="flex flex-col gap-0.5">
                 {newSessionButton}
                 {searchChatsButton}
+                {(isCrmEnabled || activeSidebarTab.isCrm()) && crmButton}
                 {isOnyxCraftEnabled && buildButton}
               </div>
             }

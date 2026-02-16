@@ -95,6 +95,22 @@ export function useTimelineHeader(
       };
     }
 
+    if (packetType === PacketType.CRM_SEARCH_TOOL_START) {
+      return { headerText: "Searching CRM", hasPackets, userStopped };
+    }
+
+    if (packetType === PacketType.CRM_CREATE_TOOL_START) {
+      return { headerText: "Creating CRM record", hasPackets, userStopped };
+    }
+
+    if (packetType === PacketType.CRM_UPDATE_TOOL_START) {
+      return { headerText: "Updating CRM record", hasPackets, userStopped };
+    }
+
+    if (packetType === PacketType.CRM_LOG_INTERACTION_TOOL_START) {
+      return { headerText: "Logging CRM interaction", hasPackets, userStopped };
+    }
+
     if (
       packetType === PacketType.MEMORY_TOOL_START ||
       packetType === PacketType.MEMORY_TOOL_NO_ACCESS

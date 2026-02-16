@@ -95,6 +95,14 @@ export function getToolName(packets: Packet[]): string {
       return (
         (firstPacket.obj as { tool_name?: string }).tool_name || "Custom Tool"
       );
+    case PacketType.CRM_SEARCH_TOOL_START:
+      return "CRM Search";
+    case PacketType.CRM_CREATE_TOOL_START:
+      return "CRM Create";
+    case PacketType.CRM_UPDATE_TOOL_START:
+      return "CRM Update";
+    case PacketType.CRM_LOG_INTERACTION_TOOL_START:
+      return "CRM Log Interaction";
     case PacketType.IMAGE_GENERATION_TOOL_START:
       return "Generate Image";
     case PacketType.DEEP_RESEARCH_PLAN_START:
@@ -132,6 +140,11 @@ export function getToolIcon(packets: Packet[]): JSX.Element {
       return <SvgLink className="w-3.5 h-3.5" />;
     case PacketType.CUSTOM_TOOL_START:
       return <FiTool className="w-3.5 h-3.5" />;
+    case PacketType.CRM_SEARCH_TOOL_START:
+    case PacketType.CRM_CREATE_TOOL_START:
+    case PacketType.CRM_UPDATE_TOOL_START:
+    case PacketType.CRM_LOG_INTERACTION_TOOL_START:
+      return <SvgUser className="w-3.5 h-3.5" />;
     case PacketType.IMAGE_GENERATION_TOOL_START:
       return <SvgImage className="w-3.5 h-3.5" />;
     case PacketType.DEEP_RESEARCH_PLAN_START:

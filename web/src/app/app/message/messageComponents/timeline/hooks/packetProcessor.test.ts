@@ -26,6 +26,8 @@ import {
   createFetchToolDocumentsPacket,
   createPythonToolStartPacket,
   createPythonToolDeltaPacket,
+  createCrmToolStartPacket,
+  createCrmToolDeltaPacket,
 } from "./__tests__/testHelpers";
 
 // ============================================================================
@@ -267,6 +269,13 @@ describe("packetProcessor", () => {
       [PacketType.PYTHON_TOOL_START, "PYTHON_TOOL_START"],
       [PacketType.FETCH_TOOL_START, "FETCH_TOOL_START"],
       [PacketType.CUSTOM_TOOL_START, "CUSTOM_TOOL_START"],
+      [PacketType.CRM_SEARCH_TOOL_START, "CRM_SEARCH_TOOL_START"],
+      [PacketType.CRM_CREATE_TOOL_START, "CRM_CREATE_TOOL_START"],
+      [PacketType.CRM_UPDATE_TOOL_START, "CRM_UPDATE_TOOL_START"],
+      [
+        PacketType.CRM_LOG_INTERACTION_TOOL_START,
+        "CRM_LOG_INTERACTION_TOOL_START",
+      ],
       [PacketType.FILE_READER_START, "FILE_READER_START"],
       [PacketType.REASONING_START, "REASONING_START"],
       [PacketType.DEEP_RESEARCH_PLAN_START, "DEEP_RESEARCH_PLAN_START"],
@@ -791,6 +800,55 @@ describe("packetProcessor", () => {
 
       expect(result.groupKeysWithSectionEnd.has("0-0")).toBe(true);
     });
+  });
+
+  describe("CRM Tool flow", () => {
+    const crmPacketPairs: Array<
+      [
+        | PacketType.CRM_SEARCH_TOOL_START
+        | PacketType.CRM_CREATE_TOOL_START
+        | PacketType.CRM_UPDATE_TOOL_START
+        | PacketType.CRM_LOG_INTERACTION_TOOL_START,
+        | PacketType.CRM_SEARCH_TOOL_DELTA
+        | PacketType.CRM_CREATE_TOOL_DELTA
+        | PacketType.CRM_UPDATE_TOOL_DELTA
+        | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+      ]
+    > = [
+      [PacketType.CRM_SEARCH_TOOL_START, PacketType.CRM_SEARCH_TOOL_DELTA],
+      [PacketType.CRM_CREATE_TOOL_START, PacketType.CRM_CREATE_TOOL_DELTA],
+      [PacketType.CRM_UPDATE_TOOL_START, PacketType.CRM_UPDATE_TOOL_DELTA],
+      [
+        PacketType.CRM_LOG_INTERACTION_TOOL_START,
+        PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+      ],
+    ];
+
+    test.each(crmPacketPairs)(
+      "full %s flow: START -> DELTA -> SECTION_END",
+      (startType, deltaType) => {
+        const state = createInitialState(1);
+        const packets = [
+          createCrmToolStartPacket(startType, { turn_index: 0 }),
+          createCrmToolDeltaPacket(
+            deltaType,
+            { status: "ok", payload_type: "crm" },
+            { turn_index: 0 }
+          ),
+          createPacket(PacketType.SECTION_END, { turn_index: 0 }),
+        ];
+
+        const result = processPackets(state, packets);
+
+        expect(result.toolGroups.length).toBe(1);
+        expect(result.toolGroupKeys.has("0-0")).toBe(true);
+        expect(result.groupKeysWithSectionEnd.has("0-0")).toBe(true);
+
+        const group = result.groupedPacketsMap.get("0-0");
+        expect(group?.[0]?.obj.type).toBe(startType);
+        expect(group?.[1]?.obj.type).toBe(deltaType);
+      }
+    );
   });
 
   describe("handleStreamingStatusPacket", () => {

@@ -293,6 +293,43 @@ class HierarchyNodeType(str, PyEnum):
     CHANNEL = "channel"
 
 
+class CrmContactSource(str, PyEnum):
+    MANUAL = "manual"
+    IMPORT = "import"
+    REFERRAL = "referral"
+    INBOUND = "inbound"
+    OTHER = "other"
+
+
+class CrmContactStatus(str, PyEnum):
+    LEAD = "lead"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ARCHIVED = "archived"
+
+
+class CrmOrganizationType(str, PyEnum):
+    CUSTOMER = "customer"
+    PROSPECT = "prospect"
+    PARTNER = "partner"
+    VENDOR = "vendor"
+    OTHER = "other"
+
+
+class CrmInteractionType(str, PyEnum):
+    NOTE = "note"
+    CALL = "call"
+    EMAIL = "email"
+    MEETING = "meeting"
+    EVENT = "event"
+
+
+class CrmAttendeeRole(str, PyEnum):
+    ORGANIZER = "organizer"
+    ATTENDEE = "attendee"
+    OBSERVER = "observer"
+
+
 class LLMModelFlowType(str, PyEnum):
     CHAT = "chat"
     VISION = "vision"

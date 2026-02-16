@@ -31,6 +31,12 @@ from onyx.tools.models import SearchToolUsage
 from onyx.tools.tool_implementations.custom.custom_tool import (
     build_custom_tools_from_openapi_schema_and_headers,
 )
+from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
+from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
+    CrmLogInteractionTool,
+)
+from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
+from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
@@ -258,6 +264,44 @@ def construct_tools(
                         emitter=emitter,
                         user_file_ids=cfg.user_file_ids,
                         chat_file_ids=cfg.chat_file_ids,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmSearchTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmSearchTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmCreateTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmCreateTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                        user_id=str(user.id) if user.id else None,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmUpdateTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmUpdateTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmLogInteractionTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmLogInteractionTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                        user_id=str(user.id) if user.id else None,
                     )
                 ]
 

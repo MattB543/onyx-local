@@ -34,6 +34,14 @@ describe("packetUtils", () => {
       PacketType.PYTHON_TOOL_DELTA,
       PacketType.CUSTOM_TOOL_START,
       PacketType.CUSTOM_TOOL_DELTA,
+      PacketType.CRM_SEARCH_TOOL_START,
+      PacketType.CRM_SEARCH_TOOL_DELTA,
+      PacketType.CRM_CREATE_TOOL_START,
+      PacketType.CRM_CREATE_TOOL_DELTA,
+      PacketType.CRM_UPDATE_TOOL_START,
+      PacketType.CRM_UPDATE_TOOL_DELTA,
+      PacketType.CRM_LOG_INTERACTION_TOOL_START,
+      PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
       PacketType.REASONING_START,
       PacketType.REASONING_DELTA,
       PacketType.FETCH_TOOL_START,
@@ -95,6 +103,14 @@ describe("packetUtils", () => {
       PacketType.PYTHON_TOOL_DELTA,
       PacketType.CUSTOM_TOOL_START,
       PacketType.CUSTOM_TOOL_DELTA,
+      PacketType.CRM_SEARCH_TOOL_START,
+      PacketType.CRM_SEARCH_TOOL_DELTA,
+      PacketType.CRM_CREATE_TOOL_START,
+      PacketType.CRM_CREATE_TOOL_DELTA,
+      PacketType.CRM_UPDATE_TOOL_START,
+      PacketType.CRM_UPDATE_TOOL_DELTA,
+      PacketType.CRM_LOG_INTERACTION_TOOL_START,
+      PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
       PacketType.FETCH_TOOL_START,
       PacketType.FETCH_TOOL_URLS,
       PacketType.FETCH_TOOL_DOCUMENTS,
@@ -197,6 +213,16 @@ describe("packetUtils", () => {
     test("returns true for SEARCH_TOOL_DOCUMENTS_DELTA", () => {
       const packet = createPacket(PacketType.SEARCH_TOOL_DOCUMENTS_DELTA);
       expect(isSearchToolPacket(packet)).toBe(true);
+    });
+
+    test("returns false for CRM_SEARCH_TOOL_START", () => {
+      const packet = createPacket(PacketType.CRM_SEARCH_TOOL_START);
+      expect(isSearchToolPacket(packet)).toBe(false);
+    });
+
+    test("returns false for CRM_SEARCH_TOOL_DELTA", () => {
+      const packet = createPacket(PacketType.CRM_SEARCH_TOOL_DELTA);
+      expect(isSearchToolPacket(packet)).toBe(false);
     });
 
     test("returns false for other packet types", () => {

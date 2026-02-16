@@ -58,3 +58,9 @@ node_modules
 
 # plans
 plans/
+
+# claude
+claude/
+
+#.pem
+*.pem

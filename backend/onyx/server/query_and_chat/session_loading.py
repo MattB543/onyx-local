@@ -20,6 +20,14 @@ from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import AgentResponseDelta
 from onyx.server.query_and_chat.streaming_models import AgentResponseStart
 from onyx.server.query_and_chat.streaming_models import CitationInfo
+from onyx.server.query_and_chat.streaming_models import CrmCreateToolDelta
+from onyx.server.query_and_chat.streaming_models import CrmCreateToolStart
+from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolDelta
+from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolStart
+from onyx.server.query_and_chat.streaming_models import CrmSearchToolDelta
+from onyx.server.query_and_chat.streaming_models import CrmSearchToolStart
+from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
+from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
 from onyx.server.query_and_chat.streaming_models import CustomToolDelta
 from onyx.server.query_and_chat.streaming_models import CustomToolStart
 from onyx.server.query_and_chat.streaming_models import FileReaderResult
@@ -48,6 +56,12 @@ from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileRea
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
 )
+from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
+from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
+    CrmLogInteractionTool,
+)
+from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
+from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
@@ -207,6 +221,77 @@ def create_custom_tool_packets(
     )
 
     return packets
+
+
+def _parse_crm_tool_payload(tool_call_response: str | None) -> dict:
+    if not tool_call_response:
+        return {}
+    try:
+        payload = json.loads(tool_call_response)
+        if isinstance(payload, dict):
+            return payload
+        return {"result": payload}
+    except json.JSONDecodeError:
+        return {"result": tool_call_response}
+
+
+def create_crm_search_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmSearchToolStart()),
+        Packet(placement=placement, obj=CrmSearchToolDelta(payload=payload)),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_crm_create_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmCreateToolStart()),
+        Packet(placement=placement, obj=CrmCreateToolDelta(payload=payload)),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_crm_update_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmUpdateToolStart()),
+        Packet(placement=placement, obj=CrmUpdateToolDelta(payload=payload)),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_crm_log_interaction_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmLogInteractionToolStart()),
+        Packet(
+            placement=placement,
+            obj=CrmLogInteractionToolDelta(payload=payload),
+        ),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
 
 
 def create_file_reader_packets(
@@ -585,6 +670,42 @@ def translate_assistant_message_to_packets(
                                     index=memory_data.get("index"),
                                 )
                             )
+
+                    elif tool.in_code_tool_id == CrmSearchTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_search_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == CrmCreateTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_create_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == CrmUpdateTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_update_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == CrmLogInteractionTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_log_interaction_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
 
                     else:
                         # Custom tool or unknown tool

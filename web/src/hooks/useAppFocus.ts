@@ -12,6 +12,7 @@ export type AppFocusType =
   | { type: "agent" | "project" | "chat"; id: string }
   | "new-session"
   | "more-agents"
+  | "crm"
   | "user-settings";
 
 export class AppFocus {
@@ -41,6 +42,10 @@ export class AppFocus {
     return this.value === "user-settings";
   }
 
+  isCrm(): boolean {
+    return this.value === "crm";
+  }
+
   getId(): string | null {
     return typeof this.value === "object" ? this.value.id : null;
   }
@@ -51,6 +56,7 @@ export class AppFocus {
     | "chat"
     | "new-session"
     | "more-agents"
+    | "crm"
     | "user-settings" {
     return typeof this.value === "object" ? this.value.type : this.value;
   }
@@ -63,6 +69,11 @@ export default function useAppFocus(): AppFocus {
   // Check if we're on the user settings page
   if (pathname.startsWith("/app/settings")) {
     return new AppFocus("user-settings");
+  }
+
+  // Check if we're on CRM pages
+  if (pathname.startsWith("/app/crm")) {
+    return new AppFocus("crm");
   }
 
   // Check if we're on the agents page
