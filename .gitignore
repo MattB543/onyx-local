@@ -15,6 +15,8 @@
 .venv
 .mypy_cache
 .idea
+__pycache__/
+*.py[cod]
 
 # testing
 /web/test-results/
@@ -67,3 +69,11 @@ claude/
 
 # any files with logs_ in the name
 logs_*.txt
+
+# local lint artifact outputs/scripts (ad hoc analysis only)
+web/eslint_errors.txt
+web/eslint_out.json
+web/eslint_output.json
+web/count_violations.js
+web/list_files_for_rule.js
+web/list_violations.js
