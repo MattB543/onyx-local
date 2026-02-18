@@ -61,8 +61,11 @@ FILE_TOKEN_COUNT_THRESHOLD = int(
     os.environ.get("FILE_TOKEN_COUNT_THRESHOLD", str(_DEFAULT_FILE_TOKEN_LIMIT))
 )
 
-# If set to true, will show extra/uncommon connectors in the "Other" category
-SHOW_EXTRA_CONNECTORS = os.environ.get("SHOW_EXTRA_CONNECTORS", "").lower() == "true"
+# Show extra/uncommon connectors in the "Other" category by default.
+# Can be disabled by setting SHOW_EXTRA_CONNECTORS=false.
+SHOW_EXTRA_CONNECTORS = (
+    os.environ.get("SHOW_EXTRA_CONNECTORS", "true").lower() == "true"
+)
 
 # Controls whether to allow admin query history reports with:
 # 1. associated user emails

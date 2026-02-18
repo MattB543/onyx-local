@@ -2,12 +2,14 @@ from enum import Enum as PyEnum
 
 from onyx.configs.constants import DocumentSource
 
-# NOTE: do not need https://www.googleapis.com/auth/documents.readonly
-# this is counted under `/auth/drive.readonly`
+# Single credential path for Google Drive now supports both ingestion (read) and
+# output use cases (create/update docs/files).
 GOOGLE_SCOPES = {
     DocumentSource.GOOGLE_DRIVE: [
         "https://www.googleapis.com/auth/drive.readonly",
         "https://www.googleapis.com/auth/drive.metadata.readonly",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/documents",
         "https://www.googleapis.com/auth/admin.directory.group.readonly",
         "https://www.googleapis.com/auth/admin.directory.user.readonly",
     ],

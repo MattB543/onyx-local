@@ -552,7 +552,8 @@ class GoogleAppWebCredentials(BaseModel):
     auth_provider_x509_cert_url: str
     client_secret: str
     redirect_uris: list[str]
-    javascript_origins: list[str]
+    # Some Google OAuth client exports omit this key for server-side flows.
+    javascript_origins: list[str] = Field(default_factory=list)
 
 
 class GoogleAppCredentials(BaseModel):

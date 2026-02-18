@@ -20,6 +20,7 @@ from onyx.configs.app_configs import WEB_DOMAIN
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.google_utils.google_auth import get_google_oauth_creds
 from onyx.connectors.google_utils.google_auth import sanitize_oauth_credentials
+from onyx.connectors.google_utils.shared_constants import GOOGLE_SCOPES
 from onyx.connectors.google_utils.shared_constants import (
     DB_CREDENTIALS_AUTHENTICATION_METHOD,
 )
@@ -55,14 +56,8 @@ class GoogleDriveOAuth:
 
     TOKEN_URL = "https://oauth2.googleapis.com/token"
 
-    # SCOPE is per https://docs.danswer.dev/connectors/google-drive
-    # TODO: Merge with or use google_utils.GOOGLE_SCOPES
-    SCOPE = (
-        "https://www.googleapis.com/auth/drive.readonly%20"
-        "https://www.googleapis.com/auth/drive.metadata.readonly%20"
-        "https://www.googleapis.com/auth/admin.directory.user.readonly%20"
-        "https://www.googleapis.com/auth/admin.directory.group.readonly"
-    )
+    # Keep interactive OAuth scopes in sync with connector OAuth scopes.
+    SCOPE = "%20".join(GOOGLE_SCOPES[DocumentSource.GOOGLE_DRIVE])
 
     REDIRECT_URI = f"{WEB_DOMAIN}/admin/connectors/google-drive/oauth/callback"
     DEV_REDIRECT_URI = f"https://redirectmeto.com/{REDIRECT_URI}"

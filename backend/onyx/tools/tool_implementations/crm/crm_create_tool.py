@@ -100,15 +100,121 @@ class CrmCreateTool(Tool[None]):
                         },
                         "contact": {
                             "type": "object",
-                            "description": "Contact payload when entity_type is 'contact'.",
+                            "description": "Contact payload when entity_type is 'contact'. Required field: first_name.",
+                            "properties": {
+                                "first_name": {
+                                    "type": "string",
+                                    "description": "First name (required).",
+                                },
+                                "last_name": {
+                                    "type": "string",
+                                    "description": "Last name.",
+                                },
+                                "email": {
+                                    "type": "string",
+                                    "description": "Email address. Used for deduplication — if a contact with this email exists, returns the existing one.",
+                                },
+                                "phone": {
+                                    "type": "string",
+                                    "description": "Phone number.",
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "description": "Job title (e.g. 'Lead Dev', 'CEO', 'Account Manager').",
+                                },
+                                "organization_id": {
+                                    "type": "string",
+                                    "description": "UUID of an existing organization to link this contact to.",
+                                },
+                                "owner_id": {
+                                    "type": "string",
+                                    "description": "UUID of the team member who owns this contact.",
+                                },
+                                "source": {
+                                    "type": "string",
+                                    "enum": ["manual", "import", "referral", "inbound", "other"],
+                                    "description": "How this contact entered the system.",
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["lead", "active", "inactive", "archived"],
+                                    "description": "Contact lifecycle status. Defaults to 'lead'.",
+                                },
+                                "notes": {
+                                    "type": "string",
+                                    "description": "Free-text notes about this contact.",
+                                },
+                                "linkedin_url": {
+                                    "type": "string",
+                                    "description": "LinkedIn profile URL.",
+                                },
+                                "location": {
+                                    "type": "string",
+                                    "description": "Location (e.g. 'San Francisco, CA').",
+                                },
+                                "tag_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "UUIDs of existing tags to apply to this contact.",
+                                },
+                            },
+                            "required": ["first_name"],
                         },
                         "organization": {
                             "type": "object",
-                            "description": "Organization payload when entity_type is 'organization'.",
+                            "description": "Organization payload when entity_type is 'organization'. Required field: name.",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Organization name (required). Used for deduplication.",
+                                },
+                                "website": {
+                                    "type": "string",
+                                    "description": "Website URL.",
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["customer", "prospect", "partner", "vendor", "other"],
+                                    "description": "Relationship type.",
+                                },
+                                "sector": {
+                                    "type": "string",
+                                    "description": "Industry sector (e.g. 'Technology', 'Healthcare').",
+                                },
+                                "location": {
+                                    "type": "string",
+                                    "description": "Location (e.g. 'New York, NY').",
+                                },
+                                "size": {
+                                    "type": "string",
+                                    "description": "Company size (e.g. '50-100', '1000+').",
+                                },
+                                "notes": {
+                                    "type": "string",
+                                    "description": "Free-text notes about this organization.",
+                                },
+                                "tag_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "UUIDs of existing tags to apply to this organization.",
+                                },
+                            },
+                            "required": ["name"],
                         },
                         "tag": {
                             "type": "object",
-                            "description": "Tag payload when entity_type is 'tag'.",
+                            "description": "Tag payload when entity_type is 'tag'. Required field: name.",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Tag name (required).",
+                                },
+                                "color": {
+                                    "type": "string",
+                                    "description": "Tag color (e.g. 'blue', '#FF5733').",
+                                },
+                            },
+                            "required": ["name"],
                         },
                     },
                     "required": ["entity_type"],

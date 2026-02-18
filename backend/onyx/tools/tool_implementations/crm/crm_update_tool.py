@@ -90,6 +90,7 @@ class CrmUpdateTool(Tool[None]):
                         "entity_type": {
                             "type": "string",
                             "enum": sorted(list(CRM_UPDATE_ENTITY_TYPES)),
+                            "description": "Whether to update a 'contact' or 'organization'.",
                         },
                         "entity_id": {
                             "type": "string",
@@ -97,7 +98,14 @@ class CrmUpdateTool(Tool[None]):
                         },
                         "updates": {
                             "type": "object",
-                            "description": "Fields to update.",
+                            "description": (
+                                "Fields to update. Only include fields you want to change. "
+                                "For contacts: first_name, last_name, email, phone, title (job title), "
+                                "organization_id, owner_id, source (manual|import|referral|inbound|other), "
+                                "status (lead|active|inactive|archived), notes, linkedin_url, location. "
+                                "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
+                                "sector, location, size, notes."
+                            ),
                         },
                     },
                     "required": ["entity_type", "entity_id", "updates"],

@@ -90,33 +90,65 @@ class CrmLogInteractionTool(Tool[None]):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string"},
+                        "title": {
+                            "type": "string",
+                            "description": "Short title for the interaction (e.g. 'Discovery call with Acme Corp').",
+                        },
                         "interaction_type": {
                             "type": "string",
                             "enum": [member.value for member in CrmInteractionType],
+                            "description": "Type of interaction. Defaults to 'note' if omitted.",
                         },
-                        "summary": {"type": "string"},
+                        "summary": {
+                            "type": "string",
+                            "description": "Summary of what happened — key discussion points, decisions, and action items.",
+                        },
                         "occurred_at": {
                             "type": "string",
-                            "description": "ISO datetime string.",
+                            "description": "When this interaction happened, as an ISO datetime string. Omit for 'right now'.",
                         },
-                        "contact_id": {"type": "string"},
-                        "organization_id": {"type": "string"},
-                        "primary_contact_id": {"type": "string"},
+                        "contact_id": {
+                            "type": "string",
+                            "description": "UUID of the primary contact for this interaction.",
+                        },
+                        "organization_id": {
+                            "type": "string",
+                            "description": "UUID of the organization this interaction relates to.",
+                        },
+                        "primary_contact_id": {
+                            "type": "string",
+                            "description": "UUID of the primary contact if different from contact_id. Auto-added as attendee.",
+                        },
                         "attendees": {
                             "type": "array",
+                            "description": (
+                                "People who attended. Each item can provide an email or name "
+                                "for automatic resolution to an existing contact or team member. "
+                                "The system will report what matched and at what confidence level."
+                            ),
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "user_id": {"type": "string"},
-                                    "contact_id": {"type": "string"},
-                                    "email": {"type": "string"},
-                                    "name": {"type": "string"},
-                                    "id": {"type": "string"},
-                                    "token": {"type": "string"},
+                                    "email": {
+                                        "type": "string",
+                                        "description": "Email address — best way to match an attendee to an existing contact or user.",
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Full name — used for fuzzy matching if email is not provided.",
+                                    },
+                                    "contact_id": {
+                                        "type": "string",
+                                        "description": "UUID of a known CRM contact. Use if you already have the ID.",
+                                    },
+                                    "user_id": {
+                                        "type": "string",
+                                        "description": "UUID of a known team member. Use if you already have the ID.",
+                                    },
                                     "role": {
                                         "type": "string",
                                         "enum": [member.value for member in CrmAttendeeRole],
+                                        "description": "Role in the interaction. Defaults to 'attendee'.",
                                     },
                                 },
                             },
