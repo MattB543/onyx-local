@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Fragment, createElement } from "react";
 
 /**
  * Escapes special regex characters in a string
@@ -22,8 +22,8 @@ export function highlightMatch(text: string, query: string): React.ReactNode {
 
   return parts.map((part, i) =>
     i % 2 === 1
-      ? React.createElement("span", { key: i, className: "text-text-05" }, part)
-      : React.createElement(React.Fragment, { key: i }, part)
+      ? createElement("span", { key: i, className: "text-text-05" }, part)
+      : createElement(Fragment, { key: i }, part)
   );
 }
 

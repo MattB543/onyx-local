@@ -79,7 +79,7 @@ function updateParentInMap(
 export function upsertMessages(
   currentMessages: MessageTreeState,
   messagesToAdd: Message[],
-  makeLatestChildMessage: boolean = false
+  makeLatestChildMessage = false
 ): MessageTreeState {
   let newMessages = new Map(currentMessages);
   let messagesToAddClones = messagesToAdd.map((msg) => ({ ...msg })); // Clone all incoming messages

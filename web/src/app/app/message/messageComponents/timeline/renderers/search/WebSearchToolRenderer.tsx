@@ -33,7 +33,7 @@ const queryToSourceInfo = (query: string, index: number): SourceInfo => ({
  *              No StepContainer wrapper. Used for parallel streaming preview.
  * - INLINE: Shows queries for collapsed streaming view.
  */
-export const WebSearchToolRenderer: MessageRenderer<SearchToolPacket, {}> = ({
+export const WebSearchToolRenderer: MessageRenderer<SearchToolPacket, Record<string, never>> = ({
   packets,
   onComplete,
   animate,

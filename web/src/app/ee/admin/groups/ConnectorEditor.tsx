@@ -4,6 +4,7 @@ import { ConnectorMultiSelect } from "@/components/ConnectorMultiSelect";
 interface ConnectorEditorProps {
   selectedCCPairIds: number[];
   setSetCCPairIds: (ccPairId: number[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   allCCPairs: ConnectorStatus<any, any>[];
 }
 

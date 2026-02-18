@@ -99,13 +99,14 @@ const getAdminConfigureInfo = (
 // Get source metadata for configured sources - deduplicated by source type
 function getConfiguredSources(
   availableSources: ValidSources[]
-): Array<SourceMetadata & { originalName: string; uniqueKey: string }> {
+): (SourceMetadata & { originalName: string; uniqueKey: string })[] {
   const allSources = listSourceMetadata();
 
   const seenSources = new Set<string>();
-  const configuredSources: Array<
-    SourceMetadata & { originalName: string; uniqueKey: string }
-  > = [];
+  const configuredSources: (SourceMetadata & {
+    originalName: string;
+    uniqueKey: string;
+  })[] = [];
 
   availableSources.forEach((sourceName) => {
     // Handle federated connectors by removing the federated_ prefix
@@ -228,17 +229,18 @@ export default function ActionsPopover({
     (selectedAssistant.attached_document_count ?? 0) === 0;
 
   // Store MCP server auth/loading state (tools are part of selectedAssistant.tools)
-  const [mcpServerData, setMcpServerData] = useState<{
-    [serverId: number]: {
+  const [mcpServerData, setMcpServerData] = useState<
+    Record<number, {
       isAuthenticated: boolean;
       isLoading: boolean;
-    };
-  }>({});
+    }>
+  >({});
 
   const [mcpApiKeyModal, setMcpApiKeyModal] = useState<{
     isOpen: boolean;
     serverId: number | null;
     serverName: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     authTemplate?: any;
     onSuccess?: () => void;
     isAuthenticated?: boolean;
@@ -479,7 +481,9 @@ export default function ActionsPopover({
           setMcpServers(servers);
           // Seed auth/loading state based on response
           setMcpServerData((prev) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const next = { ...prev } as any;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             servers.forEach((s: any) => {
               next[s.id as number] = {
                 isAuthenticated: !!s.user_authenticated || !!s.is_authenticated,

@@ -50,7 +50,7 @@ export default function NonAdminStep() {
           <div className="flex items-center gap-1">
             <SvgCheckCircle className="w-4 h-4 stroke-status-success-05" />
             <Text as="p" text03 mainUiBody>
-              You're all set!
+              You&apos;re all set!
             </Text>
           </div>
           <OpalButton

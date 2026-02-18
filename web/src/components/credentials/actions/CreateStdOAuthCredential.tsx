@@ -8,9 +8,8 @@ import CardSection from "@/components/admin/CardSection";
 import { getConnectorOauthRedirectUrl } from "@/lib/connectors/oauth";
 import { OAuthAdditionalKwargDescription } from "@/lib/connectors/credentials";
 
-type formType = {
-  [key: string]: any; // For additional credential fields
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type formType = Record<string, any>; // For additional credential fields
 
 export function CreateStdOAuthCredential({
   sourceType,

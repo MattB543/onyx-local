@@ -11,7 +11,7 @@ import {
   MessageProps,
   APIMessageProps,
 } from "./types";
-import React, { useId, useMemo } from "react";
+import React, { cloneElement, isValidElement, useId, useMemo } from "react";
 import { useFieldContext } from "./FieldContext";
 import { Slot } from "@radix-ui/react-slot";
 import Text from "../texts/Text";
@@ -111,9 +111,10 @@ export const FormFieldControl: React.FC<ControlProps> = ({
     return <Slot {...ariaAttributes}>{children}</Slot>;
   }
 
-  if (React.isValidElement(children)) {
-    return React.cloneElement(children, {
+  if (isValidElement(children)) {
+    return cloneElement(children, {
       ...ariaAttributes,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(children.props as any),
     });
   }

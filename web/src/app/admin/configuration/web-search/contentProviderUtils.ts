@@ -132,10 +132,10 @@ export function isContentProviderConfigured(
 }
 
 export function getCurrentContentProviderType(
-  providers: Array<{
+  providers: {
     is_active: boolean;
     provider_type: WebContentProviderType;
-  }>
+  }[]
 ): WebContentProviderType {
   return (
     providers.find((p) => p.is_active && p.provider_type !== "onyx_web_crawler")

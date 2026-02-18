@@ -2,7 +2,7 @@ import { PacketType, sendMessage, SendMessageParams } from "./lib";
 
 export class CurrentMessageFIFO {
   private stack: PacketType[] = [];
-  isComplete: boolean = false;
+  isComplete = false;
   error: string | null = null;
 
   push(packetBunch: PacketType) {

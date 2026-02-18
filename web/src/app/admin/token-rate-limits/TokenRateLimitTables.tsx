@@ -175,6 +175,7 @@ export const GenericTokenRateLimitTable = ({
   title?: string;
   description?: string;
   hideHeading?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   responseMapper?: (data: any) => TokenRateLimitDisplay[];
   isAdmin?: boolean;
 }) => {

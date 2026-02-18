@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useRef, useEffect, useLayoutEffect } from "react";
+import { HtmlHTMLAttributes, useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export interface VerticalShadowScrollerProps
-  extends React.HtmlHTMLAttributes<HTMLDivElement> {
+  extends HtmlHTMLAttributes<HTMLDivElement> {
   // Mask related
   disableMask?: boolean;
   backgroundColor?: string;

@@ -66,6 +66,7 @@ interface BedrockFormValues {
   provider: string;
   api_key_changed: boolean;
   default_model_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model_configurations: any[];
   groups: number[];
   is_public: boolean;

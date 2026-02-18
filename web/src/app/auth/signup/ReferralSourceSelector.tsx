@@ -3,6 +3,7 @@
 import { useState } from "react";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { Label } from "@/components/Field";
+import Cookies from "js-cookie";
 
 interface ReferralSourceSelectorProps {
   defaultValue?: string;
@@ -29,8 +30,7 @@ export default function ReferralSourceSelector({
 
   const handleChange = (value: string) => {
     setReferralSource(value);
-    const cookies = require("js-cookie");
-    cookies.set("referral_source", value, {
+    Cookies.set("referral_source", value, {
       expires: 365,
       path: "/",
       sameSite: "strict",

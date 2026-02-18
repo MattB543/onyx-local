@@ -1,11 +1,12 @@
-import { ValidSources } from "./types";
 import {
   Connector,
   ConnectorBase,
   ConnectorSnapshot,
 } from "./connectors/connectors";
+import { ValidSources } from "./types";
 async function handleResponse(
   response: Response
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<[string | null, any]> {
   const responseJson = await response.json();
   if (response.ok) {
@@ -104,7 +105,7 @@ export async function deleteConnector(
 export async function runConnector(
   connectorId: number,
   credentialIds: number[],
-  fromBeginning: boolean = false
+  fromBeginning = false
 ): Promise<string | null> {
   const response = await fetch("/api/manage/admin/connector/run-once", {
     method: "POST",
@@ -130,6 +131,7 @@ export async function deleteConnectorIfExistsAndIsUnlinked({
 }): Promise<string | null> {
   const connectorsResponse = await fetch("/api/manage/connector");
   if (connectorsResponse.ok) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const connectors = (await connectorsResponse.json()) as Connector<any>[];
     const matchingConnectors = connectors.filter(
       (connector) =>

@@ -40,7 +40,12 @@ CRM_UPDATE_ENTITY_TYPES = {"contact", "organization"}
 class CrmUpdateTool(Tool[None]):
     NAME = "crm_update"
     DISPLAY_NAME = "CRM Update"
-    DESCRIPTION = "Update existing CRM contacts or organizations."
+    DESCRIPTION = (
+        "Update fields on an existing CRM contact or organization. Requires the entity's UUID "
+        "(from a prior search, list, or create). Only include fields you want to change in the "
+        "updates object — omitted fields are left unchanged. Use this to fix info, change status, "
+        "reassign ownership, or link a contact to an organization."
+    )
 
     def __init__(
         self,

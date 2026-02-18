@@ -43,7 +43,7 @@ function constructCurrentImageState(packets: ImageGenerationToolPacket[]) {
 
 export const ImageToolRenderer: MessageRenderer<
   ImageGenerationToolPacket,
-  {}
+  Record<string, never>
 > = ({ packets, onComplete, renderType, children }) => {
   const { prompt, images, isGenerating, isComplete, error } =
     constructCurrentImageState(packets);

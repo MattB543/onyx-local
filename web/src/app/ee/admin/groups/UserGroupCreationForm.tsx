@@ -14,6 +14,7 @@ import { SvgUsers } from "@opal/icons";
 export interface UserGroupCreationFormProps {
   onClose: () => void;
   users: User[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ccPairs: ConnectorStatus<any, any>[];
   existingUserGroup?: UserGroup;
 }

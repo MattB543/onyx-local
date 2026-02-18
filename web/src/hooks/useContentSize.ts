@@ -93,7 +93,7 @@ interface ContentSize {
  */
 export function useContentSize(
   dependencies?: React.DependencyList,
-  observeResize: boolean = true
+  observeResize = true
 ): [React.RefObject<HTMLDivElement | null>, ContentSize] {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<ContentSize>({ width: 0, height: 0 });

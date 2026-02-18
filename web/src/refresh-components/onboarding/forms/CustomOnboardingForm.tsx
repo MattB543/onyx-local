@@ -42,6 +42,7 @@ interface CustomFormValues {
   api_version: string;
   api_key_changed: boolean;
   default_model_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model_configurations: any[];
   custom_config: Record<string, string>;
   groups: number[];
@@ -91,6 +92,7 @@ function CustomFormFields(props: OnboardingFormChildProps<CustomFormValues>) {
 
   // Convert model_configurations back to KeyValue[] for display
   const modelConfigsAsKeyValue: KeyValue[] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     formikProps.values.model_configurations?.map((config: any) => ({
       key: config.name || "",
       value: config.max_input_tokens?.toString() || "",
@@ -397,6 +399,7 @@ export function CustomOnboardingForm({
       transformValues={(values, fetchedModels) => {
         // For custom providers, use the values from the form and filter out empty entries
         const modelConfigsToUse = (values.model_configurations || []).filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (config: any) => config.name && config.name.trim() !== ""
         );
 

@@ -21,7 +21,7 @@ function Invisible({ children }: { children?: ReactNode }) {
  * For leaf components: Community renders Invisible with no children,
  * so nothing is rendered.
  */
-export function eeGated<P extends {}>(
+export function eeGated<P extends object>(
   EEComponent: ComponentType<P>
 ): ComponentType<P> {
   function EEGatedWrapper(props: P) {

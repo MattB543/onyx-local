@@ -9,6 +9,8 @@ from onyx.tools.tool_implementations.knowledge_graph.knowledge_graph_tool import
     KnowledgeGraphTool,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
+from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
+from onyx.tools.tool_implementations.crm.crm_list_tool import CrmListTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
@@ -39,6 +41,8 @@ BUILT_IN_TOOL_TYPES = Union[
     CrmCreateTool,
     CrmUpdateTool,
     CrmLogInteractionTool,
+    CrmListTool,
+    CrmGetTool,
 ]
 
 BUILT_IN_TOOL_MAP: dict[str, Type[BUILT_IN_TOOL_TYPES]] = {
@@ -54,6 +58,8 @@ BUILT_IN_TOOL_MAP: dict[str, Type[BUILT_IN_TOOL_TYPES]] = {
     CrmCreateTool.__name__: CrmCreateTool,
     CrmUpdateTool.__name__: CrmUpdateTool,
     CrmLogInteractionTool.__name__: CrmLogInteractionTool,
+    CrmListTool.__name__: CrmListTool,
+    CrmGetTool.__name__: CrmGetTool,
 }
 
 STOPPING_TOOLS_NAMES: list[str] = [ImageGenerationTool.NAME]

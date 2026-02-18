@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, RefObject, useMemo } from "react";
+import { RefObject, memo, useMemo, useRef } from "react";
 import { Packet, StopReason } from "@/app/app/services/streamingModels";
 import { FullChatState } from "@/app/app/message/messageComponents/interfaces";
 import { FeedbackType } from "@/app/app/interfaces";
@@ -71,7 +71,7 @@ function arePropsEqual(
   );
 }
 
-const AgentMessage = React.memo(function AgentMessage({
+const AgentMessage = memo(function AgentMessage({
   rawPackets,
   chatState,
   nodeId,
@@ -131,6 +131,7 @@ const AgentMessage = React.memo(function AgentMessage({
   // Memoized with granular dependencies to prevent cascading re-renders
   // Note: chatState object is recreated upstream on every render, so we depend on
   // individual fields instead of the whole object for proper memoization
+  /* eslint-disable react-hooks/preserve-manual-memoization -- intentionally destructured deps for perf */
   const effectiveChatState = useMemo<FullChatState>(
     () => ({
       ...chatState,
@@ -145,6 +146,7 @@ const AgentMessage = React.memo(function AgentMessage({
       mergedCitations,
     ]
   );
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   // Message switching logic
   const {

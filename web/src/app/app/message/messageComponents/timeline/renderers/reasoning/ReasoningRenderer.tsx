@@ -74,6 +74,7 @@ function constructCurrentReasoningState(packets: ReasoningPacket[]) {
       p.obj.type === PacketType.SECTION_END ||
       p.obj.type === PacketType.ERROR ||
       // Support reasoning_done from backend
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (p.obj as any).type === PacketType.REASONING_DONE
   );
   const deltas = packets

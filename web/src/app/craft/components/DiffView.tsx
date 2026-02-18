@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+
 import { cn } from "@/lib/utils";
 
 interface DiffViewProps {
@@ -111,7 +112,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
  */
 function collapseUnchanged(
   lines: DiffLine[],
-  contextLines: number = 3
+  contextLines = 3
 ): DiffLine[] {
   const result: DiffLine[] = [];
   const changeIndices: number[] = [];

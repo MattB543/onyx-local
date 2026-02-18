@@ -1,7 +1,7 @@
 import AppPage from "@/refresh-pages/AppPage";
 
 export interface PageProps {
-  searchParams: Promise<{ [key: string]: string }>;
+  searchParams: Promise<Record<string, string>>;
 }
 
 export default async function Page(props: PageProps) {

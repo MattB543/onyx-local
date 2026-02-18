@@ -336,6 +336,7 @@ export default function MCPAuthenticationModal({
             dirty,
           }) => {
             // Auto-populate transport based on URL
+            // eslint-disable-next-line react-hooks/rules-of-hooks -- useEffect in Formik render callback
             useEffect(() => {
               if (mcpServer?.server_url) {
                 const transport = getTransportFromUrl(mcpServer.server_url);

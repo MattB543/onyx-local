@@ -1,6 +1,7 @@
-import React from "react";
+import React, { isValidElement } from "react";
 
 export function extractCodeText(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   node: any,
   content: string,
   children: React.ReactNode
@@ -42,7 +43,8 @@ export function extractCodeText(
       if (typeof node === "number") return String(node);
       if (!node) return "";
 
-      if (React.isValidElement(node)) {
+      if (isValidElement(node)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const children = (node.props as any).children;
         if (Array.isArray(children)) {
           return children.map(extractTextFromReactNode).join("");

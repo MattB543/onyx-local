@@ -22,6 +22,7 @@ import { useToastFromQuery } from "@/hooks/useToast";
 import { SvgSearch } from "@opal/icons";
 export interface EmbeddingDetails {
   api_key: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   custom_config: any;
   default_model_id?: number;
   name: string;

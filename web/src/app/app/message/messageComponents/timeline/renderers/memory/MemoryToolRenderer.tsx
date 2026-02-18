@@ -23,7 +23,7 @@ import { useCreateModal } from "@/refresh-components/contexts/ModalContext";
  * - Complete (SectionEnd): "Memory saved" / "Memory updated" + memory text
  * - No Access: "Memory tool disabled"
  */
-export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, {}> = ({
+export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string, never>> = ({
   packets,
   stopPacketSeen,
   renderType,

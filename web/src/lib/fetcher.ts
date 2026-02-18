@@ -1,6 +1,8 @@
 export class FetchError extends Error {
   status: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   info: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, status: number, info: any) {
     super(message);
     this.status = status;
@@ -8,11 +10,7 @@ export class FetchError extends Error {
   }
 }
 
-export class RedirectError extends FetchError {
-  constructor(message: string, status: number, info: any) {
-    super(message, status, info);
-  }
-}
+export class RedirectError extends FetchError {}
 
 const DEFAULT_AUTH_ERROR_MSG =
   "An error occurred while fetching the data, related to the user's authentication status.";

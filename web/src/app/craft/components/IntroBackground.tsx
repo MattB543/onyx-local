@@ -290,6 +290,7 @@ export default function BuildModeIntroBackground(
     updateParticles(canvas);
     drawParticles(ctx);
 
+    // eslint-disable-next-line react-hooks/immutability -- self-referencing animation loop
     animationRef.current = requestAnimationFrame(animate);
   }, [updateParticles, drawParticles]);
 

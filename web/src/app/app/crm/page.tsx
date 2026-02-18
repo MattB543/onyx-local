@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+import CrmHomePage from "@/refresh-pages/CrmHomePage";
 
 export default function CrmPage() {
-  redirect("/app/crm/contacts");
+  return <CrmHomePage />;
 }
 

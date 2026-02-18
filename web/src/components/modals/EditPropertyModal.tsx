@@ -8,6 +8,7 @@ export interface EditPropertyModalProps {
   propertyDetails?: string;
   propertyName: string;
   propertyValue: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validationSchema: any;
   onClose: () => void;
   onSubmit: (propertyName: string, propertyValue: string) => Promise<void>;

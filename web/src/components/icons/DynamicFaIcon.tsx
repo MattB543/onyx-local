@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { IconBaseProps, IconType } from "react-icons";
 import { FaQuestion } from "react-icons/fa";
 
@@ -8,8 +8,9 @@ interface DynamicIconProps extends IconBaseProps {
 
 // Renders a FontAwesome icon dynamically based on the provided name
 const DynamicFaIcon: React.FC<DynamicIconProps> = ({ name, ...props }) => {
-  const IconComponent = getPreloadedIcon(name);
+  const IconComponent = useMemo(() => getPreloadedIcon(name), [name]);
   return IconComponent ? (
+    // eslint-disable-next-line react-hooks/static-components -- dynamic icon component selected by name
     <IconComponent className="h-4 w-4" {...props} />
   ) : (
     <FaQuestion className="h-4 w-4" {...props} />

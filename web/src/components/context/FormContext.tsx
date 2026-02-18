@@ -11,7 +11,9 @@ import { ValidSources } from "@/lib/types";
 
 interface FormContextType {
   formStep: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formValues: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setFormValues: (values: Record<string, any>) => void;
   nextFormStep: (contract?: string) => void;
   prevFormStep: () => void;
@@ -38,6 +40,7 @@ export const FormProvider: React.FC<{
   // Initialize formStep based on the URL parameter
   const formStepFromUrlParams = parseInt(searchParams?.get("step") || "0", 10);
   const [formStep, setFormStep] = useState(formStepFromUrlParams);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [formValues, setFormValues] = useState<Record<string, any>>({});
 
   const [allowAdvanced, setAllowAdvanced] = useState(false);

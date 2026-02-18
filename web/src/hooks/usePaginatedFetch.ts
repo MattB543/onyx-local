@@ -9,6 +9,7 @@ import { errorHandlingFetcher } from "@/lib/fetcher";
 // Any type that has an id property
 type PaginatedType = {
   id: number | string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 };
 
@@ -57,7 +58,7 @@ function usePaginatedFetch<T extends PaginatedType>({
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [totalItems, setTotalItems] = useState<number>(0);
-  const [cachedBatches, setCachedBatches] = useState<{ [key: number]: T[][] }>(
+  const [cachedBatches, setCachedBatches] = useState<Record<number, T[][]>>(
     {}
   );
 

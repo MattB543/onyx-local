@@ -7,9 +7,7 @@ type Column = {
   alignment?: "left" | "right";
 };
 
-type TableData = {
-  [key: string]: string | number | JSX.Element;
-};
+type TableData = Record<string, string | number | JSX.Element>;
 
 interface BasicTableProps {
   columns: Column[];

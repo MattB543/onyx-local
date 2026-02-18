@@ -1,12 +1,12 @@
 import { FormikProps, ErrorMessage } from "formik";
-import Text from "@/refresh-components/texts/Text";
+
 import Button from "@/refresh-components/buttons/Button";
-import InputComboBox from "@/refresh-components/inputs/InputComboBox/InputComboBox";
 import { Disabled } from "@/refresh-components/Disabled";
+import InputComboBox from "@/refresh-components/inputs/InputComboBox/InputComboBox";
+import Text from "@/refresh-components/texts/Text";
+
 import { SvgX } from "@opal/icons";
-export type GenericMultiSelectFormType<T extends string> = {
-  [K in T]: number[];
-};
+export type GenericMultiSelectFormType<T extends string> = Record<T, number[]>;
 
 interface GenericItem {
   id: number;
@@ -23,6 +23,7 @@ interface GenericMultiSelectProps<
   subtext?: string;
   items: GenericItem[] | undefined;
   isLoading: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any;
   emptyMessage: string;
   disabled?: boolean;

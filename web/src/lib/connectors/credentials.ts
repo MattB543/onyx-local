@@ -106,12 +106,24 @@ export interface GoogleDriveCredentialJson {
   authentication_method?: string;
 }
 
+export interface GoogleCalendarCredentialJson {
+  google_tokens: string;
+  google_primary_admin: string;
+  authentication_method?: string;
+}
+
 export interface GmailServiceAccountCredentialJson {
   google_service_account_key: string;
   google_primary_admin: string;
 }
 
 export interface GoogleDriveServiceAccountCredentialJson {
+  google_service_account_key: string;
+  google_primary_admin: string;
+  authentication_method?: string;
+}
+
+export interface GoogleCalendarServiceAccountCredentialJson {
   google_service_account_key: string;
   google_primary_admin: string;
   authentication_method?: string;
@@ -248,8 +260,8 @@ export interface FirefliesCredentialJson {
   fireflies_api_key: string;
 }
 
-export interface MediaWikiCredentialJson {}
-export interface WikipediaCredentialJson extends MediaWikiCredentialJson {}
+export type MediaWikiCredentialJson = Record<string, never>;
+export type WikipediaCredentialJson = MediaWikiCredentialJson;
 
 export interface EgnyteCredentialJson {
   domain: string;
@@ -281,6 +293,7 @@ export interface TestRailCredentialJson {
   testrail_api_key: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const credentialTemplates: Record<ValidSources, any> = {
   github: { github_access_token: "" } as GithubCredentialJson,
   gitlab: {
@@ -470,6 +483,7 @@ export const credentialTemplates: Record<ValidSources, any> = {
 
   // NOTE: These are Special Cases
   google_drive: { google_tokens: "" } as GoogleDriveCredentialJson,
+  google_calendar: { google_tokens: "" } as GoogleCalendarCredentialJson,
   gmail: { google_tokens: "" } as GmailCredentialJson,
   gitbook: {
     gitbook_api_key: "",

@@ -90,7 +90,7 @@ export function useCaptcha() {
   }, [isCaptchaEnabled]);
 
   const getCaptchaToken = useCallback(
-    async (action: string = "submit"): Promise<string | undefined> => {
+    async (action = "submit"): Promise<string | undefined> => {
       if (!isCaptchaEnabled) {
         return undefined;
       }

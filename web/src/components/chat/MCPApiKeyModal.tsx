@@ -8,8 +8,8 @@ import Label from "@/refresh-components/form/Label";
 import Text from "@/refresh-components/texts/Text";
 import { SvgAlertCircle, SvgEye, SvgEyeClosed, SvgKey } from "@opal/icons";
 interface MCPAuthTemplate {
-  headers: Array<{ name: string; value: string }>;
-  request_body_params: Array<{ path: string; value: string }>;
+  headers: { name: string; value: string }[];
+  request_body_params: { path: string; value: string }[];
   required_fields: string[];
 }
 

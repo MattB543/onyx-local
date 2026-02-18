@@ -5,7 +5,7 @@ import { useEffect } from "react";
 export function useKeyPress(
   callback: () => void,
   key: string,
-  enabled: boolean = true
+  enabled = true
 ) {
   useEffect(() => {
     if (!enabled) return;
@@ -27,7 +27,7 @@ export function useKeyPress(
  * @param callback - Function to call when the Escape key is pressed
  * @param enabled - Optional boolean to enable/disable the hook (defaults to true)
  */
-export function useEscape(callback: () => void, enabled: boolean = true) {
+export function useEscape(callback: () => void, enabled = true) {
   useKeyPress(callback, "Escape", enabled);
 }
 
@@ -37,6 +37,6 @@ export function useEscape(callback: () => void, enabled: boolean = true) {
  * @param callback - Function to call when the Enter key is pressed
  * @param enabled - Optional boolean to enable/disable the hook (defaults to true)
  */
-export function useEnter(callback: () => void, enabled: boolean = true) {
+export function useEnter(callback: () => void, enabled = true) {
   useKeyPress(callback, "Enter", enabled);
 }

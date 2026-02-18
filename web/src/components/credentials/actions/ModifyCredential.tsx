@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useMemo, useState } from "react";
 import Modal from "@/refresh-components/Modal";
 import Button from "@/refresh-components/buttons/Button";
 import Text from "@/refresh-components/texts/Text";
@@ -13,11 +13,16 @@ import { Connector } from "@/lib/connectors/connectors";
 import { SvgAlertTriangle, SvgTrash } from "@opal/icons";
 import { Button as OpalButton } from "@opal/components";
 interface CredentialSelectionTableProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Credential<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   editableCredentials: Credential<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSelectCredential: (credential: Credential<any> | null) => void;
   currentCredentialId?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onDeleteCredential: (credential: Credential<any>) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onEditCredential?: (credential: Credential<any>) => void;
 }
 
@@ -36,7 +41,7 @@ function CredentialSelectionTable({
   // rkuo: this appears to merge editableCredentials into credentials so we get a single list
   // of credentials to display
   // Pretty sure this merging should be done outside of this UI component
-  const allCredentials = React.useMemo(() => {
+  const allCredentials = useMemo(() => {
     const credMap = new Map(editableCredentials.map((cred) => [cred.id, cred]));
     credentials.forEach((cred) => {
       if (!credMap.has(cred.id)) {
@@ -149,18 +154,25 @@ function CredentialSelectionTable({
 export interface ModifyCredentialProps {
   close?: () => void;
   showIfEmpty?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attachedConnector?: Connector<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Credential<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   editableCredentials: Credential<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   defaultedCredential?: Credential<any>;
   accessType: AccessType;
   onSwap?: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newCredential: Credential<any>,
     connectorId: number,
     accessType: AccessType
   ) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSwitch?: (newCredential: Credential<any>) => void;
   onEditCredential?: (credential: Credential<ConfluenceCredentialJson>) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onDeleteCredential: (credential: Credential<any | null>) => void;
   onCreateNew?: () => void;
 }
@@ -180,8 +192,10 @@ export default function ModifyCredential({
   onCreateNew,
 }: ModifyCredentialProps) {
   const [selectedCredential, setSelectedCredential] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
   const [confirmDeletionCredential, setConfirmDeletionCredential] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<null | Credential<any>>(null);
 
   if (!credentials || !editableCredentials) return null;
@@ -229,6 +243,7 @@ export default function ModifyCredential({
         </Text>
 
         <CredentialSelectionTable
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onDeleteCredential={async (credential: Credential<any | null>) => {
             setConfirmDeletionCredential(credential);
           }}
@@ -243,6 +258,7 @@ export default function ModifyCredential({
           }
           credentials={credentials}
           editableCredentials={editableCredentials}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onSelectCredential={(credential: Credential<any> | null) => {
             if (credential && onSwitch) {
               onSwitch(credential);

@@ -27,7 +27,13 @@ CRM_SEARCH_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 class CrmSearchTool(Tool[None]):
     NAME = "crm_search"
     DISPLAY_NAME = "CRM Search"
-    DESCRIPTION = "Search CRM contacts, organizations, interactions, and tags."
+    DESCRIPTION = (
+        "Search CRM records by text query. Use this to find contacts by name or email, "
+        "organizations by name, interactions by title or summary, or tags by name. "
+        "Always search before creating to avoid duplicates. Use entity_types to narrow "
+        "results (e.g. only contacts). Results are ranked by relevance. "
+        "For structured filtering (by status, org, tags) without a text query, use crm_list instead."
+    )
 
     def __init__(
         self,

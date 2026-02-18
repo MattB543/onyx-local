@@ -1,11 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { ComponentPropsWithoutRef, forwardRef } from "react";
 import * as SeparatorPrimitive from "@radix-ui/react-separator";
 import { cn } from "@/lib/utils";
 
 export interface SeparatorProps
-  extends React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {
+  extends ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {
   noPadding?: boolean;
 }
 
@@ -30,7 +30,7 @@ export interface SeparatorProps
  * <Separator decorative={false} />
  * ```
  */
-const Separator = React.forwardRef(
+const Separator = forwardRef(
   (
     {
       noPadding,

@@ -52,6 +52,7 @@ export default function ConfigureConnectorModal({
 }: ConfigureConnectorModalProps) {
   const [step, setStep] = useState<ModalStep>("credential");
   const [selectedCredential, setSelectedCredential] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
 
   const sourceMetadata = connectorType
@@ -69,6 +70,7 @@ export default function ConfigureConnectorModal({
 
   // Fetch credentials for this connector type
   const { data: credentials, mutate: refreshCredentials } = useSWR<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Credential<any>[]
   >(
     connectorType && open && !isConfigured
@@ -96,6 +98,7 @@ export default function ConfigureConnectorModal({
   // Don't render for configured connectors (handled by popover in ConnectorCard)
   if (isConfigured) return null;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCredentialCreated = (cred: Credential<any>) => {
     setSelectedCredential(cred);
     refreshCredentials();

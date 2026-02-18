@@ -32,7 +32,7 @@ export default function SelectInput({
         className="w-full p-2 border border-border-03 rounded-08 bg-transparent text-text-04 focus:ring-2 focus:ring-lighter-agent focus:border-lighter-agent focus:outline-none"
       >
         <option value="">Select an option</option>
-        {options?.map((option: any) => (
+        {options?.map((option: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
           <option key={option.name} value={option.name}>
             {option.name}
           </option>

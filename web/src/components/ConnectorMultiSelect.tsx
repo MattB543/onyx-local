@@ -13,6 +13,7 @@ import { Button } from "@opal/components";
 interface ConnectorMultiSelectProps {
   name: string;
   label: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connectors: ConnectorStatus<any, any>[];
   selectedIds: number[];
   onChange: (selectedIds: number[]) => void;

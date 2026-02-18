@@ -352,6 +352,7 @@ const MemoizedAppSidebarInner = memo(
     }
 
     // Handle chat to project drag and drop
+    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const handleChatProjectDragEnd = useCallback(
       async (event: DragEndEvent) => {
         const { active, over } = event;
@@ -430,6 +431,7 @@ const MemoizedAppSidebarInner = memo(
         refreshProjects,
       ]
     );
+    /* eslint-enable react-hooks/preserve-manual-memoization */
 
     const { isAdmin, isCurator, user } = useUser();
     const activeSidebarTab = useAppFocus();
@@ -438,6 +440,7 @@ const MemoizedAppSidebarInner = memo(
       (user?.preferences?.default_app_mode?.toLowerCase() as
         | "chat"
         | "search") ?? "chat";
+    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const newSessionButton = useMemo(() => {
       const href =
         combinedSettings?.settings?.disable_default_assistant && currentAgent
@@ -467,6 +470,7 @@ const MemoizedAppSidebarInner = memo(
       currentAgent,
       defaultAppMode,
     ]);
+    /* eslint-enable react-hooks/preserve-manual-memoization */
 
     const buildButton = useMemo(
       () => (
@@ -532,6 +536,7 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded, activeSidebarTab, visibleAgents]
     );
+    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const newProjectButton = useMemo(
       () => (
         <SidebarTab
@@ -546,6 +551,7 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded, createProjectModal.toggle, createProjectModal.isOpen]
     );
+    /* eslint-enable react-hooks/preserve-manual-memoization */
     const handleShowBuildIntro = useCallback(() => {
       setShowIntroAnimation(true);
     }, []);

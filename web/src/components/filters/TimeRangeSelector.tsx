@@ -6,8 +6,11 @@ export function TimeRangeSelector({
   className,
   timeRangeValues,
 }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onValueChange: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   className: any;
 
   timeRangeValues: { label: string; value: Date }[];

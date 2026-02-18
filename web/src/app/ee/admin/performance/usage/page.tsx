@@ -21,6 +21,7 @@ export default function AnalyticsPage() {
       <AdminPageTitle title="Usage Statistics" icon={SvgActivity} />
       <AdminDateRangeSelector
         value={timeRange}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onValueChange={(value) => setTimeRange(value as any)}
       />
       <QueryPerformanceChart timeRange={timeRange} />

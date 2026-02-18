@@ -17,6 +17,7 @@ export type SearchType = (typeof SearchType)[keyof typeof SearchType];
 
 export interface ToolResponse {
   id?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response?: any;
 }
 export interface ExtendedToolResponse extends ToolResponse {
@@ -66,7 +67,7 @@ export interface OnyxDocument extends MinimalOnyxDocument {
   score: number;
   chunk_ind: number;
   match_highlights: string[];
-  metadata: { [key: string]: string };
+  metadata: Record<string, string>;
   updated_at: string | null;
   db_doc_id?: number;
   is_internet: boolean;
@@ -98,9 +99,7 @@ export interface DocumentRelevance {
   content: string;
 }
 
-export interface Relevance {
-  [url: string]: DocumentRelevance;
-}
+export type Relevance = Record<string, DocumentRelevance>;
 
 export interface RelevanceChunk {
   relevance_summaries: Relevance;
@@ -168,6 +167,7 @@ export interface SearchRequestArgs {
   timeRange: DateRangePickerValue | null;
   tags: Tag[];
   persona: Persona;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateDocumentRelevance: (relevance: any) => void;
   updateCurrentAnswer: (val: string) => void;
   updateQuotes: (quotes: Quote[]) => void;
@@ -181,6 +181,7 @@ export interface SearchRequestArgs {
     chat_session_id: string
   ) => void;
   finishedSearching: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateComments: (comments: any) => void;
   selectedSearchType: SearchType | null;
 }
@@ -228,7 +229,7 @@ export interface BaseFilters {
   source_type?: ValidSources[] | null;
   document_set?: string[] | null;
   time_cutoff?: string | null; // ISO date string
-  tags?: Array<{ tag_key: string; tag_value: string }> | null;
+  tags?: { tag_key: string; tag_value: string }[] | null;
 }
 
 /**

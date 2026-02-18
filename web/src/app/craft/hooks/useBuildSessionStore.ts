@@ -1,31 +1,12 @@
 "use client";
 
 import { create } from "zustand";
-import { getDemoDataEnabled } from "@/app/craft/v1/constants";
+
+import { DELETE_SUCCESS_DISPLAY_DURATION_MS } from "@/app/craft/constants";
 import {
   getBuildUserPersona,
   getBuildLlmSelection,
 } from "@/app/craft/onboarding/constants";
-import { DELETE_SUCCESS_DISPLAY_DURATION_MS } from "@/app/craft/constants";
-
-import {
-  ApiSandboxResponse,
-  Artifact,
-  ArtifactType,
-  BuildMessage,
-  Session,
-  SessionHistoryItem,
-  SessionStatus,
-  ToolCall,
-  ToolCallStatus,
-} from "@/app/craft/types/streamingTypes";
-
-import {
-  StreamItem,
-  ToolCallState,
-  TodoListState,
-} from "@/app/craft/types/displayTypes";
-
 import {
   createSession as apiCreateSession,
   fetchSession,
@@ -37,9 +18,25 @@ import {
   fetchArtifacts,
   restoreSession,
 } from "@/app/craft/services/apiServices";
-
-import { genId } from "@/app/craft/utils/streamItemHelpers";
+import {
+  StreamItem,
+  ToolCallState,
+  TodoListState,
+} from "@/app/craft/types/displayTypes";
+import {
+  ApiSandboxResponse,
+  Artifact,
+  ArtifactType,
+  BuildMessage,
+  Session,
+  SessionHistoryItem,
+  SessionStatus,
+  ToolCall,
+  ToolCallStatus,
+} from "@/app/craft/types/streamingTypes";
 import { parsePacket } from "@/app/craft/utils/parsePacket";
+import { genId } from "@/app/craft/utils/streamItemHelpers";
+import { getDemoDataEnabled } from "@/app/craft/v1/constants";
 
 /**
  * Convert loaded messages (with message_metadata) to StreamItem[] format.
@@ -1398,7 +1395,7 @@ export const useBuildSessionStore = create<BuildSessionStore>()((set, get) => ({
   // Utilities (mirrors chat's cleanup pattern)
   // ===========================================================================
 
-  cleanupOldSessions: (maxSessions: number = 10) => {
+  cleanupOldSessions: (maxSessions = 10) => {
     set((state) => {
       const sortedSessions = Array.from(state.sessions.entries()).sort(
         ([, a], [, b]) => b.lastAccessed.getTime() - a.lastAccessed.getTime()

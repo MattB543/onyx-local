@@ -4,6 +4,7 @@ import * as InputLayouts from "@/layouts/input-layouts";
 import Text from "@/refresh-components/texts/Text";
 import { SvgLock } from "@opal/icons";
 interface NonSelectableConnectorsProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connectors: ConnectorStatus<any, any>[];
   title: string;
   description: string;

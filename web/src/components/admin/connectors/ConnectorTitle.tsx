@@ -12,6 +12,7 @@ import { getSourceMetadata } from "@/lib/sources";
 import Link from "next/link";
 
 interface ConnectorTitleProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connector: Connector<any>;
   ccPairId: number;
   ccPairName: string | null | undefined;

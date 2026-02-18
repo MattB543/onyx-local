@@ -716,7 +716,7 @@ export const BooleanFormField = memo(function BooleanFormField({
     <div>
       <div className="flex items-center text-sm">
         <FastField name={name} type="checkbox">
-          {({ field, form }: any) => (
+          {({ field, form }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
             <SimpleTooltip
               // This may seem confusing, but we only want to show the `disabledTooltip` if and only if the `BooleanFormField` is disabled.
               // If it disabled, then we "enable" the showing of the tooltip. Thus, `disabled={!disabled}` is not a mistake.

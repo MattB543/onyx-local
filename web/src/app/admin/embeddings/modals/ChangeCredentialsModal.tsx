@@ -207,6 +207,7 @@ export default function ChangeCredentialsModal({
                       type="password"
                       className="border border-border rounded w-full py-2 px-3 bg-background-emphasis"
                       value={apiKey}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       onChange={(e: any) => setApiKey(e.target.value)}
                       placeholder="Paste your API key here"
                     />
@@ -228,6 +229,7 @@ export default function ChangeCredentialsModal({
                           bg-background-emphasis
                       `}
                       value={apiUrl}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       onChange={(e: any) => setApiUrl(e.target.value)}
                       placeholder="Paste your API URL here"
                     />
@@ -256,6 +258,7 @@ export default function ChangeCredentialsModal({
                        bg-background-emphasis
                    `}
                       value={modelName}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       onChange={(e: any) => setModelName(e.target.value)}
                       placeholder="Paste your model name here"
                     />

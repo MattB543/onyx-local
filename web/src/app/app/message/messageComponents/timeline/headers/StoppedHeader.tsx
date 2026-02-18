@@ -1,4 +1,4 @@
-import React from "react";
+import { memo } from "react";
 import { SvgFold, SvgExpand } from "@opal/icons";
 import { Button } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
@@ -12,7 +12,7 @@ export interface StoppedHeaderProps {
 }
 
 /** Header when user stopped/cancelled */
-export const StoppedHeader = React.memo(function StoppedHeader({
+export const StoppedHeader = memo(function StoppedHeader({
   totalSteps,
   collapsible,
   isExpanded,

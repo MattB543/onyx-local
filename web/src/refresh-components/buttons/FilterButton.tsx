@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { ButtonHTMLAttributes, useState } from "react";
 import Text from "@/refresh-components/texts/Text";
 import { cn, noProp } from "@/lib/utils";
 import type { IconProps } from "@opal/types";
@@ -44,7 +44,7 @@ const iconClasses = (transient?: boolean) =>
   }) as const;
 
 export interface FilterButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  extends ButtonHTMLAttributes<HTMLButtonElement> {
   // Button states:
   active?: boolean;
   transient?: boolean;

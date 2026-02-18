@@ -1,5 +1,6 @@
-import { INTERNAL_URL } from "@/lib/constants";
 import { NextRequest, NextResponse } from "next/server";
+
+import { INTERNAL_URL } from "@/lib/constants";
 
 /* NextJS is annoying and makes use use a separate function for
 each request type >:( */
@@ -103,18 +104,17 @@ async function handleRequest(request: NextRequest, path: string[]) {
       );
     }
 
-    const response = await fetch(backendUrl, {
+    const fetchOptions: RequestInit & { duplex?: "half" } = {
       method: request.method,
       headers: headers,
       body: request.body,
       signal: request.signal,
       redirect: "manual",
-      // @ts-ignore
       duplex: "half",
-    });
+    };
+    const response = await fetch(backendUrl, fetchOptions as RequestInit);
 
     const setCookies =
-      // @ts-ignore - undici provides getSetCookie in Node.
       response.headers.getSetCookie?.() ??
       (response.headers.get("set-cookie")
         ? [response.headers.get("set-cookie")]

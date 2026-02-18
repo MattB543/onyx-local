@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { Formik, Form, FormikProps, FieldArray, Field } from "formik";
 import * as Yup from "yup";
 import {
@@ -26,6 +26,7 @@ const COST_CALCULATION_TOKENS = 1_000_000;
 interface AdvancedEmbeddingFormPageProps {
   updateAdvancedEmbeddingDetails: (
     key: keyof AdvancedSearchConfiguration,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     value: any
   ) => void;
   advancedEmbeddingDetails: AdvancedSearchConfiguration;
@@ -43,6 +44,7 @@ const embeddingPrecisionOptions: StringOrNumberOption[] = [
 ];
 
 const AdvancedEmbeddingFormPage = forwardRef<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   FormikProps<any>,
   AdvancedEmbeddingFormPageProps
 >(
@@ -60,7 +62,7 @@ const AdvancedEmbeddingFormPage = forwardRef<
       LLMContextualCost[]
     >(LLM_CONTEXTUAL_COST_ADMIN_URL, errorHandlingFetcher);
 
-    const llmOptions: StringOrNumberOption[] = React.useMemo(
+    const llmOptions: StringOrNumberOption[] = useMemo(
       () =>
         (contextualCosts || []).map((cost) => {
           return {
@@ -87,7 +89,7 @@ const AdvancedEmbeddingFormPage = forwardRef<
     };
 
     // Get the current value for the selector based on the parent state
-    const getCurrentLLMValue = React.useMemo(() => {
+    const getCurrentLLMValue = useMemo(() => {
       if (!advancedEmbeddingDetails.contextual_rag_llm_name) return null;
       return advancedEmbeddingDetails.contextual_rag_llm_name;
     }, [advancedEmbeddingDetails.contextual_rag_llm_name]);

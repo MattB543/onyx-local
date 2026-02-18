@@ -1,4 +1,4 @@
-import React from "react";
+import { memo } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import Button from "@/refresh-components/buttons/Button";
@@ -8,7 +8,7 @@ import { SvgExternalLink } from "@opal/icons";
 import { LineItemLayout, Section } from "@/layouts/general-layouts";
 import { Card } from "@/refresh-components/cards";
 
-const FinalStepItem = React.memo(
+const FinalStepItem = memo(
   ({
     title,
     description,

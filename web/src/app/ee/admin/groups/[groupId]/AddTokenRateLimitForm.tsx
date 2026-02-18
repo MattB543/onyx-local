@@ -1,8 +1,10 @@
-import { toast } from "@/hooks/useToast";
-import CreateRateLimitModal from "../../../../admin/token-rate-limits/CreateRateLimitModal";
-import { Scope } from "../../../../admin/token-rate-limits/types";
-import { insertGroupTokenRateLimit } from "../../../../admin/token-rate-limits/lib";
 import { mutate } from "swr";
+
+import { toast } from "@/hooks/useToast";
+
+import CreateRateLimitModal from "../../../../admin/token-rate-limits/CreateRateLimitModal";
+import { insertGroupTokenRateLimit } from "../../../../admin/token-rate-limits/lib";
+import { Scope } from "../../../../admin/token-rate-limits/types";
 
 interface AddMemberFormProps {
   isOpen: boolean;
@@ -13,7 +15,7 @@ interface AddMemberFormProps {
 const handleCreateGroupTokenRateLimit = async (
   period_hours: number,
   token_budget: number,
-  group_id: number = -1
+  group_id = -1
 ) => {
   const tokenRateLimitArgs = {
     enabled: true,
@@ -32,7 +34,7 @@ export const AddTokenRateLimitForm: React.FC<AddMemberFormProps> = ({
     _: Scope,
     period_hours: number,
     token_budget: number,
-    group_id: number = -1
+    group_id = -1
   ) => {
     handleCreateGroupTokenRateLimit(period_hours, token_budget, group_id)
       .then(() => {

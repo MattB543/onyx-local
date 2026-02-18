@@ -1,14 +1,13 @@
-import {
+import { Packet,
   MessageDelta,
   MessageStart,
   PacketType,
-  StreamingCitation,
-} from "./streamingModels";
-import { Packet } from "@/app/app/services/streamingModels";
+  StreamingCitation } from "@/app/app/services/streamingModels";
+
 
 export function isToolPacket(
   packet: Packet,
-  includeSectionEnd: boolean = true
+  includeSectionEnd = true
 ) {
   let toolPacketTypes = [
     PacketType.SEARCH_TOOL_START,

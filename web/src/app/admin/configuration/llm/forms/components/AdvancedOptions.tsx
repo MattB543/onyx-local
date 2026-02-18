@@ -9,6 +9,7 @@ import { useAgents } from "@/hooks/useAgents";
 export function AdvancedOptions({
   formikProps,
 }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formikProps: FormikProps<any>;
 }) {
   const { agents, isLoading: agentsLoading, error: agentsError } = useAgents();

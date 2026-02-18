@@ -1,11 +1,15 @@
 "use client";
 
 import React, {
-  useRef,
-  useState,
+  Children,
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
   useEffect,
   useMemo,
-  useCallback,
+  useRef,
+  useState,
 } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn, mergeRefs } from "@/lib/utils";
@@ -25,12 +29,12 @@ interface TabsContextValue {
   variant: "contained" | "pill";
 }
 
-const TabsContext = React.createContext<TabsContextValue | undefined>(
+const TabsContext = createContext<TabsContextValue | undefined>(
   undefined
 );
 
 const useTabsContext = () => {
-  const context = React.useContext(TabsContext);
+  const context = useContext(TabsContext);
   return context; // Returns undefined if used outside Tabs.List (allows explicit override)
 };
 
@@ -333,7 +337,7 @@ function PillIndicator({
  * @param value - The controlled active tab value
  * @param onValueChange - Callback fired when the active tab changes
  */
-const TabsRoot = React.forwardRef<
+const TabsRoot = forwardRef<
   React.ElementRef<typeof TabsPrimitive.Root>,
   WithoutStyles<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>>
 >(({ ...props }, ref) => (
@@ -395,7 +399,7 @@ interface TabsListProps
  * - **Pill**: Uses Flexbox for content-width tabs with animated bottom indicator
  * - The `variant` prop is automatically propagated to child `Tabs.Trigger` components via context
  */
-const TabsList = React.forwardRef<
+const TabsList = forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   TabsListProps
 >(
@@ -473,7 +477,7 @@ const TabsList = React.forwardRef<
         style={
           variant === "contained"
             ? {
-                gridTemplateColumns: `repeat(${React.Children.count(
+                gridTemplateColumns: `repeat(${Children.count(
                   children
                 )}, 1fr)`,
               }
@@ -588,7 +592,7 @@ interface TabsTriggerProps
  * - Tooltips work on disabled triggers via wrapper span technique
  * - Loading spinner appears after the label text
  */
-const TabsTrigger = React.forwardRef<
+const TabsTrigger = forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   TabsTriggerProps
 >(
@@ -696,7 +700,7 @@ TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
  *
  * @param value - The tab value this content is associated with (must match a Tabs.Trigger value)
  */
-const TabsContent = React.forwardRef<
+const TabsContent = forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   SectionProps & { value: string }
 >(({ children, value, ...props }, ref) => (

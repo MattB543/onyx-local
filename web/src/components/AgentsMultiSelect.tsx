@@ -15,6 +15,7 @@ interface AgentsMultiSelectProps<T extends AgentsMultiSelectFormType> {
   formikProps: FormikProps<T>;
   agents: Agent[] | undefined;
   isLoading?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error?: any;
   label?: string;
   subtext?: string;

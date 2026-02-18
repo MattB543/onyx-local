@@ -5,8 +5,8 @@ import { MutableRefObject } from "react";
  * Returns true if any timeout was cleared.
  */
 export function clearTimeoutRefs(
-  timeoutRefs: Array<MutableRefObject<NodeJS.Timeout | null>>,
-  resetToNull: boolean = false
+  timeoutRefs: MutableRefObject<NodeJS.Timeout | null>[],
+  resetToNull = false
 ): boolean {
   let hadPendingTimeout = false;
 

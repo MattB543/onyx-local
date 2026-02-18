@@ -45,6 +45,7 @@ const CREDENTIAL_URL = "/api/manage/admin/credential";
 
 export const usePublicCredentials = () => {
   const { mutate } = useSWRConfig();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swrResponse = useSWR<Credential<any>[]>(
     CREDENTIAL_URL,
     errorHandlingFetcher
@@ -211,6 +212,7 @@ export const useConnectorIndexingStatusWithPagination = (
 export const useConnectorStatus = (refreshInterval = 30000) => {
   const { mutate } = useSWRConfig();
   const url = CONNECTOR_STATUS_URL;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swrResponse = useSWR<ConnectorStatus<any, any>[]>(
     url,
     errorHandlingFetcher,
@@ -925,13 +927,14 @@ export const fetchConnectorIndexingStatus = async (
 // Get source metadata for configured sources - deduplicated by source type
 function getConfiguredSources(
   availableSources: ValidSources[]
-): Array<SourceMetadata & { originalName: string; uniqueKey: string }> {
+): (SourceMetadata & { originalName: string; uniqueKey: string })[] {
   const allSources = getSourceMetadataForSources(availableSources);
 
   const seenSources = new Set<string>();
-  const configuredSources: Array<
-    SourceMetadata & { originalName: string; uniqueKey: string }
-  > = [];
+  const configuredSources: (SourceMetadata & {
+    originalName: string;
+    uniqueKey: string;
+  })[] = [];
 
   availableSources.forEach((sourceName) => {
     // Handle federated connectors by removing the federated_ prefix

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { useCurrentChatState } from "@/app/app/stores/useChatSessionStore";
 import { useScrollContainer } from "@/components/chat/ScrollContainerContext";
 
@@ -27,7 +27,7 @@ export interface DynamicBottomSpacerProps {
  * below messages to push content up when a new round starts.
  * Uses ResizeObserver to efficiently detect content changes instead of polling.
  */
-const DynamicBottomSpacer = React.memo(
+const DynamicBottomSpacer = memo(
   ({ anchorNodeId }: DynamicBottomSpacerProps) => {
     const spacerRef = useRef<HTMLDivElement>(null);
     const chatState = useCurrentChatState();

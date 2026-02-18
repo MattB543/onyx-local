@@ -1,4 +1,4 @@
-import React from "react";
+import { createRef } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Checkbox from "./Checkbox";
@@ -223,7 +223,7 @@ describe("Checkbox", () => {
 
   describe("Ref forwarding", () => {
     test("forwards ref to input element", () => {
-      const ref = React.createRef<HTMLInputElement>();
+      const ref = createRef<HTMLInputElement>();
       render(<Checkbox ref={ref} />);
       expect(ref.current).toBeInstanceOf(HTMLInputElement);
       expect(ref.current?.type).toBe("checkbox");

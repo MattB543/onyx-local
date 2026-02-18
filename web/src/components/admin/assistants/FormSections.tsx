@@ -14,7 +14,7 @@ import { useState, useEffect } from "react";
 export const NameField = memo(function NameField() {
   return (
     <FastField name="name">
-      {({ field }: any) => (
+      {({ field }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
         <TextFormField
           {...field}
           maxWidth="max-w-lg"
@@ -33,7 +33,7 @@ export const NameField = memo(function NameField() {
 export const DescriptionField = memo(function DescriptionField() {
   return (
     <FastField name="description">
-      {({ field }: any) => (
+      {({ field }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
         <TextFormField
           {...field}
           maxWidth="max-w-lg"
@@ -51,7 +51,7 @@ export const DescriptionField = memo(function DescriptionField() {
 export const SystemPromptField = memo(function SystemPromptField() {
   return (
     <FastField name="system_prompt">
-      {({ field }: any) => (
+      {({ field }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
         <TextFormField
           {...field}
           maxWidth="max-w-4xl"
@@ -71,7 +71,7 @@ export const SystemPromptField = memo(function SystemPromptField() {
 export const TaskPromptField = memo(function TaskPromptField() {
   return (
     <FastField name="task_prompt">
-      {({ field, form }: any) => (
+      {({ field, form }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
         <TextFormField
           {...field}
           maxWidth="max-w-4xl"
@@ -102,6 +102,7 @@ export const MCPServerSection = memo(function MCPServerSection({
   onToggleServerTools,
 }: {
   serverId: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serverTools: any[];
   serverName: string;
   serverUrl: string;
@@ -109,6 +110,7 @@ export const MCPServerSection = memo(function MCPServerSection({
   onToggleCollapse: (serverId: number) => void;
   onToggleServerTools: () => void;
 }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values } = useFormikContext<any>();
   const [expandedToolDescriptions, setExpandedToolDescriptions] = useState<
     Record<number, boolean>
@@ -169,7 +171,7 @@ export const MCPServerSection = memo(function MCPServerSection({
               }`}
               name={`enabled_tools_map.${tool.id}`}
             >
-              {({ field, form }: any) => (
+              {({ field, form }: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
                 <label className="flex items-center space-x-2">
                   <div className="pt-0.5">
                     <Checkbox

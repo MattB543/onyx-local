@@ -6,7 +6,7 @@ import Button from "@/refresh-components/buttons/Button";
 const WHITESPACE_SPLIT = /\s+/;
 const EMAIL_REGEX = /[^@]+@[^.]+\.[^.]/;
 
-const addUsers = async (url: string, { arg }: { arg: Array<string> }) => {
+const addUsers = async (url: string, { arg }: { arg: string[] }) => {
   return await fetch(url, {
     method: "PUT",
     headers: {

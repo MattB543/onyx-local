@@ -28,6 +28,7 @@ export interface MCPServer {
   auth_performer?: MCPAuthenticationPerformer;
   is_authenticated: boolean;
   user_authenticated?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth_template?: any;
   admin_credentials?: Record<string, string>;
   user_credentials?: Record<string, string>;
@@ -69,6 +70,7 @@ export interface MethodSpec {
   summary: string;
   path: string;
   method: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spec: Record<string, any>;
   custom_headers: { key: string; value: string }[];
 }
@@ -81,6 +83,7 @@ export interface ToolSnapshot {
 
   // only specified for Custom Tools. OpenAPI schema which represents
   // the tool's API.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   definition: Record<string, any> | null;
 
   // only specified for Custom Tools. Custom headers to add to the tool's API requests.
@@ -151,6 +154,7 @@ export interface OAuthConfigCreate {
   client_id: string;
   client_secret: string;
   scopes?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   additional_params?: Record<string, any>;
 }
 
@@ -161,6 +165,7 @@ export interface OAuthConfigUpdate {
   client_id?: string;
   client_secret?: string;
   scopes?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   additional_params?: Record<string, any>;
 }
 

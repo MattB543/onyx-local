@@ -1,23 +1,27 @@
 "use client";
 
-import { toast } from "@/hooks/useToast";
-import { basicLogin, basicSignup } from "@/lib/user";
-import Button from "@/refresh-components/buttons/Button";
 import { Form, Formik } from "formik";
-import * as Yup from "yup";
-import { requestEmailVerification } from "../lib";
-import { useMemo, useState } from "react";
-import { Spinner } from "@/components/Spinner";
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import * as Yup from "yup";
+
+import { Spinner } from "@/components/Spinner";
+import { toast } from "@/hooks/useToast";
+import { validateInternalRedirect } from "@/lib/auth/redirectValidation";
+import { useCaptcha } from "@/lib/hooks/useCaptcha";
+import { basicLogin, basicSignup } from "@/lib/user";
 import { useUser } from "@/providers/UserProvider";
-import { FormikField } from "@/refresh-components/form/FormikField";
+import Button from "@/refresh-components/buttons/Button";
 import { FormField } from "@/refresh-components/form/FormField";
+import { FormikField } from "@/refresh-components/form/FormikField";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import PasswordInputTypeIn from "@/refresh-components/inputs/PasswordInputTypeIn";
-import { validateInternalRedirect } from "@/lib/auth/redirectValidation";
 import { APIFormFieldState } from "@/refresh-components/form/types";
+
 import { SvgArrowRightCircle } from "@opal/icons";
-import { useCaptcha } from "@/lib/hooks/useCaptcha";
+
+import { requestEmailVerification } from "../lib";
+
 
 interface EmailPasswordFormProps {
   isSignup?: boolean;
@@ -106,8 +110,9 @@ export default function EmailPasswordForm({
             if (!response.ok) {
               setIsWorking(false);
 
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const errorDetail: any = (await response.json()).detail;
-              let errorMsg: string = "Unknown error";
+              let errorMsg = "Unknown error";
               if (typeof errorDetail === "object" && errorDetail.reason) {
                 errorMsg = errorDetail.reason;
               } else if (errorDetail === "REGISTER_USER_ALREADY_EXISTS") {
@@ -149,8 +154,9 @@ export default function EmailPasswordForm({
             }
           } else {
             setIsWorking(false);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const errorDetail: any = (await loginResponse.json()).detail;
-            let errorMsg: string = "Unknown error";
+            let errorMsg = "Unknown error";
             if (errorDetail === "LOGIN_BAD_CREDENTIALS") {
               errorMsg = "Invalid email or password";
             } else if (errorDetail === "NO_WEB_LOGIN_AND_HAS_NO_PASSWORD") {

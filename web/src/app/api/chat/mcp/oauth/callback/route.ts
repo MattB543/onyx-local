@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (!resp.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err = await resp.json().catch(() => ({}) as any);
       return NextResponse.json(
         { error: err.detail || "OAuth callback failed" },

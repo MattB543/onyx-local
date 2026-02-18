@@ -10,6 +10,7 @@ const ERROR_MESSAGES = {
 export default function AuthErrorDisplay({
   searchParams,
 }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   searchParams: any;
 }) {
   const error = searchParams?.error;

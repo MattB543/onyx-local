@@ -12,8 +12,10 @@ import { useFormikContext } from "formik";
 
 export interface DynamicConnectionFormProps {
   config: ConnectionConfiguration;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   values: any;
   connector: ConfigurableSources;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentCredential: Credential<any> | null;
 }
 
@@ -23,6 +25,7 @@ export default function DynamicConnectionForm({
   connector,
   currentCredential,
 }: DynamicConnectionFormProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { setFieldValue } = useFormikContext<any>(); // Get Formik's context functions
 
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);

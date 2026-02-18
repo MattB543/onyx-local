@@ -10,7 +10,7 @@
     "dev:profile": "NEXT_PUBLIC_ENABLE_STATS=true next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src",
     "lint:unused": "eslint --ext .js,.jsx,.ts,.tsx --rule 'unused-imports/no-unused-imports: error' --quiet --fix=false src/",
     "lint:fix-unused": "eslint --ext .js,.jsx,.ts,.tsx --rule 'unused-imports/no-unused-imports: error' --quiet --fix src/",
     "lint:fix-unused-vars": "eslint --ext .js,.jsx,.ts,.tsx --fix --quiet src/",

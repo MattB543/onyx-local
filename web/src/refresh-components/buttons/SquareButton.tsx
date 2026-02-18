@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import type { IconProps } from "@opal/types";
 
@@ -10,7 +10,7 @@ export interface SquareButtonProps
   icon: React.FunctionComponent<IconProps>;
 }
 
-const SquareButton = React.forwardRef<HTMLButtonElement, SquareButtonProps>(
+const SquareButton = forwardRef<HTMLButtonElement, SquareButtonProps>(
   ({ transient = false, icon: Icon, className, ...props }, ref) => {
     return (
       <button

@@ -32,6 +32,7 @@ export default function UpgradingPage({
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
 
   const { data: connectors, isLoading: isLoadingConnectors } = useSWR<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Connector<any>[]
   >("/api/manage/connector", errorHandlingFetcher, {
     refreshInterval: 5000, // 5 seconds

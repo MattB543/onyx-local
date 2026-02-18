@@ -42,6 +42,10 @@ class StreamingType(Enum):
     CRM_UPDATE_TOOL_DELTA = "crm_update_tool_delta"
     CRM_LOG_INTERACTION_TOOL_START = "crm_log_interaction_tool_start"
     CRM_LOG_INTERACTION_TOOL_DELTA = "crm_log_interaction_tool_delta"
+    CRM_LIST_TOOL_START = "crm_list_tool_start"
+    CRM_LIST_TOOL_DELTA = "crm_list_tool_delta"
+    CRM_GET_TOOL_START = "crm_get_tool_start"
+    CRM_GET_TOOL_DELTA = "crm_get_tool_delta"
     FILE_READER_START = "file_reader_start"
     FILE_READER_RESULT = "file_reader_result"
     REASONING_START = "reasoning_start"
@@ -311,6 +315,26 @@ class CrmLogInteractionToolDelta(BaseObj):
     payload: dict[str, Any]
 
 
+class CrmListToolStart(BaseObj):
+    type: Literal["crm_list_tool_start"] = StreamingType.CRM_LIST_TOOL_START.value
+
+
+class CrmListToolDelta(BaseObj):
+    type: Literal["crm_list_tool_delta"] = StreamingType.CRM_LIST_TOOL_DELTA.value
+
+    payload: dict[str, Any]
+
+
+class CrmGetToolStart(BaseObj):
+    type: Literal["crm_get_tool_start"] = StreamingType.CRM_GET_TOOL_START.value
+
+
+class CrmGetToolDelta(BaseObj):
+    type: Literal["crm_get_tool_delta"] = StreamingType.CRM_GET_TOOL_DELTA.value
+
+    payload: dict[str, Any]
+
+
 ################################################
 # File Reader Packets
 ################################################
@@ -427,6 +451,10 @@ PacketObj = Union[
     CrmUpdateToolDelta,
     CrmLogInteractionToolStart,
     CrmLogInteractionToolDelta,
+    CrmListToolStart,
+    CrmListToolDelta,
+    CrmGetToolStart,
+    CrmGetToolDelta,
     FileReaderStart,
     FileReaderResult,
     MemoryToolStart,

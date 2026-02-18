@@ -69,6 +69,7 @@ export interface BuildMessage {
   content: string;
   timestamp: Date;
   /** Structured ACP event data (tool calls, thinking, plans) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   message_metadata?: Record<string, any> | null;
   /** Tool calls associated with this message (for assistant messages) */
   toolCalls?: ToolCall[];
@@ -99,10 +100,13 @@ export interface ToolCall {
   /** Tool input parameters */
   input?: Record<string, unknown>;
   /** Raw input from ACP (complete command/parameters) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_input?: Record<string, any> | null;
   /** Raw output from ACP (complete result) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_output?: Record<string, any> | null;
   /** Content block from ACP (description text) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content?: any | null;
   /** Result content (when completed) */
   result?: string;
@@ -176,6 +180,7 @@ export interface ApiMessageResponse {
   session_id: string;
   type: "user" | "assistant";
   content: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   message_metadata?: Record<string, any> | null;
   created_at: string;
 }
@@ -242,6 +247,7 @@ export interface ToolStartPacket {
   type: "tool_start";
   tool_call_id: string;
   tool_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_input: Record<string, any>;
   title?: string;
   timestamp: string;
@@ -262,6 +268,7 @@ export interface ToolEndPacket {
   tool_call_id: string;
   tool_name: string;
   status: "success" | "error" | "cancelled";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result?: string | Record<string, any>;
   error?: string;
   timestamp: string;
@@ -317,6 +324,7 @@ export interface DonePacket {
     | "max_turn_requests"
     | "refusal"
     | "cancelled";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   usage?: Record<string, any>;
   timestamp: string;
 }
@@ -326,6 +334,7 @@ export interface ErrorPacket {
   type: "error";
   message: string;
   code?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
   timestamp: string;
 }
@@ -404,10 +413,12 @@ export interface ImageContentBlock {
 export type ContentBlock =
   | TextContentBlock
   | ImageContentBlock
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | Record<string, any>;
 
 // Base ACP event fields
 export interface ACPBaseEvent {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   field_meta?: Record<string, any> | null; // _meta field for extensibility
   timestamp: string;
 }
@@ -434,7 +445,9 @@ export interface ToolCallStartPacket extends ACPBaseEvent {
   title: string | null;
   content: ContentBlock | null;
   locations: string[] | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_input: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_output: Record<string, any> | null;
   status: string | null;
   session_update?: string;
@@ -448,7 +461,9 @@ export interface ToolCallProgressPacket extends ACPBaseEvent {
   title: string | null;
   content: ContentBlock | null;
   locations: string[] | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_input: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_output: Record<string, any> | null;
   status: string | null;
   session_update?: string;
@@ -457,12 +472,12 @@ export interface ToolCallProgressPacket extends ACPBaseEvent {
 // ACP: agent_plan_update - Agent's execution plan
 export interface AgentPlanUpdatePacket extends ACPBaseEvent {
   type: "agent_plan_update";
-  entries: Array<{
+  entries: {
     id: string;
     description: string;
     status: string;
     priority: string | number | null;
-  }> | null;
+  }[] | null;
   session_update?: string;
 }
 
@@ -484,6 +499,7 @@ export interface ACPErrorPacket {
   type: "error";
   code: string | null;
   message: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any> | null;
   timestamp: string;
 }

@@ -7,6 +7,7 @@ import { BrainIcon as Brain } from "@phosphor-icons/react";
 import {
   FiAlertCircle,
   FiAlertTriangle,
+  FiCalendar,
   FiChevronDown,
   FiChevronsDown,
   FiChevronsUp,
@@ -853,6 +854,7 @@ export const GithubIcon = createLogoIcon(githubLightIcon, {
 });
 export const GitlabIcon = createLogoIcon(gitlabIcon);
 export const GmailIcon = createLogoIcon(gmailIcon);
+export const GoogleCalendarIcon = createIcon(FiCalendar);
 export const GongIcon = createLogoIcon(gongIcon);
 export const GoogleDriveIcon = createLogoIcon(googleDriveIcon);
 export const GoogleIcon = createLogoIcon(googleIcon);

@@ -19,6 +19,7 @@ const PRIVATE_KEY_FIELD_KEY = "private_key";
 export async function submitCredential<T>(
   credential: CredentialBase<T> | CredentialWithPrivateKey<T>
 ): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credential?: Credential<any>;
   message: string;
   isSuccess: boolean;

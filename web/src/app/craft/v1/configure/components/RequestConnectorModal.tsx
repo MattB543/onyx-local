@@ -95,9 +95,9 @@ export default function RequestConnectorModal({
 
           <div className="flex flex-col gap-3">
             <Text mainUiBody text04 className="text-center">
-              Let us know which connectors you'd like to craft with
+              Let us know which connectors you&apos;d like to craft with
               <br />
-              We'll prioritize popular requests!
+              We&apos;ll prioritize popular requests!
             </Text>
 
             {successMessage && (

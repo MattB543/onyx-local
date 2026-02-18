@@ -80,6 +80,46 @@ Only add memories that are specific, likely to remain true, and likely to be use
 Focus on enduring preferences, long-term goals, stable constraints, and explicit "remember this" type requests.
 """
 
+CRM_GUIDANCE = """
+
+## CRM (Customer Relationship Management)
+
+You have access to a built-in CRM for managing contacts, organizations, interactions, and tags. \
+This CRM is used by a small team to track relationships and conversations.
+
+### Data Model
+- **Contacts** represent people. They can optionally belong to an **Organization** and have a lifecycle status \
+(lead → active → inactive → archived) and a source tracking how they entered the system.
+- **Organizations** represent companies or entities. Multiple contacts can belong to one organization.
+- **Interactions** are logged events (calls, meetings, emails, notes, events) linked to a contact and/or organization. \
+They can have **attendees** (team members or external contacts).
+- **Tags** are labels applied to contacts and organizations for categorization (e.g. "VIP", "conference-2025", "enterprise").
+
+### Best Practices
+- **Always search before creating.** Before creating a contact or organization, use `crm_search` to check if they \
+already exist. Duplicates waste everyone's time.
+- **Ask when ambiguous, don't guess.** If the user says "log my call with Sarah" but there are multiple Sarahs, \
+ask which one they mean.
+- **Be specific in confirmations.** After creating or updating, confirm what was done with key details \
+(e.g. "Created contact Sarah Chen (sarah@acme.com) at Acme Corp, tagged as 'enterprise-lead'.").
+- **Link things together.** When logging an interaction, always try to associate it with both a contact AND their organization.
+- **Use natural status flows.** New people start as "lead". Move to "active" once there's a real relationship. \
+"Inactive" for gone cold. "Archived" for no longer relevant.
+- **Choose interaction types carefully.** Use "meeting" for scheduled calls or video chats, "call" for quick phone calls, \
+"email" for email threads worth tracking, "note" for internal observations, "event" for conferences or group events.
+
+### Common Workflows
+
+**After a meeting:** Search for the contact and org → create if they don't exist → log the interaction with a summary and attendees → apply relevant tags.
+
+**Prepping for a meeting:** Use `crm_get` to pull the contact and org details, then use `crm_list` to find recent interactions and understand the relationship history.
+
+**Pipeline review:** Use `crm_list` to list contacts filtered by status (e.g. all leads) and review who needs follow-up.
+
+**Finding information:** Use `crm_search` for text queries (by name, email, keywords). Use `crm_list` for structured filtering \
+(by status, organization, tags). Use `crm_get` to drill into full details of a specific entity.
+"""
+
 TOOL_CALL_FAILURE_PROMPT = """
 LLM attempted to call a tool but failed. Most likely the tool name or arguments were misspelled.
 """.strip()

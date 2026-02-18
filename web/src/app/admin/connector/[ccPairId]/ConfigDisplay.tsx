@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ChevronUpIcon } from "lucide-react";
 import { ChevronDownIcon } from "@/components/icons/icons";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertObjectToString(obj: any): string | any {
   // Check if obj is an object and not an array or null
   if (typeof obj === "object" && obj !== null) {
@@ -24,9 +25,10 @@ function convertObjectToString(obj: any): string | any {
 }
 
 export function buildConfigEntries(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   obj: any,
   sourceType: ValidSources
-): { [key: string]: string } {
+): Record<string, string> {
   if (sourceType === ValidSources.File) {
     // File connectors show files in the InlineFileManagement component
     // Don't show file_names or file_locations in the config display
@@ -45,6 +47,7 @@ function ConfigItem({
   onEdit,
 }: {
   label: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
   onEdit?: () => void;
 }) {
@@ -214,7 +217,7 @@ export function ConfigDisplay({
   configEntries,
   onEdit,
 }: {
-  configEntries: { [key: string]: string };
+  configEntries: Record<string, string>;
   onEdit?: (key: string) => void;
 }) {
   return (

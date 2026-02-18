@@ -1,6 +1,7 @@
+import { mutate } from "swr";
+
 import { runConnector } from "@/lib/connector";
 import { ValidSources } from "@/lib/types";
-import { mutate } from "swr";
 
 export function buildCCPairInfoUrl(ccPairId: string | number) {
   return `/api/manage/admin/cc-pair/${ccPairId}`;
@@ -8,7 +9,7 @@ export function buildCCPairInfoUrl(ccPairId: string | number) {
 
 export function buildSimilarCredentialInfoURL(
   source_type: ValidSources,
-  get_editable: boolean = false
+  get_editable = false
 ) {
   const base = `/api/manage/admin/similar-credentials/${source_type}`;
   return get_editable ? `${base}?get_editable=True` : base;

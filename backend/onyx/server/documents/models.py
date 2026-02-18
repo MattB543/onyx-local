@@ -617,6 +617,11 @@ class GDriveCallback(BaseModel):
     code: str
 
 
+class GoogleCalendarCallback(BaseModel):
+    state: str
+    code: str
+
+
 class IndexingStatusRequest(BaseModel):
     secondary_index: bool = False
     source: DocumentSource | None = None

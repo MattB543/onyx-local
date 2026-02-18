@@ -17,7 +17,9 @@ export interface EditCredentialProps {
   credential: Credential<dictionaryType>;
   onClose: () => void;
   onUpdate: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectedCredentialId: Credential<any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     details: any,
     onSuccess: () => void
   ) => Promise<void>;

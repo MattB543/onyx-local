@@ -30,6 +30,11 @@ export function EditableStringFieldDisplay({
     }
   }, [isEditing]);
 
+  const resetEditing = () => {
+    setIsEditing(false);
+    setEditableValue(value);
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -54,11 +59,6 @@ export function EditableStringFieldDisplay({
   const handleUpdate = async () => {
     await onUpdate(editableValue);
     setIsEditing(false);
-  };
-
-  const resetEditing = () => {
-    setIsEditing(false);
-    setEditableValue(value);
   };
 
   const handleKeyDown = (

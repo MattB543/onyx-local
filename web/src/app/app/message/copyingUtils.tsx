@@ -80,6 +80,7 @@ export function copyAll(content: string) {
     .use(rehypeSanitize)
     .use(rehypeStringify)
     .process(content)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .then((file: any) => {
       const htmlContent = String(file);
 

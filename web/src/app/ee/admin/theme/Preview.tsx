@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { memo } from "react";
 import type { Components } from "react-markdown";
 import Text from "@/refresh-components/texts/Text";
 import Truncated from "@/refresh-components/texts/Truncated";
@@ -32,7 +32,7 @@ const previewMarkdownComponents = {
   },
 } satisfies Partial<Components>;
 
-const PreviewMinimalMarkdown = React.memo(function PreviewMinimalMarkdown({
+const PreviewMinimalMarkdown = memo(function PreviewMinimalMarkdown({
   content,
   className,
 }: {

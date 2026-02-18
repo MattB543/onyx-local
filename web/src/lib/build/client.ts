@@ -21,12 +21,12 @@ export interface ArtifactInfo {
 /** Text or image content from the agent */
 export interface AgentMessageChunkEvent {
   sessionUpdate: "agent_message_chunk";
-  content: Array<{
+  content: {
     type: "text" | "image";
     text?: string;
     image?: string;
     mimeType?: string;
-  }>;
+  }[];
 }
 
 /** Agent's internal reasoning/thinking */
@@ -47,12 +47,12 @@ export interface ToolCallStartEvent {
 export interface ToolCallProgressEvent {
   sessionUpdate: "tool_call_update";
   toolCallId: string;
-  content?: Array<{
+  content?: {
     type: "text" | "image";
     text?: string;
     image?: string;
     mimeType?: string;
-  }>;
+  }[];
   error?: string;
   isComplete?: boolean;
 }
@@ -60,11 +60,11 @@ export interface ToolCallProgressEvent {
 /** Agent's execution plan */
 export interface AgentPlanUpdateEvent {
   sessionUpdate: "plan";
-  plan: Array<{
+  plan: {
     id: string;
     description: string;
     status: "pending" | "in_progress" | "completed" | "failed";
-  }>;
+  }[];
 }
 
 /** Agent mode change */
@@ -348,7 +348,7 @@ export function getArtifactUrl(sessionId: string, path: string): string {
 
 export async function listDirectory(
   sessionId: string,
-  path: string = ""
+  path = ""
 ): Promise<DirectoryListing> {
   const url = path
     ? `/api/build/sessions/${sessionId}/files?path=${encodeURIComponent(path)}`
@@ -360,6 +360,6 @@ export async function listDirectory(
   return response.json();
 }
 
-export function getWebappUrl(sessionId: string, path: string = ""): string {
+export function getWebappUrl(sessionId: string, path = ""): string {
   return `/api/build/sessions/${sessionId}/webapp${path ? `/${path}` : ""}`;
 }

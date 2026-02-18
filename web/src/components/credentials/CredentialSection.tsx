@@ -54,6 +54,7 @@ export default function CredentialSection({
     errorHandlingFetcher,
     { refreshInterval: 5000 } // 5 seconds
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: editableCredentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(sourceType, true),
     errorHandlingFetcher,
@@ -73,6 +74,7 @@ export default function CredentialSection({
       } else {
         const redirectUrl = await getConnectorOauthRedirectUrl(sourceType, {});
         if (redirectUrl) {
+          // eslint-disable-next-line react-hooks/immutability -- browser navigation
           window.location.href = redirectUrl;
         }
       }
@@ -83,6 +85,7 @@ export default function CredentialSection({
   };
 
   const onSwap = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectedCredential: Credential<any>,
     connectorId: number,
     accessType: AccessType
@@ -108,26 +111,31 @@ export default function CredentialSection({
   };
 
   const onUpdateCredential = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectedCredential: Credential<any | null>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     details: any,
     onSucces: () => void
   ) => {
     let privateKey: TypedFile | null = null;
-    Object.entries(details).forEach(([key, value]) => {
-      if (isTypedFileField(key)) {
-        privateKey = value as TypedFile;
-        delete details[key];
-      }
-    });
+    const cleanedDetails = Object.fromEntries(
+      Object.entries(details).filter(([key, value]) => {
+        if (isTypedFileField(key)) {
+          privateKey = value as TypedFile;
+          return false;
+        }
+        return true;
+      })
+    );
     let response;
     if (privateKey) {
       response = await updateCredentialWithPrivateKey(
         selectedCredential.id,
-        details,
+        cleanedDetails,
         privateKey
       );
     } else {
-      response = await updateCredential(selectedCredential.id, details);
+      response = await updateCredential(selectedCredential.id, cleanedDetails);
     }
     if (response.ok) {
       toast.success("Updated credential");
@@ -137,11 +145,13 @@ export default function CredentialSection({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onEditCredential = (credential: Credential<any>) => {
     closeModifyCredential();
     setEditingCredential(credential);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onDeleteCredential = async (credential: Credential<any | null>) => {
     await deleteCredential(credential.id, true);
     mutate(buildCCPairInfoUrl(ccPair.id));
@@ -151,6 +161,7 @@ export default function CredentialSection({
   const [showModifyCredential, setShowModifyCredential] = useState(false);
   const [showCreateCredential, setShowCreateCredential] = useState(false);
   const [editingCredential, setEditingCredential] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
 
   const closeModifyCredential = () => {
@@ -245,6 +256,7 @@ export default function CredentialSection({
                 credentials={credentials}
                 editableCredentials={editableCredentials}
                 onDeleteCredential={onDeleteCredential}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onEditCredential={(credential: Credential<any>) =>
                   onEditCredential(credential)
                 }

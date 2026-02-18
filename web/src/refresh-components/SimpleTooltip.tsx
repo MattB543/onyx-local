@@ -33,7 +33,7 @@
 
 "use client";
 
-import React from "react";
+import React, { ComponentPropsWithoutRef } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -43,7 +43,7 @@ import {
 import Text from "@/refresh-components/texts/Text";
 
 export interface SimpleTooltipProps
-  extends React.ComponentPropsWithoutRef<typeof TooltipContent> {
+  extends ComponentPropsWithoutRef<typeof TooltipContent> {
   disabled?: boolean;
   tooltip?: React.ReactNode;
   children?: React.ReactNode;

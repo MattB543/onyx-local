@@ -803,18 +803,20 @@ describe("packetProcessor", () => {
   });
 
   describe("CRM Tool flow", () => {
-    const crmPacketPairs: Array<
-      [
+    const crmPacketPairs: [
+      (
         | PacketType.CRM_SEARCH_TOOL_START
         | PacketType.CRM_CREATE_TOOL_START
         | PacketType.CRM_UPDATE_TOOL_START
-        | PacketType.CRM_LOG_INTERACTION_TOOL_START,
+        | PacketType.CRM_LOG_INTERACTION_TOOL_START
+      ),
+      (
         | PacketType.CRM_SEARCH_TOOL_DELTA
         | PacketType.CRM_CREATE_TOOL_DELTA
         | PacketType.CRM_UPDATE_TOOL_DELTA
-        | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
-      ]
-    > = [
+        | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA
+      ),
+    ][] = [
       [PacketType.CRM_SEARCH_TOOL_START, PacketType.CRM_SEARCH_TOOL_DELTA],
       [PacketType.CRM_CREATE_TOOL_START, PacketType.CRM_CREATE_TOOL_DELTA],
       [PacketType.CRM_UPDATE_TOOL_START, PacketType.CRM_UPDATE_TOOL_DELTA],

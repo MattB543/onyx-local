@@ -1,6 +1,6 @@
 "use client";
 import { ActionStatus } from "@/lib/tools/interfaces";
-import React from "react";
+import { memo } from "react";
 import { Button as OpalButton } from "@opal/components";
 import Button from "@/refresh-components/buttons/Button";
 import {
@@ -27,7 +27,7 @@ interface ActionsProps {
   onToggleTools?: () => void;
 }
 
-const Actions = React.memo(
+const Actions = memo(
   ({
     status,
     serverName,

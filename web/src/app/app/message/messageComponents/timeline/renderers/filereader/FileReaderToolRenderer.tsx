@@ -64,7 +64,7 @@ function formatCharRange(
 
 export const FileReaderToolRenderer: MessageRenderer<
   FileReaderToolPacket,
-  {}
+  Record<string, never>
 > = ({ packets, onComplete, stopPacketSeen, renderType, children }) => {
   const state = constructFileReaderState(packets);
 

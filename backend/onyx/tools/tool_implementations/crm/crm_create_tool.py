@@ -44,7 +44,12 @@ CRM_CREATE_ENTITY_TYPES = {"contact", "organization", "tag"}
 class CrmCreateTool(Tool[None]):
     NAME = "crm_create"
     DISPLAY_NAME = "CRM Create"
-    DESCRIPTION = "Create CRM contacts, organizations, or tags."
+    DESCRIPTION = (
+        "Create a new CRM contact, organization, or tag. Always search first to avoid duplicates. "
+        "When creating a contact, set organization_id to link them to an existing org, and include "
+        "tag_ids to apply tags. New contacts default to 'lead' status. "
+        "Confirm what you created back to the user with key details."
+    )
 
     def __init__(
         self,

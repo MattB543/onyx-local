@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { Message } from "@/app/app/interfaces";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
 import HumanMessage from "@/app/app/message/HumanMessage";
@@ -28,6 +28,7 @@ export interface ChatUIProps {
   onSubmit: (args: {
     message: string;
     messageIdToResend?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentMessageFiles: any[];
     deepResearch: boolean;
     modelOverride?: LlmDescriptor;
@@ -39,6 +40,7 @@ export interface ChatUIProps {
     forceSearch?: boolean;
   }) => Promise<void>;
   deepResearchEnabled: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentMessageFiles: any[];
 
   onResubmit: () => void;
@@ -50,7 +52,7 @@ export interface ChatUIProps {
   anchorNodeId?: number;
 }
 
-const ChatUI = React.memo(
+const ChatUI = memo(
   ({
     liveAssistant,
     llmManager,

@@ -1,23 +1,31 @@
 "use client";
 
-import { AdminPageTitle } from "@/components/admin/Title";
-import SimpleTabs from "@/refresh-components/SimpleTabs";
-import Text from "@/components/ui/text";
 import { useState } from "react";
+import { mutate } from "swr";
+
+import { AdminPageTitle } from "@/components/admin/Title";
+import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
+import Text from "@/components/ui/text";
+import { toast } from "@/hooks/useToast";
+import { Section } from "@/layouts/general-layouts";
+import CreateButton from "@/refresh-components/buttons/CreateButton";
+import SimpleTabs from "@/refresh-components/SimpleTabs";
+
+import { SvgGlobe, SvgShield, SvgUser, SvgUsers } from "@opal/icons";
+
+import CreateRateLimitModal from "./CreateRateLimitModal";
 import {
   insertGlobalTokenRateLimit,
   insertGroupTokenRateLimit,
   insertUserTokenRateLimit,
 } from "./lib";
-import { Scope, TokenRateLimit } from "./types";
 import { GenericTokenRateLimitTable } from "./TokenRateLimitTables";
-import { mutate } from "swr";
-import { toast } from "@/hooks/useToast";
-import CreateRateLimitModal from "./CreateRateLimitModal";
-import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
-import CreateButton from "@/refresh-components/buttons/CreateButton";
-import { SvgGlobe, SvgShield, SvgUser, SvgUsers } from "@opal/icons";
-import { Section } from "@/layouts/general-layouts";
+import { Scope, TokenRateLimit } from "./types";
+
+
+
+
+
 const BASE_URL = "/api/admin/token-rate-limits";
 const GLOBAL_TOKEN_FETCH_URL = `${BASE_URL}/global`;
 const USER_TOKEN_FETCH_URL = `${BASE_URL}/users`;
@@ -39,7 +47,7 @@ const handleCreateTokenRateLimit = async (
   target_scope: Scope,
   period_hours: number,
   token_budget: number,
-  group_id: number = -1
+  group_id = -1
 ) => {
   const tokenRateLimitArgs = {
     enabled: true,
@@ -81,7 +89,7 @@ function Main() {
     target_scope: Scope,
     period_hours: number,
     token_budget: number,
-    group_id: number = -1
+    group_id = -1
   ) => {
     handleCreateTokenRateLimit(
       target_scope,

@@ -2,7 +2,7 @@ import React, { memo, useCallback, useState } from "react";
 import Text from "@/refresh-components/texts/Text";
 import Truncated from "@/refresh-components/texts/Truncated";
 import IconButton from "@/refresh-components/buttons/IconButton";
-import { cn, noProp } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Disabled } from "@/refresh-components/Disabled";
 import {
   SvgArrowExchange,
@@ -47,7 +47,10 @@ function LLMProviderCardInner({
   }, [disabled, isConnected, onClick]);
 
   const handleSettingsClick = useCallback(
-    noProp(() => (window.location.href = "/admin/configuration/llm")),
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      window.location.href = "/admin/configuration/llm";
+    },
     []
   );
 

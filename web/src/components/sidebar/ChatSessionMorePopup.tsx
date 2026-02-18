@@ -128,7 +128,6 @@ export function ChatSessionMorePopup({
     chatSession.id,
     fetchProjects,
     refreshChatSessions,
-    removeChatSessionFromProjectService,
     afterRemoveFromProject,
   ]);
 

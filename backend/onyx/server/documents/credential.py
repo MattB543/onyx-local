@@ -16,6 +16,7 @@ from onyx.configs.constants import PUBLIC_API_TAGS
 from onyx.connectors.factory import validate_ccpair_for_user
 from onyx.db.credentials import alter_credential
 from onyx.db.credentials import cleanup_gmail_credentials
+from onyx.db.credentials import cleanup_google_calendar_credentials
 from onyx.db.credentials import create_credential
 from onyx.db.credentials import CREDENTIAL_PERMISSIONS_TO_IGNORE
 from onyx.db.credentials import delete_credential
@@ -151,6 +152,8 @@ def create_credential_from_model(
     # Temporary fix for empty Google App credentials
     if credential_info.source == DocumentSource.GMAIL:
         cleanup_gmail_credentials(db_session=db_session)
+    if credential_info.source == DocumentSource.GOOGLE_CALENDAR:
+        cleanup_google_calendar_credentials(db_session=db_session)
 
     credential = create_credential(credential_info, user, db_session)
     return ObjectCreationIdResponse(
@@ -215,6 +218,8 @@ def create_credential_with_private_key(
     # Temporary fix for empty Google App credentials
     if DocumentSource(source) == DocumentSource.GMAIL:
         cleanup_gmail_credentials(db_session=db_session)
+    if DocumentSource(source) == DocumentSource.GOOGLE_CALENDAR:
+        cleanup_google_calendar_credentials(db_session=db_session)
 
     credential = create_credential(credential_info, user, db_session)
     return ObjectCreationIdResponse(

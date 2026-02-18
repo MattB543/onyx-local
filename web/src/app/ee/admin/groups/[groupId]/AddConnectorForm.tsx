@@ -7,6 +7,7 @@ import { ConnectorStatus, UserGroup } from "@/lib/types";
 import { ConnectorMultiSelect } from "@/components/ConnectorMultiSelect";
 import { SvgPlus } from "@opal/icons";
 export interface AddConnectorFormProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ccPairs: ConnectorStatus<any, any>[];
   userGroup: UserGroup;
   onClose: () => void;

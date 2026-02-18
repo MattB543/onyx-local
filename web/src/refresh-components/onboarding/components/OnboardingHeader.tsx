@@ -1,4 +1,4 @@
-import React from "react";
+import { memo } from "react";
 import { STEP_CONFIG } from "@/refresh-components/onboarding/constants";
 import {
   OnboardingActions,
@@ -18,7 +18,7 @@ interface OnboardingHeaderProps {
   handleHideOnboarding: () => void;
   handleFinishOnboarding: () => void;
 }
-const OnboardingHeader = React.memo(
+const OnboardingHeader = memo(
   ({
     state: onboardingState,
     actions: onboardingActions,

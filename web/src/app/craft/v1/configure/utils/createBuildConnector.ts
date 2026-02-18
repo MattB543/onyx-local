@@ -6,7 +6,9 @@ import { connectorConfigs, isLoadState } from "@/lib/connectors/connectors";
 
 export interface CreateBuildConnectorParams {
   connectorType: ValidSources;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credential: Credential<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connectorSpecificConfig?: Record<string, any>;
   connectorName?: string;
   userEmail?: string;
@@ -38,6 +40,7 @@ export async function createBuildConnector({
   const userIdentifier = getUserIdentifier(userEmail);
   const name = connectorName || `build-mode-${connectorType}${userIdentifier}`;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filteredConfig: Record<string, any> = {};
   Object.entries(connectorSpecificConfig).forEach(([key, value]) => {
     if (value !== "" && value !== null && value !== undefined) {

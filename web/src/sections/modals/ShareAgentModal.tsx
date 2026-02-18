@@ -57,8 +57,8 @@ function ShareAgentFormContent({ agentId }: ShareAgentFormContentProps) {
   const { agent: fullAgent } = useAgent(agentId ?? null);
   const shareAgentModal = useModal();
 
-  const acceptedUsers = usersData ?? [];
-  const groups = groupsData ?? [];
+  const acceptedUsers = useMemo(() => usersData ?? [], [usersData]);
+  const groups = useMemo(() => groupsData ?? [], [groupsData]);
 
   // Create options for InputComboBox from all accepted users and groups
   const comboBoxOptions = useMemo(() => {

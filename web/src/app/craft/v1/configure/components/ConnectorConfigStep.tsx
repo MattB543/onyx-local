@@ -19,6 +19,7 @@ import { useUser } from "@/providers/UserProvider";
 
 interface ConnectorConfigStepProps {
   connectorType: ValidSources;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credential: Credential<any>;
   onSuccess: () => void;
   onBack: () => void;
@@ -31,6 +32,7 @@ function ConnectorConfigForm({
   onBack,
 }: ConnectorConfigStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values } = useFormikContext<Record<string, any>>();
   const { user } = useUser();
 
@@ -78,6 +80,7 @@ function ConnectorConfigForm({
               key={field.name}
               field={field}
               values={values}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               connector={connectorType as any}
               currentCredential={credential}
             />
@@ -90,6 +93,7 @@ function ConnectorConfigForm({
               key={field.name}
               field={field}
               values={values}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               connector={connectorType as any}
               currentCredential={credential}
             />
@@ -125,8 +129,10 @@ export default function ConnectorConfigStep({
   onBack,
 }: ConnectorConfigStepProps) {
   const { user } = useUser();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const baseInitialValues = createConnectorInitialValues(connectorType as any);
   const userIdentifier = getUserIdentifier(user?.email);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialValues: Record<string, any> = {
     ...baseInitialValues,
     connector_name: `build-mode-${connectorType}${userIdentifier}`,

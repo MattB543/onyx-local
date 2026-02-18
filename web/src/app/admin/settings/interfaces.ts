@@ -77,6 +77,7 @@ export interface Notification {
     persona_id?: number;
     link?: string;
     version?: string; // For release notes notifications
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
 }

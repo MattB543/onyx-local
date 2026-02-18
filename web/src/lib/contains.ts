@@ -1,8 +1,7 @@
 import { RefObject } from "react";
 
-interface SomeNonNestedObject {
-  [key: string]: any;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SomeNonNestedObject = Record<string, any>;
 
 export function objectsAreEquivalent(
   a: SomeNonNestedObject,
@@ -16,8 +15,7 @@ export function objectsAreEquivalent(
     return false;
   }
 
-  for (let i = 0; i < aProps.length; i++) {
-    const propName = aProps[i];
+  for (const propName of aProps) {
     if (propName === undefined) {
       continue;
     }

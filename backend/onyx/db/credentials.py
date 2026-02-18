@@ -490,6 +490,15 @@ def cleanup_google_drive_credentials(db_session: Session) -> None:
     db_session.commit()
 
 
+def cleanup_google_calendar_credentials(db_session: Session) -> None:
+    google_calendar_credentials = fetch_credentials_by_source(
+        db_session=db_session, document_source=DocumentSource.GOOGLE_CALENDAR
+    )
+    for credential in google_calendar_credentials:
+        db_session.delete(credential)
+    db_session.commit()
+
+
 def delete_service_account_credentials(
     user: User, db_session: Session, source: DocumentSource
 ) -> None:

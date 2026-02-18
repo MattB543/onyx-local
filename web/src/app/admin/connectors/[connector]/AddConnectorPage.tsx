@@ -37,6 +37,7 @@ import Modal from "@/refresh-components/Modal";
 import { GmailMain } from "@/app/admin/connectors/[connector]/pages/gmail/GmailPage";
 import {
   useGmailCredentials,
+  useGoogleCalendarCredentials,
   useGoogleDriveCredentials,
 } from "@/app/admin/connectors/[connector]/pages/utils/hooks";
 import { Formik } from "formik";
@@ -152,17 +153,20 @@ export default function AddConnector({
 
   // State for managing credentials and files
   const [currentCredential, setCurrentCredential] =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
   const [createCredentialFormToggle, setCreateCredentialFormToggle] =
     useState(false);
 
   // Fetch credentials data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: credentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(connector),
     errorHandlingFetcher,
     { refreshInterval: 5000 }
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: editableCredentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(connector, true),
     errorHandlingFetcher,
@@ -196,11 +200,14 @@ export default function AddConnector({
   // Hooks for Google Drive and Gmail credentials
   const { liveGDriveCredential } = useGoogleDriveCredentials(connector);
   const { liveGmailCredential } = useGmailCredentials(connector);
+  const { liveGoogleCalendarCredential } =
+    useGoogleCalendarCredentials(connector);
 
   // Check if credential is activated
   const credentialActivated =
     (connector === "google_drive" && liveGDriveCredential) ||
     (connector === "gmail" && liveGmailCredential) ||
+    (connector === "google_calendar" && liveGoogleCalendarCredential) ||
     currentCredential;
 
   // Check if there are no credentials
@@ -233,6 +240,7 @@ export default function AddConnector({
     mutate(buildSimilarCredentialInfoURL(connector));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onDeleteCredential = async (credential: Credential<any | null>) => {
     const response = await deleteCredential(credential.id, true);
     if (response.ok) {
@@ -243,6 +251,7 @@ export default function AddConnector({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onSwap = async (selectedCredential: Credential<any>) => {
     setCurrentCredential(selectedCredential);
     setAllowCreate(true);
@@ -308,6 +317,7 @@ export default function AddConnector({
           (acc, [key, value]) => {
             // Filter out empty strings from arrays
             if (Array.isArray(value)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               value = (value as any[]).filter(
                 (item) => typeof item !== "string" || item.trim() !== ""
               );
@@ -326,14 +336,25 @@ export default function AddConnector({
             }
             return acc;
           },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as Record<string, any>
         );
 
         // Apply advanced configuration-specific transforms.
+        const isGoogleCalendarConnector =
+          connector === ValidSources.GoogleCalendar;
+        const defaultPruneFreqForConnectorHours = isGoogleCalendarConnector
+          ? 1
+          : defaultPruneFreqHours;
+        const defaultRefreshFreqForConnectorMinutes = isGoogleCalendarConnector
+          ? 60
+          : defaultRefreshFreqMinutes;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const advancedConfiguration: any = {
-          pruneFreq: (pruneFreq ?? defaultPruneFreqHours) * 3600,
+          pruneFreq: (pruneFreq ?? defaultPruneFreqForConnectorHours) * 3600,
           indexingStart: convertStringToDateTime(indexingStart),
-          refreshFreq: (refreshFreq ?? defaultRefreshFreqMinutes) * 60,
+          refreshFreq: (refreshFreq ?? defaultRefreshFreqForConnectorMinutes) * 60,
         };
 
         // File-specific handling
@@ -392,6 +413,7 @@ export default function AddConnector({
           );
 
           const connectorCreationPromise = (async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { message, isSuccess, response } = await submitConnector<any>(
               {
                 connector_specific_config: transformedConnectorSpecificConfig,
@@ -427,10 +449,11 @@ export default function AddConnector({
               const credential =
                 currentCredential ||
                 liveGDriveCredential ||
-                liveGmailCredential;
+                liveGmailCredential ||
+                liveGoogleCalendarCredential;
               const linkCredentialResponse = await linkCredential(
                 response.id,
-                credential?.id!,
+                credential!.id,
                 name,
                 access_type,
                 groups,
@@ -653,6 +676,7 @@ export default function AddConnector({
                   currentCredential ||
                   liveGDriveCredential ||
                   liveGmailCredential ||
+                  liveGoogleCalendarCredential ||
                   null
                 }
               />

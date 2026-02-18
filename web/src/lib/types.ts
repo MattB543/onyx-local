@@ -250,15 +250,18 @@ export interface FederatedConnectorDetail {
   id: number;
   source: ValidSources.FederatedSlack;
   name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: Record<string, any>;
   oauth_token_exists: boolean;
   oauth_token_expires_at: string | null;
-  document_sets: Array<{
+  document_sets: {
     id: number;
     name: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     entities: Record<string, any>;
-  }>;
+  }[];
 }
 
 export interface OAuthPrepareAuthorizationResponse {
@@ -331,6 +334,7 @@ export interface CCPairDescriptor<ConnectorType, CredentialType> {
 
 export interface FederatedConnectorConfig {
   federated_connector_id: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entities: Record<string, any>;
 }
 
@@ -338,6 +342,7 @@ export interface FederatedConnectorDescriptor {
   id: number;
   name: string;
   source: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entities: Record<string, any>;
 }
 
@@ -353,6 +358,7 @@ export interface FederatedConnectorSummary {
   id: number;
   name: string;
   source: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   entities: Record<string, any>;
 }
 
@@ -430,13 +436,13 @@ export type SlackBot = {
   name: string;
   enabled: boolean;
   configs_count: number;
-  slack_channel_configs: Array<{
+  slack_channel_configs: {
     id: number;
     is_default: boolean;
     channel_config: {
       channel_name: string;
     };
-  }>;
+  }[];
   bot_token: string;
   app_token: string;
   user_token?: string;
@@ -454,6 +460,7 @@ export interface UserGroup {
   name: string;
   users: User[];
   curator_ids: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cc_pairs: CCPairDescriptor<any, any>[];
   document_sets: DocumentSetSummary[];
   personas: Persona[];
@@ -468,6 +475,7 @@ export enum ValidSources {
   Slack = "slack",
   GoogleDrive = "google_drive",
   Gmail = "gmail",
+  GoogleCalendar = "google_calendar",
   Bookstack = "bookstack",
   Outline = "outline",
   Confluence = "confluence",
@@ -537,6 +545,7 @@ export const validAutoSyncSources = [
   ValidSources.Jira,
   ValidSources.GoogleDrive,
   ValidSources.Gmail,
+  ValidSources.GoogleCalendar,
   ValidSources.Slack,
   ValidSources.Salesforce,
   ValidSources.GitHub,
@@ -570,7 +579,9 @@ export interface CredentialFieldSpec {
   type: string;
   description: string;
   required: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   example?: any;
   secret: boolean;
 }
@@ -579,9 +590,12 @@ export interface ConfigurationFieldSpec {
   type: string;
   description: string;
   required: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   example?: any;
   secret: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hidden_when?: Record<string, any>;
 }
 
@@ -595,7 +609,9 @@ export interface ConfigurationSchemaResponse {
 
 export interface FederatedConnectorCreateRequest {
   source: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config?: Record<string, any>;
 }
 

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { WithoutStyles } from "@/types";
-import React from "react";
+import React, { InputHTMLAttributes } from "react";
 
 // ============================================================================
 // TABLE LAYOUTS - For building table-like structures without raw divs
@@ -62,8 +62,8 @@ function TableCell({ flex, width, children, ...rest }: TableCellProps) {
  *
  * @param children - Sidebar content
  */
-interface SidebarLayoutProps
-  extends WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>> {}
+type SidebarLayoutProps =
+  WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>>;
 function SidebarLayout({ children, ...rest }: SidebarLayoutProps) {
   return (
     <div className="sidebar-layout" {...rest}>
@@ -100,8 +100,8 @@ function TwoColumnLayout({
 /**
  * ContentColumn - The main content area in a two-column layout
  */
-interface ContentColumnProps
-  extends WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>> {}
+type ContentColumnProps =
+  WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>>;
 function ContentColumn({ children, ...rest }: ContentColumnProps) {
   return (
     <div className="content-column-layout" {...rest}>
@@ -113,7 +113,7 @@ function ContentColumn({ children, ...rest }: ContentColumnProps) {
 /**
  * HiddenInput - A hidden input element (for file uploads, etc.)
  */
-interface HiddenInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface HiddenInputProps extends InputHTMLAttributes<HTMLInputElement> {
   inputRef?: React.Ref<HTMLInputElement>;
 }
 function HiddenInput({ inputRef, ...rest }: HiddenInputProps) {
@@ -123,8 +123,8 @@ function HiddenInput({ inputRef, ...rest }: HiddenInputProps) {
 /**
  * CheckboxCell - A fixed-width cell for checkboxes in tables
  */
-interface CheckboxCellProps
-  extends WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>> {}
+type CheckboxCellProps =
+  WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>>;
 function CheckboxCell({ children, ...rest }: CheckboxCellProps) {
   return (
     <div className="checkbox-cell-layout" {...rest}>
@@ -136,8 +136,8 @@ function CheckboxCell({ children, ...rest }: CheckboxCellProps) {
 /**
  * SourceIconsRow - A row of source icons
  */
-interface SourceIconsRowProps
-  extends WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>> {}
+type SourceIconsRowProps =
+  WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>>;
 function SourceIconsRow({ children, ...rest }: SourceIconsRowProps) {
   return (
     <div className="source-icons-layout" {...rest}>

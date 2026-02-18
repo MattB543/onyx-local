@@ -28,6 +28,10 @@ class GmailService(Resource):
     pass
 
 
+class GoogleCalendarService(Resource):
+    pass
+
+
 class RefreshableDriveObject:
     """
     Running Google drive service retrieval functions
@@ -83,7 +87,13 @@ def _get_google_service(
     service_version: str,
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
-) -> GoogleDriveService | GoogleDocsService | AdminService | GmailService:
+) -> (
+    GoogleDriveService
+    | GoogleDocsService
+    | AdminService
+    | GmailService
+    | GoogleCalendarService
+):
     service: Resource
     if isinstance(creds, ServiceAccountCredentials):
         # NOTE: https://developers.google.com/identity/protocols/oauth2/service-account#error-codes
@@ -121,3 +131,10 @@ def get_gmail_service(
     user_email: str | None = None,
 ) -> GmailService:
     return _get_google_service("gmail", "v1", creds, user_email)
+
+
+def get_calendar_service(
+    creds: ServiceAccountCredentials | OAuthCredentials,
+    user_email: str | None = None,
+) -> GoogleCalendarService:
+    return _get_google_service("calendar", "v3", creds, user_email)

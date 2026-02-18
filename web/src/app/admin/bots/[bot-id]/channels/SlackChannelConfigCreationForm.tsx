@@ -191,6 +191,7 @@ export const SlackChannelConfigCreationForm = ({
                 ? values.persona_id
                 : null,
             standard_answer_categories: values.standard_answer_categories.map(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (category: any) => category.id
             ),
             response_type: values.response_type as SlackBotResponseType,

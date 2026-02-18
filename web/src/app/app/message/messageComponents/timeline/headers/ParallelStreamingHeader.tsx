@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { SvgFold, SvgExpand } from "@opal/icons";
 import Tabs from "@/refresh-components/Tabs";
 import { Button } from "@opal/components";
@@ -19,7 +19,7 @@ export interface ParallelStreamingHeaderProps {
 }
 
 /** Header during streaming with parallel tools - tabs only */
-export const ParallelStreamingHeader = React.memo(
+export const ParallelStreamingHeader = memo(
   function ParallelStreamingHeader({
     steps,
     activeTab,

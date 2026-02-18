@@ -73,7 +73,7 @@ export default function ComingSoonConnectors() {
             Coming Soon
           </Text>
           <Text secondaryBody text03>
-            Don't see what you're looking for? Submit a connector request!
+            Don&apos;t see what you&apos;re looking for? Submit a connector request!
           </Text>
         </div>
         <button

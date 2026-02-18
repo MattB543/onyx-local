@@ -19,10 +19,13 @@ export const SlackTokensForm = ({
   onValuesChange,
 }: {
   isUpdate: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initialValues: any;
   existingSlackBotId?: number;
   refreshSlackBot?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   router: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onValuesChange?: (values: any) => void;
 }) => {
   useEffect(() => {

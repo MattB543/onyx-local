@@ -1,43 +1,52 @@
 "use client";
 
 import React, {
+  memo,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from "react";
-import LineItem from "@/refresh-components/buttons/LineItem";
+
 import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
-import LLMPopover from "@/refresh-components/popovers/LLMPopover";
-import { InputPrompt } from "@/app/app/interfaces";
-import { FilterManager, LlmManager, useFederatedConnectors } from "@/lib/hooks";
-import usePromptShortcuts from "@/hooks/usePromptShortcuts";
-import useFilter from "@/hooks/useFilter";
-import useCCPairs from "@/hooks/useCCPairs";
-import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
-import { ChatState } from "@/app/app/interfaces";
-import { useForcedTools } from "@/lib/hooks/useForcedTools";
-import { useAppMode } from "@/providers/AppModeProvider";
-import useAppFocus from "@/hooks/useAppFocus";
-import { getFormattedDateRangeString } from "@/lib/dateUtils";
-import { truncateString, cn } from "@/lib/utils";
-import { Disabled } from "@/refresh-components/Disabled";
-import { useUser } from "@/providers/UserProvider";
-import { SettingsContext } from "@/providers/SettingsProvider";
-import { useProjectsContext } from "@/providers/ProjectsContext";
-import { FileCard } from "@/sections/cards/FileCard";
+import { InputPrompt, ChatState } from "@/app/app/interfaces";
 import {
   ProjectFile,
   UserFileStatus,
 } from "@/app/app/projects/projectsService";
-import FilePickerPopover from "@/refresh-components/popovers/FilePickerPopover";
-import ActionsPopover from "@/refresh-components/popovers/ActionsPopover";
 import {
   getIconForAction,
   hasSearchToolsAvailable,
 } from "@/app/app/services/actionUtils";
+import useAppFocus from "@/hooks/useAppFocus";
+import useCCPairs from "@/hooks/useCCPairs";
+import useFilter from "@/hooks/useFilter";
+import usePromptShortcuts from "@/hooks/usePromptShortcuts";
+import { Section } from "@/layouts/general-layouts";
+import { getFormattedDateRangeString } from "@/lib/dateUtils";
+import { FilterManager, LlmManager, useFederatedConnectors } from "@/lib/hooks";
+import { useForcedTools } from "@/lib/hooks/useForcedTools";
+import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
+import { truncateString, cn } from "@/lib/utils";
+import { useAppMode } from "@/providers/AppModeProvider";
+import { useProjectsContext } from "@/providers/ProjectsContext";
+import { useQueryController } from "@/providers/QueryControllerProvider";
+import { SettingsContext } from "@/providers/SettingsProvider";
+import { useUser } from "@/providers/UserProvider";
+import LineItem from "@/refresh-components/buttons/LineItem";
+import { Disabled } from "@/refresh-components/Disabled";
+import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
+import Popover from "@/refresh-components/Popover";
+import ActionsPopover from "@/refresh-components/popovers/ActionsPopover";
+import FilePickerPopover from "@/refresh-components/popovers/FilePickerPopover";
+import LLMPopover from "@/refresh-components/popovers/LLMPopover";
+import Spacer from "@/refresh-components/Spacer";
+import { FileCard } from "@/sections/cards/FileCard";
+
+import { Button } from "@opal/components";
 import {
   SvgArrowUp,
   SvgCalendar,
@@ -50,12 +59,6 @@ import {
   SvgStop,
   SvgX,
 } from "@opal/icons";
-import { Button, OpenButton } from "@opal/components";
-import Popover from "@/refresh-components/Popover";
-import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
-import { useQueryController } from "@/providers/QueryControllerProvider";
-import { Section } from "@/layouts/general-layouts";
-import Spacer from "@/refresh-components/Spacer";
 
 const LINE_HEIGHT = 24;
 const MIN_INPUT_HEIGHT = 44;
@@ -130,9 +133,9 @@ export interface AppInputBarProps {
   ref?: React.Ref<AppInputBarHandle>;
 }
 
-const AppInputBar = React.memo(
+const AppInputBar = memo(
   ({
-    retrievalEnabled,
+    retrievalEnabled: _retrievalEnabled,
     removeDocs,
     toggleDocumentSidebar,
     filterManager,
@@ -162,7 +165,7 @@ const AppInputBar = React.memo(
     const { isClassifying, classification } = useQueryController();
 
     // Expose reset and focus methods to parent via ref
-    React.useImperativeHandle(ref, () => ({
+    useImperativeHandle(ref, () => ({
       reset: () => {
         setMessage("");
       },
@@ -256,6 +259,7 @@ const AppInputBar = React.memo(
 
     useEffect(() => {
       if (initialMessage) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional sync when parent seeds/updates initial input text.
         setMessage(initialMessage);
       }
     }, [initialMessage]);
@@ -263,9 +267,8 @@ const AppInputBar = React.memo(
     function handlePaste(event: React.ClipboardEvent) {
       const items = event.clipboardData?.items;
       if (items) {
-        const pastedFiles = [];
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
+        const pastedFiles: File[] = [];
+        for (const item of Array.from(items)) {
           if (item && item.kind === "file") {
             const file = item.getAsFile();
             if (file) pastedFiles.push(file);
@@ -333,6 +336,7 @@ const AppInputBar = React.memo(
 
     // Reset tabbingIconIndex when filtered prompts change to avoid out-of-bounds
     useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional UI reset when prompt options change.
       setTabbingIconIndex(0);
     }, [filteredPrompts]);
 
@@ -519,6 +523,7 @@ const AppInputBar = React.memo(
                       event.key === "Enter" &&
                       !showPrompts &&
                       !event.shiftKey &&
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       !(event.nativeEvent as any).isComposing
                     ) {
                       event.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { ButtonHTMLAttributes, useMemo } from "react";
 import type { IconProps } from "@opal/types";
 import { cn } from "@/lib/utils";
 import SimpleTooltip from "@/refresh-components/SimpleTooltip";
@@ -281,7 +281,7 @@ const iconClasses = (transient: boolean | undefined) =>
   }) as const;
 
 export interface IconButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  extends ButtonHTMLAttributes<HTMLButtonElement> {
   // Top level button variants
   main?: boolean;
   action?: boolean;

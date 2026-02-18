@@ -31,6 +31,7 @@ export const ErrorBanner = ({
   error: string;
   errorCode?: string;
   isRetryable?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
   stackTrace?: string | null;
   resubmit?: () => void;

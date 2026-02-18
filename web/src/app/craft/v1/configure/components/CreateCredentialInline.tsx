@@ -18,6 +18,7 @@ import { getSourceMetadata } from "@/lib/sources";
 
 interface CreateCredentialInlineProps {
   connectorType: ValidSources;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSuccess: (credential: Credential<any>) => void;
   onCancel: () => void;
 }

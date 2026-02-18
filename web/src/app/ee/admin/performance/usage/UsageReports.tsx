@@ -16,7 +16,7 @@ import Text from "@/components/ui/text";
 import Title from "@/components/ui/title";
 import Button from "@/refresh-components/buttons/Button";
 import useSWR from "swr";
-import React, { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UsageReport } from "./types";
 import { ThreeDotsLoader } from "@/components/Loading";
 import Link from "next/link";
@@ -248,14 +248,14 @@ function UsageReportsTable({
   });
 
   // Refresh when refreshTrigger changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (refreshTrigger > 0) {
       mutate();
     }
   }, [refreshTrigger, mutate]);
 
   // Detect when a new report appears
-  React.useEffect(() => {
+  useEffect(() => {
     if (usageReportsMetadata && previousReportCount !== null) {
       if (usageReportsMetadata.length > previousReportCount) {
         onNewReportDetected();
@@ -358,7 +358,7 @@ export default function UsageReports() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isWaitingForReport, setIsWaitingForReport] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
-  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleReportGenerated = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -391,7 +391,7 @@ export default function UsageReports() {
   };
 
   // Cleanup on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);

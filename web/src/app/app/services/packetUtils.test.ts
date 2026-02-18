@@ -20,6 +20,7 @@ function createPacket(
 ): Packet {
   return {
     placement: { turn_index: 0, tab_index: 0, ...placement },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     obj: { type } as any,
   };
 }

@@ -266,10 +266,10 @@ export default function FilePickerPopover({
           description="Upload files or pick from your recent files."
           recentFiles={recentFilesSnapshot}
           onPickRecent={(file) => {
-            onPickRecent && onPickRecent(file);
+            if (onPickRecent) onPickRecent(file);
           }}
           onUnpickRecent={(file) => {
-            onUnpickRecent && onUnpickRecent(file);
+            if (onUnpickRecent) onUnpickRecent(file);
           }}
           handleUploadChange={handleUploadChange}
           onView={onFileClick}
@@ -286,11 +286,11 @@ export default function FilePickerPopover({
           <FilePickerPopoverContents
             recentFiles={recentFilesSnapshot}
             onPickRecent={(file) => {
-              onPickRecent && onPickRecent(file);
+              if (onPickRecent) onPickRecent(file);
               setOpen(false);
             }}
             onFileClick={(file) => {
-              onFileClick && onFileClick(file);
+              if (onFileClick) onFileClick(file);
               setOpen(false);
             }}
             triggerUploadPicker={() => {

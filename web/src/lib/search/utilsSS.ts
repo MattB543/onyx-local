@@ -8,8 +8,10 @@ export async function fetchValidFilterInfo() {
     fetchSS("/manage/document-set"),
   ]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let connectors = [] as Connector<any>[];
   if (connectorsResponse.ok) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     connectors = (await connectorsResponse.json()) as Connector<any>[];
   } else {
     console.log(

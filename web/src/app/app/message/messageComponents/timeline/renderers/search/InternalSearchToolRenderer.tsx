@@ -51,7 +51,7 @@ const resultToSourceInfo = (doc: OnyxDocument): SourceInfo => ({
  */
 export const InternalSearchToolRenderer: MessageRenderer<
   SearchToolPacket,
-  {}
+  Record<string, never>
 > = ({
   packets,
   onComplete,

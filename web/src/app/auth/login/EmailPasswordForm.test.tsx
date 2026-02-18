@@ -23,7 +23,9 @@ describe("Email/Password Login Workflow", () => {
     jest.clearAllMocks();
     fetchSpy = jest.spyOn(global, "fetch");
     // Mock window.location.href for redirect testing
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).location;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     window.location = { href: "" } as any;
   });
 
@@ -115,7 +117,9 @@ describe("Email/Password Signup Workflow", () => {
     jest.clearAllMocks();
     fetchSpy = jest.spyOn(global, "fetch");
     // Mock window.location.href
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).location;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     window.location = { href: "" } as any;
   });
 

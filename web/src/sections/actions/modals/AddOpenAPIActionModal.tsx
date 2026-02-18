@@ -66,6 +66,7 @@ function parseJsonWithTrailingCommas(jsonString: string) {
   return JSON.parse(cleanedJsonString);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function prettifyDefinition(definition: any) {
   return JSON.stringify(definition, null, 2);
 }
@@ -458,6 +459,7 @@ export default function AddOpenAPIActionModal({
         const updatePayload: {
           name?: string;
           description?: string;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           definition: Record<string, any>;
         } = {
           definition: parsedDefinition,

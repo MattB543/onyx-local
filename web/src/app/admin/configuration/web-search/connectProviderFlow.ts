@@ -120,7 +120,9 @@ export async function connectProviderFlow({
       if (!testResponse.ok) {
         const errorBody = await testResponse.json().catch(() => ({}));
         throw new Error(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           typeof (errorBody as any)?.detail === "string"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ? (errorBody as any).detail
             : msg.validationFailedFallback
         );
@@ -150,7 +152,9 @@ export async function connectProviderFlow({
     if (!upsertResponse.ok) {
       const errorBody = await upsertResponse.json().catch(() => ({}));
       throw new Error(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         typeof (errorBody as any)?.detail === "string"
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ? (errorBody as any).detail
           : msg.activateFailedFallback
       );

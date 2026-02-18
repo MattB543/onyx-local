@@ -64,3 +64,6 @@ claude/
 
 #.pem
 *.pem
+
+# any files with logs_ in the name
+logs_*.txt

@@ -50,7 +50,7 @@ export default function CloudEmbeddingPage({
   advancedEmbeddingDetails: AdvancedSearchConfiguration;
 }) {
   function hasProviderTypeinArray(
-    arr: Array<{ provider_type: string }>,
+    arr: { provider_type: string }[],
     searchName: string
   ): boolean {
     return arr.some(

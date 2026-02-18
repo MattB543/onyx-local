@@ -1,18 +1,19 @@
 import React, { useCallback, useMemo, JSX } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+
 import "katex/dist/katex.min.css";
 import "@/app/app/message/custom-code-styles.css";
-import { FullChatState } from "@/app/app/message/messageComponents/interfaces";
+import { CodeBlock } from "@/app/app/message/CodeBlock";
+import { extractCodeText, preprocessLaTeX } from "@/app/app/message/codeUtils";
 import {
   MemoizedAnchor,
   MemoizedParagraph,
 } from "@/app/app/message/MemoizedTextComponents";
-import { extractCodeText, preprocessLaTeX } from "@/app/app/message/codeUtils";
-import { CodeBlock } from "@/app/app/message/CodeBlock";
+import { FullChatState } from "@/app/app/message/messageComponents/interfaces";
 import { transformLinkUri, cn } from "@/lib/utils";
 
 /**
@@ -49,6 +50,7 @@ export const useMarkdownComponents = (
   className?: string
 ) => {
   const paragraphCallback = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (props: any) => (
       <MemoizedParagraph className={className}>
         {props.children}
@@ -58,6 +60,7 @@ export const useMarkdownComponents = (
   );
 
   const anchorCallback = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (props: any) => (
       <MemoizedAnchor
         updatePresentingDocument={state?.setPresentingDocument || (() => {})}
@@ -81,13 +84,16 @@ export const useMarkdownComponents = (
     () => ({
       a: anchorCallback,
       p: paragraphCallback,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pre: ({ node, className, children }: any) => {
         // Don't render the pre wrapper - CodeBlock handles its own wrapper
         return <>{children}</>;
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       b: ({ node, className, children }: any) => {
         return <span className={className}>{children}</span>;
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ul: ({ node, className, children, ...props }: any) => {
         return (
           <ul className={className} {...props}>
@@ -95,6 +101,7 @@ export const useMarkdownComponents = (
           </ul>
         );
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ol: ({ node, className, children, ...props }: any) => {
         return (
           <ol className={className} {...props}>
@@ -102,6 +109,7 @@ export const useMarkdownComponents = (
           </ol>
         );
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       li: ({ node, className, children, ...props }: any) => {
         return (
           <li className={className} {...props}>
@@ -109,6 +117,7 @@ export const useMarkdownComponents = (
           </li>
         );
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       table: ({ node, className, children, ...props }: any) => {
         return (
           <div className="markdown-table-breakout">
@@ -118,6 +127,7 @@ export const useMarkdownComponents = (
           </div>
         );
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       code: ({ node, className, children }: any) => {
         const codeText = extractCodeText(node, processedContent, children);
 
@@ -139,8 +149,9 @@ export const useMarkdownComponents = (
  */
 export const renderMarkdown = (
   content: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   markdownComponents: any,
-  textSize: string = "text-base"
+  textSize = "text-base"
 ): JSX.Element => {
   return (
     <div dir="auto">

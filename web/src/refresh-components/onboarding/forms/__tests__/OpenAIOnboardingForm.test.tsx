@@ -32,6 +32,7 @@ jest.mock("@/components/modals/ProviderModal", () => ({
     onSubmit,
     submitDisabled,
     isSubmitting,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }: any) => {
     if (!open) return null;
     return (
@@ -100,6 +101,7 @@ const mockFetchModels = jest.fn().mockResolvedValue({
 
 jest.mock("@/app/admin/configuration/llm/utils", () => ({
   canProviderFetchModels: jest.fn().mockReturnValue(true),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetchModels: (...args: any[]) => mockFetchModels(...args),
 }));
 

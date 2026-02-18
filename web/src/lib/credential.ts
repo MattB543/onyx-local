@@ -13,6 +13,7 @@ import {
   CREDENTIAL_JSON,
 } from "./constants";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createCredential(credential: CredentialBase<any>) {
   return await fetch(`/api/manage/credential`, {
     method: "POST",
@@ -24,6 +25,7 @@ export async function createCredential(credential: CredentialBase<any>) {
 }
 
 export async function createCredentialWithPrivateKey(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credential: CredentialWithPrivateKey<any>
 ) {
   const formData = new FormData();
@@ -90,6 +92,7 @@ export function linkCredential(
   name?: string,
   accessType?: AccessType,
   groups?: number[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   autoSyncOptions?: Record<string, any>,
   processingMode?: ProcessingMode
 ) {
@@ -111,6 +114,7 @@ export function linkCredential(
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function updateCredential(credentialId: number, newDetails: any) {
   const name = newDetails.name;
   const details = Object.fromEntries(
@@ -132,6 +136,7 @@ export function updateCredential(credentialId: number, newDetails: any) {
 
 export function updateCredentialWithPrivateKey(
   credentialId: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   newDetails: any,
   privateKey: TypedFile
 ) {

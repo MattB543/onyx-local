@@ -1,6 +1,14 @@
 "use client";
 
-import React from "react";
+import React, {
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 import type { IconProps } from "@opal/types";
@@ -36,7 +44,7 @@ const ModalRoot = DialogPrimitive.Root;
  * <Modal.Overlay />
  * ```
  */
-const ModalOverlay = React.forwardRef<
+const ModalOverlay = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   WithoutStyles<React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>>
 >(({ ...props }, ref) => (
@@ -64,10 +72,10 @@ interface ModalContextValue {
   setHasDescription: (value: boolean) => void;
 }
 
-const ModalContext = React.createContext<ModalContextValue | null>(null);
+const ModalContext = createContext<ModalContextValue | null>(null);
 
 const useModalContext = () => {
-  const context = React.useContext(ModalContext);
+  const context = useContext(ModalContext);
   if (!context) {
     throw new Error("Modal compound components must be used within Modal");
   }
@@ -126,7 +134,7 @@ interface ModalContentProps
    *  Stays inside DialogPrimitive.Content for proper focus management. */
   bottomSlot?: React.ReactNode;
 }
-const ModalContent = React.forwardRef<
+const ModalContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   ModalContentProps
 >(
@@ -143,19 +151,19 @@ const ModalContent = React.forwardRef<
     },
     ref
   ) => {
-    const closeButtonRef = React.useRef<HTMLDivElement>(null);
-    const [hasAttemptedClose, setHasAttemptedClose] = React.useState(false);
-    const [hasDescription, setHasDescription] = React.useState(false);
-    const hasUserTypedRef = React.useRef(false);
+    const closeButtonRef = useRef<HTMLDivElement>(null);
+    const [hasAttemptedClose, setHasAttemptedClose] = useState(false);
+    const [hasDescription, setHasDescription] = useState(false);
+    const hasUserTypedRef = useRef(false);
 
     // Reset state when modal closes or opens
-    const resetState = React.useCallback(() => {
+    const resetState = useCallback(() => {
       setHasAttemptedClose(false);
       hasUserTypedRef.current = false;
     }, []);
 
     // Handle input events to detect typing
-    const handleInput = React.useCallback((e: Event) => {
+    const handleInput = useCallback((e: Event) => {
       // Early exit if already detected typing (performance optimization)
       if (hasUserTypedRef.current) {
         return;
@@ -193,10 +201,10 @@ const ModalContent = React.forwardRef<
     }, []);
 
     // Keep track of the container node for cleanup
-    const containerNodeRef = React.useRef<HTMLDivElement | null>(null);
+    const containerNodeRef = useRef<HTMLDivElement | null>(null);
 
     // Callback ref to attach event listener when element mounts
-    const contentRef = React.useCallback(
+    const contentRef = useCallback(
       (node: HTMLDivElement | null) => {
         // Cleanup previous listener if exists
         if (containerNodeRef.current) {
@@ -219,12 +227,12 @@ const ModalContent = React.forwardRef<
     );
 
     // Check if user has typed anything
-    const hasModifiedInputs = React.useCallback(() => {
+    const hasModifiedInputs = useCallback(() => {
       return hasUserTypedRef.current;
     }, []);
 
     // Handle escape key and outside clicks
-    const handleInteractOutside = React.useCallback(
+    const handleInteractOutside = useCallback(
       (e: Event) => {
         // If preventAccidentalClose is disabled, always allow immediate close
         if (!preventAccidentalClose) {
@@ -383,13 +391,13 @@ interface ModalHeaderProps extends WithoutStyles<SectionProps> {
   description?: string;
   onClose?: () => void;
 }
-const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
+const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(
   ({ icon: Icon, title, description, onClose, children, ...props }, ref) => {
     const { closeButtonRef, setHasDescription } = useModalContext();
 
     // useLayoutEffect ensures aria-describedby is set before paint,
     // so screen readers announce the description when the dialog opens
-    React.useLayoutEffect(() => {
+    useLayoutEffect(() => {
       setHasDescription(!!description);
     }, [description, setHasDescription]);
 
@@ -463,7 +471,7 @@ ModalHeader.displayName = "ModalHeader";
 interface ModalBodyProps extends WithoutStyles<SectionProps> {
   twoTone?: boolean;
 }
-const ModalBody = React.forwardRef<HTMLDivElement, ModalBodyProps>(
+const ModalBody = forwardRef<HTMLDivElement, ModalBodyProps>(
   ({ twoTone = true, children, ...props }, ref) => {
     return (
       <div
@@ -496,7 +504,7 @@ ModalBody.displayName = "ModalBody";
  * </Modal.Footer>
  * ```
  */
-const ModalFooter = React.forwardRef<
+const ModalFooter = forwardRef<
   HTMLDivElement,
   WithoutStyles<SectionProps>
 >(({ ...props }, ref) => {

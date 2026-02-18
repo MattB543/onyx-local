@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SvgCheck, SvgMinus } from "@opal/icons";
 const getRootClasses = (checked: boolean, indeterminate: boolean) => ({
@@ -166,6 +166,6 @@ function CheckboxInner(
   );
 }
 
-const Checkbox = React.forwardRef(CheckboxInner);
+const Checkbox = forwardRef(CheckboxInner);
 Checkbox.displayName = "Checkbox";
 export default Checkbox;

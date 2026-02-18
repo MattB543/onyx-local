@@ -1,6 +1,6 @@
 "use client";
 
-import React, { RefObject, useState, useCallback, useMemo } from "react";
+import { RefObject, memo, useCallback, useMemo, useState } from "react";
 import { Packet, StreamingCitation } from "@/app/app/services/streamingModels";
 import { FeedbackType } from "@/app/app/interfaces";
 import { OnyxDocument } from "@/lib/search/interfaces";
@@ -31,7 +31,7 @@ import FeedbackModal, {
 import { Button } from "@opal/components";
 
 // Wrapper component for SourceTag in toolbar to handle memoization
-const SourcesTagWrapper = React.memo(function SourcesTagWrapper({
+const SourcesTagWrapper = memo(function SourcesTagWrapper({
   citations,
   documentMap,
   nodeId,

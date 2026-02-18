@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { create } from "zustand";
+
 import {
   ChatState,
   RegenerationState,
@@ -12,7 +14,6 @@ import {
   getMessageByMessageId,
   MessageTreeState,
 } from "../services/messageTree";
-import { useMemo } from "react";
 
 interface ChatSessionData {
   sessionId: string;
@@ -525,7 +526,7 @@ export const useChatSessionStore = create<ChatSessionStore>()((set, get) => ({
     }
   },
 
-  cleanupOldSessions: (maxSessions: number = 10) => {
+  cleanupOldSessions: (maxSessions = 10) => {
     set((state) => {
       const sortedSessions = Array.from(state.sessions.entries()).sort(
         ([, a], [, b]) => b.lastAccessed.getTime() - a.lastAccessed.getTime()

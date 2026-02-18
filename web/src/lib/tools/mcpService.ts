@@ -183,6 +183,7 @@ export async function upsertMCPServer(serverData: {
   api_token?: string;
   oauth_client_id?: string;
   oauth_client_secret?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth_template?: any;
   admin_credentials?: Record<string, string>;
   existing_server_id?: number;

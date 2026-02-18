@@ -25,6 +25,7 @@ interface UseChatSessionsOutput {
   currentChatSession: ChatSession | null;
   agentForCurrentChatSession: MinimalPersonaSnapshot | null;
   isLoading: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any;
   refreshChatSessions: KeyedMutator<ChatSessionsResponse>;
   addPendingChatSession: (params: PendingChatSessionParams) => void;
@@ -123,7 +124,7 @@ export default function useChatSessions(): UseChatSessionsOutput {
 
   const appFocus = useAppFocus();
   const pendingSessions = usePendingSessions();
-  const fetchedSessions = data?.sessions ?? [];
+  const fetchedSessions = useMemo(() => data?.sessions ?? [], [data?.sessions]);
 
   // Clean up pending sessions that now appear in fetched data
   // (they now have messages and the server returns them)
@@ -161,6 +162,7 @@ export default function useChatSessions(): UseChatSessionsOutput {
 
   // Add a pending chat session that will persist across SWR revalidations
   // The session will be automatically removed once it appears in the server response
+  /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
   const addPendingChatSession = useCallback(
     ({ chatSessionId, personaId, projectId }: PendingChatSessionParams) => {
       // Don't add sessions that belong to a project
@@ -195,6 +197,7 @@ export default function useChatSessions(): UseChatSessionsOutput {
     },
     []
   );
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return {
     chatSessions,

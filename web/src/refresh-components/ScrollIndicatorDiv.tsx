@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import { HTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Throttle interval for scroll events (~60fps)
 const SCROLL_THROTTLE_MS = 16;
 
 export interface ScrollIndicatorDivProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+  extends HTMLAttributes<HTMLDivElement> {
   // Mask/Shadow options
   disableIndicators?: boolean;
   backgroundColor?: string;

@@ -37,6 +37,7 @@ interface AppearanceThemeSettingsProps {
 }
 
 export interface AppearanceThemeSettingsRef {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   focusFirstError: (errors: Record<string, any>) => void;
 }
 
@@ -47,6 +48,7 @@ export const AppearanceThemeSettings = forwardRef<
   { selectedLogo, setSelectedLogo, charLimits },
   ref
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values, errors, setFieldValue } = useFormikContext<any>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const applicationNameInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +85,7 @@ export const AppearanceThemeSettings = forwardRef<
 
   // Expose focusFirstError method to parent component
   useImperativeHandle(ref, () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     focusFirstError: (errors: Record<string, any>) => {
       // Focus on the first field with an error, in priority order
       const fieldRefs = [
@@ -178,6 +181,7 @@ export const AppearanceThemeSettings = forwardRef<
       return logoObjectUrl;
     }
     if (values.use_custom_logo) {
+      // eslint-disable-next-line react-hooks/purity -- cache-busting URL needs fresh timestamp
       return `/api/enterprise-settings/logo?u=${Date.now()}`;
     }
     return undefined;
@@ -236,7 +240,7 @@ export const AppearanceThemeSettings = forwardRef<
               />
             </FormField.Control>
             <FormField.Description>
-              This name will show across the app and replace "Onyx" in the UI.
+              This name will show across the app and replace &ldquo;Onyx&rdquo; in the UI.
             </FormField.Description>
             <FormField.Message
               messages={{ error: errors.application_name as string }}

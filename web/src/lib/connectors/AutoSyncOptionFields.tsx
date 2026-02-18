@@ -15,6 +15,7 @@ export const autoSyncConfigBySource: Record<
   confluence: {},
   jira: {},
   google_drive: {},
+  google_calendar: {},
   gmail: {},
   github: {},
   slack: {},

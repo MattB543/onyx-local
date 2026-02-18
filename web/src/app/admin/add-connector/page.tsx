@@ -42,6 +42,7 @@ function SourceTileTooltipWrapper({
   sourceMetadata: SourceMetadata;
   preSelect?: boolean;
   federatedConnectors?: FederatedConnectorDetail[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   slackCredentials?: Credential<any>[];
 }) {
   // Check if there's already a federated connector for this source
@@ -133,6 +134,7 @@ export default function Page() {
   const settings = useContext(SettingsContext);
 
   // Fetch Slack credentials to determine navigation behavior
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: slackCredentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(ValidSources.Slack),
     errorHandlingFetcher

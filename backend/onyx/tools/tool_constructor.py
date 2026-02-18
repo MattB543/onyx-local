@@ -32,6 +32,8 @@ from onyx.tools.tool_implementations.custom.custom_tool import (
     build_custom_tools_from_openapi_schema_and_headers,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
+from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
+from onyx.tools.tool_implementations.crm.crm_list_tool import CrmListTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
@@ -302,6 +304,24 @@ def construct_tools(
                         db_session=db_session,
                         emitter=emitter,
                         user_id=str(user.id) if user.id else None,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmListTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmListTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                    )
+                ]
+
+            elif tool_cls.__name__ == CrmGetTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    CrmGetTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
                     )
                 ]
 

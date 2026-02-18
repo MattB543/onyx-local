@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import React from "react";
+import React, { HTMLAttributes } from "react";
 import Text from "../texts/Text";
 import {
   SvgAlertCircle,
@@ -24,7 +24,7 @@ const iconMap: Record<MessageVariant, React.ReactNode> = {
   idle: null,
 };
 
-interface FieldMessageRootProps extends React.HTMLAttributes<HTMLDivElement> {
+interface FieldMessageRootProps extends HTMLAttributes<HTMLDivElement> {
   variant: MessageVariant;
   children: React.ReactNode;
 }
@@ -51,7 +51,7 @@ const FieldMessageRoot: React.FC<FieldMessageRootProps> = ({
 };
 
 interface FieldMessageContentProps
-  extends React.HTMLAttributes<HTMLParagraphElement> {
+  extends HTMLAttributes<HTMLParagraphElement> {
   children: React.ReactNode;
 }
 

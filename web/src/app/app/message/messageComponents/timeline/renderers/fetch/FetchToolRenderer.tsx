@@ -46,7 +46,7 @@ const documentToSourceInfo = (doc: OnyxDocument): SourceInfo => ({
  * - HIGHLIGHT: Shows URL list with header embedded directly in content.
  *              No StepContainer wrapper. Used for parallel streaming preview.
  */
-export const FetchToolRenderer: MessageRenderer<FetchToolPacket, {}> = ({
+export const FetchToolRenderer: MessageRenderer<FetchToolPacket, Record<string, never>> = ({
   packets,
   onComplete,
   animate,

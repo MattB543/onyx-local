@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { FileDescriptor } from "@/app/app/interfaces";
 import "katex/dist/katex.min.css";
 import MessageSwitcher from "@/app/app/message/MessageSwitcher";
@@ -119,7 +119,7 @@ function arePropsEqual(
   );
 }
 
-const HumanMessage = React.memo(function HumanMessage({
+const HumanMessage = memo(function HumanMessage({
   content: initialContent,
   files,
   nodeId,

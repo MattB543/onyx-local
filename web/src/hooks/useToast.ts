@@ -1,6 +1,6 @@
-import { useEffect, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import type { Route } from "next";
+import { useRouter } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,12 +162,10 @@ export function useToast() {
 // Query-param toast hook
 // ---------------------------------------------------------------------------
 
-interface ToastFromQueryMessages {
-  [key: string]: {
+type ToastFromQueryMessages = Record<string, {
     message: string;
     type?: ToastLevel | null;
-  };
-}
+  }>;
 
 /**
  * Reads a `?message=<key>` query param on mount, fires the matching toast,

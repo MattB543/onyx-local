@@ -46,7 +46,7 @@ export interface LLMProvider {
   api_key: string | null;
   api_base: string | null;
   api_version: string | null;
-  custom_config: { [key: string]: string } | null;
+  custom_config: Record<string, string> | null;
   default_model_name: string;
   is_public: boolean;
   is_auto_mode: boolean;

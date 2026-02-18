@@ -112,6 +112,8 @@ KV_GMAIL_CRED_KEY = "gmail_app_credential"
 KV_GMAIL_SERVICE_ACCOUNT_KEY = "gmail_service_account_key"
 KV_GOOGLE_DRIVE_CRED_KEY = "google_drive_app_credential"
 KV_GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY = "google_drive_service_account_key"
+KV_GOOGLE_CALENDAR_CRED_KEY = "google_calendar_app_credential"
+KV_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY = "google_calendar_service_account_key"
 KV_GEN_AI_KEY_CHECK_TIME = "genai_api_key_last_check_time"
 KV_SETTINGS_KEY = "onyx_settings"
 KV_CUSTOMER_UUID_KEY = "customer_uuid"
@@ -173,6 +175,7 @@ class DocumentSource(str, Enum):
     WEB = "web"
     GOOGLE_DRIVE = "google_drive"
     GMAIL = "gmail"
+    GOOGLE_CALENDAR = "google_calendar"
     REQUESTTRACKER = "requesttracker"
     GITHUB = "github"
     GITBOOK = "gitbook"
@@ -623,6 +626,7 @@ DocumentSourceDescription: dict[DocumentSource, str] = {
     DocumentSource.WEB: "indexed web pages",
     DocumentSource.GOOGLE_DRIVE: "google drive documents (docs, sheets, etc.)",
     DocumentSource.GMAIL: "email messages",
+    DocumentSource.GOOGLE_CALENDAR: "calendar events and meeting details",
     DocumentSource.REQUESTTRACKER: "requesttracker",
     DocumentSource.GITHUB: "github data (issues, PRs)",
     DocumentSource.GITBOOK: "gitbook data",

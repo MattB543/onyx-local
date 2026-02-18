@@ -5,6 +5,7 @@ import { useFormikContext } from "formik";
 
 // After a submit with errors, scroll + focus the first invalid field
 export function FormErrorFocus() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { submitCount, errors, isSubmitting } = useFormikContext<any>();
   const lastHandled = useRef(0);
 
@@ -37,7 +38,9 @@ export function FormErrorFocus() {
 
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (typeof (target as any).focus === "function") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (target as any).focus({ preventScroll: true });
           }
         }

@@ -9,6 +9,7 @@ import {
 import { FormFieldState } from "./types";
 import React, { useMemo, memo } from "react";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type FormikFieldProps<T = any> = {
   name: string;
   render: (

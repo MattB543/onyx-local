@@ -23,7 +23,7 @@ export const setupGmailOAuth = async ({
     ];
   }
   const credential =
-    (await credentialCreationResponse.json()) as Credential<{}>;
+    (await credentialCreationResponse.json()) as Credential<Record<string, never>>;
 
   const authorizationUrlResponse = await fetch(
     `/api/manage/connector/gmail/authorize/${credential.id}`

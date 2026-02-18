@@ -1,5 +1,10 @@
 "use client";
 
+import { Persona } from "@/app/admin/assistants/interfaces";
+import {
+  DiscordChannelConfig,
+  DiscordChannelType,
+} from "@/app/admin/discord-bot/types";
 import {
   Table,
   TableBody,
@@ -8,22 +13,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Switch from "@/refresh-components/inputs/Switch";
-import InputSelect from "@/refresh-components/inputs/InputSelect";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
-import Text from "@/refresh-components/texts/Text";
 import { Section } from "@/layouts/general-layouts";
-import {
-  DiscordChannelConfig,
-  DiscordChannelType,
-} from "@/app/admin/discord-bot/types";
+import EmptyMessage from "@/refresh-components/EmptyMessage";
+import InputSelect from "@/refresh-components/inputs/InputSelect";
+import Switch from "@/refresh-components/inputs/Switch";
+import Text from "@/refresh-components/texts/Text";
+
 import { SvgHash, SvgBubbleText, SvgLock } from "@opal/icons";
 import { IconProps } from "@opal/types";
-import { Persona } from "@/app/admin/assistants/interfaces";
+
 
 function getChannelIcon(
   channelType: DiscordChannelType,
-  isPrivate: boolean = false
+  isPrivate = false
 ): React.ComponentType<IconProps> {
   // TODO: Need different icon for private channel vs private forum
   if (isPrivate) {

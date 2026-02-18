@@ -57,6 +57,5 @@ export default function useIsDefaultAgent({
     urlAssistantId,
     existingChatSessionId,
     selectedChatSession?.persona_id,
-    liveAssistant?.id,
   ]);
 }

@@ -106,6 +106,7 @@ const ToolItem: React.FC<ToolItemProps> = ({
     ? { label: undefined, bg: "", text: "" }
     : getMethodStyles(openApiMetadata?.method);
 
+  /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
   const highlightedPathContent = useMemo(() => {
     if (!openApiMetadata?.path) {
       return null;
@@ -145,6 +146,7 @@ const ToolItem: React.FC<ToolItemProps> = ({
 
     return segments;
   }, [openApiMetadata?.path, methodText]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return (
     <div

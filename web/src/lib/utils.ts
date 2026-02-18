@@ -1,13 +1,15 @@
-import type { ComponentType } from "react";
 import { clsx, type ClassValue } from "clsx";
+import type { ComponentType } from "react";
 import { twMerge } from "tailwind-merge";
-import type { IconProps } from "@opal/types";
+
 import {
   SvgImage,
   SvgFileChartPie,
   SvgFileBraces,
   SvgFileText,
 } from "@opal/icons";
+import type { IconProps } from "@opal/types";
+
 import { ALLOWED_URL_PROTOCOLS } from "./constants";
 
 const URI_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
@@ -158,7 +160,7 @@ export function isImageExtension(
  */
 export function formatBytes(
   bytes: number | undefined,
-  decimals: number = 2
+  decimals = 2
 ): string {
   if (bytes == null) return "Unknown";
   if (bytes === 0) return "0 Bytes";
@@ -268,7 +270,7 @@ export function getFileIcon(
  * Useful for determining whether image previews should be compact.
  */
 export function hasNonImageFiles(
-  files: Array<{ name?: string | null }>
+  files: { name?: string | null }[]
 ): boolean {
   return files.some((file) => !isImageFile(file.name));
 }

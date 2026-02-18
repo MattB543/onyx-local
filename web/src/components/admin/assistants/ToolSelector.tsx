@@ -26,7 +26,8 @@ import { Info } from "lucide-react";
 interface ToolSelectorProps {
   tools: ToolSnapshot[];
   mcpServers?: MCPServer[];
-  enabledToolsMap: { [key: number]: boolean };
+  enabledToolsMap: Record<number, boolean>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setFieldValue?: (field: string, value: any) => void;
   imageGenerationDisabled?: boolean;
   imageGenerationDisabledTooltip?: string;
@@ -77,7 +78,7 @@ export function ToolSelector({
     const mcp = allCustom.filter((tool) => tool.mcp_server_id);
     const custom = allCustom.filter((tool) => !tool.mcp_server_id);
 
-    const groups: { [serverId: number]: ToolSnapshot[] } = {};
+    const groups: Record<number, ToolSnapshot[]> = {};
     mcp.forEach((tool) => {
       if (tool.mcp_server_id) {
         if (!groups[tool.mcp_server_id]) {

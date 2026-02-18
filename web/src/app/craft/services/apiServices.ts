@@ -267,6 +267,7 @@ export async function checkPreProvisionedSession(
  * For user_message: {type: "user_message", content: {type: "text", text: "..."}}
  */
 function extractContentFromMetadata(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any> | null | undefined
 ): string {
   if (!metadata) return "";
@@ -387,7 +388,7 @@ export async function fetchWebappInfo(
 
 export async function fetchDirectoryListing(
   sessionId: string,
-  path: string = ""
+  path = ""
 ): Promise<DirectoryListing> {
   const url = new URL(
     `${API_BASE}/sessions/${sessionId}/files`,

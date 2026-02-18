@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Children } from "react";
 import { cn } from "@/lib/utils";
 
 export type TimelineSurfaceBackground = "tint" | "transparent";
@@ -24,7 +24,7 @@ export function TimelineSurface({
   roundedBottom = false,
   background = "tint",
 }: TimelineSurfaceProps) {
-  if (React.Children.count(children) === 0) {
+  if (Children.count(children) === 0) {
     return null;
   }
 

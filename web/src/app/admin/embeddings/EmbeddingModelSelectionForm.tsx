@@ -34,6 +34,7 @@ export interface EmbeddingDetails {
   api_url?: string;
   api_version?: string;
   deployment_name?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   custom_config: any;
   provider_type: EmbeddingProvider;
 }

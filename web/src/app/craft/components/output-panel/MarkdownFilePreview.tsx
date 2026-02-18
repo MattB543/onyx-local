@@ -19,6 +19,7 @@ export default function MarkdownFilePreview({ content }: FileRendererProps) {
           content={content}
           className="max-w-3xl mx-auto"
           components={{
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             a: ({ href, children }: any) => (
               <a
                 href={href}

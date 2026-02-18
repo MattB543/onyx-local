@@ -26,21 +26,28 @@ export function CredentialFieldsRenderer({
   setAuthMethod,
 }: CredentialFieldsRendererProps) {
   const templateWithAuth =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     credentialTemplate as CredentialTemplateWithAuth<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values, setValues } = useFormikContext<any>();
 
   // remove other auth‐method fields when switching
   const handleAuthMethodChange = (newMethod: string) => {
-    // start from current form values
-    const cleaned = { ...values, authentication_method: newMethod };
-    // delete every field not in the selected auth method
+    // Collect field keys that belong to other auth methods
+    const keysToRemove = new Set<string>();
     templateWithAuth.authMethods?.forEach((m) => {
       if (m.value !== newMethod) {
         Object.keys(m.fields).forEach((fieldKey) => {
-          delete cleaned[fieldKey];
+          keysToRemove.add(fieldKey);
         });
       }
     });
+    // Build cleaned values without those keys
+    const cleaned = Object.fromEntries(
+      Object.entries({ ...values, authentication_method: newMethod }).filter(
+        ([key]) => !keysToRemove.has(key)
+      )
+    );
     setValues(cleaned);
     setAuthMethod?.(newMethod);
   };

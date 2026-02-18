@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -128,7 +128,7 @@ function getLanguageHint(toolCall: ToolCallState): string | undefined {
 export default function ToolCallPill({ toolCall }: ToolCallPillProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const Icon = getToolIcon(toolCall.kind);
+  const Icon = useMemo(() => getToolIcon(toolCall.kind), [toolCall.kind]);
   const statusDisplay = getStatusDisplay(toolCall.status);
   const StatusIcon = statusDisplay.icon;
 
@@ -159,6 +159,7 @@ export default function ToolCallPill({ toolCall }: ToolCallPillProps) {
                     className={cn("size-4 shrink-0", statusDisplay.iconClass)}
                   />
                 ) : (
+                  // eslint-disable-next-line react-hooks/static-components -- dynamic icon
                   <Icon className="size-4 stroke-text-03 shrink-0" />
                 )}
 

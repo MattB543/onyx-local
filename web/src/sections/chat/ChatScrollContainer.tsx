@@ -2,6 +2,8 @@
 
 import React, {
   ForwardedRef,
+  forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -59,8 +61,8 @@ function buildContentMask(): string {
   return `linear-gradient(to bottom, transparent 0%, transparent 0rem, black ${TOP_FADE_HEIGHT}, black calc(100% - ${BOTTOM_FADE_HEIGHT}), transparent 100%)`;
 }
 
-const ChatScrollContainer = React.memo(
-  React.forwardRef(
+const ChatScrollContainer = memo(
+  forwardRef(
     (
       {
         children,

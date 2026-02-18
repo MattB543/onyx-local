@@ -22,12 +22,14 @@ interface MultiSelectDropdownProps {
 }
 
 const getReactSelectStyles = () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: (base: any) => ({
     ...base,
     backgroundColor: "var(--background-neutral-00)",
     borderColor: "var(--border-03)",
     color: "var(--text-04)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   menu: (base: any) => ({
     ...base,
     backgroundColor: "var(--background-neutral-00)",
@@ -35,10 +37,12 @@ const getReactSelectStyles = () => ({
     borderRadius: "4px",
     overflow: "hidden",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   menuList: (base: any) => ({
     ...base,
     backgroundColor: "var(--background-neutral-00)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   option: (base: any, state: any) => ({
     ...base,
     backgroundColor: state.isSelected
@@ -48,14 +52,17 @@ const getReactSelectStyles = () => ({
         : "transparent",
     color: "var(--text-04)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   multiValue: (base: any) => ({
     ...base,
     backgroundColor: "var(--background-150)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   multiValueLabel: (base: any) => ({
     ...base,
     color: "var(--text-04)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   multiValueRemove: (base: any) => ({
     ...base,
     color: "var(--text-04)",
@@ -64,14 +71,17 @@ const getReactSelectStyles = () => ({
       color: "var(--text-04)",
     },
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: (base: any) => ({
     ...base,
     color: "var(--text-04)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   placeholder: (base: any) => ({
     ...base,
     color: "var(--text-02)",
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   singleValue: (base: any) => ({
     ...base,
     color: "var(--text-04)",
@@ -99,6 +109,7 @@ const MultiSelectDropdown = ({
     setInputValue(input);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChange = (selected: any) => {
     setSelectedOptions(selected || []);
     onChange(selected || []);

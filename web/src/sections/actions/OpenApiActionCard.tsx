@@ -22,7 +22,7 @@ export interface OpenApiActionCardProps {
   onManage?: (tool: ToolSnapshot) => void;
   onDelete?: (tool: ToolSnapshot) => Promise<void> | void;
   onRename?: (toolId: number, newName: string) => Promise<void>;
-  mutateOpenApiTools: () => Promise<unknown> | void;
+  mutateOpenApiTools: () => Promise<unknown> | undefined;
   onOpenDisconnectModal?: (tool: ToolSnapshot) => void;
 }
 

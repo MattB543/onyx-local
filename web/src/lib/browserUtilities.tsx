@@ -27,6 +27,7 @@ export const useOperatingSystem = (): OperatingSystem => {
 // Use this to handle the sidebar shortcut for the chat page
 // The shortcut is Ctrl+E on Windows/Linux and Cmd+E on Mac
 // This hook handles the keyboard event and toggles the sidebar
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const useSidebarShortcut = (router: any, toggleSidebar: () => void) => {
   const os = useOperatingSystem();
 

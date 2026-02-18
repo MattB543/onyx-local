@@ -69,7 +69,7 @@ export interface RetrievalDetails {
 }
 
 // Citation number -> Document ID (allows O(1) lookup when rendering citations)
-export type CitationMap = { [citation_num: number]: string };
+export type CitationMap = Record<number, string>;
 
 export enum ChatFileType {
   IMAGE = "image",
@@ -107,13 +107,17 @@ export interface LLMRelevanceFilterPacket {
 
 export interface ToolCallMetadata {
   tool_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_args: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_result?: Record<string, any>;
 }
 
 export interface ToolCallFinalResult {
   tool_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_args: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_result: Record<string, any>;
 }
 
@@ -155,6 +159,7 @@ export interface Message {
   stackTrace?: string | null;
   errorCode?: string | null;
   isRetryable?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errorDetails?: Record<string, any> | null;
   overridden_model?: string;
   stopReason?: StreamStopReason | null;
@@ -226,6 +231,7 @@ export interface BackendMessage {
 
   sub_questions: SubQuestionDetail[];
   // Keeping existing properties
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   comments: any;
   parentMessageId: number | null;
   refined_answer_improvement: boolean | null;
@@ -257,6 +263,7 @@ export interface StreamingError {
   stack_trace: string;
   error_code?: string;
   is_retryable?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
 }
 

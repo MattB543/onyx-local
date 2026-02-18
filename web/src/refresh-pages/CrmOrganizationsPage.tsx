@@ -1,175 +1,80 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Form, Formik } from "formik";
-import * as Yup from "yup";
+import { useMemo, useState } from "react";
+
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputSelectField from "@/refresh-components/form/InputSelectField";
-import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
-import InputTypeInField from "@/refresh-components/form/InputTypeInField";
-import Button from "@/refresh-components/buttons/Button";
-import Text from "@/refresh-components/texts/Text";
-import { SvgUser } from "@opal/icons";
-import {
-  CrmOrganizationType,
-  createCrmOrganization,
-} from "@/app/app/crm/crmService";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
+import { cn } from "@/lib/utils";
+import Button from "@/refresh-components/buttons/Button";
+import Card from "@/refresh-components/cards/Card";
+import EmptyMessage from "@/refresh-components/EmptyMessage";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import Pagination from "@/refresh-components/Pagination";
+import Text from "@/refresh-components/texts/Text";
+import CreateOrganizationModal from "@/refresh-pages/crm/components/CreateOrganizationModal";
+import OrgAvatar from "@/refresh-pages/crm/components/OrgAvatar";
+import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 
+import { SvgGlobe, SvgOrganization, SvgPlusCircle, SvgTag } from "@opal/icons";
+
 const PAGE_SIZE = 25;
-const ORGANIZATION_TYPES: CrmOrganizationType[] = [
-  "customer",
-  "prospect",
-  "partner",
-  "vendor",
-  "other",
-];
 
-interface OrganizationCreateValues {
-  name: string;
-  website: string;
-  type: CrmOrganizationType | "";
-  sector: string;
-  location: string;
-  size: string;
-  notes: string;
-}
+function websiteLabel(website: string | null): string {
+  if (!website) {
+    return "No website";
+  }
 
-const organizationCreateValidationSchema = Yup.object().shape({
-  name: Yup.string().trim().required("Organization name is required."),
-  website: Yup.string().trim().url("Enter a valid URL.").optional(),
-});
-
-function optionalText(value: string): string | undefined {
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
+  return website.replace(/^https?:\/\//i, "");
 }
 
 export default function CrmOrganizationsPage() {
   const [searchText, setSearchText] = useState("");
   const [pageNum, setPageNum] = useState(0);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const { organizations, totalItems, isLoading, error, refreshOrganizations } =
     useCrmOrganizations({
-      q: searchText,
+      q: searchText || undefined,
       pageNum,
       pageSize: PAGE_SIZE,
     });
 
-  const hasPrev = pageNum > 0;
-  const hasNext = (pageNum + 1) * PAGE_SIZE < totalItems;
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
+    [totalItems]
+  );
+
+  const emptyDescription = searchText
+    ? "Try a broader search query."
+    : "Create your first organization to get started.";
 
   return (
     <AppLayouts.Root>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
-          icon={SvgUser}
+          icon={SvgOrganization}
           title="CRM"
           description="Manage contacts and organizations."
-          rightChildren={
-            <Button
-              action
-              primary
-              size="md"
-              type="button"
-              onClick={() => setShowCreateForm((previous) => !previous)}
-            >
-              {showCreateForm ? "Cancel" : "New Organization"}
-            </Button>
-          }
         >
-          <CrmNav />
+          <CrmNav
+            rightContent={
+              <Button
+                action
+                primary
+                leftIcon={SvgPlusCircle}
+                onClick={() => setCreateModalOpen(true)}
+              >
+                New Organization
+              </Button>
+            }
+          />
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          {showCreateForm && (
-            <Formik<OrganizationCreateValues>
-              initialValues={{
-                name: "",
-                website: "",
-                type: "",
-                sector: "",
-                location: "",
-                size: "",
-                notes: "",
-              }}
-              validationSchema={organizationCreateValidationSchema}
-              onSubmit={async (values, { resetForm, setStatus }) => {
-                try {
-                  await createCrmOrganization({
-                    name: values.name.trim(),
-                    website: optionalText(values.website),
-                    type: values.type || undefined,
-                    sector: optionalText(values.sector),
-                    location: optionalText(values.location),
-                    size: optionalText(values.size),
-                    notes: optionalText(values.notes),
-                  });
-                  await refreshOrganizations();
-                  resetForm();
-                  setShowCreateForm(false);
-                } catch {
-                  setStatus("Failed to create organization.");
-                }
-              }}
-            >
-              {({ isSubmitting, status }) => (
-                <Form className="flex flex-col gap-2 rounded-12 border border-border-subtle p-3">
-                  <Text as="p" mainUiAction text02>
-                    Create Organization
-                  </Text>
-
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <InputTypeInField name="name" placeholder="Organization name" />
-                    <InputTypeInField name="website" placeholder="Website URL" />
-                    <InputSelectField name="type">
-                      <InputSelect.Trigger placeholder="Type" />
-                      <InputSelect.Content>
-                        {ORGANIZATION_TYPES.map((typeOption) => (
-                          <InputSelect.Item key={typeOption} value={typeOption}>
-                            {typeOption.toUpperCase()}
-                          </InputSelect.Item>
-                        ))}
-                      </InputSelect.Content>
-                    </InputSelectField>
-                    <InputTypeInField name="sector" placeholder="Sector" />
-                    <InputTypeInField name="location" placeholder="Location" />
-                    <InputTypeInField name="size" placeholder="Size" />
-                  </div>
-
-                  <InputTextAreaField
-                    name="notes"
-                    placeholder="Notes"
-                    rows={3}
-                  />
-
-                  {status && (
-                    <Text
-                      as="p"
-                      secondaryAction
-                      className="text-status-error-03"
-                    >
-                      {status}
-                    </Text>
-                  )}
-
-                  <div className="flex justify-end">
-                    <Button action primary type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "Creating..." : "Create Organization"}
-                    </Button>
-                  </div>
-                </Form>
-              )}
-            </Formik>
-          )}
-
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <InputTypeIn
               value={searchText}
               onChange={(event) => {
@@ -179,14 +84,15 @@ export default function CrmOrganizationsPage() {
               placeholder="Search organizations"
               leftSearchIcon
             />
-            <Text as="p" secondaryAction text03>
+
+            <Text as="p" secondaryAction text03 className="md:justify-self-end">
               {totalItems} total
             </Text>
           </div>
 
           {error && (
             <Text as="p" secondaryBody className="text-status-error-03">
-              Failed to load CRM organizations.
+              Failed to load organizations.
             </Text>
           )}
 
@@ -195,58 +101,118 @@ export default function CrmOrganizationsPage() {
               Loading organizations...
             </Text>
           ) : organizations.length === 0 ? (
-            <Text as="p" secondaryBody text03>
-              No organizations found.
-            </Text>
+            <EmptyMessage
+              icon={SvgOrganization}
+              title="No organizations found"
+              description={emptyDescription}
+            />
           ) : (
             <div className="flex flex-col gap-2">
-              {organizations.map((organization) => (
-                <Link
-                  key={organization.id}
-                  href={`/app/crm/organizations/${organization.id}`}
-                  className="rounded-08 border border-border-subtle p-3 hover:bg-background-tint-02"
-                >
-                  <Text as="p" mainUiAction text02>
-                    {organization.name}
-                  </Text>
-                  <Text as="p" secondaryBody text03>
-                    {organization.website || "No website"}
-                  </Text>
-                  <Text as="p" secondaryBody text03>
-                    {organization.type?.toUpperCase() || "No type"}
-                  </Text>
-                </Link>
-              ))}
+              {organizations.map((organization) => {
+                const visibleTags = organization.tags.slice(0, 2);
+                const remainingTagCount = Math.max(
+                  0,
+                  organization.tags.length - 2
+                );
+                const detailsRow =
+                  [
+                    organization.sector,
+                    organization.location,
+                    organization.size,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "No additional details";
+
+                return (
+                  <Link
+                    key={organization.id}
+                    href={`/app/crm/organizations/${organization.id}`}
+                    className="block"
+                  >
+                    <Card
+                      variant="secondary"
+                      className="gap-2 transition-colors hover:bg-background-tint-02"
+                    >
+                      <div className="flex items-start gap-3">
+                        <OrgAvatar
+                          name={organization.name}
+                          type={organization.type}
+                        />
+
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Text as="p" mainUiAction text02>
+                              {organization.name}
+                            </Text>
+                            <TypeBadge type={organization.type} />
+                          </div>
+
+                          <Text as="p" secondaryBody text03>
+                            {detailsRow}
+                          </Text>
+
+                          <div className="flex items-center gap-1">
+                            <SvgGlobe size={14} className="stroke-text-03" />
+                            <Text as="p" secondaryBody text03>
+                              {websiteLabel(organization.website)}
+                            </Text>
+                          </div>
+
+                          {visibleTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {visibleTags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
+                                  )}
+                                >
+                                  <SvgTag
+                                    size={10}
+                                    className="stroke-text-03"
+                                  />
+                                  <Text as="span" figureSmallLabel text03>
+                                    {tag.name}
+                                  </Text>
+                                </span>
+                              ))}
+
+                              {remainingTagCount > 0 && (
+                                <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
+                                  <Text as="span" figureSmallLabel text03>
+                                    +{remainingTagCount}
+                                  </Text>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                );
+              })}
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <Button
-              action
-              secondary
-              size="md"
-              type="button"
-              disabled={!hasPrev}
-              onClick={() => setPageNum((value) => Math.max(0, value - 1))}
-            >
-              Previous
-            </Button>
-            <Text as="p" secondaryAction text03>
-              Page {pageNum + 1}
-            </Text>
-            <Button
-              action
-              secondary
-              size="md"
-              type="button"
-              disabled={!hasNext}
-              onClick={() => setPageNum((value) => value + 1)}
-            >
-              Next
-            </Button>
-          </div>
+          {!isLoading && organizations.length > 0 && totalPages > 1 && (
+            <Pagination
+              currentPage={pageNum + 1}
+              totalPages={totalPages}
+              onPageChange={(nextPage) => setPageNum(nextPage - 1)}
+            />
+          )}
         </SettingsLayouts.Body>
       </SettingsLayouts.Root>
+
+      <CreateOrganizationModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={() => {
+          setPageNum(0);
+          void refreshOrganizations();
+        }}
+      />
     </AppLayouts.Root>
   );
 }

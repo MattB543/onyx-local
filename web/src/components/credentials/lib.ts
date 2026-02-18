@@ -1,6 +1,5 @@
 import * as Yup from "yup";
 
-import { dictionaryType, formType } from "./types";
 import {
   Credential,
   getDisplayNameForCredentialKey,
@@ -8,8 +7,12 @@ import {
 } from "@/lib/connectors/credentials";
 import { isTypedFileField } from "@/lib/connectors/fileTypes";
 
+import { dictionaryType, formType } from "./types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createValidationSchema(json_values: Record<string, any>) {
   const schemaFields: Record<string, Yup.AnySchema> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const template = json_values as CredentialTemplateWithAuth<any>;
   // multi‐auth templates
   if (template.authMethods && template.authMethods.length > 1) {
@@ -90,7 +93,7 @@ export function createValidationSchema(json_values: Record<string, any>) {
 }
 
 export function createEditingValidationSchema(json_values: dictionaryType) {
-  const schemaFields: { [key: string]: Yup.AnySchema } = {};
+  const schemaFields: Record<string, Yup.AnySchema> = {};
 
   for (const key in json_values) {
     if (Object.prototype.hasOwnProperty.call(json_values, key)) {
@@ -107,6 +110,7 @@ export function createEditingValidationSchema(json_values: dictionaryType) {
   return Yup.object().shape(schemaFields);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createInitialValues(credential: Credential<any>): formType {
   const initialValues: formType = {
     name: credential.name || "",
@@ -115,6 +119,7 @@ export function createInitialValues(credential: Credential<any>): formType {
   for (const key in credential.credential_json) {
     // Initialize TypedFile fields as null, other fields as empty strings
     if (isTypedFileField(key)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       initialValues[key] = null as any; // TypedFile fields start as null
     } else {
       initialValues[key] = "";

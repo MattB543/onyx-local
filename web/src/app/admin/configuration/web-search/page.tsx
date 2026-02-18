@@ -131,8 +131,8 @@ export default function Page() {
     errorHandlingFetcher
   );
 
-  const searchProviders = searchProvidersData ?? [];
-  const contentProviders = contentProvidersData ?? [];
+  const searchProviders = useMemo(() => searchProvidersData ?? [], [searchProvidersData]);
+  const contentProviders = useMemo(() => contentProvidersData ?? [], [contentProvidersData]);
 
   const isLoading = isLoadingSearchProviders || isLoadingContentProviders;
 

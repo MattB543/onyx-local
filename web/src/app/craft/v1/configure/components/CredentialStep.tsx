@@ -38,9 +38,13 @@ import { useUser } from "@/providers/UserProvider";
 
 interface CredentialStepProps {
   connectorType: ValidSources;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Credential<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   selectedCredential: Credential<any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSelectCredential: (cred: Credential<any>) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onCredentialCreated: (cred: Credential<any>) => void;
   onCredentialDeleted: (credId: number) => void;
   onContinue: () => void;
@@ -117,6 +121,7 @@ export default function CredentialStep({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDeleteCredential = async (credential: Credential<any>) => {
     try {
       const response = await deleteCredential(credential.id);
@@ -130,6 +135,7 @@ export default function CredentialStep({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSwap = (newCredential: Credential<any>) => {
     onSelectCredential(newCredential);
   };

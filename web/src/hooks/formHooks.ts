@@ -37,6 +37,7 @@ import { useField } from "formik";
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useOnChangeEvent<T = any>(
   name: string,
   f?: (event: T) => void
@@ -80,6 +81,7 @@ export function useOnChangeEvent<T = any>(
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useOnChangeValue<T = any>(
   name: string,
   f?: (value: T) => void
@@ -114,6 +116,7 @@ export function useOnChangeValue<T = any>(
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useOnBlurEvent<T = any>(name: string, f?: (event: T) => void) {
   const [field] = useField<T>(name);
   return (event: T) => {

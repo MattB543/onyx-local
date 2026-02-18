@@ -93,6 +93,7 @@ from onyx.db.connector_credential_pair import (
     get_connector_credential_pairs_for_user_parallel,
 )
 from onyx.db.credentials import cleanup_gmail_credentials
+from onyx.db.credentials import cleanup_google_calendar_credentials
 from onyx.db.credentials import cleanup_google_drive_credentials
 from onyx.db.credentials import create_credential
 from onyx.db.credentials import delete_service_account_credentials
@@ -138,6 +139,7 @@ from onyx.server.documents.models import FailedConnectorIndexingStatus
 from onyx.server.documents.models import FileUploadResponse
 from onyx.server.documents.models import GDriveCallback
 from onyx.server.documents.models import GmailCallback
+from onyx.server.documents.models import GoogleCalendarCallback
 from onyx.server.documents.models import GoogleAppCredentials
 from onyx.server.documents.models import GoogleServiceAccountCredentialRequest
 from onyx.server.documents.models import GoogleServiceAccountKey
@@ -160,6 +162,7 @@ logger = setup_logger()
 
 _GMAIL_CREDENTIAL_ID_COOKIE_NAME = "gmail_credential_id"
 _GOOGLE_DRIVE_CREDENTIAL_ID_COOKIE_NAME = "google_drive_credential_id"
+_GOOGLE_CALENDAR_CREDENTIAL_ID_COOKIE_NAME = "google_calendar_credential_id"
 _INDEXING_STATUS_PAGE_SIZE = 10
 
 SEEN_ZIP_DETAIL = "Only one zip file is allowed per file connector, \
@@ -245,6 +248,50 @@ def delete_google_app_credentials(
     try:
         delete_google_app_cred(DocumentSource.GOOGLE_DRIVE)
         cleanup_google_drive_credentials(db_session=db_session)
+    except KvKeyNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return StatusResponse(
+        success=True, message="Successfully deleted Google App Credentials"
+    )
+
+
+@router.get("/admin/connector/google-calendar/app-credential")
+def check_google_calendar_app_credentials_exist(
+    _: User = Depends(current_curator_or_admin_user),
+) -> dict[str, str]:
+    try:
+        return {
+            "client_id": get_google_app_cred(
+                DocumentSource.GOOGLE_CALENDAR
+            ).web.client_id
+        }
+    except KvKeyNotFoundError:
+        raise HTTPException(status_code=404, detail="Google App Credentials not found")
+
+
+@router.put("/admin/connector/google-calendar/app-credential")
+def upsert_google_calendar_app_credentials(
+    app_credentials: GoogleAppCredentials, _: User = Depends(current_admin_user)
+) -> StatusResponse:
+    try:
+        upsert_google_app_cred(app_credentials, DocumentSource.GOOGLE_CALENDAR)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return StatusResponse(
+        success=True, message="Successfully saved Google App Credentials"
+    )
+
+
+@router.delete("/admin/connector/google-calendar/app-credential")
+def delete_google_calendar_app_credentials(
+    _: User = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> StatusResponse:
+    try:
+        delete_google_app_cred(DocumentSource.GOOGLE_CALENDAR)
+        cleanup_google_calendar_credentials(db_session=db_session)
     except KvKeyNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -345,6 +392,54 @@ def delete_google_service_account_key(
     )
 
 
+@router.get("/admin/connector/google-calendar/service-account-key")
+def check_google_calendar_service_account_key_exist(
+    _: User = Depends(current_curator_or_admin_user),
+) -> dict[str, str]:
+    try:
+        return {
+            "service_account_email": get_service_account_key(
+                DocumentSource.GOOGLE_CALENDAR
+            ).client_email
+        }
+    except KvKeyNotFoundError:
+        raise HTTPException(
+            status_code=404, detail="Google Service Account Key not found"
+        )
+
+
+@router.put("/admin/connector/google-calendar/service-account-key")
+def upsert_google_calendar_service_account_key(
+    service_account_key: GoogleServiceAccountKey, _: User = Depends(current_admin_user)
+) -> StatusResponse:
+    try:
+        upsert_service_account_key(
+            service_account_key, DocumentSource.GOOGLE_CALENDAR
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return StatusResponse(
+        success=True, message="Successfully saved Google Service Account Key"
+    )
+
+
+@router.delete("/admin/connector/google-calendar/service-account-key")
+def delete_google_calendar_service_account_key(
+    _: User = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> StatusResponse:
+    try:
+        delete_service_account_key(DocumentSource.GOOGLE_CALENDAR)
+        cleanup_google_calendar_credentials(db_session=db_session)
+    except KvKeyNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return StatusResponse(
+        success=True, message="Successfully deleted Google Service Account Key"
+    )
+
+
 @router.put("/admin/connector/google-drive/service-account-credential")
 def upsert_service_account_credential(
     service_account_credential_request: GoogleServiceAccountCredentialRequest,
@@ -392,6 +487,31 @@ def upsert_gmail_service_account_credential(
     # first delete all existing service account credentials
     delete_service_account_credentials(user, db_session, DocumentSource.GMAIL)
     # `user=None` since this credential is not a personal credential
+    credential = create_credential(
+        credential_data=credential_base, user=user, db_session=db_session
+    )
+    return ObjectCreationIdResponse(id=credential.id)
+
+
+@router.put("/admin/connector/google-calendar/service-account-credential")
+def upsert_google_calendar_service_account_credential(
+    service_account_credential_request: GoogleServiceAccountCredentialRequest,
+    user: User = Depends(current_curator_or_admin_user),
+    db_session: Session = Depends(get_session),
+) -> ObjectCreationIdResponse:
+    """Special API for creating a service-account-based Google Calendar credential."""
+    try:
+        credential_base = build_service_account_creds(
+            DocumentSource.GOOGLE_CALENDAR,
+            primary_admin_email=service_account_credential_request.google_primary_admin,
+            name="Service Account (uploaded)",
+        )
+    except KvKeyNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    delete_service_account_credentials(
+        user, db_session, DocumentSource.GOOGLE_CALENDAR
+    )
     credential = create_credential(
         credential_data=credential_base, user=user, db_session=db_session
     )
@@ -1712,6 +1832,21 @@ def google_drive_auth(
     )
 
 
+@router.get("/connector/google-calendar/authorize/{credential_id}")
+def google_calendar_auth(
+    response: Response, credential_id: str, _: User = Depends(current_user)
+) -> AuthUrl:
+    response.set_cookie(
+        key=_GOOGLE_CALENDAR_CREDENTIAL_ID_COOKIE_NAME,
+        value=credential_id,
+        httponly=True,
+        max_age=600,
+    )
+    return AuthUrl(
+        auth_url=get_auth_url(int(credential_id), DocumentSource.GOOGLE_CALENDAR)
+    )
+
+
 @router.get("/connector/gmail/callback")
 def gmail_callback(
     request: Request,
@@ -1771,6 +1906,41 @@ def google_drive_callback(
         )
 
     return StatusResponse(success=True, message="Updated Google Drive access tokens")
+
+
+@router.get("/connector/google-calendar/callback")
+def google_calendar_callback(
+    request: Request,
+    callback: GoogleCalendarCallback = Depends(),
+    user: User = Depends(current_user),
+    db_session: Session = Depends(get_session),
+) -> StatusResponse:
+    credential_id_cookie = request.cookies.get(
+        _GOOGLE_CALENDAR_CREDENTIAL_ID_COOKIE_NAME
+    )
+    if credential_id_cookie is None or not credential_id_cookie.isdigit():
+        raise HTTPException(
+            status_code=401, detail="Request did not pass CSRF verification."
+        )
+    credential_id = int(credential_id_cookie)
+    verify_csrf(credential_id, callback.state)
+
+    credentials: Credentials | None = update_credential_access_tokens(
+        callback.code,
+        credential_id,
+        user,
+        db_session,
+        DocumentSource.GOOGLE_CALENDAR,
+        GoogleOAuthAuthenticationMethod.UPLOADED,
+    )
+    if credentials is None:
+        raise HTTPException(
+            status_code=500, detail="Unable to fetch Google Calendar access tokens"
+        )
+
+    return StatusResponse(
+        success=True, message="Updated Google Calendar access tokens"
+    )
 
 
 @router.get("/connector", tags=PUBLIC_API_TAGS)

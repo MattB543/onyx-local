@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { HTMLAttributes, forwardRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import Text from "@/refresh-components/texts/Text";
 import IconButton from "@/refresh-components/buttons/IconButton";
@@ -196,7 +196,7 @@ const textClasses = {
   },
 } as const;
 
-export interface MessageProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface MessageProps extends HTMLAttributes<HTMLDivElement> {
   // Type variants:
   flash?: boolean;
   static?: boolean;
@@ -360,7 +360,7 @@ function MessageInner(
   );
 }
 
-const Message = React.forwardRef<HTMLDivElement, MessageProps>(MessageInner);
+const Message = forwardRef<HTMLDivElement, MessageProps>(MessageInner);
 Message.displayName = "Message";
 
 export default Message;

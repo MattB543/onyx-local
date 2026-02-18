@@ -27,7 +27,7 @@ export const setupGoogleDriveOAuth = async ({
     ];
   }
   const credential =
-    (await credentialCreationResponse.json()) as Credential<{}>;
+    (await credentialCreationResponse.json()) as Credential<Record<string, never>>;
 
   const authorizationUrlResponse = await fetch(
     `/api/manage/connector/google-drive/authorize/${credential.id}`

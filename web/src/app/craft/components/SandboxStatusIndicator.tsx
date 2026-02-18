@@ -57,7 +57,7 @@ const STATUS_CONFIG = {
 
 type Status = keyof typeof STATUS_CONFIG;
 
-interface SandboxStatusIndicatorProps {}
+type SandboxStatusIndicatorProps = Record<string, never>;
 
 /**
  * Derives the current sandbox status from session state or pre-provisioning state.

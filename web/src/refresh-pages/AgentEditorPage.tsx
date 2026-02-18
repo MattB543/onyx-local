@@ -230,7 +230,7 @@ function AgentIconEditor({ existingAgent }: AgentIconEditorProps) {
                 Upload Image
               </LineItem>,
               null,
-              <div className="grid grid-cols-4 gap-1">
+              <div key="icon-grid" className="grid grid-cols-4 gap-1">
                 <SquareButton
                   key="default-icon"
                   icon={() => (
@@ -289,6 +289,7 @@ function MCPServerCard({
   isLoading,
 }: MCPServerCardProps) {
   const [isFolded, setIsFolded] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values, setFieldValue, getFieldMeta } = useFormikContext<any>();
   const serverFieldName = `mcp_server_${server.id}`;
   const isServerEnabled = values[serverFieldName]?.enabled ?? false;
@@ -455,10 +456,12 @@ export default function AgentEditorPage({
 
   // LLM Model Selection
   const getCurrentLlm = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (values: any, llmProviders: any) =>
       values.llm_model_version_override && values.llm_model_provider_override
         ? (() => {
             const provider = llmProviders?.find(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (p: any) => p.name === values.llm_model_provider_override
             );
             return structureValue(
@@ -472,6 +475,7 @@ export default function AgentEditorPage({
   );
 
   const onLlmSelect = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (selected: string | null, setFieldValue: any) => {
       if (selected === null) {
         setFieldValue("llm_model_version_override", null);
@@ -776,6 +780,7 @@ export default function AgentEditorPage({
       // Collect enabled MCP tool IDs
       mcpServers.forEach((server) => {
         const serverFieldName = `mcp_server_${server.id}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const serverData = (values as any)[serverFieldName];
 
         if (
@@ -799,6 +804,7 @@ export default function AgentEditorPage({
       // Collect enabled OpenAPI tool IDs
       openApiTools.forEach((openApiTool) => {
         const toolFieldName = `openapi_tool_${openApiTool.id}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((values as any)[toolFieldName] === true) {
           toolIds.push(openApiTool.id);
         }

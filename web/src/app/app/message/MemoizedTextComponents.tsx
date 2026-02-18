@@ -86,6 +86,7 @@ export const MemoizedAnchor = memo(
           const associatedDocInfo = associatedDoc
             ? {
                 ...associatedDoc,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 icon: icon as any,
                 link: associatedDoc.link,
               }
@@ -126,7 +127,9 @@ export const MemoizedLink = memo(
     openQuestion,
     ...rest
   }: Partial<DocumentCardProps & QuestionCardProps> & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     node?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   }) => {
     const value = rest.children;

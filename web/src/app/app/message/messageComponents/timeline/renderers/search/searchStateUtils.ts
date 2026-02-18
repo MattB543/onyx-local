@@ -10,9 +10,7 @@ import { OnyxDocument } from "@/lib/search/interfaces";
 
 export const MAX_TITLE_LENGTH = 25;
 
-export const getMetadataTags = (metadata?: {
-  [key: string]: string;
-}): string[] | undefined => {
+export const getMetadataTags = (metadata?: Record<string, string>): string[] | undefined => {
   if (!metadata) return undefined;
   const tags = Object.values(metadata)
     .filter((value) => typeof value === "string" && value.length > 0)

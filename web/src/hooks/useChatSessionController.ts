@@ -162,6 +162,7 @@ export default function useChatSessionController({
         // If we're supposed to submit on initial load, then do that here
         if (
           shouldSubmitOnLoad(searchParams) &&
+          // eslint-disable-next-line react-hooks/immutability -- ref is a hook argument but mutation is intentional
           !submitOnLoadPerformed.current
         ) {
           submitOnLoadPerformed.current = true;

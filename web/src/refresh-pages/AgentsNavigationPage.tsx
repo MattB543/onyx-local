@@ -121,6 +121,7 @@ export default function AgentsNavigationPage() {
             if (response.ok) {
               const data = await response.json();
               const server = data.mcp_servers?.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (s: any) => s.id === serverId
               );
               if (server) {
@@ -264,7 +265,7 @@ export default function AgentsNavigationPage() {
           type: "mcp_group";
           mcp_server_id: number;
           server_name: string;
-          tools: Array<{ id: number; name: string; display_name: string }>;
+          tools: { id: number; name: string; display_name: string }[];
         };
 
     const mcpGroupItems: ActionItem[] = Array.from(mcpGroupsMap.entries()).map(

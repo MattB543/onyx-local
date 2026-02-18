@@ -83,6 +83,7 @@ export default function ProviderCreationModal({
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setFieldValue: (field: string, value: any) => void
   ) => {
     const file = event.target.files?.[0];
@@ -107,6 +108,7 @@ export default function ProviderCreationModal({
   };
 
   const handleSubmit = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     values: any,
     { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
   ) => {

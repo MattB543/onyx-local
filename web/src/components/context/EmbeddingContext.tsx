@@ -10,7 +10,9 @@ import type { Route } from "next";
 
 interface EmbeddingFormContextType {
   formStep: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formValues: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setFormValues: (values: Record<string, any>) => void;
   nextFormStep: (contract?: string) => void;
   prevFormStep: () => void;
@@ -36,6 +38,7 @@ export const EmbeddingFormProvider: React.FC<{
   // Initialize formStep based on the URL parameter
   const stepFromUrl = parseInt(searchParams?.get("step") || "0", 10);
   const [formStep, setFormStep] = useState(stepFromUrl);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [formValues, setFormValues] = useState<Record<string, any>>({});
 
   const [allowAdvanced, setAllowAdvanced] = useState(false);

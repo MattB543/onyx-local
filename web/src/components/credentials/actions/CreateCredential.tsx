@@ -7,6 +7,7 @@ import { TextFormField } from "@/components/Field";
 import { Form, Formik, FormikHelpers } from "formik";
 import { toast } from "@/hooks/useToast";
 import GDriveMain from "@/app/admin/connectors/[connector]/pages/gdrive/GoogleDrivePage";
+import GoogleCalendarMain from "@/app/admin/connectors/[connector]/pages/gcalendar/GoogleCalendarPage";
 import { Connector } from "@/lib/connectors/connectors";
 import { Credential, credentialTemplates } from "@/lib/connectors/credentials";
 import { GmailMain } from "@/app/admin/connectors/[connector]/pages/gmail/GmailPage";
@@ -46,6 +47,7 @@ const CreateButton = ({
 
 type formType = IsPublicGroupSelectorFormType & {
   name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // For additional credential fields
 };
 
@@ -71,15 +73,18 @@ export default function CreateCredential({
   // Special handlers
   onClose?: () => void;
   // Switch currently selected credential
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSwitch?: (selectedCredential: Credential<any>) => Promise<void>;
   // Switch currently selected credential + link with connector
   onSwap?: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectedCredential: Credential<any>,
     connectorId: number,
     accessType: AccessType
   ) => void;
 
   // For swapping credentials on selection
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   swapConnector?: Connector<any>;
 
   // Mutating parent state
@@ -158,7 +163,7 @@ export default function CreateCredential({
       await refresh();
 
       if (onSwitch) {
-        onSwitch(response?.credential!);
+        onSwitch(credential);
       }
     } catch (error) {
       console.error("Error submitting credential:", error);
@@ -176,10 +181,15 @@ export default function CreateCredential({
     return <GDriveMain />;
   }
 
+  if (sourceType == "google_calendar") {
+    return <GoogleCalendarMain />;
+  }
+
   const credentialTemplate: dictionaryType = credentialTemplates[sourceType];
   const validationSchema = createValidationSchema(credentialTemplate);
 
   // Set initial auth method for templates with multiple auth methods
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const templateWithAuth = credentialTemplate as any;
   const initialAuthMethod =
     templateWithAuth?.authMethods?.[0]?.value || undefined;

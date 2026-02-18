@@ -1,4 +1,5 @@
 "use client";
+// eslint-disable-next-line import-x/no-named-as-default -- posthog-js uses same name for default and named export
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { useEffect } from "react";

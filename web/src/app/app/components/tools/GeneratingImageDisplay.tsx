@@ -4,6 +4,7 @@ export default function GeneratingImageDisplay({ isCompleted = false }) {
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
   const animationRef = useRef<number | null>(null);
+  // eslint-disable-next-line react-hooks/purity -- useRef initial value computed once at mount
   const startTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {

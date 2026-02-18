@@ -1,3 +1,6 @@
+import React from "react";
+
+import { Persona } from "@/app/admin/assistants/interfaces";
 import {
   AxeroIcon,
   BookstackIcon,
@@ -11,6 +14,7 @@ import {
   GitlabIcon,
   BitbucketIcon,
   GmailIcon,
+  GoogleCalendarIcon,
   GongIcon,
   GoogleDriveIcon,
   GoogleSitesIcon,
@@ -48,12 +52,14 @@ import {
   EmailIcon,
   TestRailIcon,
 } from "@/components/icons/icons";
-import { ValidSources } from "./types";
-import { SourceCategory, SourceMetadata } from "./search/interfaces";
-import { Persona } from "@/app/admin/assistants/interfaces";
-import React from "react";
-import { DOCS_ADMINS_PATH } from "./constants";
+
 import { SvgFileText, SvgGlobe } from "@opal/icons";
+
+import { DOCS_ADMINS_PATH } from "./constants";
+import { SourceCategory, SourceMetadata } from "./search/interfaces";
+import { ValidSources } from "./types";
+
+
 
 interface PartialSourceMetadata {
   icon: React.FC<{ size?: number; className?: string }>;
@@ -74,9 +80,7 @@ interface PartialSourceMetadata {
   customDescription?: string;
 }
 
-type SourceMap = {
-  [K in ValidSources | "federated_slack"]: PartialSourceMetadata;
-};
+type SourceMap = Record<ValidSources | "federated_slack", PartialSourceMetadata>;
 
 const slackMetadata = {
   icon: ColorSlackIcon,
@@ -305,6 +309,13 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     displayName: "Gmail",
     category: SourceCategory.Messaging,
     docs: `${DOCS_ADMINS_PATH}/connectors/official/gmail/overview`,
+  },
+  google_calendar: {
+    icon: GoogleCalendarIcon,
+    displayName: "Google Calendar",
+    category: SourceCategory.Other,
+    docs: `${DOCS_ADMINS_PATH}/connectors/official/google_calendar/overview`,
+    oauthSupported: true,
   },
   drupal_wiki: {
     icon: DrupalWikiIcon,

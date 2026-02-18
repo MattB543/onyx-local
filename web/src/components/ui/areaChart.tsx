@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/card";
 
 interface AreaChartProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any[];
   categories?: string[];
   index?: string;
@@ -35,7 +36,9 @@ interface AreaChartProps {
   className?: string;
   title?: string;
   description?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   xAxisFormatter?: (value: any) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   yAxisFormatter?: (value: any) => string;
   stacked?: boolean;
 }

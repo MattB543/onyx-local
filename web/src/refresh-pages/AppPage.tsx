@@ -187,6 +187,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
 
     // If there's a message, submit it
     if (message) {
+      // eslint-disable-next-line react-hooks/immutability -- onSubmit declared later in component but stable via useChatController
       onSubmit({
         message,
         currentMessageFiles,

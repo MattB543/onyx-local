@@ -32,6 +32,10 @@ CONNECTOR_CLASS_MAP = {
         module_path="onyx.connectors.gmail.connector",
         class_name="GmailConnector",
     ),
+    DocumentSource.GOOGLE_CALENDAR: ConnectorMapping(
+        module_path="onyx.connectors.google_calendar.connector",
+        class_name="GoogleCalendarConnector",
+    ),
     DocumentSource.GITLAB: ConnectorMapping(
         module_path="onyx.connectors.gitlab.connector",
         class_name="GitlabConnector",

@@ -1,33 +1,65 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import Button from "@/refresh-components/buttons/Button";
+import { usePathname, useRouter } from "next/navigation";
 
-export default function CrmNav() {
+import Tabs from "@/refresh-components/Tabs";
+
+type CrmTab = "home" | "contacts" | "organizations";
+
+interface CrmNavProps {
+  rightContent?: React.ReactNode;
+}
+
+function getCurrentTab(pathname: string): CrmTab {
+  if (pathname.startsWith("/app/crm/organizations")) {
+    return "organizations";
+  }
+
+  if (pathname.startsWith("/app/crm/contacts")) {
+    return "contacts";
+  }
+
+  return "home";
+}
+
+export default function CrmNav({ rightContent }: CrmNavProps) {
   const pathname = usePathname();
-  const inOrganizations = pathname.startsWith("/app/crm/organizations");
-  const inContacts = !inOrganizations;
+  const router = useRouter();
+  const activeTab = getCurrentTab(pathname);
 
   return (
-    <div className="flex gap-2">
-      <Button
-        main
-        primary
-        href="/app/crm/contacts"
-        transient={inContacts}
-        size="md"
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => {
+        const nextTab = value as CrmTab;
+
+        if (nextTab === "home") {
+          router.push("/app/crm");
+          return;
+        }
+
+        if (nextTab === "contacts") {
+          router.push("/app/crm/contacts");
+          return;
+        }
+
+        router.push("/app/crm/organizations");
+      }}
+    >
+      <Tabs.List
+        variant="pill"
+        rightContent={rightContent}
+        className={`
+          !bg-transparent
+          [&_[role=tab][data-state=active]]:!bg-transparent
+          [&_[role=tab][data-state=inactive]]:!bg-transparent
+          [&_[role=tab][data-state=active]]:!text-text-05
+        `}
       >
-        Contacts
-      </Button>
-      <Button
-        main
-        primary
-        href="/app/crm/organizations"
-        transient={inOrganizations}
-        size="md"
-      >
-        Organizations
-      </Button>
-    </div>
+        <Tabs.Trigger value="home">Home</Tabs.Trigger>
+        <Tabs.Trigger value="contacts">Contacts</Tabs.Trigger>
+        <Tabs.Trigger value="organizations">Organizations</Tabs.Trigger>
+      </Tabs.List>
+    </Tabs>
   );
 }

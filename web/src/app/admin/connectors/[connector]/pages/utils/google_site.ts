@@ -6,6 +6,7 @@ import { ValidSources } from "@/lib/types";
 
 export const submitGoogleSite = async (
   selectedFiles: File[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   base_url: any,
   refreshFreq: number,
   pruneFreq: number,

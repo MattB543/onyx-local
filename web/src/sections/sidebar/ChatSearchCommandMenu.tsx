@@ -348,8 +348,9 @@ export default function ChatSearchCommandMenu({
                   onSelect={() => handleNewProject(searchValue.trim())}
                 >
                   <>
-                    Create New Project "
-                    <span className="text-text-05">{searchValue.trim()}</span>"
+                    Create New Project &ldquo;
+                    <span className="text-text-05">{searchValue.trim()}</span>
+                    &rdquo;
                   </>
                 </CommandMenu.Action>
               )}

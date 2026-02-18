@@ -80,6 +80,7 @@ export default function EmbeddingForm() {
 
   const updateAdvancedEmbeddingDetails = (
     key: keyof AdvancedSearchConfiguration,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     value: any
   ) => {
     setAdvancedEmbeddingDetails((values) => ({ ...values, [key]: value }));
@@ -252,7 +253,9 @@ export default function EmbeddingForm() {
                 if (switchoverType == SwitchoverType.INSTANT) {
                   setShowInstantSwitchConfirm(true);
                 } else {
+                  // eslint-disable-next-line react-hooks/immutability -- functions declared later in component but stable
                   handleReIndex();
+                  // eslint-disable-next-line react-hooks/immutability -- functions declared later in component but stable
                   navigateToEmbeddingPage("search settings");
                 }
               }}

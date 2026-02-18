@@ -31,7 +31,7 @@ import { toast } from "@/hooks/useToast";
 export const CUSTOM_PROVIDER_NAME = "custom";
 
 function customConfigProcessing(customConfigsList: [string, string][]) {
-  const customConfig: { [key: string]: string } = {};
+  const customConfig: Record<string, string> = {};
   customConfigsList.forEach(([key, value]) => {
     customConfig[key] = value;
   });
@@ -224,6 +224,7 @@ export function CustomForm({
 
                   <FieldArray
                     name="custom_config_list"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     render={(arrayHelpers: ArrayHelpers<any[]>) => (
                       <div className="w-full">
                         {formikProps.values.custom_config_list.map(
@@ -294,6 +295,7 @@ export function CustomForm({
 
                   <ModelConfigurationField
                     name="model_configurations"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     formikProps={formikProps as any}
                   />
 

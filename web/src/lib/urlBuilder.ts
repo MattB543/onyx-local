@@ -1,6 +1,4 @@
-type QueryParams = {
-  [key: string]: string | number | boolean | null | undefined;
-};
+type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
 export function buildApiPath(base: string, params?: QueryParams): string {
   let queryString = "";

@@ -242,6 +242,7 @@ export default function MCPActionCard({
   };
 
   // Left action for ToolsList footer
+  /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
   const leftAction = useMemo(() => {
     const lastRefreshedText = timeAgo(server.last_refreshed_at);
 
@@ -269,6 +270,7 @@ export default function MCPActionCard({
     onRefreshTools,
     isToolsRefreshing,
   ]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return (
     <>

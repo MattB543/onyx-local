@@ -1,4 +1,4 @@
-import React, { useState, useMemo, ReactNode } from "react";
+import React, { ReactNode, useEffect, useMemo, useState } from "react";
 import { Form, Formik, FormikProps } from "formik";
 import * as Yup from "yup";
 import ProviderModal from "@/components/modals/ProviderModal";
@@ -21,6 +21,7 @@ import {
 import type { IconProps } from "@opal/types";
 import { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface OnboardingFormChildProps<T extends Record<string, any>> {
   // Formik props
   formikProps: FormikProps<T>;
@@ -58,6 +59,7 @@ export interface OnboardingFormChildProps<T extends Record<string, any>> {
   disabled: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface OnboardingFormWrapperProps<T extends Record<string, any>> {
   // Modal props
   icon: React.FunctionComponent<IconProps>;
@@ -78,15 +80,18 @@ export interface OnboardingFormWrapperProps<T extends Record<string, any>> {
 
   // Form configuration
   initialValues: T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validationSchema: Yup.Schema<any>;
 
   // Render function for form content
   children: (props: OnboardingFormChildProps<T>) => ReactNode;
 
   // Optional: transform values before submission
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transformValues?: (values: T, fetchedModelConfigurations: any[]) => any;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function OnboardingFormWrapper<T extends Record<string, any>>({
   icon,
   title,
@@ -139,7 +144,7 @@ export function OnboardingFormWrapper<T extends Record<string, any>>({
   }, [fetchedModelConfigurations, llmDescriptor]);
 
   // Reset form when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setFormResetKey((prev) => prev + 1);
       setApiStatus("loading");
@@ -153,7 +158,7 @@ export function OnboardingFormWrapper<T extends Record<string, any>>({
   }, [open]);
 
   // Update models API status when configurations change
-  React.useEffect(() => {
+  useEffect(() => {
     if (fetchedModelConfigurations.length > 0 && !isFetchingModels) {
       setModelsApiStatus("success");
     }
@@ -280,6 +285,7 @@ export function OnboardingFormWrapper<T extends Record<string, any>>({
       try {
         const { models, error } = await fetchModels(
           llmDescriptor.name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formikProps.values as Record<string, any>
         );
         if (error) {

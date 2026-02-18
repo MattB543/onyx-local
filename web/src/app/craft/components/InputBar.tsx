@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   memo,
   forwardRef,
@@ -12,9 +13,7 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
-import { useRouter } from "next/navigation";
-import { cn, isImageFile } from "@/lib/utils";
-import { Disabled } from "@/refresh-components/Disabled";
+
 import {
   useUploadFilesContext,
   BuildFile,
@@ -22,10 +21,13 @@ import {
 } from "@/app/craft/contexts/UploadFilesContext";
 import { useDemoDataEnabled } from "@/app/craft/hooks/useBuildSessionStore";
 import { CRAFT_CONFIGURE_PATH } from "@/app/craft/v1/constants";
+import { cn, isImageFile } from "@/lib/utils";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import SelectButton from "@/refresh-components/buttons/SelectButton";
-import { Button } from "@opal/components";
+import { Disabled } from "@/refresh-components/Disabled";
 import SimpleTooltip from "@/refresh-components/SimpleTooltip";
+
+import { Button } from "@opal/components";
 import {
   SvgArrowUp,
   SvgClock,
@@ -233,8 +235,7 @@ const InputBar = memo(
           const items = event.clipboardData?.items;
           if (items) {
             const pastedFiles: File[] = [];
-            for (let i = 0; i < items.length; i++) {
-              const item = items[i];
+            for (const item of Array.from(items)) {
               if (item && item.kind === "file") {
                 const file = item.getAsFile();
                 if (file) pastedFiles.push(file);
@@ -290,6 +291,7 @@ const InputBar = memo(
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             !(event.nativeEvent as any).isComposing
           ) {
             event.preventDefault();

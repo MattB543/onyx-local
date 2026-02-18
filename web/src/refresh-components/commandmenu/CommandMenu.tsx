@@ -1,25 +1,31 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import React, {
+  Children,
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import { Section } from "@/layouts/general-layouts";
 import { cn } from "@/lib/utils";
-import Text from "@/refresh-components/texts/Text";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import LineItem from "@/refresh-components/buttons/LineItem";
 import Tag from "@/refresh-components/buttons/Tag";
-import { Button } from "@opal/components";
-import ScrollIndicatorDiv from "@/refresh-components/ScrollIndicatorDiv";
 import Divider from "@/refresh-components/Divider";
-import { Section } from "@/layouts/general-layouts";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import ScrollIndicatorDiv from "@/refresh-components/ScrollIndicatorDiv";
+import Text from "@/refresh-components/texts/Text";
+
+import { Button } from "@opal/components";
 import { SvgSearch, SvgX } from "@opal/icons";
+
 import type {
   CommandMenuProps,
   CommandMenuContentProps,
@@ -86,11 +92,11 @@ function getOrderedItems(): string[] {
  * ```
  */
 function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
-  const [highlightedValue, setHighlightedValue] = React.useState<string | null>(
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(
     null
   );
-  const [isKeyboardNav, setIsKeyboardNav] = React.useState(false);
-  const [itemsRevision, setItemsRevision] = React.useState(0);
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
+  const [itemsRevision, setItemsRevision] = useState(0);
 
   // Centralized callback registry - items register their onSelect callback, type, and defaultHighlight
   const itemCallbacks = useRef<
@@ -158,7 +164,7 @@ function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
       value: string,
       onSelect: () => void,
       type: "filter" | "item" | "action" = "item",
-      defaultHighlight: boolean = true
+      defaultHighlight = true
     ) => {
       if (
         process.env.NODE_ENV === "development" &&
@@ -361,7 +367,7 @@ function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
  * Modal container with overlay, sizing, and animations.
  * Keyboard handling is centralized in Root and accessed via context.
  */
-const CommandMenuContent = React.forwardRef<
+const CommandMenuContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   CommandMenuContentProps
 >(({ children }, ref) => {
@@ -505,7 +511,7 @@ function CommandMenuHeader({
  */
 function CommandMenuList({ children, emptyMessage }: CommandMenuListProps) {
   const { isKeyboardNav, onListMouseLeave } = useCommandMenuContext();
-  const childCount = React.Children.count(children);
+  const childCount = Children.count(children);
 
   if (childCount === 0 && emptyMessage) {
     return (

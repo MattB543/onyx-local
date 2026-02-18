@@ -36,10 +36,12 @@ export default function MinimalMarkdown({
     const defaults: Components = {
       a: MemoizedLink,
       p: MemoizedParagraph,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pre: ({ node, className, children }: any) => {
         // Don't render the pre wrapper - CodeBlock handles its own wrapper
         return <>{children}</>;
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       code: ({ node, inline, className, children, ...props }: any) => {
         const codeText = extractCodeText(node, content, children);
         return (

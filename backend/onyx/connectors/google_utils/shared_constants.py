@@ -16,6 +16,9 @@ GOOGLE_SCOPES = {
         "https://www.googleapis.com/auth/admin.directory.user.readonly",
         "https://www.googleapis.com/auth/admin.directory.group.readonly",
     ],
+    DocumentSource.GOOGLE_CALENDAR: [
+        "https://www.googleapis.com/auth/calendar.readonly",
+    ],
 }
 
 # This is the Oauth token
@@ -46,7 +49,7 @@ MISSING_SCOPES_ERROR_STR = "client not authorized for any of the scopes requeste
 # Documentation and error messages
 SCOPE_DOC_URL = "https://docs.onyx.app/admins/connectors/official/google_drive/overview"
 ONYX_SCOPE_INSTRUCTIONS = (
-    "You have upgraded Onyx without updating the Google Auth scopes. "
+    "You have upgraded Onyx without updating the Google connector auth scopes. "
     f"Please refer to the documentation to learn how to update the scopes: {SCOPE_DOC_URL}"
 )
 

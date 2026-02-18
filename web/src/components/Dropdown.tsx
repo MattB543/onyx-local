@@ -156,6 +156,7 @@ export const DefaultDropdown = forwardRef<HTMLDivElement, DefaultDropdownProps>(
     const selectedOption = options.find((option) => option.value === selected);
     const [isOpen, setIsOpen] = useState(false);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleSelect = (value: any) => {
       onSelect(value);
       setIsOpen(false);
@@ -227,3 +228,4 @@ export const DefaultDropdown = forwardRef<HTMLDivElement, DefaultDropdownProps>(
     );
   }
 );
+DefaultDropdown.displayName = "DefaultDropdown";

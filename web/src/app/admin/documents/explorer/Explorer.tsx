@@ -105,6 +105,7 @@ export function Explorer({
   documentSets,
 }: {
   initialSearchValue: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connectors: Connector<any>[];
   documentSets: DocumentSetSummary[];
 }) {
@@ -174,6 +175,7 @@ export function Explorer({
             if (
               event.key === "Enter" &&
               !event.shiftKey &&
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               !(event.nativeEvent as any).isComposing
             ) {
               onSearch(query);

@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useMemo,
-  useRef,
-  memo,
-  useCallback,
-  useEffect,
-} from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as GeneralLayouts from "@/layouts/general-layouts";
 import * as TableLayouts from "@/layouts/table-layouts";
 import * as InputLayouts from "@/layouts/input-layouts";
@@ -464,7 +457,7 @@ function RecentFilesTableContent({
     },
   ];
 
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <GeneralLayouts.Section gap={0.5} alignItems="stretch">

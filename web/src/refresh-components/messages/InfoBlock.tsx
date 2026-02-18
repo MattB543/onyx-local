@@ -1,18 +1,18 @@
 "use client";
 
-import React, { memo } from "react";
+import React, { HTMLAttributes, forwardRef, memo } from "react";
 import { cn } from "@/lib/utils";
 import type { IconProps } from "@opal/types";
 import Truncated from "@/refresh-components/texts/Truncated";
 
-export interface InfoBlockProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface InfoBlockProps extends HTMLAttributes<HTMLDivElement> {
   icon: React.FunctionComponent<IconProps>;
   title: string;
   description?: string;
   iconClassName?: string;
 }
 
-const InfoBlockInner = React.forwardRef<HTMLDivElement, InfoBlockProps>(
+const InfoBlockInner = forwardRef<HTMLDivElement, InfoBlockProps>(
   (
     { icon: Icon, title, description, iconClassName, className, ...props },
     ref
@@ -43,6 +43,7 @@ const InfoBlockInner = React.forwardRef<HTMLDivElement, InfoBlockProps>(
     );
   }
 );
+InfoBlockInner.displayName = "InfoBlockInner";
 const InfoBlock = memo(InfoBlockInner);
 InfoBlock.displayName = "InfoBlock";
 

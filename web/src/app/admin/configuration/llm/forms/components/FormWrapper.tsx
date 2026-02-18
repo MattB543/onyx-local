@@ -18,6 +18,7 @@ import { LLM_PROVIDERS_ADMIN_URL } from "../../constants";
 
 export interface ProviderFormContext {
   onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mutate: KeyedMutator<any>;
   isTesting: boolean;
   setIsTesting: (testing: boolean) => void;

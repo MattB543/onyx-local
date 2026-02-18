@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -105,7 +105,7 @@ export default function WorkingLine({ toolCall }: WorkingLineProps) {
 
   const statusDisplay = getStatusDisplay(toolCall.status);
   const StatusIcon = statusDisplay.icon;
-  const ToolIcon = getToolIcon(toolCall.kind);
+  const ToolIcon = useMemo(() => getToolIcon(toolCall.kind), [toolCall.kind]);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -127,6 +127,7 @@ export default function WorkingLine({ toolCall }: WorkingLineProps) {
                 )}
               />
             ) : (
+              // eslint-disable-next-line react-hooks/static-components -- dynamic icon
               <ToolIcon
                 className={cn("size-3.5 stroke-text-03 shrink-0 mt-0.5")}
               />

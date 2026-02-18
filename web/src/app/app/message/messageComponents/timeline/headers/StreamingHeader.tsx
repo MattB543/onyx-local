@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { memo } from "react";
 import { SvgFold, SvgExpand } from "@opal/icons";
 import { Button } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
@@ -19,7 +19,7 @@ export interface StreamingHeaderProps {
 }
 
 /** Header during streaming - shimmer text with current activity */
-export const StreamingHeader = React.memo(function StreamingHeader({
+export const StreamingHeader = memo(function StreamingHeader({
   headerText,
   collapsible,
   buttonTitle,

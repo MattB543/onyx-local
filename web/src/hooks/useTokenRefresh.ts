@@ -17,7 +17,9 @@ export function useTokenRefresh(
   onRefreshFail: () => Promise<void>
 ) {
   // Track last refresh time to avoid unnecessary calls
-  const [lastTokenRefresh, setLastTokenRefresh] = useState<number>(Date.now());
+  const [lastTokenRefresh, setLastTokenRefresh] = useState<number>(() =>
+    Date.now()
+  );
 
   // Use a ref to track first load
   const isFirstLoad = useRef(true);

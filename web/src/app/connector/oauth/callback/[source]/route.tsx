@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       headers: request.headers,
       body: request.body,
       signal: request.signal,
-      // @ts-ignore
+      // @ts-expect-error -- duplex needed for Node fetch streaming body
       duplex: "half",
     });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+
 import { TurnGroup } from "../transformers";
 
 export interface TimelineExpansionState {
@@ -15,7 +16,7 @@ export interface TimelineExpansionState {
 export function useTimelineExpansion(
   stopPacketSeen: boolean,
   lastTurnGroup: TurnGroup | undefined,
-  hasDisplayContent: boolean = false
+  hasDisplayContent = false
 ): TimelineExpansionState {
   const [isExpanded, setIsExpanded] = useState(false);
   const [parallelActiveTab, setParallelActiveTab] = useState<string>("");

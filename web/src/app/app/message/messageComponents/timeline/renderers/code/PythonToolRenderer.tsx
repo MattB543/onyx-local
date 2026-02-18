@@ -76,7 +76,7 @@ function constructCurrentPythonState(packets: PythonToolPacket[]) {
   };
 }
 
-export const PythonToolRenderer: MessageRenderer<PythonToolPacket, {}> = ({
+export const PythonToolRenderer: MessageRenderer<PythonToolPacket, Record<string, never>> = ({
   packets,
   onComplete,
   renderType,
@@ -91,6 +91,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, {}> = ({
     }
   }, [isComplete, onComplete]);
 
+  /* eslint-disable react-hooks/preserve-manual-memoization -- deps may be mutated by streaming */
   const status = useMemo(() => {
     if (isExecuting) {
       return "Executing Python code...";
@@ -103,6 +104,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, {}> = ({
     }
     return "Python execution";
   }, [isComplete, isExecuting, hasError]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   // Shared content for all states - used by both FULL and compact modes
   const content = (

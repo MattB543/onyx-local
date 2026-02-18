@@ -40,7 +40,13 @@ from onyx.tools.tool_implementations.crm.models import serialize_interaction
 class CrmLogInteractionTool(Tool[None]):
     NAME = "crm_log_interaction"
     DISPLAY_NAME = "CRM Log Interaction"
-    DESCRIPTION = "Log a CRM interaction and attach resolved attendees."
+    DESCRIPTION = (
+        "Log a call, meeting, email, note, or event in the CRM. Link it to a contact_id and/or "
+        "organization_id for context. Include attendees by email or name — the system will try to "
+        "match them to existing contacts and team members and report what matched. Always include "
+        "a summary capturing key discussion points and action items. Set occurred_at if the "
+        "interaction happened in the past."
+    )
 
     def __init__(
         self,
@@ -332,6 +338,7 @@ class CrmLogInteractionTool(Tool[None]):
 
             resolved_attendees: list[dict[str, Any]] = []
             needs_confirmation: list[dict[str, Any]] = []
+            resolution_details: list[dict[str, Any]] = []
 
             for attendee in attendees_raw:
                 role = CrmAttendeeRole.ATTENDEE
@@ -397,6 +404,14 @@ class CrmLogInteractionTool(Tool[None]):
                             "role": role,
                         }
                     )
+                    resolution_details.append(
+                        {
+                            "input": str(user_id),
+                            "matched_type": "user",
+                            "matched_label": user.personal_name or user.email or str(user.id),
+                            "confidence": "exact_id",
+                        }
+                    )
                     continue
 
                 if attendee_contact_id:
@@ -417,6 +432,14 @@ class CrmLogInteractionTool(Tool[None]):
                             "role": role,
                         }
                     )
+                    resolution_details.append(
+                        {
+                            "input": str(attendee_contact_id),
+                            "matched_type": "contact",
+                            "matched_label": contact_full_name(attendee_contact) or attendee_contact.email or str(attendee_contact.id),
+                            "confidence": "exact_id",
+                        }
+                    )
                     continue
 
                 if token_for_resolution and isinstance(token_for_resolution, str):
@@ -430,6 +453,37 @@ class CrmLogInteractionTool(Tool[None]):
                                 "user_id": resolved["user_id"],
                                 "contact_id": resolved["contact_id"],
                                 "role": role,
+                            }
+                        )
+                        # Determine matched label for resolution details
+                        if resolved["contact_id"]:
+                            matched_contact = get_contact_by_id(resolved["contact_id"], db_session)
+                            matched_label = (
+                                contact_full_name(matched_contact) if matched_contact else str(resolved["contact_id"])
+                            )
+                            matched_type = "contact"
+                        else:
+                            matched_user = db_session.get(User, resolved["user_id"])
+                            matched_label = (
+                                (matched_user.personal_name or matched_user.email or str(matched_user.id))
+                                if matched_user
+                                else str(resolved["user_id"])
+                            )
+                            matched_type = "user"
+
+                        # Map None reason to a confidence level
+                        confidence = "fuzzy_match"
+                        if "@" in token_for_resolution:
+                            confidence = "exact_email"
+                        elif token_for_resolution.lower() == matched_label.lower():
+                            confidence = "exact_name"
+
+                        resolution_details.append(
+                            {
+                                "input": token_for_resolution,
+                                "matched_type": matched_type,
+                                "matched_label": matched_label,
+                                "confidence": confidence,
                             }
                         )
                     else:
@@ -527,10 +581,12 @@ class CrmLogInteractionTool(Tool[None]):
                 )
 
             attendees = get_interaction_attendees(interaction.id, db_session)
-            payload = {
+            payload: dict[str, Any] = {
                 "status": "created",
                 "interaction": serialize_interaction(interaction, attendees=attendees),
             }
+            if resolution_details:
+                payload["attendee_resolution"] = resolution_details
 
         compact_payload = compact_tool_payload_for_model(payload)
         self.emitter.emit(

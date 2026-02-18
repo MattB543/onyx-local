@@ -10,16 +10,19 @@ const SUPPORTED_HTTP_METHODS = new Set([
   "head",
 ]);
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isPlainRecord = (value: unknown): value is Record<string, any> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 export function extractMethodSpecsFromDefinition(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   definition?: Record<string, any> | null
 ): MethodSpec[] {
   if (!isPlainRecord(definition) || !isPlainRecord(definition.paths)) {
     return [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pathEntries = Object.entries(definition.paths as Record<string, any>);
   const methods: MethodSpec[] = [];
 
@@ -59,6 +62,7 @@ export function extractMethodSpecsFromDefinition(
 }
 
 export async function validateToolDefinition(toolData: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   definition: Record<string, any>;
 }): Promise<ApiResponse<MethodSpec[]>> {
   try {
@@ -86,6 +90,7 @@ export async function validateToolDefinition(toolData: {
 export async function createCustomTool(toolData: {
   name: string;
   description?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   definition: Record<string, any>;
   custom_headers: { key: string; value: string }[];
   passthrough_auth: boolean;
@@ -115,6 +120,7 @@ export async function createCustomTool(toolData: {
 type ToolUpdatePayload = {
   name?: string;
   description?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   definition?: Record<string, any>;
   custom_headers?: { key: string; value: string }[] | null;
   passthrough_auth?: boolean;

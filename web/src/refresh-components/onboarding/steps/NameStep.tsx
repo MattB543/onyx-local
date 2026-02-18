@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { memo, useRef } from "react";
 import Text from "@/refresh-components/texts/Text";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import { OnboardingState, OnboardingActions, OnboardingStep } from "../types";
@@ -14,7 +14,7 @@ export interface NameStepProps {
   actions: OnboardingActions;
 }
 
-const NameStep = React.memo(
+const NameStep = memo(
   ({ state: onboardingState, actions: onboardingActions }: NameStepProps) => {
     const { userName } = onboardingState.data;
     const { updateName, goToStep, setButtonActive, nextStep } =

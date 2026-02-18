@@ -298,8 +298,8 @@ export function processRawChatHistory(
   rawMessages: BackendMessage[],
   packets: Packet[][]
 ): Map<number, Message> {
-  const messages: Map<number, Message> = new Map();
-  const parentMessageChildrenMap: Map<number, number[]> = new Map();
+  const messages = new Map<number, Message>();
+  const parentMessageChildrenMap = new Map<number, number[]>();
 
   let assistantMessageInd = 0;
 

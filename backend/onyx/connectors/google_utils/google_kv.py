@@ -1,4 +1,5 @@
 import json
+import urllib.request
 from typing import cast
 from urllib.parse import parse_qs
 from urllib.parse import ParseResult
@@ -13,8 +14,11 @@ from onyx.configs.constants import DocumentSource
 from onyx.configs.constants import KV_CRED_KEY
 from onyx.configs.constants import KV_GMAIL_CRED_KEY
 from onyx.configs.constants import KV_GMAIL_SERVICE_ACCOUNT_KEY
+from onyx.configs.constants import KV_GOOGLE_CALENDAR_CRED_KEY
+from onyx.configs.constants import KV_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY
 from onyx.configs.constants import KV_GOOGLE_DRIVE_CRED_KEY
 from onyx.configs.constants import KV_GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY
+from onyx.connectors.google_utils.resources import get_calendar_service
 from onyx.connectors.google_utils.resources import get_drive_service
 from onyx.connectors.google_utils.resources import get_gmail_service
 from onyx.connectors.google_utils.shared_constants import (
@@ -57,8 +61,30 @@ def _build_frontend_google_drive_redirect(source: DocumentSource) -> str:
         return f"{WEB_DOMAIN}/admin/connectors/google-drive/auth/callback"
     elif source == DocumentSource.GMAIL:
         return f"{WEB_DOMAIN}/admin/connectors/gmail/auth/callback"
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        return f"{WEB_DOMAIN}/admin/connectors/google-calendar/auth/callback"
     else:
         raise ValueError(f"Unsupported source: {source}")
+
+
+def _get_oauth_user_via_userinfo(creds: OAuthCredentials) -> str | None:
+    if not creds.token:
+        return None
+
+    request = urllib.request.Request(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {creds.token}"},
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            user_info = json.loads(response.read().decode("utf-8"))
+            email = user_info.get("email")
+            if isinstance(email, str):
+                return email
+    except Exception:
+        logger.warning("Failed to resolve OAuth user via Google userinfo endpoint")
+
+    return None
 
 
 def _get_current_oauth_user(creds: OAuthCredentials, source: DocumentSource) -> str:
@@ -83,17 +109,34 @@ def _get_current_oauth_user(creds: OAuthCredentials, source: DocumentSource) -> 
             .execute()
         )
         email = user_info.get("emailAddress")
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        email = None
+        try:
+            calendar_service = get_calendar_service(creds)
+            primary_calendar = (
+                calendar_service.calendarList().get(calendarId="primary").execute()
+            )
+            email = primary_calendar.get("id")
+        except Exception:
+            logger.warning(
+                "Failed to resolve OAuth user via primary calendar lookup; falling back to userinfo endpoint"
+            )
+
+        if not isinstance(email, str) or "@" not in email:
+            email = _get_oauth_user_via_userinfo(creds)
     else:
         raise ValueError(f"Unsupported source: {source}")
+
+    if not isinstance(email, str) or "@" not in email:
+        raise ValueError(f"Failed to determine OAuth user email for source={source}")
+
     return email
 
 
 def verify_csrf(credential_id: int, state: str) -> None:
     csrf = get_kv_store().load(KV_CRED_KEY.format(str(credential_id)))
     if csrf != state:
-        raise PermissionError(
-            "State from Google Drive Connector callback does not match expected"
-        )
+        raise PermissionError("State from Google connector callback does not match expected")
 
 
 def update_credential_access_tokens(
@@ -164,6 +207,8 @@ def get_auth_url(credential_id: int, source: DocumentSource) -> str:
         creds_str = str(get_kv_store().load(KV_GOOGLE_DRIVE_CRED_KEY))
     elif source == DocumentSource.GMAIL:
         creds_str = str(get_kv_store().load(KV_GMAIL_CRED_KEY))
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        creds_str = str(get_kv_store().load(KV_GOOGLE_CALENDAR_CRED_KEY))
     else:
         raise ValueError(f"Unsupported source: {source}")
     credential_json = json.loads(creds_str)
@@ -188,6 +233,8 @@ def get_google_app_cred(source: DocumentSource) -> GoogleAppCredentials:
         creds_str = str(get_kv_store().load(KV_GOOGLE_DRIVE_CRED_KEY))
     elif source == DocumentSource.GMAIL:
         creds_str = str(get_kv_store().load(KV_GMAIL_CRED_KEY))
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        creds_str = str(get_kv_store().load(KV_GOOGLE_CALENDAR_CRED_KEY))
     else:
         raise ValueError(f"Unsupported source: {source}")
     return GoogleAppCredentials(**json.loads(creds_str))
@@ -202,6 +249,10 @@ def upsert_google_app_cred(
         )
     elif source == DocumentSource.GMAIL:
         get_kv_store().store(KV_GMAIL_CRED_KEY, app_credentials.json(), encrypt=True)
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        get_kv_store().store(
+            KV_GOOGLE_CALENDAR_CRED_KEY, app_credentials.json(), encrypt=True
+        )
     else:
         raise ValueError(f"Unsupported source: {source}")
 
@@ -211,6 +262,8 @@ def delete_google_app_cred(source: DocumentSource) -> None:
         get_kv_store().delete(KV_GOOGLE_DRIVE_CRED_KEY)
     elif source == DocumentSource.GMAIL:
         get_kv_store().delete(KV_GMAIL_CRED_KEY)
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        get_kv_store().delete(KV_GOOGLE_CALENDAR_CRED_KEY)
     else:
         raise ValueError(f"Unsupported source: {source}")
 
@@ -220,6 +273,8 @@ def get_service_account_key(source: DocumentSource) -> GoogleServiceAccountKey:
         creds_str = str(get_kv_store().load(KV_GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY))
     elif source == DocumentSource.GMAIL:
         creds_str = str(get_kv_store().load(KV_GMAIL_SERVICE_ACCOUNT_KEY))
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        creds_str = str(get_kv_store().load(KV_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY))
     else:
         raise ValueError(f"Unsupported source: {source}")
     return GoogleServiceAccountKey(**json.loads(creds_str))
@@ -238,6 +293,12 @@ def upsert_service_account_key(
         get_kv_store().store(
             KV_GMAIL_SERVICE_ACCOUNT_KEY, service_account_key.json(), encrypt=True
         )
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        get_kv_store().store(
+            KV_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY,
+            service_account_key.json(),
+            encrypt=True,
+        )
     else:
         raise ValueError(f"Unsupported source: {source}")
 
@@ -247,5 +308,7 @@ def delete_service_account_key(source: DocumentSource) -> None:
         get_kv_store().delete(KV_GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY)
     elif source == DocumentSource.GMAIL:
         get_kv_store().delete(KV_GMAIL_SERVICE_ACCOUNT_KEY)
+    elif source == DocumentSource.GOOGLE_CALENDAR:
+        get_kv_store().delete(KV_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY)
     else:
         raise ValueError(f"Unsupported source: {source}")

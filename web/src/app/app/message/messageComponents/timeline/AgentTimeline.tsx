@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useCallback } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import { StopReason } from "@/app/app/services/streamingModels";
 import { FullChatState, RenderType } from "../interfaces";
 import { TurnGroup } from "./transformers";
@@ -115,7 +115,7 @@ function areAgentTimelinePropsEqual(
   );
 }
 
-export const AgentTimeline = React.memo(function AgentTimeline({
+export const AgentTimeline = memo(function AgentTimeline({
   turnGroups,
   chatState,
   stopPacketSeen = false,

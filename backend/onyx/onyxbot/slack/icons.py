@@ -15,6 +15,8 @@ def source_to_github_img_link(source: DocumentSource) -> str | None:
         return "https://raw.githubusercontent.com/onyx-dot-app/onyx/main/web/public/Gmail.png"
     if source == DocumentSource.GOOGLE_DRIVE.value:
         return "https://raw.githubusercontent.com/onyx-dot-app/onyx/main/web/public/GoogleDrive.png"
+    if source == DocumentSource.GOOGLE_CALENDAR.value:
+        return "https://raw.githubusercontent.com/onyx-dot-app/onyx/main/web/public/Google.png"
     if source == DocumentSource.GITHUB.value:
         return "https://raw.githubusercontent.com/onyx-dot-app/onyx/main/web/public/Github.png"
     if source == DocumentSource.GITLAB.value:

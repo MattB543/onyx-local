@@ -174,6 +174,7 @@ export default function BillingPage() {
           // Refresh the page to update settings (including ee_features_enabled)
           router.refresh();
           // Navigate to billing details now that the license is active
+          // eslint-disable-next-line react-hooks/immutability -- changeView is declared later but stable
           changeView("details");
         } catch (error) {
           console.error("Failed to sync license after billing return:", error);

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
   GMAIL_AUTH_IS_ADMIN_COOKIE_NAME,
+  GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME,
   GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME,
 } from "@/lib/constants";
 import {
@@ -14,7 +15,21 @@ import { processCookies } from "@/lib/userSS";
 
 export const GET = async (request: NextRequest) => {
   const requestCookies = await cookies();
-  const connector = request.url.includes("gmail") ? "gmail" : "google-drive";
+  const callbackPath = request.nextUrl.pathname;
+
+  let connector: "gmail" | "google-drive" | "google-calendar" | null = null;
+  if (callbackPath.includes("/gmail/")) {
+    connector = "gmail";
+  } else if (callbackPath.includes("/google-drive/")) {
+    connector = "google-drive";
+  } else if (callbackPath.includes("/google-calendar/")) {
+    connector = "google-calendar";
+  }
+
+  if (connector === null) {
+    return NextResponse.redirect(new URL("/auth/error", getDomain(request)));
+  }
+
   const callbackEndpoint = `/manage/connector/${connector}/callback`;
   const url = new URL(buildUrl(callbackEndpoint));
   url.search = request.nextUrl.search;
@@ -43,7 +58,9 @@ export const GET = async (request: NextRequest) => {
   const authCookieName =
     connector === "gmail"
       ? GMAIL_AUTH_IS_ADMIN_COOKIE_NAME
-      : GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME;
+      : connector === "google-drive"
+        ? GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME
+        : GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME;
 
   if (requestCookies.get(authCookieName)?.value?.toLowerCase() === "true") {
     return NextResponse.redirect(

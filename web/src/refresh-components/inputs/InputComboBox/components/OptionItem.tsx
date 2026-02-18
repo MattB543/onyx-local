@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import { ComboBoxOption } from "../types";
 import { sanitizeOptionId } from "../utils/aria";
@@ -48,7 +48,7 @@ const highlightMatch = (text: string, searchTerm: string): React.ReactNode => {
  * Renders a single option item in the dropdown
  * Memoized to prevent unnecessary re-renders
  */
-export const OptionItem = React.memo(
+export const OptionItem = memo(
   ({
     option,
     index,

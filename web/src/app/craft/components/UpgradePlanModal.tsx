@@ -37,20 +37,20 @@ export default function UpgradePlanModal({
 
             <div className="flex flex-col items-center gap-2 text-center">
               <Text headingH2 text05>
-                You've reached your message limit
+                You&apos;ve reached your message limit
               </Text>
               <Text mainUiBody text03 className="max-w-sm">
                 {isPaidUser ? (
                   <>
-                    You've used all {limits?.limit ?? 25} messages for this
+                    You&apos;ve used all {limits?.limit ?? 25} messages for this
                     week. Your message limit will automatically reset at the
                     start of each week, allowing you to continue crafting with
                     Onyx.
                   </>
                 ) : (
                   <>
-                    You've used all {limits?.limit ?? 5} free messages available
-                    in your trial. You've reached the limit for your free
+                    You&apos;ve used all {limits?.limit ?? 5} free messages available
+                    in your trial. You&apos;ve reached the limit for your free
                     account.
                   </>
                 )}

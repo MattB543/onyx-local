@@ -1,4 +1,10 @@
+import { redirect } from "next/navigation";
+
+import SignInButton from "@/app/auth/login/SignInButton";
+import AuthErrorDisplay from "@/components/auth/AuthErrorDisplay";
+import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 import { HealthCheckBanner } from "@/components/health/healthcheck";
+import { AuthType } from "@/lib/constants";
 import { User } from "@/lib/types";
 import {
   getCurrentUserSS,
@@ -6,18 +12,17 @@ import {
   AuthTypeMetadata,
   getAuthUrlSS,
 } from "@/lib/userSS";
-import { redirect } from "next/navigation";
-import EmailPasswordForm from "../login/EmailPasswordForm";
-import SignInButton from "@/app/auth/login/SignInButton";
-import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
-import ReferralSourceSelector from "./ReferralSourceSelector";
-import AuthErrorDisplay from "@/components/auth/AuthErrorDisplay";
-import Text from "@/refresh-components/texts/Text";
 import { cn } from "@/lib/utils";
-import { AuthType } from "@/lib/constants";
+import Text from "@/refresh-components/texts/Text";
+
+import EmailPasswordForm from "../login/EmailPasswordForm";
+
+
+import ReferralSourceSelector from "./ReferralSourceSelector";
+
 
 const Page = async (props: {
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) => {
   const searchParams = await props.searchParams;
   const nextUrl = Array.isArray(searchParams?.next)

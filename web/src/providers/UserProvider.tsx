@@ -100,6 +100,7 @@ export function UserProvider({
     if (!posthog) return;
 
     if (user?.id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const identifyData: Record<string, any> = {
         email: user.email,
       };

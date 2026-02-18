@@ -137,7 +137,7 @@ function renderPayload(payload: Record<string, unknown>): JSX.Element {
 /**
  * CrmToolRenderer - Renders CRM built-in tool execution state.
  */
-export const CrmToolRenderer: MessageRenderer<CrmToolPacket, {}> = ({
+export const CrmToolRenderer: MessageRenderer<CrmToolPacket, Record<string, never>> = ({
   packets,
   stopPacketSeen,
   renderType,

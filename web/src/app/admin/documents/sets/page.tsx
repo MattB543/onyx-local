@@ -50,6 +50,7 @@ const FederatedConnectorTitle = ({
   showMetadata = true,
   isLink = true,
 }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   federatedConnector: any;
   showMetadata?: boolean;
   isLink?: boolean;
@@ -59,6 +60,7 @@ const FederatedConnectorTitle = ({
   const mainSectionClassName = "text-blue-500 dark:text-blue-100 flex w-fit";
   const mainDisplay = (
     <>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <SourceIcon sourceType={sourceType as any} iconSize={16} />
       <div className="ml-1 my-auto text-xs font-medium truncate">
         {federatedConnector.name}

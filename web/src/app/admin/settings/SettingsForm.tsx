@@ -116,6 +116,7 @@ export function SettingsForm() {
   }
 
   async function updateSettingField(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updateRequests: { fieldName: keyof Settings; newValue: any }[]
   ) {
     // Optimistically update the local state
@@ -161,6 +162,7 @@ export function SettingsForm() {
     if (fieldName === "anonymous_user_enabled" && checked) {
       setShowConfirmModal(true);
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updates: { fieldName: keyof Settings; newValue: any }[] = [
         { fieldName, newValue: checked },
       ];
@@ -169,6 +171,7 @@ export function SettingsForm() {
   }
 
   function handleConfirmAnonymousUsers() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: { fieldName: keyof Settings; newValue: any }[] = [
       { fieldName: "anonymous_user_enabled", newValue: true },
     ];

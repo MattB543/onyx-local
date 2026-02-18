@@ -27,6 +27,7 @@ import { FederatedConnectorSelector } from "@/components/FederatedConnectorSelec
 import { useFederatedConnectors } from "@/lib/hooks";
 
 interface SetCreationPopupProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ccPairs: ConnectorStatus<any, any>[];
   userGroups: UserGroup[] | undefined;
   onClose: () => void;

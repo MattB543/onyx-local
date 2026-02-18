@@ -14,7 +14,7 @@ export type KGConfigRaw = {
   coverage_start: string;
 };
 
-export type EntityTypeValues = { [key: string]: EntityType };
+export type EntityTypeValues = Record<string, EntityType>;
 
 export type SourceAndEntityTypeView = {
   source_statistics: Record<string, SourceStatistics>;

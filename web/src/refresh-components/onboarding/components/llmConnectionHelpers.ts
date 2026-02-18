@@ -18,7 +18,7 @@ export const buildInitialValues = () => ({
 });
 
 export const getModelOptions = (
-  fetchedModelConfigurations: Array<{ name: string }>
+  fetchedModelConfigurations: { name: string }[]
 ) => {
   return fetchedModelConfigurations.map((model) => ({
     label: model.name,
@@ -31,6 +31,7 @@ export type TestApiKeyResult =
   | { ok: false; errorMessage: string };
 
 const submitLlmTestRequest = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload: any,
   fallbackErrorMessage: string
 ): Promise<TestApiKeyResult> => {
@@ -57,9 +58,11 @@ const submitLlmTestRequest = async (
 
 export const testApiKeyHelper = async (
   providerName: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formValues: any,
   apiKey?: string,
   modelName?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customConfigOverride?: Record<string, any>
 ): Promise<TestApiKeyResult> => {
   let finalApiBase = formValues?.api_base;
@@ -111,6 +114,7 @@ export const testApiKeyHelper = async (
 };
 
 export const testCustomProvider = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formValues: any
 ): Promise<TestApiKeyResult> => {
   const payload = {

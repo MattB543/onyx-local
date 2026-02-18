@@ -60,12 +60,14 @@ export function ModelPreview({
             </div>
 
             {"embedding_precision" in model &&
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (model as any).embedding_precision && (
                 <div>
                   <span className="font-semibold text-text-700">
                     Precision:
                   </span>
                   <div className="text-text-600">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {(model as any).embedding_precision}
                   </div>
                 </div>

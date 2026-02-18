@@ -3,6 +3,7 @@ import { OnyxDocument } from "./search/interfaces";
 export function removeDuplicateDocs(
   documents: OnyxDocument[],
   agentic?: boolean,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   relevance?: any
 ) {
   const seen = new Set<string>();

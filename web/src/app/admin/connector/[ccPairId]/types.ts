@@ -44,7 +44,9 @@ export interface CCPairFullInfo {
   status: ConnectorCredentialPairStatus;
   in_repeated_error_state: boolean;
   num_docs_indexed: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connector: Connector<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credential: Credential<any>;
   number_of_index_attempts: number;
   last_index_attempt_status: ValidStatuses | null;

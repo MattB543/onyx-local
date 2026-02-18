@@ -20,8 +20,11 @@ export const showErrorNotification = (message: string) => {
 export interface MoveOperationParams {
   chatSession: ChatSession;
   targetProjectId: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   refreshChatSessions: () => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   refreshCurrentProjectDetails: () => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetchProjects: () => Promise<any>;
   currentProjectId: number | null;
 }

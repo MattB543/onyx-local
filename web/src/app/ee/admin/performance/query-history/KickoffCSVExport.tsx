@@ -1,8 +1,13 @@
-import { toast } from "@/hooks/useToast";
-import Button from "@/refresh-components/buttons/Button";
 import { useRef, useState } from "react";
+
+import { toast } from "@/hooks/useToast";
+import { cn } from "@/lib/utils";
+import Button from "@/refresh-components/buttons/Button";
+
+import { SvgLoader, SvgPlayCircle } from "@opal/icons";
+
 import { DateRange } from "../../../../../components/dateRangeSelectors/AdminDateRangeSelector";
-import { withRequestId, withDateRange } from "./utils";
+
 import {
   CHECK_QUERY_HISTORY_EXPORT_STATUS_URL,
   DOWNLOAD_QUERY_HISTORY_URL,
@@ -15,8 +20,8 @@ import {
   SpinnerStatus,
   StartQueryHistoryExportResponse,
 } from "./types";
-import { cn } from "@/lib/utils";
-import { SvgLoader, SvgPlayCircle } from "@opal/icons";
+import { withRequestId, withDateRange } from "./utils";
+
 export default function KickoffCSVExport({
   dateRange,
 }: {
@@ -24,10 +29,13 @@ export default function KickoffCSVExport({
 }) {
   const timerIdRef = useRef<null | number>(null);
   const retryCount = useRef<number>(0);
-  const [, rerender] = useState<void>();
+  const [, setRerenderCounter] = useState(0);
+  const rerender = () => {
+    setRerenderCounter((count) => count + 1);
+  };
   const [spinnerStatus, setSpinnerStatus] = useState<SpinnerStatus>("static");
 
-  const reset = (failure: boolean = false) => {
+  const reset = (failure = false) => {
     setSpinnerStatus("static");
     if (timerIdRef.current) {
       clearInterval(timerIdRef.current);

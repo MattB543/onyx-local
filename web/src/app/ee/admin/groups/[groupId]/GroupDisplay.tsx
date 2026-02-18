@@ -37,6 +37,7 @@ import GenericConfirmModal from "@/components/modals/GenericConfirmModal";
 
 interface GroupDisplayProps {
   users: User[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ccPairs: ConnectorStatus<any, any>[];
   userGroup: UserGroup;
   refreshUserGroup: () => void;
@@ -87,6 +88,7 @@ const UserRoleDropdown = ({
           const errorData = await response.json();
           throw new Error(errorData.detail || "Failed to update user role");
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         onError(error.message);
         setLocalRole(user.role);

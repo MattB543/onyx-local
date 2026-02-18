@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChatSessionMorePopup } from "@/components/sidebar/ChatSessionMorePopup";
 import { useProjectsContext } from "@/providers/ProjectsContext";
@@ -22,10 +22,10 @@ export default function ProjectChatSessionList() {
     isLoadingProjectDetails,
   } = useProjectsContext();
   const { agents: assistants } = useAgents();
-  const [isRenamingChat, setIsRenamingChat] = React.useState<string | null>(
+  const [isRenamingChat, setIsRenamingChat] = useState<string | null>(
     null
   );
-  const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(null);
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
 
   const projectChats: ChatSession[] = useMemo(() => {
     const sessions = currentProjectDetails?.project?.chat_sessions || [];

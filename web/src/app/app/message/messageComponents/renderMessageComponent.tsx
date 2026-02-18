@@ -1,4 +1,4 @@
-import React, { JSX, memo } from "react";
+import React, { JSX, memo, useMemo } from "react";
 import {
   ChatPacket,
   Packet,
@@ -17,7 +17,7 @@ import { MessageTextRenderer } from "./renderers/MessageTextRenderer";
 import { ImageToolRenderer } from "./renderers/ImageToolRenderer";
 import { PythonToolRenderer } from "./timeline/renderers/code/PythonToolRenderer";
 import { ReasoningRenderer } from "./timeline/renderers/reasoning/ReasoningRenderer";
-import CustomToolRenderer from "./renderers/CustomToolRenderer";
+import { CustomToolRenderer } from "./renderers/CustomToolRenderer";
 import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
 import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
 import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
@@ -115,6 +115,7 @@ function isResearchAgentPacket(packet: Packet) {
 
 export function findRenderer(
   groupedPackets: GroupedPackets
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): MessageRenderer<any, any> | null {
   // Check for chat messages first
   if (groupedPackets.packets.some((packet) => isChatPacket(packet))) {
@@ -205,7 +206,8 @@ export const RendererComponent = memo(function RendererComponent({
   useShortRenderer = false,
   children,
 }: RendererComponentProps) {
-  const RendererFn = findRenderer({ packets });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- packets identity changes every render; renderer is derived from packet type
+  const RendererFn = useMemo(() => findRenderer({ packets }), [packets.length]);
   const renderType = useShortRenderer ? RenderType.HIGHLIGHT : RenderType.FULL;
 
   if (!RendererFn) {
@@ -214,6 +216,7 @@ export const RendererComponent = memo(function RendererComponent({
 
   return (
     <RendererFn
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       packets={packets as any}
       state={chatState}
       onComplete={onComplete}

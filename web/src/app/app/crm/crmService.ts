@@ -301,11 +301,11 @@ export async function listCrmInteractions(args?: {
 export async function createCrmInteraction(
   body: Partial<CrmInteraction> &
     Pick<CrmInteraction, "title" | "type"> & {
-      attendees?: Array<{
+      attendees?: {
         user_id?: string | null;
         contact_id?: string | null;
         role?: CrmAttendeeRole;
-      }>;
+      }[];
     }
 ): Promise<CrmInteraction> {
   return postJson(

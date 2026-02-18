@@ -9,12 +9,25 @@ import { buildSimilarCredentialInfoURL } from "@/app/admin/connector/[ccPairId]/
 export const GOOGLE_SERVICES = {
   GMAIL: "gmail",
   GOOGLE_DRIVE: "google-drive",
+  GOOGLE_CALENDAR: "google-calendar",
 } as const;
 
-export const useGoogleAppCredential = (service: "gmail" | "google_drive") => {
-  const endpoint = `/api/manage/admin/connector/${
-    service === "gmail" ? GOOGLE_SERVICES.GMAIL : GOOGLE_SERVICES.GOOGLE_DRIVE
-  }/app-credential`;
+type GoogleConnectorService = "gmail" | "google_drive" | "google_calendar";
+
+const mapServiceToEndpoint = (service: GoogleConnectorService) => {
+  if (service === "gmail") {
+    return GOOGLE_SERVICES.GMAIL;
+  }
+  if (service === "google_drive") {
+    return GOOGLE_SERVICES.GOOGLE_DRIVE;
+  }
+  return GOOGLE_SERVICES.GOOGLE_CALENDAR;
+};
+
+export const useGoogleAppCredential = (service: GoogleConnectorService) => {
+  const endpoint = `/api/manage/admin/connector/${mapServiceToEndpoint(
+    service
+  )}/app-credential`;
 
   return useSWR<{ client_id: string }, FetchError>(
     endpoint,
@@ -22,12 +35,10 @@ export const useGoogleAppCredential = (service: "gmail" | "google_drive") => {
   );
 };
 
-export const useGoogleServiceAccountKey = (
-  service: "gmail" | "google_drive"
-) => {
-  const endpoint = `/api/manage/admin/connector/${
-    service === "gmail" ? GOOGLE_SERVICES.GMAIL : GOOGLE_SERVICES.GOOGLE_DRIVE
-  }/service-account-key`;
+export const useGoogleServiceAccountKey = (service: GoogleConnectorService) => {
+  const endpoint = `/api/manage/admin/connector/${mapServiceToEndpoint(
+    service
+  )}/service-account-key`;
 
   return useSWR<{ service_account_email: string }, FetchError>(
     endpoint,
@@ -36,8 +47,12 @@ export const useGoogleServiceAccountKey = (
 };
 
 export const useGoogleCredentials = (
-  source: ValidSources.Gmail | ValidSources.GoogleDrive
+  source:
+    | ValidSources.Gmail
+    | ValidSources.GoogleDrive
+    | ValidSources.GoogleCalendar
 ) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(source),
     errorHandlingFetcher,
@@ -59,8 +74,10 @@ export const useConnectorsByCredentialId = (credential_id: number | null) => {
 };
 
 export const checkCredentialsFetched = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   appCredentialData: any,
   appCredentialError: FetchError | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serviceAccountKeyData: any,
   serviceAccountKeyError: FetchError | undefined
 ) => {
@@ -107,14 +124,19 @@ export const checkConnectorsExist = (
 };
 
 export const refreshAllGoogleData = (
-  source: ValidSources.Gmail | ValidSources.GoogleDrive
+  source:
+    | ValidSources.Gmail
+    | ValidSources.GoogleDrive
+    | ValidSources.GoogleCalendar
 ) => {
   mutate(buildSimilarCredentialInfoURL(source));
 
   const service =
     source === ValidSources.Gmail
       ? GOOGLE_SERVICES.GMAIL
-      : GOOGLE_SERVICES.GOOGLE_DRIVE;
+      : source === ValidSources.GoogleDrive
+        ? GOOGLE_SERVICES.GOOGLE_DRIVE
+        : GOOGLE_SERVICES.GOOGLE_CALENDAR;
   mutate(`/api/manage/admin/connector/${service}/app-credential`);
   mutate(`/api/manage/admin/connector/${service}/service-account-key`);
 };

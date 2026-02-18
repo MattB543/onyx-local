@@ -1,7 +1,7 @@
-import React from "react";
+import React, { HTMLAttributes } from "react";
 import { MdDragIndicator } from "react-icons/md";
 
-interface DragHandleProps extends React.HTMLAttributes<HTMLDivElement> {
+interface DragHandleProps extends HTMLAttributes<HTMLDivElement> {
   isDragging?: boolean;
   size?: number;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { memo, useCallback } from "react";
 import { StopReason } from "@/app/app/services/streamingModels";
 import { FullChatState, RenderType } from "../interfaces";
 import { TransformedStep } from "./transformers";
@@ -18,7 +18,7 @@ export interface CollapsedStreamingContentProps {
   renderTypeOverride?: RenderType;
 }
 
-export const CollapsedStreamingContent = React.memo(
+export const CollapsedStreamingContent = memo(
   function CollapsedStreamingContent({
     step,
     chatState,

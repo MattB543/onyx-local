@@ -1,9 +1,11 @@
 import { AdminPageTitle } from "@/components/admin/Title";
-import { Explorer } from "./Explorer";
 import { fetchValidFilterInfo } from "@/lib/search/utilsSS";
+
 import { SvgZoomIn } from "@opal/icons";
+
+import { Explorer } from "./Explorer";
 export default async function Page(props: {
-  searchParams: Promise<{ [key: string]: string }>;
+  searchParams: Promise<Record<string, string>>;
 }) {
   const searchParams = await props.searchParams;
   const { connectors, documentSets } = await fetchValidFilterInfo();

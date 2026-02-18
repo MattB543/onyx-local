@@ -30,6 +30,7 @@ export interface MCPServer {
   auth_performer: MCPAuthenticationPerformer;
   is_authenticated: boolean;
   user_authenticated?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth_template?: any;
   user_credentials?: Record<string, string>;
 }

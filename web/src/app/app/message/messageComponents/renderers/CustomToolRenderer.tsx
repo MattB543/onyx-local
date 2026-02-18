@@ -41,7 +41,7 @@ function constructCustomToolState(packets: CustomToolPacket[]) {
   };
 }
 
-export const CustomToolRenderer: MessageRenderer<CustomToolPacket, {}> = ({
+export const CustomToolRenderer: MessageRenderer<CustomToolPacket, Record<string, never>> = ({
   packets,
   onComplete,
   renderType,
@@ -56,6 +56,7 @@ export const CustomToolRenderer: MessageRenderer<CustomToolPacket, {}> = ({
     }
   }, [isComplete, onComplete]);
 
+  /* eslint-disable react-hooks/preserve-manual-memoization -- deps may be mutated by streaming */
   const status = useMemo(() => {
     if (isComplete) {
       if (responseType === "image") return `${toolName} returned images`;
@@ -65,6 +66,7 @@ export const CustomToolRenderer: MessageRenderer<CustomToolPacket, {}> = ({
     if (isRunning) return `${toolName} running...`;
     return null;
   }, [toolName, responseType, isComplete, isRunning]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   const icon = FiTool;
 

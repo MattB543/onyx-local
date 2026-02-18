@@ -16,6 +16,7 @@ from onyx.prompts.prompt_utils import get_company_context
 from onyx.prompts.prompt_utils import handle_onyx_date_awareness
 from onyx.prompts.prompt_utils import replace_citation_guidance_tag
 from onyx.prompts.prompt_utils import replace_reminder_tag
+from onyx.prompts.tool_prompts import CRM_GUIDANCE
 from onyx.prompts.tool_prompts import GENERATE_IMAGE_GUIDANCE
 from onyx.prompts.tool_prompts import INTERNAL_SEARCH_GUIDANCE
 from onyx.prompts.tool_prompts import MEMORY_GUIDANCE
@@ -38,6 +39,7 @@ from onyx.tools.tool_implementations.images.image_generation_tool import (
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool
+from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
 from onyx.utils.timing import log_function_time
@@ -235,6 +237,7 @@ def build_system_prompt(
             + PYTHON_TOOL_GUIDANCE
             + GENERATE_IMAGE_GUIDANCE
             + MEMORY_GUIDANCE
+            + CRM_GUIDANCE
         )
         return system_prompt
 
@@ -280,5 +283,9 @@ def build_system_prompt(
 
         if has_memory or include_all_guidance:
             system_prompt += MEMORY_GUIDANCE
+
+        has_crm = any(isinstance(tool, CrmSearchTool) for tool in tools)
+        if has_crm or include_all_guidance:
+            system_prompt += CRM_GUIDANCE
 
     return system_prompt

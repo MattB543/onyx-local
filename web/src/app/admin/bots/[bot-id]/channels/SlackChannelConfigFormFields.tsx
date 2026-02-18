@@ -49,6 +49,7 @@ export interface SlackChannelConfigFormFieldsProps {
   nonSearchAssistants: MinimalPersonaSnapshot[];
   standardAnswerCategoryResponse: StandardAnswerCategoryResponse;
   slack_bot_id: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formikProps: any;
 }
 
@@ -63,6 +64,7 @@ export function SlackChannelConfigFormFields({
   formikProps,
 }: SlackChannelConfigFormFieldsProps) {
   const router = useRouter();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values, setFieldValue } = useFormikContext<any>();
   const [viewUnselectableSets, setViewUnselectableSets] = useState(false);
   const [viewSyncEnabledAssistants, setViewSyncEnabledAssistants] =
@@ -111,6 +113,7 @@ export function SlackChannelConfigFormFields({
     const uniqueDescriptors = new Map();
     documentSets.forEach((ds: DocumentSetSummary) => {
       const ccPairSummaries = getCcPairSummaries(ds);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ccPairSummaries.forEach((summary: any) => {
         if (
           summary.access_type === "private" &&
@@ -542,6 +545,7 @@ export function SlackChannelConfigFormFields({
               <StandardAnswerCategoryDropdownField
                 standardAnswerCategoryResponse={standardAnswerCategoryResponse}
                 categories={values.standard_answer_categories}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setCategories={(categories: any) =>
                   setFieldValue("standard_answer_categories", categories)
                 }
@@ -579,7 +583,7 @@ export function SlackChannelConfigFormFields({
                     Relevant Connectors:
                   </h4>
                   <div className="max-h-40 overflow-y-auto border-t border-text-subtle flex-col gap-y-2">
-                    {memoizedPrivateConnectors.map((ccpairinfo: any) => (
+                    {memoizedPrivateConnectors.map((ccpairinfo: any) => ( /* eslint-disable-line @typescript-eslint/no-explicit-any */
                       <Link
                         key={ccpairinfo.id}
                         href={`/admin/connector/${ccpairinfo.id}`}

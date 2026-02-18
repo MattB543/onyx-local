@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-export interface FrostedDivProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface FrostedDivProps extends HTMLAttributes<HTMLDivElement> {
   /**
    * Background color for the frost effect.
    * Defaults to a semi-transparent white

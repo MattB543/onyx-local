@@ -44,6 +44,7 @@ interface AzureFormValues {
   deployment_name: string;
   target_uri: string;
   default_model_name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model_configurations: any[];
   groups: number[];
   is_public: boolean;

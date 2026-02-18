@@ -36,7 +36,7 @@ export const CodeBlock = memo(function CodeBlock({
     });
   }, [codeText]);
 
-  const CopyButton = () => (
+  const copyButton = (
     <div
       className="ml-auto cursor-pointer select-none"
       onMouseDown={handleCopy}
@@ -81,33 +81,27 @@ export const CodeBlock = memo(function CodeBlock({
     );
   }
 
-  const CodeContent = () => {
-    if (!language) {
-      return (
-        <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
-          <code className={`text-sm hljs ${className}`}>
-            {Array.isArray(children)
-              ? children.map((child, index) => (
-                  <MemoizedCodeLine key={index} content={child} />
-                ))
-              : children}
-          </code>
-        </pre>
-      );
-    }
-
-    return (
-      <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
-        <code className="text-xs">
-          {Array.isArray(children)
-            ? children.map((child, index) => (
-                <MemoizedCodeLine key={index} content={child} />
-              ))
-            : children}
-        </code>
-      </pre>
-    );
-  };
+  const codeContent = !language ? (
+    <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
+      <code className={`text-sm hljs ${className}`}>
+        {Array.isArray(children)
+          ? children.map((child, index) => (
+              <MemoizedCodeLine key={index} content={child} />
+            ))
+          : children}
+      </code>
+    </pre>
+  ) : (
+    <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
+      <code className="text-xs">
+        {Array.isArray(children)
+          ? children.map((child, index) => (
+              <MemoizedCodeLine key={index} content={child} />
+            ))
+          : children}
+      </code>
+    </pre>
+  );
 
   return (
     <div className="bg-background-tint-00 px-1 pb-1 rounded-12 max-w-full min-w-0">
@@ -120,11 +114,11 @@ export const CodeBlock = memo(function CodeBlock({
             className="my-auto"
           />
           <Text secondaryMono>{language}</Text>
-          {codeText && <CopyButton />}
+          {codeText && copyButton}
         </div>
       )}
 
-      <CodeContent />
+      {codeContent}
     </div>
   );
 });

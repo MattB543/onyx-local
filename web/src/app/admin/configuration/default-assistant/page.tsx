@@ -1,27 +1,32 @@
 "use client";
 
-import { useState } from "react";
 import { Formik, Form } from "formik";
-import { ThreeDotsLoader } from "@/components/Loading";
+import { Info } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AdminPageTitle } from "@/components/admin/Title";
-import { errorHandlingFetcher } from "@/lib/fetcher";
-import Text from "@/refresh-components/texts/Text";
+import { useState } from "react";
 import useSWR, { mutate } from "swr";
+
+import { ToolSelector } from "@/components/admin/assistants/ToolSelector";
+import { AdminPageTitle } from "@/components/admin/Title";
 import { ErrorCallout } from "@/components/ErrorCallout";
-import { toast } from "@/hooks/useToast";
-import { useAgents } from "@/hooks/useAgents";
-import Separator from "@/refresh-components/Separator";
 import { SubLabel } from "@/components/Field";
+import { HoverPopup } from "@/components/HoverPopup";
+import { ThreeDotsLoader } from "@/components/Loading";
+
+
+import { useAgents } from "@/hooks/useAgents";
+import { toast } from "@/hooks/useToast";
+import { errorHandlingFetcher } from "@/lib/fetcher";
+import Separator from "@/refresh-components/Separator";
+import Text from "@/refresh-components/texts/Text";
 import Button from "@/refresh-components/buttons/Button";
 import { useSettingsContext } from "@/providers/SettingsProvider";
-import Link from "next/link";
 import { Callout } from "@/components/ui/callout";
 import { ToolSnapshot, MCPServersResponse } from "@/lib/tools/interfaces";
-import { ToolSelector } from "@/components/admin/assistants/ToolSelector";
 import InputTextArea from "@/refresh-components/inputs/InputTextArea";
-import { HoverPopup } from "@/components/HoverPopup";
-import { Info } from "lucide-react";
+
+
 import { SvgOnyxLogo } from "@opal/icons";
 
 interface DefaultAssistantConfiguration {
@@ -113,7 +118,7 @@ function DefaultAssistantConfig() {
     return <ThreeDotsLoader />;
   }
 
-  const enabledToolsMap: { [key: number]: boolean } = {};
+  const enabledToolsMap: Record<number, boolean> = {};
   tools.forEach((tool) => {
     // Enable tool if it's in the current config OR if it's marked as default_enabled
     enabledToolsMap[tool.id] =
@@ -167,6 +172,7 @@ function DefaultAssistantConfig() {
             await refreshAgents();
 
             toast.success("Default assistant updated successfully!");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error: any) {
             toast.error(error.message || "Failed to update assistant");
           } finally {
