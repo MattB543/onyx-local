@@ -6,6 +6,8 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
+      args:
+        - ONYX_VERSION=${ONYX_VERSION:-0.0.0-dev}
     command: >
       /bin/sh -c "
       alembic upgrade head &&
@@ -56,6 +58,8 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
+      args:
+        - ONYX_VERSION=${ONYX_VERSION:-0.0.0-dev}
     command: >
       /bin/sh -c "
       if [ -f /etc/ssl/certs/custom-ca.crt ]; then
@@ -123,6 +127,7 @@ services:
       context: ../../web
       dockerfile: Dockerfile
       args:
+        - ONYX_VERSION=${ONYX_VERSION:-0.0.0-dev}
         - NEXT_PUBLIC_DISABLE_LOGOUT=${NEXT_PUBLIC_DISABLE_LOGOUT:-}
         - NEXT_PUBLIC_THEME=${NEXT_PUBLIC_THEME:-}
         - NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED=${NEXT_PUBLIC_FORGOT_PASSWORD_ENABLED:-}

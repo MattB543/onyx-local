@@ -54,12 +54,13 @@ git pull origin main
 Rebuild and restart all changed services:
 
 ```bash
-docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server
+ONYX_VERSION=$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server
 ```
 
 - `--build` rebuilds images from source (required since we are not using pre-built images).
 - `--force-recreate` ensures containers are fully recreated even if the image hash appears unchanged.
 - List only the services you changed, or omit service names to rebuild everything.
+- `ONYX_VERSION=$(git rev-parse --short HEAD)` stamps containers with the current commit SHA so footer/system version reflects deployed code.
 
 ---
 
@@ -100,7 +101,7 @@ Hit the site in a browser and confirm it loads without errors.
 Run this single SSH command from your local machine to pull, rebuild all application services, and restart nginx in one shot:
 
 ```bash
-ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${PROD_HOST}" "cd /home/ec2-user/onyx-local && git pull origin main && docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server && docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx"
+ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${PROD_HOST}" "cd /home/ec2-user/onyx-local && git pull origin main && ONYX_VERSION=\$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server && docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx"
 ```
 
 ---
@@ -110,28 +111,28 @@ ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${PROD_HOST}" "cd /home/ec2-user/onyx-loca
 ### Backend only (API + background workers)
 
 ```bash
-docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background
+ONYX_VERSION=$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background
 docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx
 ```
 
 ### Frontend only (Next.js web server)
 
 ```bash
-docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate web_server
+ONYX_VERSION=$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate web_server
 docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx
 ```
 
 ### Backend + Frontend
 
 ```bash
-docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server
+ONYX_VERSION=$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server
 docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx
 ```
 
 ### Everything (nuclear option)
 
 ```bash
-docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate
+ONYX_VERSION=$(git rev-parse --short HEAD) docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate
 ```
 
 This rebuilds and recreates every service in the stack. Nginx is included so no separate restart is needed.
