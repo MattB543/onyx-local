@@ -58,6 +58,7 @@ export const ParallelStreamingHeader = memo(
               />
             ) : undefined
           }
+          className="bg-transparent"
         >
           {steps.map((step) => (
             <Tabs.Trigger

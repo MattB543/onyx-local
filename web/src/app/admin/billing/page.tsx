@@ -294,6 +294,7 @@ export default function BillingPage() {
       plans: (
         <PlansView
           hasSubscription={!!hasSubscription}
+          hasLicense={!!licenseData?.has_license}
           onCheckout={() => changeView("checkout")}
           hideFeatures={showLicenseActivationInput}
         />
