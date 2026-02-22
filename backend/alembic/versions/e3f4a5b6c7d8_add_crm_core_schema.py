@@ -98,12 +98,125 @@ ALL_CRM_TOOLS = [
 ]
 
 
+def _seed_crm_tools(conn: sa.engine.Connection) -> None:
+    for tool in ALL_CRM_TOOLS:
+        existing = conn.execute(
+            sa.text("SELECT id FROM tool WHERE in_code_tool_id = :in_code_tool_id"),
+            {"in_code_tool_id": tool["in_code_tool_id"]},
+        ).fetchone()
+
+        if existing:
+            tool_id = existing[0]
+            conn.execute(
+                sa.text(
+                    """
+                    UPDATE tool
+                    SET name = :name,
+                        display_name = :display_name,
+                        description = :description,
+                        enabled = :enabled
+                    WHERE id = :tool_id
+                    """
+                ),
+                {
+                    **tool,
+                    "tool_id": tool_id,
+                },
+            )
+        else:
+            tool_id = conn.execute(
+                sa.text(
+                    """
+                    INSERT INTO tool (name, display_name, description, in_code_tool_id, enabled)
+                    VALUES (:name, :display_name, :description, :in_code_tool_id, :enabled)
+                    RETURNING id
+                    """
+                ),
+                tool,
+            ).scalar_one()
+
+        conn.execute(
+            sa.text(
+                """
+                INSERT INTO persona__tool (persona_id, tool_id)
+                VALUES (0, :tool_id)
+                ON CONFLICT DO NOTHING
+                """
+            ),
+            {"tool_id": tool_id},
+        )
+
+
 # ---------------------------------------------------------------------------
 # upgrade
 # ---------------------------------------------------------------------------
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    # Compatibility path for legacy prod schemas that already created CRM tables
+    # through the old incremental chain ending at d7e8f9a0b1c2.
+    if "crm_settings" in inspector.get_table_names():
+        op.execute(
+            """
+            ALTER TABLE crm_settings
+            ADD COLUMN IF NOT EXISTS contact_stage_options varchar[]
+            NOT NULL
+            DEFAULT ARRAY['lead','active','inactive','archived']::varchar[];
+            """
+        )
+        op.execute(
+            """
+            ALTER TABLE crm_settings
+            ADD COLUMN IF NOT EXISTS contact_category_suggestions varchar[]
+            NOT NULL
+            DEFAULT ARRAY['Policy Maker','Journalist','Academic','Allied Org','Lab Member']::varchar[];
+            """
+        )
+        op.execute(
+            """
+            ALTER TABLE crm_contact
+            ADD COLUMN IF NOT EXISTS category varchar;
+            """
+        )
+        op.execute(
+            """
+            ALTER TABLE crm_contact
+            ALTER COLUMN status SET DEFAULT 'lead';
+            """
+        )
+        op.execute(
+            """
+            ALTER TABLE crm_interaction
+            ADD COLUMN IF NOT EXISTS updated_at timestamptz
+            NOT NULL
+            DEFAULT now();
+            """
+        )
+        op.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crm_contact_owner (
+                contact_id UUID NOT NULL,
+                user_id UUID NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (contact_id, user_id),
+                FOREIGN KEY (contact_id) REFERENCES crm_contact(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
+            );
+            """
+        )
+        op.execute(
+            """
+            CREATE INDEX IF NOT EXISTS ix_crm_contact_owner_user_id
+                ON crm_contact_owner (user_id);
+            """
+        )
+
+        _seed_crm_tools(bind)
+        return
+
     # ── crm_settings ──────────────────────────────────────────────────────
     op.create_table(
         "crm_settings",
@@ -465,54 +578,7 @@ def upgrade() -> None:
     )
 
     # ── Seed CRM tools ────────────────────────────────────────────────────
-    conn = op.get_bind()
-
-    for tool in ALL_CRM_TOOLS:
-        existing = conn.execute(
-            sa.text("SELECT id FROM tool WHERE in_code_tool_id = :in_code_tool_id"),
-            {"in_code_tool_id": tool["in_code_tool_id"]},
-        ).fetchone()
-
-        if existing:
-            tool_id = existing[0]
-            conn.execute(
-                sa.text(
-                    """
-                    UPDATE tool
-                    SET name = :name,
-                        display_name = :display_name,
-                        description = :description,
-                        enabled = :enabled
-                    WHERE id = :tool_id
-                    """
-                ),
-                {
-                    **tool,
-                    "tool_id": tool_id,
-                },
-            )
-        else:
-            tool_id = conn.execute(
-                sa.text(
-                    """
-                    INSERT INTO tool (name, display_name, description, in_code_tool_id, enabled)
-                    VALUES (:name, :display_name, :description, :in_code_tool_id, :enabled)
-                    RETURNING id
-                    """
-                ),
-                tool,
-            ).scalar_one()
-
-        conn.execute(
-            sa.text(
-                """
-                INSERT INTO persona__tool (persona_id, tool_id)
-                VALUES (0, :tool_id)
-                ON CONFLICT DO NOTHING
-                """
-            ),
-            {"tool_id": tool_id},
-        )
+    _seed_crm_tools(bind)
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """add_custom_jobs_framework
 
 Revision ID: e1f2a3b4c5d6
-Revises: 19c0ccb01687
+Revises: d7e8f9a0b1c2
 Create Date: 2026-02-18 16:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "e1f2a3b4c5d6"
-down_revision = "19c0ccb01687"
+down_revision = "d7e8f9a0b1c2"
 branch_labels = None
 depends_on = None
 
