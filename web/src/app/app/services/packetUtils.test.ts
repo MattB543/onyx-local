@@ -3,7 +3,6 @@
  * Tests packet type classification and utility functions
  */
 
-import { Packet, PacketType, Placement } from "./streamingModels";
 import {
   isToolPacket,
   isActualToolCallPacket,
@@ -12,6 +11,7 @@ import {
   isStreamingComplete,
   isFinalAnswerComing,
 } from "./packetUtils";
+import { Packet, PacketType, Placement } from "./streamingModels";
 
 // Helper to create a mock packet with a specific type
 function createPacket(
@@ -43,6 +43,8 @@ describe("packetUtils", () => {
       PacketType.CRM_UPDATE_TOOL_DELTA,
       PacketType.CRM_LOG_INTERACTION_TOOL_START,
       PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+      PacketType.CALENDAR_SEARCH_TOOL_START,
+      PacketType.CALENDAR_SEARCH_TOOL_DELTA,
       PacketType.REASONING_START,
       PacketType.REASONING_DELTA,
       PacketType.FETCH_TOOL_START,
@@ -112,6 +114,8 @@ describe("packetUtils", () => {
       PacketType.CRM_UPDATE_TOOL_DELTA,
       PacketType.CRM_LOG_INTERACTION_TOOL_START,
       PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+      PacketType.CALENDAR_SEARCH_TOOL_START,
+      PacketType.CALENDAR_SEARCH_TOOL_DELTA,
       PacketType.FETCH_TOOL_START,
       PacketType.FETCH_TOOL_URLS,
       PacketType.FETCH_TOOL_DOCUMENTS,

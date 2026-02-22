@@ -176,7 +176,8 @@ export function createCrmToolStartPacket(
     | PacketType.CRM_SEARCH_TOOL_START
     | PacketType.CRM_CREATE_TOOL_START
     | PacketType.CRM_UPDATE_TOOL_START
-    | PacketType.CRM_LOG_INTERACTION_TOOL_START,
+    | PacketType.CRM_LOG_INTERACTION_TOOL_START
+    | PacketType.CALENDAR_SEARCH_TOOL_START,
   placement: Partial<Placement> = {}
 ): Packet {
   return createPacket(type, placement);
@@ -187,7 +188,8 @@ export function createCrmToolDeltaPacket(
     | PacketType.CRM_SEARCH_TOOL_DELTA
     | PacketType.CRM_CREATE_TOOL_DELTA
     | PacketType.CRM_UPDATE_TOOL_DELTA
-    | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+    | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA
+    | PacketType.CALENDAR_SEARCH_TOOL_DELTA,
   payload: Record<string, unknown>,
   placement: Partial<Placement> = {}
 ): Packet {

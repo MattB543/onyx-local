@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $webDir = Join-Path $root "web"

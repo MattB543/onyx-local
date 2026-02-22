@@ -38,6 +38,7 @@ from onyx.configs.app_configs import APP_HOST
 from onyx.configs.app_configs import APP_PORT
 from onyx.configs.app_configs import AUTH_RATE_LIMITING_ENABLED
 from onyx.configs.app_configs import AUTH_TYPE
+from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
 from onyx.configs.app_configs import LOG_ENDPOINT_LATENCY
 from onyx.configs.app_configs import OAUTH_CLIENT_ID
 from onyx.configs.app_configs import OAUTH_CLIENT_SECRET
@@ -151,6 +152,11 @@ from shared_configs.configs import MULTI_TENANT
 from shared_configs.configs import POSTGRES_DEFAULT_SCHEMA
 from shared_configs.configs import SENTRY_DSN
 from shared_configs.contextvars import CURRENT_TENANT_ID_CONTEXTVAR
+
+if ENABLE_CUSTOM_JOBS:
+    from onyx.server.manage.custom_jobs.api import (
+        admin_router as custom_jobs_admin_router,
+    )
 
 warnings.filterwarnings(
     "ignore", category=ResourceWarning, message=r"Unclosed client session"
@@ -414,6 +420,10 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, embedding_router)
     include_router_with_global_prefix_prepended(application, web_search_router)
     include_router_with_global_prefix_prepended(application, web_search_admin_router)
+    if ENABLE_CUSTOM_JOBS:
+        include_router_with_global_prefix_prepended(
+            application, custom_jobs_admin_router
+        )
     include_router_with_global_prefix_prepended(
         application, opensearch_migration_admin_router
     )

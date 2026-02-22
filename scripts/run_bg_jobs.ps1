@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $backendDir = Join-Path $root "backend"
@@ -12,6 +13,7 @@ $env:PYTHONPATH = $backendDir
 $env:AUTH_TYPE = "basic"
 $env:DEV_MODE = "true"
 $env:FILE_STORE_BACKEND = "postgres"
+$env:LICENSE_ENFORCEMENT_ENABLED = "false"
 $env:LOG_LEVEL = "debug"
 $env:DEV_LOGGING_ENABLED = "true"
 $env:REQUIRE_EMAIL_VERIFICATION = "False"

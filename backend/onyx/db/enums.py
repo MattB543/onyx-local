@@ -301,13 +301,6 @@ class CrmContactSource(str, PyEnum):
     OTHER = "other"
 
 
-class CrmContactStatus(str, PyEnum):
-    LEAD = "lead"
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    ARCHIVED = "archived"
-
-
 class CrmOrganizationType(str, PyEnum):
     CUSTOMER = "customer"
     PROSPECT = "prospect"
@@ -334,3 +327,51 @@ class LLMModelFlowType(str, PyEnum):
     CHAT = "chat"
     VISION = "vision"
     CONTEXTUAL_RAG = "contextual_rag"
+
+
+class CustomJobTriggerType(str, PyEnum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    TRIGGERED = "triggered"
+
+
+class CustomJobRunStatus(str, PyEnum):
+    PENDING = "pending"
+    STARTED = "started"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    SKIPPED = "skipped"
+    TIMEOUT = "timeout"
+
+    def is_terminal(self) -> bool:
+        return self in {
+            CustomJobRunStatus.SUCCESS,
+            CustomJobRunStatus.FAILURE,
+            CustomJobRunStatus.SKIPPED,
+            CustomJobRunStatus.TIMEOUT,
+        }
+
+
+class CustomJobStepStatus(str, PyEnum):
+    PENDING = "pending"
+    STARTED = "started"
+    SUCCESS = "success"
+    FAILURE = "failure"
+    SKIPPED = "skipped"
+    TIMEOUT = "timeout"
+
+    def is_terminal(self) -> bool:
+        return self in {
+            CustomJobStepStatus.SUCCESS,
+            CustomJobStepStatus.FAILURE,
+            CustomJobStepStatus.SKIPPED,
+            CustomJobStepStatus.TIMEOUT,
+        }
+
+
+class CustomJobTriggerEventStatus(str, PyEnum):
+    RECEIVED = "received"
+    ENQUEUED = "enqueued"
+    CONSUMED = "consumed"
+    DROPPED = "dropped"
+    FAILED = "failed"

@@ -889,6 +889,7 @@ def handle_stream_message_objects(
                 include_citations=new_msg_req.include_citations,
                 all_injected_file_metadata=all_injected_file_metadata,
                 inject_memories_in_prompt=user.use_memories,
+                timezone=new_msg_req.timezone,
             )
 
     except ValueError as e:

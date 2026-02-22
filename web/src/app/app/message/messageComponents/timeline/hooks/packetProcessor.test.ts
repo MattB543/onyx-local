@@ -10,11 +10,10 @@ import {
   PacketType,
   StopReason,
 } from "@/app/app/services/streamingModels";
-import { createInitialState, processPackets } from "./packetProcessor";
+
 import {
   createPacket,
   createStopPacket,
-  createCitationPacket,
   createBranchingPacket,
   createMessageStartPacket,
   createImageDeltaPacket,
@@ -29,6 +28,7 @@ import {
   createCrmToolStartPacket,
   createCrmToolDeltaPacket,
 } from "./__tests__/testHelpers";
+import { createInitialState, processPackets } from "./packetProcessor";
 
 // ============================================================================
 // Tests
@@ -276,6 +276,7 @@ describe("packetProcessor", () => {
         PacketType.CRM_LOG_INTERACTION_TOOL_START,
         "CRM_LOG_INTERACTION_TOOL_START",
       ],
+      [PacketType.CALENDAR_SEARCH_TOOL_START, "CALENDAR_SEARCH_TOOL_START"],
       [PacketType.FILE_READER_START, "FILE_READER_START"],
       [PacketType.REASONING_START, "REASONING_START"],
       [PacketType.DEEP_RESEARCH_PLAN_START, "DEEP_RESEARCH_PLAN_START"],
@@ -809,12 +810,14 @@ describe("packetProcessor", () => {
         | PacketType.CRM_CREATE_TOOL_START
         | PacketType.CRM_UPDATE_TOOL_START
         | PacketType.CRM_LOG_INTERACTION_TOOL_START
+        | PacketType.CALENDAR_SEARCH_TOOL_START
       ),
       (
         | PacketType.CRM_SEARCH_TOOL_DELTA
         | PacketType.CRM_CREATE_TOOL_DELTA
         | PacketType.CRM_UPDATE_TOOL_DELTA
         | PacketType.CRM_LOG_INTERACTION_TOOL_DELTA
+        | PacketType.CALENDAR_SEARCH_TOOL_DELTA
       ),
     ][] = [
       [PacketType.CRM_SEARCH_TOOL_START, PacketType.CRM_SEARCH_TOOL_DELTA],
@@ -823,6 +826,10 @@ describe("packetProcessor", () => {
       [
         PacketType.CRM_LOG_INTERACTION_TOOL_START,
         PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+      ],
+      [
+        PacketType.CALENDAR_SEARCH_TOOL_START,
+        PacketType.CALENDAR_SEARCH_TOOL_DELTA,
       ],
     ];
 

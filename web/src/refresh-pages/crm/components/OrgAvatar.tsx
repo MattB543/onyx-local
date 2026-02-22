@@ -1,7 +1,7 @@
 import { CrmOrganizationType } from "@/app/app/crm/crmService";
 import { cn } from "@/lib/utils";
 
-const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+const TYPE_COLORS = {
   customer: { bg: "bg-green-100", text: "text-green-700" },
   prospect: { bg: "bg-blue-100", text: "text-blue-700" },
   partner: { bg: "bg-purple-100", text: "text-purple-700" },
@@ -11,7 +11,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const sizeClasses = {
-  sm: "w-8 h-8 text-xs",
+  sm: "w-8 h-8 text-sm",
   md: "w-10 h-10 text-sm",
   lg: "w-12 h-12 text-base",
 };
@@ -24,7 +24,8 @@ interface OrgAvatarProps {
 
 export default function OrgAvatar({ name, type, size = "md" }: OrgAvatarProps) {
   const initial = (name?.[0] || "?").toUpperCase();
-  const color = TYPE_COLORS[type || "default"] ?? TYPE_COLORS["default"]!;
+  const colorKey: keyof typeof TYPE_COLORS = type ?? "default";
+  const color = TYPE_COLORS[colorKey];
 
   return (
     <div

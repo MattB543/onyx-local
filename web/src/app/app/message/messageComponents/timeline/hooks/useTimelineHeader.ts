@@ -1,12 +1,14 @@
 import { useMemo } from "react";
-import { TurnGroup } from "../transformers";
+
+import { constructCurrentSearchState } from "@/app/app/message/messageComponents/timeline/renderers/search/searchStateUtils";
 import {
   PacketType,
   SearchToolPacket,
   StopReason,
   CustomToolStart,
 } from "@/app/app/services/streamingModels";
-import { constructCurrentSearchState } from "@/app/app/message/messageComponents/timeline/renderers/search/searchStateUtils";
+
+import { TurnGroup } from "../transformers";
 
 export interface TimelineHeaderResult {
   headerText: string;
@@ -109,6 +111,10 @@ export function useTimelineHeader(
 
     if (packetType === PacketType.CRM_LOG_INTERACTION_TOOL_START) {
       return { headerText: "Logging CRM interaction", hasPackets, userStopped };
+    }
+
+    if (packetType === PacketType.CALENDAR_SEARCH_TOOL_START) {
+      return { headerText: "Searching calendar", hasPackets, userStopped };
     }
 
     if (

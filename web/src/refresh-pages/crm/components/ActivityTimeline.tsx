@@ -73,7 +73,7 @@ export default function ActivityTimeline({
       </div>
 
       {isLoading ? (
-        <Text as="p" secondaryBody text03>
+        <Text as="p" secondaryBody text03 className="text-sm">
           Loading activity...
         </Text>
       ) : interactions.length === 0 ? (
@@ -92,7 +92,12 @@ export default function ActivityTimeline({
                 <div className="relative z-10 flex w-[31px] justify-center">
                   <div className="h-2 w-2 rounded-full bg-border-02" />
                 </div>
-                <Text as="p" secondaryBody text03 className="font-medium">
+                <Text
+                  as="p"
+                  secondaryBody
+                  text03
+                  className="text-sm font-medium"
+                >
                   {group.label}
                 </Text>
               </div>

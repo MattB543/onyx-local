@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_
@@ -11,13 +12,14 @@ from sqlalchemy import or_
 from sqlalchemy import select
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import delete
 
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmContactStatus
 from onyx.db.enums import CrmInteractionType
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import CrmContact
+from onyx.db.models import CrmContactOwner
 from onyx.db.models import CrmContact__Tag
 from onyx.db.models import CrmInteraction
 from onyx.db.models import CrmInteractionAttendee
@@ -30,6 +32,14 @@ from onyx.db.models import User
 
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 200
+DEFAULT_CONTACT_STAGE_OPTIONS = ["lead", "active", "inactive", "archived"]
+DEFAULT_CONTACT_CATEGORY_SUGGESTIONS = [
+    "Policy Maker",
+    "Journalist",
+    "Academic",
+    "Allied Org",
+    "Lab Member",
+]
 
 
 @dataclass(frozen=True)
@@ -53,7 +63,7 @@ def _normalize_email(email: str | None) -> str | None:
     return email or None
 
 
-def _normalize_name(name: str | None) -> str | None:
+def _strip_or_none(name: str | None) -> str | None:
     if name is None:
         return None
     name = name.strip()
@@ -67,6 +77,55 @@ def _normalize_text(value: str | None) -> str | None:
     return value or None
 
 
+def _normalize_stage_options(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw in values:
+        candidate = raw.strip().lower()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        normalized.append(candidate)
+
+    if not normalized:
+        raise ValueError("At least one CRM stage option is required.")
+    return normalized
+
+
+def _normalize_category_suggestions(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw in values:
+        candidate = raw.strip()
+        dedupe_key = candidate.lower()
+        if not candidate or dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalized.append(candidate)
+
+    return normalized
+
+
+def _dedupe_uuid_list(values: list[UUID]) -> list[UUID]:
+    deduped: list[UUID] = []
+    seen: set[UUID] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+def _normalize_status(value: str) -> str:
+    normalized = value.strip().lower()
+    if not normalized:
+        raise ValueError("Contact status cannot be empty.")
+    return normalized
+
+
 def _escape_like_query(value: str) -> str:
     return (
         value.replace("\\", "\\\\")
@@ -77,13 +136,15 @@ def _escape_like_query(value: str) -> str:
 
 def get_or_create_crm_settings(db_session: Session) -> CrmSettings:
     settings = db_session.get(CrmSettings, 1)
-    if settings is not None:
-        return settings
-
-    settings = CrmSettings(id=1)
-    db_session.add(settings)
-    db_session.commit()
-    db_session.refresh(settings)
+    if settings is None:
+        settings = CrmSettings(
+            id=1,
+            contact_stage_options=list(DEFAULT_CONTACT_STAGE_OPTIONS),
+            contact_category_suggestions=list(DEFAULT_CONTACT_CATEGORY_SUGGESTIONS),
+        )
+        db_session.add(settings)
+        db_session.commit()
+        db_session.refresh(settings)
     return settings
 
 
@@ -91,13 +152,52 @@ def update_crm_settings(
     db_session: Session,
     *,
     updated_by: UUID | None,
-    patches: dict[str, bool],
+    patches: dict[str, Any],
 ) -> CrmSettings:
     settings = get_or_create_crm_settings(db_session)
-    mutable_fields = {"enabled", "tier2_enabled", "tier3_deals", "tier3_custom_fields"}
+    mutable_fields = {
+        "enabled",
+        "tier2_enabled",
+        "tier3_deals",
+        "tier3_custom_fields",
+        "contact_stage_options",
+        "contact_category_suggestions",
+    }
 
     for key, value in patches.items():
         if key not in mutable_fields:
+            continue
+        if key == "contact_stage_options":
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) for item in value
+            ):
+                raise ValueError("'contact_stage_options' must be a list of strings.")
+            normalized_stage_options = _normalize_stage_options(value)
+            existing_stage_values = {
+                _normalize_status(stage)
+                for stage in db_session.scalars(select(CrmContact.status).distinct())
+                if isinstance(stage, str) and stage.strip()
+            }
+            removed_in_use_stages = sorted(
+                existing_stage_values - set(normalized_stage_options)
+            )
+            if removed_in_use_stages:
+                raise ValueError(
+                    "Cannot remove CRM stages currently in use: "
+                    + ", ".join(removed_in_use_stages)
+                )
+            settings.contact_stage_options = normalized_stage_options
+            continue
+        if key == "contact_category_suggestions":
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) for item in value
+            ):
+                raise ValueError(
+                    "'contact_category_suggestions' must be a list of strings."
+                )
+            settings.contact_category_suggestions = _normalize_category_suggestions(
+                value
+            )
             continue
         setattr(settings, key, value)
 
@@ -105,6 +205,78 @@ def update_crm_settings(
     db_session.commit()
     db_session.refresh(settings)
     return settings
+
+
+def get_allowed_contact_stages(db_session: Session) -> list[str]:
+    settings = get_or_create_crm_settings(db_session)
+
+    if not settings.contact_stage_options:
+        return list(DEFAULT_CONTACT_STAGE_OPTIONS)
+    return _normalize_stage_options(settings.contact_stage_options)
+
+
+def validate_stage_string(
+    value: str | None,
+    *,
+    allowed_stages: list[str],
+    field_name: str = "status",
+) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if not normalized:
+        raise ValueError(f"'{field_name}' cannot be empty.")
+    if normalized not in allowed_stages:
+        allowed = ", ".join(allowed_stages)
+        raise ValueError(f"'{field_name}' must be one of: {allowed}.")
+    return normalized
+
+
+def _replace_contact_owners(
+    db_session: Session,
+    *,
+    contact: CrmContact,
+    owner_ids: list[UUID],
+) -> None:
+    deduped_owner_ids = _dedupe_uuid_list(owner_ids)
+    existing_owner_ids = set(
+        db_session.scalars(
+            select(CrmContactOwner.user_id).where(
+                CrmContactOwner.contact_id == contact.id
+            )
+        )
+    )
+    requested_owner_ids = set(deduped_owner_ids)
+
+    removed_owner_ids = existing_owner_ids - requested_owner_ids
+    if removed_owner_ids:
+        db_session.execute(
+            delete(CrmContactOwner).where(
+                CrmContactOwner.contact_id == contact.id,
+                CrmContactOwner.user_id.in_(removed_owner_ids),
+            )
+        )
+
+    for owner_id in deduped_owner_ids:
+        if owner_id in existing_owner_ids:
+            continue
+        db_session.add(
+            CrmContactOwner(
+                contact_id=contact.id,
+                user_id=owner_id,
+            )
+        )
+
+
+def get_contact_owner_ids(contact_id: UUID, db_session: Session) -> list[UUID]:
+    return list(
+        db_session.scalars(
+            select(CrmContactOwner.user_id)
+            .where(CrmContactOwner.contact_id == contact_id)
+            .order_by(CrmContactOwner.created_at.asc(), CrmContactOwner.user_id.asc())
+        )
+    )
 
 
 def get_contact_by_id(contact_id: UUID, db_session: Session) -> CrmContact | None:
@@ -127,7 +299,7 @@ def list_contacts(
     page_num: int,
     page_size: int,
     query: str | None = None,
-    status: CrmContactStatus | None = None,
+    status: str | None = None,
     organization_id: UUID | None = None,
     tag_ids: list[UUID] | None = None,
 ) -> tuple[list[CrmContact], int]:
@@ -150,7 +322,7 @@ def list_contacts(
             )
 
     if status:
-        stmt = stmt.where(CrmContact.status == status)
+        stmt = stmt.where(CrmContact.status == status.strip().lower())
 
     if organization_id:
         stmt = stmt.where(CrmContact.organization_id == organization_id)
@@ -182,15 +354,16 @@ def create_contact(
     phone: str | None,
     title: str | None,
     organization_id: UUID | None,
-    owner_id: UUID | None,
     source: CrmContactSource | None,
-    status: CrmContactStatus,
+    status: str,
     notes: str | None,
     linkedin_url: str | None,
     location: str | None,
     created_by: UUID | None,
+    owner_ids: list[UUID] | None = None,
+    category: str | None = None,
 ) -> tuple[CrmContact, bool]:
-    normalized_first_name = _normalize_name(first_name)
+    normalized_first_name = _strip_or_none(first_name)
     if normalized_first_name is None:
         raise ValueError("Contact first name cannot be empty")
 
@@ -200,22 +373,35 @@ def create_contact(
         if existing is not None:
             return existing, False
 
+    normalized_owner_ids = _dedupe_uuid_list(owner_ids or [])
+    normalized_status = _normalize_status(status)
+
     contact = CrmContact(
         first_name=normalized_first_name,
-        last_name=_normalize_name(last_name),
+        last_name=_strip_or_none(last_name),
         email=normalized_email,
-        phone=_normalize_name(phone),
-        title=_normalize_name(title),
+        phone=_strip_or_none(phone),
+        title=_strip_or_none(title),
         organization_id=organization_id,
-        owner_id=owner_id,
         source=source,
-        status=status,
+        status=normalized_status,
+        category=_strip_or_none(category),
         notes=_normalize_text(notes),
-        linkedin_url=_normalize_name(linkedin_url),
-        location=_normalize_name(location),
+        linkedin_url=_strip_or_none(linkedin_url),
+        location=_strip_or_none(location),
         created_by=created_by,
     )
     db_session.add(contact)
+    db_session.flush()
+
+    for owner_uuid in normalized_owner_ids:
+        db_session.add(
+            CrmContactOwner(
+                contact_id=contact.id,
+                user_id=owner_uuid,
+            )
+        )
+
     db_session.commit()
     db_session.refresh(contact)
     return contact, True
@@ -234,9 +420,10 @@ def update_contact(
         "phone",
         "title",
         "organization_id",
-        "owner_id",
+        "owner_ids",
         "source",
         "status",
+        "category",
         "notes",
         "linkedin_url",
         "location",
@@ -247,14 +434,14 @@ def update_contact(
             continue
 
         if key == "first_name":
-            normalized_first_name = _normalize_name(value)
+            normalized_first_name = _strip_or_none(value)
             if normalized_first_name is None:
                 raise ValueError("Contact first name cannot be empty")
             contact.first_name = normalized_first_name
             continue
 
         if key in {"last_name", "phone", "title", "linkedin_url", "location"}:
-            setattr(contact, key, _normalize_name(value))
+            setattr(contact, key, _strip_or_none(value))
             continue
 
         if key == "notes":
@@ -268,6 +455,35 @@ def update_contact(
                 if existing is not None and existing.id != contact.id:
                     raise ValueError("A CRM contact with this email already exists.")
             contact.email = normalized_email
+            continue
+
+        if key == "owner_ids":
+            if value is None:
+                _replace_contact_owners(
+                    db_session=db_session,
+                    contact=contact,
+                    owner_ids=[],
+                )
+                continue
+            if not isinstance(value, list) or not all(
+                isinstance(owner_uuid, UUID) for owner_uuid in value
+            ):
+                raise ValueError("'owner_ids' must be a list of UUID values.")
+            _replace_contact_owners(
+                db_session=db_session,
+                contact=contact,
+                owner_ids=value,
+            )
+            continue
+
+        if key == "status":
+            if not isinstance(value, str):
+                raise ValueError("'status' must be a string value.")
+            contact.status = _normalize_status(value)
+            continue
+
+        if key == "category":
+            contact.category = _strip_or_none(value)
             continue
 
         setattr(contact, key, value)
@@ -284,7 +500,7 @@ def get_organization_by_id(
 
 
 def get_organization_by_name(name: str, db_session: Session) -> CrmOrganization | None:
-    normalized_name = _normalize_name(name)
+    normalized_name = _strip_or_none(name)
     if normalized_name is None:
         return None
 
@@ -354,7 +570,7 @@ def create_organization(
     notes: str | None,
     created_by: UUID | None,
 ) -> tuple[CrmOrganization, bool]:
-    normalized_name = _normalize_name(name)
+    normalized_name = _strip_or_none(name)
     if normalized_name is None:
         raise ValueError("Organization name cannot be empty")
 
@@ -364,11 +580,11 @@ def create_organization(
 
     organization = CrmOrganization(
         name=normalized_name,
-        website=_normalize_name(website),
+        website=_strip_or_none(website),
         type=type,
-        sector=_normalize_name(sector),
-        location=_normalize_name(location),
-        size=_normalize_name(size),
+        sector=_strip_or_none(sector),
+        location=_strip_or_none(location),
+        size=_strip_or_none(size),
         notes=_normalize_text(notes),
         created_by=created_by,
     )
@@ -399,7 +615,7 @@ def update_organization(
             continue
 
         if key == "name":
-            normalized_name = _normalize_name(value)
+            normalized_name = _strip_or_none(value)
             if normalized_name is None:
                 raise ValueError("Organization name cannot be empty")
 
@@ -410,7 +626,7 @@ def update_organization(
             continue
 
         if key in {"website", "sector", "location", "size"}:
-            setattr(organization, key, _normalize_name(value))
+            setattr(organization, key, _strip_or_none(value))
             continue
 
         if key == "notes":
@@ -469,7 +685,7 @@ def create_interaction(
     summary: str | None,
     occurred_at: datetime | None,
 ) -> CrmInteraction:
-    normalized_title = _normalize_name(title)
+    normalized_title = _strip_or_none(title)
     if normalized_title is None:
         raise ValueError("Interaction title cannot be empty")
 
@@ -485,15 +701,6 @@ def create_interaction(
     db_session.add(interaction)
     db_session.commit()
     db_session.refresh(interaction)
-
-    # Always include the interaction's primary contact as an attendee.
-    if contact_id is not None:
-        add_interaction_attendees(
-            db_session=db_session,
-            interaction_id=interaction.id,
-            contact_ids=[contact_id],
-            role=CrmAttendeeRole.ATTENDEE,
-        )
 
     return interaction
 
@@ -608,7 +815,7 @@ def get_tag_by_id(tag_id: UUID, db_session: Session) -> CrmTag | None:
 
 
 def get_tag_by_name(name: str, db_session: Session) -> CrmTag | None:
-    normalized_name = _normalize_name(name)
+    normalized_name = _strip_or_none(name)
     if normalized_name is None:
         return None
 
@@ -623,7 +830,7 @@ def create_tag(
     name: str,
     color: str | None,
 ) -> tuple[CrmTag, bool]:
-    normalized_name = _normalize_name(name)
+    normalized_name = _strip_or_none(name)
     if normalized_name is None:
         raise ValueError("Tag name cannot be empty")
 
@@ -631,7 +838,7 @@ def create_tag(
     if existing is not None:
         return existing, False
 
-    tag = CrmTag(name=normalized_name, color=_normalize_name(color))
+    tag = CrmTag(name=normalized_name, color=_strip_or_none(color))
     db_session.add(tag)
     db_session.commit()
     db_session.refresh(tag)

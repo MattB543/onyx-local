@@ -102,6 +102,9 @@ class SendMessageRequest(BaseModel):
     # Example: {"Authorization": "Bearer <user_jwt>", "X-User-ID": "user123"}
     mcp_headers: dict[str, str] | None = None
 
+    # IANA timezone string (e.g. "America/New_York") from the frontend
+    timezone: str | None = None
+
     # Origin of the message for telemetry tracking
     origin: MessageOrigin = MessageOrigin.UNSET
 

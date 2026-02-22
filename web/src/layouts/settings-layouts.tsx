@@ -33,18 +33,21 @@
  * ```
  */
 
-import BackButton from "@/refresh-components/buttons/BackButton";
+import { HtmlHTMLAttributes, useEffect, useRef, useState } from "react";
+
 import { cn } from "@/lib/utils";
+import BackButton from "@/refresh-components/buttons/BackButton";
 import Separator from "@/refresh-components/Separator";
 import Spacer from "@/refresh-components/Spacer";
 import Text from "@/refresh-components/texts/Text";
 import { WithoutStyles } from "@/types";
+
 import { IconProps } from "@opal/types";
-import { HtmlHTMLAttributes, useEffect, useRef, useState } from "react";
 
 const widthClasses = {
   md: "w-[min(50rem,100%)]",
   lg: "w-[min(60rem,100%)]",
+  xl: "w-[min(72rem,100%)]",
 };
 
 /**
@@ -74,8 +77,9 @@ const widthClasses = {
  * </SettingsLayouts.Root>
  * ```
  */
-interface SettingsRootProps
-  extends WithoutStyles<React.HtmlHTMLAttributes<HTMLDivElement>> {
+interface SettingsRootProps extends WithoutStyles<
+  React.HtmlHTMLAttributes<HTMLDivElement>
+> {
   width?: keyof typeof widthClasses;
 }
 function SettingsRoot({ width = "md", ...props }: SettingsRootProps) {
@@ -178,6 +182,7 @@ export interface SettingsHeaderProps {
   backButton?: boolean;
   onBack?: () => void;
   separator?: boolean;
+  titleIconInline?: boolean;
 }
 function SettingsHeader({
   icon: Icon,
@@ -188,6 +193,7 @@ function SettingsHeader({
   backButton,
   onBack,
   separator,
+  titleIconInline = false,
 }: SettingsHeaderProps) {
   const [showShadow, setShowShadow] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -228,16 +234,32 @@ function SettingsHeader({
         className={cn("flex flex-col gap-6 px-4", backButton ? "pt-2" : "pt-4")}
       >
         <div className="flex flex-col">
-          <div className="flex flex-row justify-between items-center gap-4">
-            <Icon className="stroke-text-04 h-[1.75rem] w-[1.75rem]" />
-            {rightChildren}
-          </div>
-          <div className="flex flex-col">
-            <div aria-label="admin-page-title">
-              <Text as="p" headingH2>
-                {title}
-              </Text>
+          {titleIconInline ? (
+            <div className="flex flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Icon className="stroke-text-04 h-[1.75rem] w-[1.75rem]" />
+                <div aria-label="admin-page-title">
+                  <Text as="p" headingH2>
+                    {title}
+                  </Text>
+                </div>
+              </div>
+              {rightChildren}
             </div>
+          ) : (
+            <div className="flex flex-row justify-between items-center gap-4">
+              <Icon className="stroke-text-04 h-[1.75rem] w-[1.75rem]" />
+              {rightChildren}
+            </div>
+          )}
+          <div className="flex flex-col">
+            {!titleIconInline && (
+              <div aria-label="admin-page-title">
+                <Text as="p" headingH2>
+                  {title}
+                </Text>
+              </div>
+            )}
             {description &&
               (typeof description === "string" ? (
                 <Text as="p" secondaryBody text03>

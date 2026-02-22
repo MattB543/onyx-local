@@ -46,6 +46,8 @@ class StreamingType(Enum):
     CRM_LIST_TOOL_DELTA = "crm_list_tool_delta"
     CRM_GET_TOOL_START = "crm_get_tool_start"
     CRM_GET_TOOL_DELTA = "crm_get_tool_delta"
+    CALENDAR_SEARCH_TOOL_START = "calendar_search_tool_start"
+    CALENDAR_SEARCH_TOOL_DELTA = "calendar_search_tool_delta"
     FILE_READER_START = "file_reader_start"
     FILE_READER_RESULT = "file_reader_result"
     REASONING_START = "reasoning_start"
@@ -335,6 +337,20 @@ class CrmGetToolDelta(BaseObj):
     payload: dict[str, Any]
 
 
+class CalendarSearchToolStart(BaseObj):
+    type: Literal["calendar_search_tool_start"] = (
+        StreamingType.CALENDAR_SEARCH_TOOL_START.value
+    )
+
+
+class CalendarSearchToolDelta(BaseObj):
+    type: Literal["calendar_search_tool_delta"] = (
+        StreamingType.CALENDAR_SEARCH_TOOL_DELTA.value
+    )
+
+    payload: dict[str, Any]
+
+
 ################################################
 # File Reader Packets
 ################################################
@@ -455,6 +471,8 @@ PacketObj = Union[
     CrmListToolDelta,
     CrmGetToolStart,
     CrmGetToolDelta,
+    CalendarSearchToolStart,
+    CalendarSearchToolDelta,
     FileReaderStart,
     FileReaderResult,
     MemoryToolStart,

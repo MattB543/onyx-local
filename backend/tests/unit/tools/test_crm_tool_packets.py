@@ -25,7 +25,6 @@ from onyx.server.query_and_chat.streaming_models import CrmSearchToolStart
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
 from onyx.server.query_and_chat.streaming_models import SectionEnd
-from onyx.db.enums import CrmContactStatus
 from onyx.db.enums import CrmInteractionType
 from onyx.db.models import CrmContact
 from onyx.db.models import CrmInteraction
@@ -52,6 +51,19 @@ def db_session():
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def patch_stage_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    default_stages = ["lead", "active", "inactive", "archived"]
+    monkeypatch.setattr(
+        "onyx.tools.tool_implementations.crm.crm_create_tool.get_allowed_contact_stages",
+        lambda _db_session: default_stages,
+    )
+    monkeypatch.setattr(
+        "onyx.tools.tool_implementations.crm.crm_update_tool.get_allowed_contact_stages",
+        lambda _db_session: default_stages,
+    )
 
 
 @pytest.fixture
@@ -180,12 +192,12 @@ class TestCrmToolRun:
         contact_id = uuid4()
         contact = CrmContact(
             first_name="Alice",
-            status=CrmContactStatus.LEAD,
+            status="lead",
         )
         contact.id = contact_id
         updated_contact = CrmContact(
             first_name="Alicia",
-            status=CrmContactStatus.ACTIVE,
+            status="active",
         )
         updated_contact.id = contact_id
 
@@ -197,11 +209,15 @@ class TestCrmToolRun:
                 "onyx.tools.tool_implementations.crm.crm_update_tool.update_contact"
             ) as mock_update_contact,
             patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_owner_ids"
+            ) as mock_get_contact_owner_ids,
+            patch(
                 "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_tags"
             ) as mock_get_tags,
         ):
             mock_get_contact.return_value = contact
             mock_update_contact.return_value = updated_contact
+            mock_get_contact_owner_ids.return_value = []
             mock_get_tags.return_value = []
 
             result = tool.run(
@@ -235,6 +251,9 @@ class TestCrmToolRun:
             patch(
                 "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.create_interaction"
             ) as mock_create_interaction,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.add_interaction_attendees"
+            ),
             patch(
                 "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.get_interaction_attendees"
             ) as mock_get_attendees,

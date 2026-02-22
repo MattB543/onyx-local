@@ -135,6 +135,7 @@ celery_app.autodiscover_tasks(
             "onyx.background.celery.tasks.docprocessing",
             # Docfetching worker tasks
             "onyx.background.celery.tasks.docfetching",
+            "onyx.background.celery.tasks.custom_jobs",
             # Sandbox cleanup tasks (isolated in build feature)
             "onyx.server.features.build.sandbox.tasks",
         ]

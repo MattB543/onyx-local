@@ -8,13 +8,15 @@ from sqlalchemy.orm import sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
+from onyx.db.crm import get_allowed_contact_stages
+from onyx.db.crm import get_contact_owner_ids
+from onyx.db.crm import get_contact_tags
+from onyx.db.crm import get_interaction_attendees
+from onyx.db.crm import get_organization_tags
 from onyx.db.crm import list_contacts
 from onyx.db.crm import list_interactions
 from onyx.db.crm import list_organizations
 from onyx.db.crm import list_tags
-from onyx.db.crm import get_contact_tags
-from onyx.db.crm import get_organization_tags
-from onyx.db.enums import CrmContactStatus
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmListToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmListToolStart
@@ -25,7 +27,7 @@ from onyx.tools.models import ToolResponse
 from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
-from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
+from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_interaction
@@ -55,6 +57,7 @@ class CrmListTool(Tool[None]):
         super().__init__(emitter=emitter)
         self._id = tool_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
+        self._stage_options = get_allowed_contact_stages(db_session)
 
     @property
     def id(self) -> int:
@@ -93,7 +96,7 @@ class CrmListTool(Tool[None]):
                         },
                         "status": {
                             "type": "string",
-                            "enum": ["lead", "active", "inactive", "archived"],
+                            "enum": self._stage_options,
                             "description": (
                                 "Filter contacts by status. Only applies when entity_type is 'contact'."
                             ),
@@ -203,11 +206,15 @@ class CrmListTool(Tool[None]):
         page_num: int,
         page_size: int,
     ) -> dict[str, Any]:
-        status = parse_enum_maybe(
-            CrmContactStatus,
-            llm_kwargs.get("status"),
-            "status",
-        ) if llm_kwargs.get("status") is not None else None
+        status = (
+            parse_stage_maybe(
+                llm_kwargs.get("status"),
+                allowed_stages=self._stage_options,
+                field_name="status",
+            )
+            if llm_kwargs.get("status") is not None
+            else None
+        )
 
         organization_id = parse_uuid_maybe(
             llm_kwargs.get("organization_id"), "organization_id"
@@ -240,7 +247,11 @@ class CrmListTool(Tool[None]):
             "page_size": page_size,
             "total_items": total,
             "results": [
-                serialize_contact(c, tags=get_contact_tags(c.id, db_session))
+                serialize_contact(
+                    c,
+                    owner_ids=get_contact_owner_ids(c.id, db_session),
+                    tags=get_contact_tags(c.id, db_session),
+                )
                 for c in contacts
             ],
         }
@@ -301,8 +312,6 @@ class CrmListTool(Tool[None]):
             contact_id=contact_id,
             organization_id=organization_id,
         )
-
-        from onyx.db.crm import get_interaction_attendees
 
         return {
             "status": "ok",

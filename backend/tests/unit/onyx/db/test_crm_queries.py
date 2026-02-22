@@ -20,8 +20,6 @@ from onyx.db.crm import list_tags
 from onyx.db.crm import search_crm_entities
 from onyx.db.crm import update_contact
 from onyx.db.crm import update_organization
-from onyx.db.enums import CrmContactStatus
-from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
 from onyx.db.models import CrmContact
 from onyx.db.models import CrmOrganization
@@ -98,9 +96,8 @@ def test_create_contact_happy_path_creates_contact() -> None:
         phone=" 123 ",
         title=" VP ",
         organization_id=None,
-        owner_id=None,
         source=None,
-        status=CrmContactStatus.LEAD,
+        status="lead",
         notes=" Important lead ",
         linkedin_url=" https://linkedin.com/in/alice ",
         location=" NY ",
@@ -131,7 +128,7 @@ def test_get_contact_by_email_normalizes_case() -> None:
 def test_update_contact_happy_path_ignores_protected_fields() -> None:
     db_session = MagicMock()
     db_session.scalar.return_value = None
-    contact = CrmContact(first_name="Alice", status=CrmContactStatus.LEAD)
+    contact = CrmContact(first_name="Alice", status="lead")
     contact.id = uuid4()
     original_created_at = contact.created_at
 
@@ -158,9 +155,9 @@ def test_update_contact_happy_path_ignores_protected_fields() -> None:
 
 def test_update_contact_rejects_duplicate_email() -> None:
     db_session = MagicMock()
-    contact = CrmContact(first_name="Alice", status=CrmContactStatus.LEAD)
+    contact = CrmContact(first_name="Alice", status="lead")
     contact.id = uuid4()
-    existing_contact = CrmContact(first_name="Bob", status=CrmContactStatus.LEAD)
+    existing_contact = CrmContact(first_name="Bob", status="lead")
     existing_contact.id = uuid4()
     db_session.scalar.return_value = existing_contact
 
@@ -267,7 +264,7 @@ def test_update_organization_rejects_duplicate_name() -> None:
     db_session.commit.assert_not_called()
 
 
-def test_create_interaction_auto_adds_primary_contact_attendee() -> None:
+def test_create_interaction_does_not_auto_add_primary_contact_attendee() -> None:
     db_session = MagicMock()
     contact_id = uuid4()
 
@@ -286,15 +283,9 @@ def test_create_interaction_auto_adds_primary_contact_attendee() -> None:
     assert interaction.title == "Intro Call"
     assert interaction.summary == "Follow-up next week"
     db_session.add.assert_called_once_with(interaction)
-    # One commit for creating interaction; add_interaction_attendees is patched.
     db_session.commit.assert_called_once()
     db_session.refresh.assert_called_once_with(interaction)
-    mock_add_attendees.assert_called_once_with(
-        db_session=db_session,
-        interaction_id=interaction.id,
-        contact_ids=[contact_id],
-        role=CrmAttendeeRole.ATTENDEE,
-    )
+    mock_add_attendees.assert_not_called()
 
 
 def test_create_tag_rejects_empty_name() -> None:
@@ -386,7 +377,7 @@ def test_find_contacts_for_attendee_resolution_returns_matches() -> None:
         first_name="Alice",
         last_name="Smith",
         email="alice@example.com",
-        status=CrmContactStatus.LEAD,
+        status="lead",
     )
     contact.id = uuid4()
     db_session.scalars.return_value = [contact]

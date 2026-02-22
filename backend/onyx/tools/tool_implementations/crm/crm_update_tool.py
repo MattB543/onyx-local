@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,15 +10,17 @@ from sqlalchemy.orm import sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
+from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
+from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_tags
 from onyx.db.crm import update_contact
 from onyx.db.crm import update_organization
 from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmContactStatus
 from onyx.db.enums import CrmOrganizationType
+from onyx.db.models import User
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
@@ -29,6 +32,7 @@ from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
 from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
+from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_organization
@@ -56,6 +60,7 @@ class CrmUpdateTool(Tool[None]):
         super().__init__(emitter=emitter)
         self._id = tool_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
+        self._stage_options = get_allowed_contact_stages(db_session)
 
     @property
     def id(self) -> int:
@@ -101,8 +106,8 @@ class CrmUpdateTool(Tool[None]):
                             "description": (
                                 "Fields to update. Only include fields you want to change. "
                                 "For contacts: first_name, last_name, email, phone, title (job title), "
-                                "organization_id, owner_id, source (manual|import|referral|inbound|other), "
-                                "status (lead|active|inactive|archived), notes, linkedin_url, location. "
+                                "organization_id, owner_ids, source (manual|import|referral|inbound|other), "
+                                "status (workspace-defined contact stages), category, notes, linkedin_url, location. "
                                 "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
                                 "sector, location, size, notes."
                             ),
@@ -126,21 +131,35 @@ class CrmUpdateTool(Tool[None]):
                 "updates.source",
             )
         if "status" in normalized_updates:
-            normalized_updates["status"] = parse_enum_maybe(
-                CrmContactStatus,
+            normalized_updates["status"] = parse_stage_maybe(
                 normalized_updates.get("status"),
-                "updates.status",
+                allowed_stages=self._stage_options,
+                field_name="updates.status",
             )
         if "organization_id" in normalized_updates:
             normalized_updates["organization_id"] = parse_uuid_maybe(
                 normalized_updates.get("organization_id"),
                 "updates.organization_id",
             )
-        if "owner_id" in normalized_updates:
-            normalized_updates["owner_id"] = parse_uuid_maybe(
-                normalized_updates.get("owner_id"),
-                "updates.owner_id",
-            )
+        if "owner_ids" in normalized_updates:
+            owner_ids_raw = normalized_updates.get("owner_ids")
+            if owner_ids_raw is None:
+                normalized_updates["owner_ids"] = []
+            elif isinstance(owner_ids_raw, list):
+                owner_ids: list[UUID] = []
+                seen_owner_ids: set[UUID] = set()
+                for owner_id_raw in owner_ids_raw:
+                    parsed_owner_id = parse_uuid_maybe(owner_id_raw, "updates.owner_ids[]")
+                    if parsed_owner_id is None or parsed_owner_id in seen_owner_ids:
+                        continue
+                    seen_owner_ids.add(parsed_owner_id)
+                    owner_ids.append(parsed_owner_id)
+                normalized_updates["owner_ids"] = owner_ids
+            else:
+                raise ToolCallException(
+                    message=f"Invalid owner_ids payload type: {type(owner_ids_raw)}",
+                    llm_facing_message="'updates.owner_ids' must be an array of UUID strings.",
+                )
 
         return normalized_updates
 
@@ -206,6 +225,14 @@ class CrmUpdateTool(Tool[None]):
                                 message=f"Organization not found: {updates['organization_id']}",
                                 llm_facing_message="Could not find the provided organization_id.",
                             )
+                    if "owner_ids" in updates:
+                        for owner_id in updates["owner_ids"]:
+                            if db_session.get(User, owner_id) is not None:
+                                continue
+                            raise ToolCallException(
+                                message=f"Owner user not found: {owner_id}",
+                                llm_facing_message="Could not find one of the provided updates.owner_ids users.",
+                            )
 
                     updated_contact = update_contact(
                         db_session=db_session,
@@ -213,10 +240,15 @@ class CrmUpdateTool(Tool[None]):
                         patches=updates,
                     )
                     tags = get_contact_tags(updated_contact.id, db_session)
+                    owner_ids = get_contact_owner_ids(updated_contact.id, db_session)
                     payload = {
                         "status": "updated",
                         "entity_type": "contact",
-                        "contact": serialize_contact(updated_contact, tags=tags),
+                        "contact": serialize_contact(
+                            updated_contact,
+                            owner_ids=owner_ids,
+                            tags=tags,
+                        ),
                     }
                 else:
                     organization = get_organization_by_id(entity_id, db_session)

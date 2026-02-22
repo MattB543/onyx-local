@@ -9,16 +9,25 @@ export type CrmContactSource =
   | "referral"
   | "inbound"
   | "other";
-export type CrmContactStatus = "lead" | "active" | "inactive" | "archived";
+export type CrmContactStage = string;
 export type CrmOrganizationType =
   | "customer"
   | "prospect"
   | "partner"
   | "vendor"
   | "other";
-export type CrmInteractionType = "note" | "call" | "email" | "meeting" | "event";
+export type CrmInteractionType =
+  | "note"
+  | "call"
+  | "email"
+  | "meeting"
+  | "event";
 export type CrmAttendeeRole = "organizer" | "attendee" | "observer";
-export type CrmSearchEntityType = "contact" | "organization" | "interaction" | "tag";
+export type CrmSearchEntityType =
+  | "contact"
+  | "organization"
+  | "interaction"
+  | "tag";
 
 export interface CrmTag {
   id: string;
@@ -36,9 +45,10 @@ export interface CrmContact {
   phone: string | null;
   title: string | null;
   organization_id: string | null;
-  owner_id: string | null;
+  owner_ids: string[];
   source: CrmContactSource | null;
-  status: CrmContactStatus;
+  status: CrmContactStage;
+  category: string | null;
   notes: string | null;
   linkedin_url: string | null;
   location: string | null;
@@ -99,6 +109,8 @@ export interface CrmSettings {
   tier2_enabled: boolean;
   tier3_deals: boolean;
   tier3_custom_fields: boolean;
+  contact_stage_options: string[];
+  contact_category_suggestions: string[];
   updated_by: string | null;
   updated_at: string;
 }
@@ -144,7 +156,7 @@ async function postJson<T>(
   path: string,
   body: unknown,
   action: string,
-  method: "POST" | "PATCH" | "DELETE" = "POST"
+  method: "POST" | "PATCH" = "POST"
 ): Promise<T> {
   const response = await fetch(path, {
     method,
@@ -158,7 +170,11 @@ async function postJson<T>(
 }
 
 async function deleteJson<T>(path: string, action: string): Promise<T> {
-  return postJson<T>(path, {}, action, "DELETE");
+  const response = await fetch(path, { method: "DELETE" });
+  if (!response.ok) {
+    handleRequestError(action, response);
+  }
+  return (await response.json()) as T;
 }
 
 export async function getCrmSettings(): Promise<CrmSettings> {
@@ -169,7 +185,12 @@ export async function patchCrmSettings(
   patch: Partial<
     Pick<
       CrmSettings,
-      "enabled" | "tier2_enabled" | "tier3_deals" | "tier3_custom_fields"
+      | "enabled"
+      | "tier2_enabled"
+      | "tier3_deals"
+      | "tier3_custom_fields"
+      | "contact_stage_options"
+      | "contact_category_suggestions"
     >
   >
 ): Promise<CrmSettings> {
@@ -198,7 +219,7 @@ export async function searchCrmEntities(args: {
 
 export async function listCrmContacts(args?: {
   q?: string;
-  status?: CrmContactStatus;
+  status?: CrmContactStage;
   organization_id?: string;
   tag_ids?: string[];
   page_num?: number;
@@ -301,18 +322,16 @@ export async function listCrmInteractions(args?: {
 export async function createCrmInteraction(
   body: Partial<CrmInteraction> &
     Pick<CrmInteraction, "title" | "type"> & {
-      attendees?: {
-        user_id?: string | null;
-        contact_id?: string | null;
-        role?: CrmAttendeeRole;
-      }[];
+      attendees?:
+        | {
+            user_id?: string | null;
+            contact_id?: string | null;
+            role?: CrmAttendeeRole;
+          }[]
+        | null;
     }
 ): Promise<CrmInteraction> {
-  return postJson(
-    "/api/user/crm/interactions",
-    body,
-    "Create CRM interaction"
-  );
+  return postJson("/api/user/crm/interactions", body, "Create CRM interaction");
 }
 
 export async function listCrmTags(args?: {

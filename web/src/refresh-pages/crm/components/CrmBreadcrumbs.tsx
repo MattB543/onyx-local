@@ -26,12 +26,17 @@ export default function CrmBreadcrumbs({ items }: CrmBreadcrumbsProps) {
             )}
             {item.href && !isLast ? (
               <Link href={item.href as Route} className="hover:underline">
-                <Text as="span" secondaryBody text03>
+                <Text as="span" secondaryBody text03 className="text-sm">
                   {item.label}
                 </Text>
               </Link>
             ) : (
-              <Text as="span" secondaryBody text02 className="font-medium">
+              <Text
+                as="span"
+                secondaryBody
+                text02
+                className="text-sm font-medium"
+              >
                 {item.label}
               </Text>
             )}

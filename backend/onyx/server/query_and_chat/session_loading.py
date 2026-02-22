@@ -19,6 +19,8 @@ from onyx.deep_research.dr_mock_tools import RESEARCH_AGENT_TASK_KEY
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import AgentResponseDelta
 from onyx.server.query_and_chat.streaming_models import AgentResponseStart
+from onyx.server.query_and_chat.streaming_models import CalendarSearchToolDelta
+from onyx.server.query_and_chat.streaming_models import CalendarSearchToolStart
 from onyx.server.query_and_chat.streaming_models import CitationInfo
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolStart
@@ -65,6 +67,9 @@ from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
 from onyx.utils.logger import setup_logger
 
@@ -245,6 +250,20 @@ def create_crm_search_packets(
     return [
         Packet(placement=placement, obj=CrmSearchToolStart()),
         Packet(placement=placement, obj=CrmSearchToolDelta(payload=payload)),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_calendar_search_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CalendarSearchToolStart()),
+        Packet(placement=placement, obj=CalendarSearchToolDelta(payload=payload)),
         Packet(placement=placement, obj=SectionEnd()),
     ]
 
@@ -701,6 +720,15 @@ def translate_assistant_message_to_packets(
                     elif tool.in_code_tool_id == CrmLogInteractionTool.__name__:
                         turn_tool_packets.extend(
                             create_crm_log_interaction_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == SearchCalendarTool.__name__:
+                        turn_tool_packets.extend(
+                            create_calendar_search_packets(
                                 tool_call_response=tool_call.tool_call_response,
                                 turn_index=turn_num,
                                 tab_index=tool_call.tab_index,

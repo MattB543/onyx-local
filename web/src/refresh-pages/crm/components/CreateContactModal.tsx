@@ -1,38 +1,37 @@
 "use client";
 
 import { Form, Formik } from "formik";
-import * as Yup from "yup";
+import { useMemo } from "react";
 
-import { createCrmContact, CrmContactSource, CrmContactStatus } from "@/app/app/crm/crmService";
+import {
+  createCrmContact,
+  CrmContactSource,
+  CrmContactStage,
+} from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
+import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import InputMultiSelect, {
+  InputMultiSelectOption,
+} from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Modal from "@/refresh-components/Modal";
 import Text from "@/refresh-components/texts/Text";
+import {
+  CONTACT_SOURCES,
+  contactValidationSchema,
+  DEFAULT_CRM_CATEGORY_SUGGESTIONS,
+  DEFAULT_CRM_STAGE_OPTIONS,
+  formatCrmLabel,
+  optionalText,
+} from "@/refresh-pages/crm/crmOptions";
 
 import { SvgUser } from "@opal/icons";
-
-const CONTACT_STATUSES: CrmContactStatus[] = [
-  "lead",
-  "active",
-  "inactive",
-  "archived",
-];
-
-const CONTACT_SOURCES: CrmContactSource[] = [
-  "manual",
-  "import",
-  "referral",
-  "inbound",
-  "other",
-];
-
-const validationSchema = Yup.object().shape({
-  first_name: Yup.string().trim().required("First name is required."),
-  email: Yup.string().trim().email("Enter a valid email.").optional(),
-});
 
 interface ContactCreateValues {
   first_name: string;
@@ -40,16 +39,13 @@ interface ContactCreateValues {
   email: string;
   phone: string;
   title: string;
-  status: CrmContactStatus;
+  status: CrmContactStage;
+  category: string;
+  owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
   linkedin_url: string;
   location: string;
-}
-
-function optionalText(value: string): string | undefined {
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
 }
 
 interface CreateContactModalProps {
@@ -65,6 +61,38 @@ export default function CreateContactModal({
   organizationId,
   onSuccess,
 }: CreateContactModalProps) {
+  const { user } = useUser();
+  const { crmSettings } = useCrmSettings();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
+
+  const stageOptions = useMemo(
+    () =>
+      crmSettings?.contact_stage_options?.length
+        ? crmSettings.contact_stage_options
+        : DEFAULT_CRM_STAGE_OPTIONS,
+    [crmSettings]
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (crmSettings?.contact_category_suggestions?.length
+        ? crmSettings.contact_category_suggestions
+        : DEFAULT_CRM_CATEGORY_SUGGESTIONS
+      ).map((category) => ({
+        value: category,
+        label: category,
+      })),
+    [crmSettings]
+  );
+  const ownerOptions = useMemo<InputMultiSelectOption[]>(
+    () =>
+      (usersData || []).map((candidate) => ({
+        value: candidate.id,
+        label: candidate.full_name?.trim() || candidate.email,
+      })),
+    [usersData]
+  );
+  const initialOwnerIds = useMemo(() => (user?.id ? [user.id] : []), [user]);
+
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
       <Modal.Content width="md-sm" height="fit">
@@ -74,19 +102,22 @@ export default function CreateContactModal({
           onClose={() => onOpenChange(false)}
         />
         <Formik<ContactCreateValues>
+          enableReinitialize
           initialValues={{
             first_name: "",
             last_name: "",
             email: "",
             phone: "",
             title: "",
-            status: "lead",
+            status: stageOptions[0] ?? "lead",
+            category: "",
+            owner_ids: initialOwnerIds,
             source: "",
             notes: "",
             linkedin_url: "",
             location: "",
           }}
-          validationSchema={validationSchema}
+          validationSchema={contactValidationSchema}
           onSubmit={async (values, { setStatus }) => {
             try {
               await createCrmContact({
@@ -96,6 +127,8 @@ export default function CreateContactModal({
                 phone: optionalText(values.phone),
                 title: optionalText(values.title),
                 status: values.status,
+                category: optionalText(values.category),
+                owner_ids: values.owner_ids,
                 source: values.source || undefined,
                 notes: optionalText(values.notes),
                 linkedin_url: optionalText(values.linkedin_url),
@@ -109,7 +142,7 @@ export default function CreateContactModal({
             }
           }}
         >
-          {({ isSubmitting, status }) => (
+          {({ isSubmitting, status, values, setFieldValue }) => (
             <Form>
               <Modal.Body>
                 <div className="flex w-full flex-col gap-3">
@@ -136,9 +169,9 @@ export default function CreateContactModal({
                     <InputSelectField name="status">
                       <InputSelect.Trigger placeholder="Status" />
                       <InputSelect.Content>
-                        {CONTACT_STATUSES.map((s) => (
+                        {stageOptions.map((s) => (
                           <InputSelect.Item key={s} value={s}>
-                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                            {formatCrmLabel(s)}
                           </InputSelect.Item>
                         ))}
                       </InputSelect.Content>
@@ -148,11 +181,30 @@ export default function CreateContactModal({
                       <InputSelect.Content>
                         {CONTACT_SOURCES.map((s) => (
                           <InputSelect.Item key={s} value={s}>
-                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                            {formatCrmLabel(s)}
                           </InputSelect.Item>
                         ))}
                       </InputSelect.Content>
                     </InputSelectField>
+                    <InputComboBoxField
+                      name="category"
+                      options={categoryOptions}
+                      strict={false}
+                      placeholder="Category"
+                    />
+                  </div>
+                  <div className="flex w-full flex-col gap-1">
+                    <Text as="p" secondaryBody text03 className="text-sm">
+                      Owners
+                    </Text>
+                    <InputMultiSelect
+                      value={values.owner_ids}
+                      onChange={(nextOwnerIds) => {
+                        setFieldValue("owner_ids", nextOwnerIds);
+                      }}
+                      options={ownerOptions}
+                      placeholder="Select owner(s)"
+                    />
                   </div>
                   <InputTextAreaField
                     name="notes"
@@ -161,7 +213,11 @@ export default function CreateContactModal({
                   />
 
                   {status && (
-                    <Text as="p" secondaryBody className="text-status-error-03">
+                    <Text
+                      as="p"
+                      secondaryBody
+                      className="text-sm text-status-error-03"
+                    >
                       {status}
                     </Text>
                   )}

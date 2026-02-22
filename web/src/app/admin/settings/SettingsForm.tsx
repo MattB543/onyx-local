@@ -1,21 +1,30 @@
 "use client";
 
-import { Label, SubLabel } from "@/components/Field";
-import { toast } from "@/hooks/useToast";
-import Title from "@/components/ui/title";
-import Button from "@/refresh-components/buttons/Button";
-import { Settings } from "./interfaces";
 import { useRouter } from "next/navigation";
 import React, { useContext, useState, useEffect } from "react";
-import { SettingsContext } from "@/providers/SettingsProvider";
-import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
-import Modal from "@/refresh-components/Modal";
-import { NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
-import { AnonymousUserPath } from "./AnonymousUserPath";
+
+import { patchCrmSettings } from "@/app/app/crm/crmService";
+import { Label, SubLabel } from "@/components/Field";
 import LLMSelector from "@/components/llm/LLMSelector";
-import { useVisionProviders } from "./hooks/useVisionProviders";
+import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
+import Title from "@/components/ui/title";
+import { toast } from "@/hooks/useToast";
+import { NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { SettingsContext } from "@/providers/SettingsProvider";
+import Button from "@/refresh-components/buttons/Button";
 import InputTextArea from "@/refresh-components/inputs/InputTextArea";
+import Modal from "@/refresh-components/Modal";
+import {
+  DEFAULT_CRM_CATEGORY_SUGGESTIONS,
+  DEFAULT_CRM_STAGE_OPTIONS,
+} from "@/refresh-pages/crm/crmOptions";
+
 import { SvgAlertTriangle } from "@opal/icons";
+
+import { AnonymousUserPath } from "./AnonymousUserPath";
+import { useVisionProviders } from "./hooks/useVisionProviders";
+import { Settings } from "./interfaces";
 
 export function Checkbox({
   label,
@@ -79,6 +88,34 @@ function IntegerInput({
   );
 }
 
+function parseMultiLineValues({
+  rawValue,
+  lowerCase,
+}: {
+  rawValue: string;
+  lowerCase?: boolean;
+}): string[] {
+  const dedupedValues: string[] = [];
+  const seen = new Set<string>();
+
+  const normalizedLines = rawValue
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const value of normalizedLines) {
+    const normalizedValue = lowerCase ? value.toLowerCase() : value;
+    const dedupeKey = normalizedValue.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    dedupedValues.push(normalizedValue);
+  }
+
+  return dedupedValues;
+}
+
 export function SettingsForm() {
   const router = useRouter();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -86,7 +123,17 @@ export function SettingsForm() {
   const [chatRetention, setChatRetention] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [companyDescription, setCompanyDescription] = useState("");
+  const [crmStageOptionsRaw, setCrmStageOptionsRaw] = useState("");
+  const [crmCategorySuggestionsRaw, setCrmCategorySuggestionsRaw] =
+    useState("");
+  const [crmSaveInProgress, setCrmSaveInProgress] = useState(false);
   const isEnterpriseEnabled = usePaidEnterpriseFeaturesEnabled();
+  const {
+    crmSettings,
+    isLoading: isCrmSettingsLoading,
+    error: crmSettingsError,
+    refreshCrmSettings,
+  } = useCrmSettings();
 
   const {
     visionProviders,
@@ -109,7 +156,18 @@ export function SettingsForm() {
       );
     }
     // We don't need to fetch vision providers here anymore as the hook handles it
-  }, []);
+  }, [combinedSettings]);
+
+  useEffect(() => {
+    if (!crmSettings) {
+      return;
+    }
+
+    setCrmStageOptionsRaw((crmSettings.contact_stage_options || []).join("\n"));
+    setCrmCategorySuggestionsRaw(
+      (crmSettings.contact_category_suggestions || []).join("\n")
+    );
+  }, [crmSettings]);
 
   if (!settings) {
     return null;
@@ -212,6 +270,48 @@ export function SettingsForm() {
         },
       ]);
     }
+  }
+
+  async function handleSaveCrmSettings() {
+    const parsedStageOptions = parseMultiLineValues({
+      rawValue: crmStageOptionsRaw,
+      lowerCase: true,
+    });
+    const parsedCategorySuggestions = parseMultiLineValues({
+      rawValue: crmCategorySuggestionsRaw,
+      lowerCase: false,
+    });
+
+    if (parsedStageOptions.length === 0) {
+      toast.error("CRM stages must include at least one value.");
+      return;
+    }
+
+    setCrmSaveInProgress(true);
+    try {
+      const updatedCrmSettings = await patchCrmSettings({
+        contact_stage_options: parsedStageOptions,
+        contact_category_suggestions: parsedCategorySuggestions,
+      });
+      setCrmStageOptionsRaw(
+        (updatedCrmSettings.contact_stage_options || []).join("\n")
+      );
+      setCrmCategorySuggestionsRaw(
+        (updatedCrmSettings.contact_category_suggestions || []).join("\n")
+      );
+      await refreshCrmSettings();
+      toast.success("CRM settings updated successfully!");
+    } catch (error) {
+      console.error("Error updating CRM settings:", error);
+      toast.error("Failed to update CRM settings");
+    } finally {
+      setCrmSaveInProgress(false);
+    }
+  }
+
+  function handleResetCrmSettingsToDefaults() {
+    setCrmStageOptionsRaw(DEFAULT_CRM_STAGE_OPTIONS.join("\n"));
+    setCrmCategorySuggestionsRaw(DEFAULT_CRM_CATEGORY_SUGGESTIONS.join("\n"));
   }
 
   return (
@@ -349,6 +449,63 @@ export function SettingsForm() {
           </div>
         </>
       )}
+
+      <Title className="mt-8 mb-4">CRM Settings</Title>
+      {isCrmSettingsLoading && (
+        <div className="mb-4 text-sm text-text-03">Loading CRM settings...</div>
+      )}
+      {crmSettingsError && (
+        <div className="mb-4 text-sm text-status-error-03">
+          Failed to load CRM settings. You can still enter values and save.
+        </div>
+      )}
+      <label className="flex flex-col text-sm mb-4">
+        <Label>Contact Stage Options</Label>
+        <SubLabel>
+          One stage per line. The first stage is used as the default for new
+          contacts.
+        </SubLabel>
+        <InputTextArea
+          className="mt-1 w-full max-w-xl"
+          value={crmStageOptionsRaw}
+          onChange={(event) => setCrmStageOptionsRaw(event.target.value)}
+          placeholder={"lead\nactive\ninactive\narchived"}
+          rows={5}
+        />
+      </label>
+      <label className="flex flex-col text-sm mb-4">
+        <Label>Contact Category Suggestions</Label>
+        <SubLabel>
+          One category per line. Users can still enter custom categories when
+          creating or editing contacts.
+        </SubLabel>
+        <InputTextArea
+          className="mt-1 w-full max-w-xl"
+          value={crmCategorySuggestionsRaw}
+          onChange={(event) => setCrmCategorySuggestionsRaw(event.target.value)}
+          placeholder={
+            "Policy Maker\nJournalist\nAcademic\nAllied Org\nLab Member"
+          }
+          rows={6}
+        />
+      </label>
+      <div className="mr-auto mb-4 flex gap-2">
+        <Button
+          onClick={() => {
+            void handleSaveCrmSettings();
+          }}
+          disabled={crmSaveInProgress}
+        >
+          {crmSaveInProgress ? "Saving CRM Settings..." : "Save CRM Settings"}
+        </Button>
+        <Button
+          secondary
+          onClick={handleResetCrmSettingsToDefaults}
+          disabled={crmSaveInProgress}
+        >
+          Reset CRM Defaults
+        </Button>
+      </div>
 
       {/* Image Processing Settings */}
       <Title className="mt-8 mb-4">Image Processing</Title>

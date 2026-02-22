@@ -4,23 +4,29 @@ import { Form, Formik } from "formik";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import * as Yup from "yup";
 
 import {
   CrmContactSource,
-  CrmContactStatus,
+  CrmContactStage,
   patchCrmContact,
 } from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
+import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import InputMultiSelect, {
+  InputMultiSelectOption,
+} from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/refresh-pages/crm/components/ActivityTimeline";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
@@ -31,23 +37,16 @@ import LogInteractionModal from "@/refresh-pages/crm/components/LogInteractionMo
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import TagManager from "@/refresh-pages/crm/components/TagManager";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
+import {
+  CONTACT_SOURCES,
+  contactValidationSchema,
+  DEFAULT_CRM_CATEGORY_SUGGESTIONS,
+  DEFAULT_CRM_STAGE_OPTIONS,
+  formatCrmLabel,
+  optionalText,
+} from "@/refresh-pages/crm/crmOptions";
 
-import { SvgEdit } from "@opal/icons";
-
-const CONTACT_STATUSES: CrmContactStatus[] = [
-  "lead",
-  "active",
-  "inactive",
-  "archived",
-];
-
-const CONTACT_SOURCES: CrmContactSource[] = [
-  "manual",
-  "import",
-  "referral",
-  "inbound",
-  "other",
-];
+import { SvgEdit, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
 
@@ -59,27 +58,15 @@ interface ContactEditValues {
   title: string;
   location: string;
   linkedin_url: string;
-  status: CrmContactStatus;
+  status: CrmContactStage;
+  category: string;
+  owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
 }
 
-const validationSchema = Yup.object().shape({
-  first_name: Yup.string().trim().required("First name is required."),
-  email: Yup.string().trim().email("Enter a valid email.").optional(),
-});
-
 interface CrmContactDetailPageProps {
   contactId: string;
-}
-
-function optionalText(value: string): string | undefined {
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
-function formatLabel(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export default function CrmContactDetailPage({
@@ -108,6 +95,45 @@ export default function CrmContactDetailPage({
   const linkedOrganizationId = contact?.organization_id ?? null;
   const { organization: linkedOrganization } =
     useCrmOrganization(linkedOrganizationId);
+  const { crmSettings } = useCrmSettings();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
+
+  const stageOptions = useMemo(
+    () =>
+      crmSettings?.contact_stage_options?.length
+        ? crmSettings.contact_stage_options
+        : DEFAULT_CRM_STAGE_OPTIONS,
+    [crmSettings]
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (crmSettings?.contact_category_suggestions?.length
+        ? crmSettings.contact_category_suggestions
+        : DEFAULT_CRM_CATEGORY_SUGGESTIONS
+      ).map((category) => ({
+        value: category,
+        label: category,
+      })),
+    [crmSettings]
+  );
+  const ownerOptions = useMemo<InputMultiSelectOption[]>(
+    () =>
+      (usersData || []).map((candidate) => ({
+        value: candidate.id,
+        label: candidate.full_name?.trim() || candidate.email,
+      })),
+    [usersData]
+  );
+  const ownerLabelById = useMemo(
+    () =>
+      new Map(
+        ownerOptions.map((ownerOption) => [
+          ownerOption.value,
+          ownerOption.label,
+        ])
+      ),
+    [ownerOptions]
+  );
 
   const hasMoreInteractions = interactions.length < totalInteractions;
 
@@ -126,7 +152,12 @@ export default function CrmContactDetailPage({
         <div className="mx-auto flex w-[min(72rem,100%)] flex-col gap-6 px-4 pb-12 pt-8">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <CrmBreadcrumbs items={breadcrumbs} />
+              <div className="flex items-center gap-2">
+                <SvgUser className="h-[1.75rem] w-[1.75rem] stroke-text-04" />
+                <Text as="p" headingH2>
+                  CRM
+                </Text>
+              </div>
               <Button
                 action
                 tertiary
@@ -137,6 +168,7 @@ export default function CrmContactDetailPage({
                 Back
               </Button>
             </div>
+            <CrmBreadcrumbs items={breadcrumbs} />
 
             <CrmNav
               rightContent={
@@ -166,13 +198,13 @@ export default function CrmContactDetailPage({
           </div>
 
           {error && (
-            <Text as="p" secondaryBody className="text-status-error-03">
+            <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load contact.
             </Text>
           )}
 
           {isLoading ? (
-            <Text as="p" secondaryBody text03>
+            <Text as="p" secondaryBody text03 className="text-sm">
               Loading contact...
             </Text>
           ) : contact ? (
@@ -214,11 +246,14 @@ export default function CrmContactDetailPage({
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <StatusBadge status={contact.status} />
-                    <span className="text-xs text-text-03">
-                      Created{" "}
-                      {formatRelativeDate(contact.created_at)} · Updated{" "}
-                      {formatRelativeDate(contact.updated_at)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                      <span>
+                        Created {formatRelativeDate(contact.created_at)}
+                      </span>
+                      <span>
+                        Updated {formatRelativeDate(contact.updated_at)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -226,7 +261,10 @@ export default function CrmContactDetailPage({
               <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
                 <div className="min-w-0 flex-1">
                   {isEditing ? (
-                    <Card variant="secondary" className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start">
+                    <Card
+                      variant="secondary"
+                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                    >
                       <Text as="p" mainUiAction text02>
                         Edit Contact
                       </Text>
@@ -242,10 +280,12 @@ export default function CrmContactDetailPage({
                           location: contact.location || "",
                           linkedin_url: contact.linkedin_url || "",
                           status: contact.status,
+                          category: contact.category || "",
+                          owner_ids: contact.owner_ids || [],
                           source: contact.source || "",
                           notes: contact.notes || "",
                         }}
-                        validationSchema={validationSchema}
+                        validationSchema={contactValidationSchema}
                         onSubmit={async (values, { setStatus }) => {
                           try {
                             await patchCrmContact(contact.id, {
@@ -257,6 +297,8 @@ export default function CrmContactDetailPage({
                               location: optionalText(values.location),
                               linkedin_url: optionalText(values.linkedin_url),
                               status: values.status,
+                              category: optionalText(values.category),
+                              owner_ids: values.owner_ids,
                               source: values.source || undefined,
                               notes: optionalText(values.notes),
                             });
@@ -267,76 +309,225 @@ export default function CrmContactDetailPage({
                           }
                         }}
                       >
-                        {({ isSubmitting, status }) => (
-                          <Form className="flex flex-col gap-3">
-                            <div className="grid gap-2 md:grid-cols-2">
-                              <InputTypeInField
-                                name="first_name"
-                                placeholder="First name *"
-                              />
-                              <InputTypeInField
-                                name="last_name"
-                                placeholder="Last name"
-                              />
-                              <InputTypeInField
-                                name="email"
-                                placeholder="Email"
-                              />
-                              <InputTypeInField
-                                name="phone"
-                                placeholder="Phone"
-                              />
-                              <InputTypeInField
-                                name="title"
-                                placeholder="Title"
-                              />
-                              <InputTypeInField
-                                name="location"
-                                placeholder="Location"
-                              />
-                              <InputTypeInField
-                                name="linkedin_url"
-                                placeholder="LinkedIn URL"
-                              />
-                              <InputSelectField name="status">
-                                <InputSelect.Trigger placeholder="Status" />
-                                <InputSelect.Content>
-                                  {CONTACT_STATUSES.map((statusOption) => (
-                                    <InputSelect.Item
-                                      key={statusOption}
-                                      value={statusOption}
-                                    >
-                                      {formatLabel(statusOption)}
-                                    </InputSelect.Item>
-                                  ))}
-                                </InputSelect.Content>
-                              </InputSelectField>
-                              <InputSelectField name="source">
-                                <InputSelect.Trigger placeholder="Source" />
-                                <InputSelect.Content>
-                                  {CONTACT_SOURCES.map((source) => (
-                                    <InputSelect.Item
-                                      key={source}
-                                      value={source}
-                                    >
-                                      {formatLabel(source)}
-                                    </InputSelect.Item>
-                                  ))}
-                                </InputSelect.Content>
-                              </InputSelectField>
+                        {({ isSubmitting, status, values, setFieldValue }) => (
+                          <Form className="flex h-full flex-col gap-3">
+                            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:[&>*]:min-w-0">
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Name
+                                </Text>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                  <InputTypeInField
+                                    name="first_name"
+                                    placeholder="First name *"
+                                  />
+                                  <InputTypeInField
+                                    name="last_name"
+                                    placeholder="Last name"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Email
+                                </Text>
+                                <InputTypeInField
+                                  name="email"
+                                  placeholder="Email"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Title
+                                </Text>
+                                <InputTypeInField
+                                  name="title"
+                                  placeholder="Title"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Organization
+                                </Text>
+                                <InputTypeIn
+                                  value={
+                                    linkedOrganization?.name ||
+                                    (contact.organization_id
+                                      ? "Linked organization"
+                                      : "")
+                                  }
+                                  placeholder="No organization"
+                                  variant="readOnly"
+                                  readOnly
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Phone
+                                </Text>
+                                <InputTypeInField
+                                  name="phone"
+                                  placeholder="Phone"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Location
+                                </Text>
+                                <InputTypeInField
+                                  name="location"
+                                  placeholder="Location"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Source
+                                </Text>
+                                <InputSelectField name="source">
+                                  <InputSelect.Trigger placeholder="Source" />
+                                  <InputSelect.Content>
+                                    {CONTACT_SOURCES.map((source) => (
+                                      <InputSelect.Item
+                                        key={source}
+                                        value={source}
+                                      >
+                                        {formatCrmLabel(source)}
+                                      </InputSelect.Item>
+                                    ))}
+                                  </InputSelect.Content>
+                                </InputSelectField>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Category
+                                </Text>
+                                <InputComboBoxField
+                                  name="category"
+                                  options={categoryOptions}
+                                  strict={false}
+                                  placeholder="Category"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  LinkedIn
+                                </Text>
+                                <InputTypeInField
+                                  name="linkedin_url"
+                                  placeholder="LinkedIn URL"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Status
+                                </Text>
+                                <InputSelectField name="status">
+                                  <InputSelect.Trigger placeholder="Status" />
+                                  <InputSelect.Content>
+                                    {stageOptions.map((statusOption) => (
+                                      <InputSelect.Item
+                                        key={statusOption}
+                                        value={statusOption}
+                                      >
+                                        {formatCrmLabel(statusOption)}
+                                      </InputSelect.Item>
+                                    ))}
+                                  </InputSelect.Content>
+                                </InputSelectField>
+                              </div>
+                              <div className="flex w-full flex-col gap-1 md:col-span-2">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Owners
+                                </Text>
+                                <InputMultiSelect
+                                  value={values.owner_ids}
+                                  onChange={(nextOwnerIds) => {
+                                    setFieldValue("owner_ids", nextOwnerIds);
+                                  }}
+                                  options={ownerOptions}
+                                  placeholder="Select owner(s)"
+                                />
+                              </div>
                             </div>
 
-                            <InputTextAreaField
-                              name="notes"
-                              placeholder="Notes"
-                              rows={4}
-                            />
+                            <div className="mt-auto w-full border-t border-border-subtle" />
+
+                            <div className="flex w-full flex-col gap-1">
+                              <Text
+                                as="p"
+                                secondaryBody
+                                text03
+                                className="text-sm"
+                              >
+                                Notes
+                              </Text>
+                              <InputTextAreaField
+                                name="notes"
+                                placeholder="Notes"
+                                rows={4}
+                              />
+                            </div>
 
                             {status && (
                               <Text
                                 as="p"
                                 secondaryBody
-                                className="text-status-error-03"
+                                className="text-sm text-status-error-03"
                               >
                                 {status}
                               </Text>
@@ -358,7 +549,10 @@ export default function CrmContactDetailPage({
                       </Formik>
                     </Card>
                   ) : (
-                    <Card variant="secondary" className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start">
+                    <Card
+                      variant="secondary"
+                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                    >
                       <Text as="p" mainUiAction text02 className="w-full">
                         Details
                       </Text>
@@ -380,6 +574,22 @@ export default function CrmContactDetailPage({
                           layout="stacked"
                         />
                         <DetailField
+                          label="Organization"
+                          value={
+                            contact.organization_id
+                              ? linkedOrganization?.name ||
+                                "Linked organization"
+                              : null
+                          }
+                          type={contact.organization_id ? "org-link" : "text"}
+                          href={
+                            contact.organization_id
+                              ? `/app/crm/organizations/${contact.organization_id}`
+                              : undefined
+                          }
+                          layout="stacked"
+                        />
+                        <DetailField
                           label="Phone"
                           value={contact.phone}
                           type="phone"
@@ -393,14 +603,36 @@ export default function CrmContactDetailPage({
                         <DetailField
                           label="Source"
                           value={
-                            contact.source ? formatLabel(contact.source) : null
+                            contact.source
+                              ? formatCrmLabel(contact.source)
+                              : null
                           }
+                          layout="stacked"
+                        />
+                        <DetailField
+                          label="Category"
+                          value={contact.category}
                           layout="stacked"
                         />
                         <DetailField
                           label="LinkedIn"
                           value={contact.linkedin_url}
                           type="link"
+                          layout="stacked"
+                        />
+                        <DetailField
+                          label="Owners"
+                          value={
+                            contact.owner_ids.length > 0
+                              ? contact.owner_ids
+                                  .map(
+                                    (ownerId) =>
+                                      ownerLabelById.get(ownerId) ||
+                                      `Unknown User (${ownerId.slice(0, 8)})`
+                                  )
+                                  .join(", ")
+                              : null
+                          }
                           layout="stacked"
                         />
                       </div>
@@ -412,11 +644,14 @@ export default function CrmContactDetailPage({
                           Notes
                         </Text>
                         {contact.notes ? (
-                          <Text as="p" secondaryBody text03>
+                          <Text
+                            as="p"
+                            className="whitespace-pre-wrap text-sm font-medium text-text-05"
+                          >
                             {contact.notes}
                           </Text>
                         ) : (
-                          <Text as="p" secondaryBody text03 className="italic">
+                          <Text as="p" className="text-sm italic text-text-03">
                             -
                           </Text>
                         )}
@@ -427,17 +662,23 @@ export default function CrmContactDetailPage({
 
                 <div className="min-w-0 flex-1">
                   {interactionsError ? (
-                    <Card variant="secondary" className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start">
+                    <Card
+                      variant="secondary"
+                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                    >
                       <Text
                         as="p"
                         secondaryBody
-                        className="w-full text-status-error-03"
+                        className="w-full text-sm text-status-error-03"
                       >
                         Failed to load activity.
                       </Text>
                     </Card>
                   ) : (
-                    <Card variant="secondary" className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start">
+                    <Card
+                      variant="secondary"
+                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                    >
                       <ActivityTimeline
                         interactions={interactions}
                         isLoading={interactionsLoading}

@@ -17,6 +17,21 @@ export enum SettingsError {
   OTHER = "OTHER",
 }
 
+function buildFallbackSettings(): Settings {
+  return {
+    auto_scroll: true,
+    application_status: ApplicationStatus.ACTIVE,
+    gpu_enabled: false,
+    maximum_chat_retention_days: null,
+    notifications: [],
+    needs_reindexing: false,
+    anonymous_user_enabled: false,
+    deep_research_enabled: true,
+    temperature_override_enabled: true,
+    query_history_type: QueryHistoryType.NORMAL,
+  };
+}
+
 export async function fetchStandardSettingsSS() {
   return fetchSS("/settings");
 }
@@ -39,77 +54,77 @@ export async function fetchSettingsSS(): Promise<CombinedSettings | null> {
   }
 
   try {
-    const results = await Promise.all(tasks);
+    const results = await Promise.allSettled(tasks);
 
-    let settings: Settings;
+    let settings: Settings = buildFallbackSettings();
 
-    const result_0 = results[0];
-    if (!result_0) {
-      throw new Error("Standard settings fetch failed.");
-    }
-
-    if (!result_0.ok) {
-      if (result_0.status === 403 || result_0.status === 401) {
-        settings = {
-          auto_scroll: true,
-          application_status: ApplicationStatus.ACTIVE,
-          gpu_enabled: false,
-          maximum_chat_retention_days: null,
-          notifications: [],
-          needs_reindexing: false,
-          anonymous_user_enabled: false,
-          deep_research_enabled: true,
-          temperature_override_enabled: true,
-          query_history_type: QueryHistoryType.NORMAL,
-        };
-      } else {
-        throw new Error(
-          `fetchStandardSettingsSS failed: status=${
-            result_0.status
-          } body=${await result_0.text()}`
+    const standardResult = results[0];
+    if (!standardResult) {
+      console.warn(
+        "fetchStandardSettingsSS missing result; using fallback settings."
+      );
+    } else if (standardResult.status === "rejected") {
+      console.warn(
+        "fetchStandardSettingsSS rejected; using fallback settings.",
+        standardResult.reason
+      );
+    } else if (!standardResult.value.ok) {
+      if (
+        standardResult.value.status !== 403 &&
+        standardResult.value.status !== 401
+      ) {
+        console.warn(
+          `fetchStandardSettingsSS failed: status=${standardResult.value.status}`
         );
       }
     } else {
-      settings = await result_0.json();
+      settings = await standardResult.value.json();
     }
 
     let enterpriseSettings: EnterpriseSettings | null = null;
     if (tasks.length > 1) {
-      const result_1 = results[1];
-      if (!result_1) {
-        throw new Error("fetchEnterpriseSettingsSS failed.");
-      }
-
-      if (!result_1.ok) {
-        if (result_1.status !== 403 && result_1.status !== 401) {
-          throw new Error(
-            `fetchEnterpriseSettingsSS failed: status=${
-              result_1.status
-            } body=${await result_1.text()}`
+      const enterpriseResult = results[1];
+      if (!enterpriseResult) {
+        console.warn("fetchEnterpriseSettingsSS missing result; using null.");
+      } else if (enterpriseResult.status === "rejected") {
+        console.warn(
+          "fetchEnterpriseSettingsSS rejected; using null.",
+          enterpriseResult.reason
+        );
+      } else if (!enterpriseResult.value.ok) {
+        if (
+          enterpriseResult.value.status !== 403 &&
+          enterpriseResult.value.status !== 401
+        ) {
+          console.warn(
+            `fetchEnterpriseSettingsSS failed: status=${enterpriseResult.value.status}`
           );
         }
       } else {
-        enterpriseSettings = await result_1.json();
+        enterpriseSettings = await enterpriseResult.value.json();
       }
     }
 
     let customAnalyticsScript: string | null = null;
     if (tasks.length > 2) {
-      const result_2 = results[2];
-      if (!result_2) {
-        throw new Error("fetchCustomAnalyticsScriptSS failed.");
-      }
-
-      if (!result_2.ok) {
-        if (result_2.status !== 403) {
-          throw new Error(
-            `fetchCustomAnalyticsScriptSS failed: status=${
-              result_2.status
-            } body=${await result_2.text()}`
+      const analyticsResult = results[2];
+      if (!analyticsResult) {
+        console.warn(
+          "fetchCustomAnalyticsScriptSS missing result; using null."
+        );
+      } else if (analyticsResult.status === "rejected") {
+        console.warn(
+          "fetchCustomAnalyticsScriptSS rejected; using null.",
+          analyticsResult.reason
+        );
+      } else if (!analyticsResult.value.ok) {
+        if (analyticsResult.value.status !== 403) {
+          console.warn(
+            `fetchCustomAnalyticsScriptSS failed: status=${analyticsResult.value.status}`
           );
         }
       } else {
-        customAnalyticsScript = await result_2.json();
+        customAnalyticsScript = await analyticsResult.value.json();
       }
     }
 
@@ -129,7 +144,18 @@ export async function fetchSettingsSS(): Promise<CombinedSettings | null> {
 
     return combinedSettings;
   } catch (error) {
-    console.error("fetchSettingsSS exception: ", error);
-    return null;
+    console.warn(
+      "fetchSettingsSS unexpected exception; using fallback settings.",
+      error
+    );
+    const webVersion = getWebVersion();
+
+    return {
+      settings: buildFallbackSettings(),
+      enterpriseSettings: null,
+      customAnalyticsScript: null,
+      webVersion,
+      webDomain: HOST_URL,
+    };
   }
 }

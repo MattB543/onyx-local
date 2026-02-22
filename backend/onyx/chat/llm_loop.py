@@ -528,6 +528,7 @@ def run_llm_loop(
     include_citations: bool = True,
     all_injected_file_metadata: dict[str, FileToolMetadata] | None = None,
     inject_memories_in_prompt: bool = True,
+    timezone: str | None = None,
 ) -> None:
     with trace(
         "run_llm_loop",
@@ -649,6 +650,7 @@ def run_llm_loop(
                         tools=tools,
                         should_cite_documents=should_cite_documents
                         or always_cite_documents,
+                        timezone=timezone,
                     )
                     system_prompt = ChatMessageSimple(
                         message=system_prompt_str,

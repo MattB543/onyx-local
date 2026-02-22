@@ -3,7 +3,10 @@
 import { Form, Formik } from "formik";
 import * as Yup from "yup";
 
-import { createCrmOrganization, CrmOrganizationType } from "@/app/app/crm/crmService";
+import {
+  createCrmOrganization,
+  CrmOrganizationType,
+} from "@/app/app/crm/crmService";
 import Button from "@/refresh-components/buttons/Button";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
@@ -24,7 +27,7 @@ const ORGANIZATION_TYPES: CrmOrganizationType[] = [
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().trim().required("Organization name is required."),
-  website: Yup.string().trim().url("Enter a valid URL.").optional(),
+  website: Yup.string().trim().optional(),
 });
 
 interface OrgCreateValues {
@@ -127,7 +130,11 @@ export default function CreateOrganizationModal({
                   />
 
                   {status && (
-                    <Text as="p" secondaryBody className="text-status-error-03">
+                    <Text
+                      as="p"
+                      secondaryBody
+                      className="text-sm text-status-error-03"
+                    >
                       {status}
                     </Text>
                   )}

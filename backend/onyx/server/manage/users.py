@@ -606,7 +606,11 @@ def list_all_users_basic_info(
 ) -> list[MinimalUserSnapshot]:
     users = get_all_users(db_session)
     return [
-        MinimalUserSnapshot(id=user.id, email=user.email)
+        MinimalUserSnapshot(
+            id=user.id,
+            email=user.email,
+            full_name=user.personal_name,
+        )
         for user in users
         if include_api_keys or not is_api_key_email_address(user.email)
     ]

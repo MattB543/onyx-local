@@ -8,6 +8,9 @@ from onyx.tools.tool_implementations.images.image_generation_tool import (
 from onyx.tools.tool_implementations.knowledge_graph.knowledge_graph_tool import (
     KnowledgeGraphTool,
 )
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
 from onyx.tools.tool_implementations.crm.crm_list_tool import CrmListTool
@@ -43,6 +46,7 @@ BUILT_IN_TOOL_TYPES = Union[
     CrmLogInteractionTool,
     CrmListTool,
     CrmGetTool,
+    SearchCalendarTool,
 ]
 
 BUILT_IN_TOOL_MAP: dict[str, Type[BUILT_IN_TOOL_TYPES]] = {
@@ -60,6 +64,7 @@ BUILT_IN_TOOL_MAP: dict[str, Type[BUILT_IN_TOOL_TYPES]] = {
     CrmLogInteractionTool.__name__: CrmLogInteractionTool,
     CrmListTool.__name__: CrmListTool,
     CrmGetTool.__name__: CrmGetTool,
+    SearchCalendarTool.__name__: SearchCalendarTool,
 }
 
 STOPPING_TOOLS_NAMES: list[str] = [ImageGenerationTool.NAME]

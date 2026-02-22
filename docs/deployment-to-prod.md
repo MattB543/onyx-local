@@ -8,19 +8,27 @@ Complete guide to deploying code changes to the production EC2 instance running 
 
 | Item | Value |
 |------|-------|
-| EC2 IP | `34.246.185.118` |
-| SSH Key | `C:\Users\matth\projects\onyx-test\onyx-key.pem` |
-| SSH User | `ec2-user` |
+| EC2 IP / Host | `<set via PROD_HOST env var>` |
+| SSH Key | `<set via SSH_KEY_PATH env var>` |
+| SSH User | `<set via SSH_USER env var>` |
 | Repo on EC2 | `/home/ec2-user/onyx-local` |
 | Compose file | `deployment/docker_compose/docker-compose.prod.yml` |
 
 Services in the stack: `api_server`, `background`, `web_server`, `inference_model_server`, `indexing_model_server`, `nginx`, `relational_db`, `cache`, `index`, `minio`, `certbot`, `code-interpreter`
 
+Before running any SSH commands, set these local shell variables:
+
+```bash
+export PROD_HOST="<prod host or ip>"
+export SSH_USER="<ssh username>"
+export SSH_KEY_PATH="<absolute path to ssh key>"
+```
+
 ---
 
 ## Step 1: Commit and Push (Local Machine)
 
-From `C:\Users\matth\projects\onyx-test\onyx-local`:
+From your local `onyx-local` repository root:
 
 ```bash
 git add -A
@@ -33,7 +41,7 @@ git push origin main
 ## Step 2: SSH In, Pull, and Rebuild (EC2)
 
 ```bash
-ssh -i "C:\Users\matth\projects\onyx-test\onyx-key.pem" ec2-user@34.246.185.118
+ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${PROD_HOST}"
 ```
 
 Once on EC2:
@@ -92,7 +100,7 @@ Hit the site in a browser and confirm it loads without errors.
 Run this single SSH command from your local machine to pull, rebuild all application services, and restart nginx in one shot:
 
 ```bash
-ssh -i "C:\Users\matth\projects\onyx-test\onyx-key.pem" ec2-user@34.246.185.118 "cd /home/ec2-user/onyx-local && git pull origin main && docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server && docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx"
+ssh -i "${SSH_KEY_PATH}" "${SSH_USER}@${PROD_HOST}" "cd /home/ec2-user/onyx-local && git pull origin main && docker compose -f deployment/docker_compose/docker-compose.prod.yml up -d --build --force-recreate api_server background web_server && docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx"
 ```
 
 ---

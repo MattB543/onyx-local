@@ -1,13 +1,13 @@
 import { JSX } from "react";
 import { FiCircle, FiList, FiTool, FiXCircle } from "react-icons/fi";
-import { BrainIcon } from "@/components/icons/icons";
 
 import {
   Packet,
   PacketType,
   SearchToolPacket,
 } from "@/app/app/services/streamingModels";
-import { constructCurrentSearchState } from "./timeline/renderers/search/searchStateUtils";
+import { BrainIcon } from "@/components/icons/icons";
+
 import {
   SvgGlobe,
   SvgSearchMenu,
@@ -17,7 +17,10 @@ import {
   SvgUser,
   SvgCircle,
   SvgBookOpen,
+  SvgCalendar,
 } from "@opal/icons";
+
+import { constructCurrentSearchState } from "./timeline/renderers/search/searchStateUtils";
 
 /**
  * Check if a packet group contains an ERROR packet (tool failed)
@@ -103,6 +106,8 @@ export function getToolName(packets: Packet[]): string {
       return "CRM Update";
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return "CRM Log Interaction";
+    case PacketType.CALENDAR_SEARCH_TOOL_START:
+      return "Calendar Search";
     case PacketType.IMAGE_GENERATION_TOOL_START:
       return "Generate Image";
     case PacketType.DEEP_RESEARCH_PLAN_START:
@@ -145,6 +150,8 @@ export function getToolIcon(packets: Packet[]): JSX.Element {
     case PacketType.CRM_UPDATE_TOOL_START:
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return <SvgUser className="w-3.5 h-3.5" />;
+    case PacketType.CALENDAR_SEARCH_TOOL_START:
+      return <SvgCalendar className="w-3.5 h-3.5" />;
     case PacketType.IMAGE_GENERATION_TOOL_START:
       return <SvgImage className="w-3.5 h-3.5" />;
     case PacketType.DEEP_RESEARCH_PLAN_START:

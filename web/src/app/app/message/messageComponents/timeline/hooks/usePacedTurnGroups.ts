@@ -1,7 +1,10 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+
 import { PacketType } from "@/app/app/services/streamingModels";
-import { GroupedPacket } from "./packetProcessor";
+
 import { TurnGroup, TransformedStep } from "../transformers";
+
+import { GroupedPacket } from "./packetProcessor";
 
 // Delay between steps (ms)
 const PACING_DELAY_MS = 200;
@@ -19,6 +22,7 @@ const TOOL_START_PACKET_TYPES = new Set<PacketType>([
   PacketType.CRM_CREATE_TOOL_START,
   PacketType.CRM_UPDATE_TOOL_START,
   PacketType.CRM_LOG_INTERACTION_TOOL_START,
+  PacketType.CALENDAR_SEARCH_TOOL_START,
   PacketType.FILE_READER_START,
   PacketType.REASONING_START,
   PacketType.IMAGE_GENERATION_TOOL_START,
@@ -143,7 +147,13 @@ export function usePacedTurnGroups(
     const state = stateRef.current;
 
     if (state.pendingSteps.length > 0) {
-      const stepToReveal = state.pendingSteps.shift()!;
+      const stepToReveal = state.pendingSteps.shift();
+      if (!stepToReveal) {
+        state.toolPacingComplete = true;
+        state.pacingTimer = null;
+        setRevealTrigger((t) => t + 1);
+        return;
+      }
       state.revealedStepKeys.add(stepToReveal.key);
       state.lastRevealedPacketType = getStepPacketType(stepToReveal);
 
@@ -313,15 +323,20 @@ export function usePacedTurnGroups(
     if (prev.length === result.length) {
       let allMatch = true;
       for (let i = 0; i < result.length; i++) {
-        const oldGroup = prev[i]!;
-        const newGroup = result[i]!;
+        const oldGroup = prev[i];
+        const newGroup = result[i];
+        if (!oldGroup || !newGroup) {
+          allMatch = false;
+          break;
+        }
         if (
           oldGroup.turnIndex === newGroup.turnIndex &&
           oldGroup.steps.length === newGroup.steps.length &&
           oldGroup.steps.every(
             (s, j) =>
-              s.key === newGroup.steps[j]!.key &&
-              s.packets.length === newGroup.steps[j]!.packets.length
+              !!newGroup.steps[j] &&
+              s.key === newGroup.steps[j].key &&
+              s.packets.length === newGroup.steps[j].packets.length
           )
         ) {
           // Reuse old object reference for this group

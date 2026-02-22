@@ -7,6 +7,7 @@ from celery.schedules import crontab
 from onyx.configs.app_configs import AUTO_LLM_CONFIG_URL
 from onyx.configs.app_configs import AUTO_LLM_UPDATE_INTERVAL_SECONDS
 from onyx.configs.app_configs import DISABLE_VECTOR_DB
+from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
 from onyx.configs.app_configs import ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
 from onyx.configs.app_configs import ENTERPRISE_EDITION_ENABLED
 from onyx.configs.app_configs import SCHEDULED_EVAL_DATASET_NAMES
@@ -210,6 +211,48 @@ if SCHEDULED_EVAL_DATASET_NAMES:
                 "expires": BEAT_EXPIRES_DEFAULT,
             },
         }
+    )
+
+if ENABLE_CUSTOM_JOBS:
+    beat_task_templates.extend(
+        [
+            {
+                "name": "check-for-custom-jobs",
+                "task": OnyxCeleryTask.CHECK_FOR_CUSTOM_JOBS,
+                "schedule": timedelta(seconds=60),
+                "options": {
+                    "priority": OnyxCeleryPriority.MEDIUM,
+                    "expires": BEAT_EXPIRES_DEFAULT,
+                },
+            },
+            {
+                "name": "check-for-custom-job-trigger-events",
+                "task": OnyxCeleryTask.CHECK_FOR_CUSTOM_JOB_TRIGGER_EVENTS,
+                "schedule": timedelta(seconds=30),
+                "options": {
+                    "priority": OnyxCeleryPriority.MEDIUM,
+                    "expires": BEAT_EXPIRES_DEFAULT,
+                },
+            },
+            {
+                "name": "poll-custom-job-triggers",
+                "task": OnyxCeleryTask.POLL_CUSTOM_JOB_TRIGGERS,
+                "schedule": timedelta(seconds=300),
+                "options": {
+                    "priority": OnyxCeleryPriority.LOW,
+                    "expires": BEAT_EXPIRES_DEFAULT,
+                },
+            },
+            {
+                "name": "cleanup-custom-job-history",
+                "task": OnyxCeleryTask.CLEANUP_CUSTOM_JOB_HISTORY,
+                "schedule": timedelta(hours=24),
+                "options": {
+                    "priority": OnyxCeleryPriority.LOW,
+                    "expires": BEAT_EXPIRES_DEFAULT,
+                },
+            },
+        ]
     )
 
 # Add OpenSearch migration task if enabled.

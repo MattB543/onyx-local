@@ -30,6 +30,13 @@ function websiteLabel(website: string | null): string {
   return website.replace(/^https?:\/\//i, "");
 }
 
+function websiteHref(website: string | null): string | null {
+  if (!website) {
+    return null;
+  }
+  return website.startsWith("http") ? website : `https://${website}`;
+}
+
 export default function CrmOrganizationsPage() {
   const [searchText, setSearchText] = useState("");
   const [pageNum, setPageNum] = useState(0);
@@ -53,11 +60,12 @@ export default function CrmOrganizationsPage() {
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="lg">
+      <SettingsLayouts.Root width="xl">
         <SettingsLayouts.Header
           icon={SvgOrganization}
           title="CRM"
           description="Manage contacts and organizations."
+          titleIconInline
         >
           <CrmNav
             rightContent={
@@ -85,19 +93,24 @@ export default function CrmOrganizationsPage() {
               leftSearchIcon
             />
 
-            <Text as="p" secondaryAction text03 className="md:justify-self-end">
+            <Text
+              as="p"
+              secondaryAction
+              text03
+              className="text-sm md:justify-self-end"
+            >
               {totalItems} total
             </Text>
           </div>
 
           {error && (
-            <Text as="p" secondaryBody className="text-status-error-03">
+            <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load organizations.
             </Text>
           )}
 
           {isLoading ? (
-            <Text as="p" secondaryBody text03>
+            <Text as="p" secondaryBody text03 className="text-sm">
               Loading organizations...
             </Text>
           ) : organizations.length === 0 ? (
@@ -131,61 +144,108 @@ export default function CrmOrganizationsPage() {
                   >
                     <Card
                       variant="secondary"
-                      className="gap-2 transition-colors hover:bg-background-tint-02"
+                      className="gap-3 transition-colors hover:bg-background-tint-02"
                     >
-                      <div className="flex items-start gap-3">
-                        <OrgAvatar
-                          name={organization.name}
-                          type={organization.type}
-                        />
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <OrgAvatar
+                            name={organization.name}
+                            type={organization.type}
+                          />
 
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                             <Text as="p" mainUiAction text02>
                               {organization.name}
                             </Text>
-                            <TypeBadge type={organization.type} />
-                          </div>
 
-                          <Text as="p" secondaryBody text03>
-                            {detailsRow}
-                          </Text>
-
-                          <div className="flex items-center gap-1">
-                            <SvgGlobe size={14} className="stroke-text-03" />
-                            <Text as="p" secondaryBody text03>
-                              {websiteLabel(organization.website)}
+                            <Text
+                              as="p"
+                              secondaryBody
+                              text03
+                              className="text-sm"
+                            >
+                              {detailsRow}
                             </Text>
-                          </div>
 
-                          {visibleTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {visibleTags.map((tag) => (
-                                <span
-                                  key={tag.id}
-                                  className={cn(
-                                    "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
-                                  )}
+                            <div className="flex items-center gap-1">
+                              <SvgGlobe size={14} className="stroke-text-03" />
+                              {websiteHref(organization.website) ? (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    const href = websiteHref(
+                                      organization.website
+                                    );
+                                    if (!href) {
+                                      return;
+                                    }
+                                    window.open(
+                                      href,
+                                      "_blank",
+                                      "noopener,noreferrer"
+                                    );
+                                  }}
+                                  className="text-sm text-text-04 hover:underline"
                                 >
-                                  <SvgTag
-                                    size={10}
-                                    className="stroke-text-03"
-                                  />
-                                  <Text as="span" figureSmallLabel text03>
-                                    {tag.name}
-                                  </Text>
-                                </span>
-                              ))}
-
-                              {remainingTagCount > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
-                                  <Text as="span" figureSmallLabel text03>
-                                    +{remainingTagCount}
-                                  </Text>
-                                </span>
+                                  {websiteLabel(organization.website)}
+                                </button>
+                              ) : (
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  {websiteLabel(organization.website)}
+                                </Text>
                               )}
                             </div>
-                          )}
+
+                            {visibleTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {visibleTags.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
+                                    )}
+                                  >
+                                    <SvgTag
+                                      size={10}
+                                      className="stroke-text-03"
+                                    />
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text03
+                                      className="text-sm"
+                                    >
+                                      {tag.name}
+                                    </Text>
+                                  </span>
+                                ))}
+
+                                {remainingTagCount > 0 && (
+                                  <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text03
+                                      className="text-sm"
+                                    >
+                                      +{remainingTagCount}
+                                    </Text>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <TypeBadge type={organization.type} />
                         </div>
                       </div>
                     </Card>

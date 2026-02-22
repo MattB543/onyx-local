@@ -87,11 +87,12 @@ export default function CrmHomePage() {
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="lg">
+      <SettingsLayouts.Root width="xl">
         <SettingsLayouts.Header
           icon={SvgUser}
           title="CRM"
           description="Manage your contacts, organizations, and interactions."
+          titleIconInline
         >
           <CrmNav />
         </SettingsLayouts.Header>
@@ -111,7 +112,7 @@ export default function CrmHomePage() {
                     <Text as="p" headingH3>
                       {loadingContacts ? "--" : totalContacts}
                     </Text>
-                    <Text as="p" secondaryBody text03>
+                    <Text as="p" secondaryBody text03 className="text-sm">
                       Contacts
                     </Text>
                   </div>
@@ -132,7 +133,7 @@ export default function CrmHomePage() {
                     <Text as="p" headingH3>
                       {loadingOrgs ? "--" : totalOrgs}
                     </Text>
-                    <Text as="p" secondaryBody text03>
+                    <Text as="p" secondaryBody text03 className="text-sm">
                       Organizations
                     </Text>
                   </div>
@@ -149,7 +150,7 @@ export default function CrmHomePage() {
                   <Text as="p" headingH3>
                     {interactions.length}
                   </Text>
-                  <Text as="p" secondaryBody text03>
+                  <Text as="p" secondaryBody text03 className="text-sm">
                     Recent Interactions
                   </Text>
                 </div>
@@ -166,7 +167,7 @@ export default function CrmHomePage() {
                 <Text
                   as="span"
                   secondaryBody
-                  className="text-text-04 hover:underline"
+                  className="text-sm text-text-04 hover:underline"
                 >
                   View all
                 </Text>
@@ -174,12 +175,12 @@ export default function CrmHomePage() {
             </div>
 
             {loadingContacts ? (
-              <Text as="p" secondaryBody text03>
+              <Text as="p" secondaryBody text03 className="text-sm">
                 Loading...
               </Text>
             ) : contacts.length === 0 ? (
               <Card variant="tertiary">
-                <Text as="p" secondaryBody text03>
+                <Text as="p" secondaryBody text03 className="text-sm">
                   No contacts yet. Create your first contact to get started.
                 </Text>
               </Card>
@@ -223,11 +224,21 @@ export default function CrmHomePage() {
                               <StatusBadge status={contact.status} />
                             </div>
 
-                            <Text as="p" secondaryBody text03>
+                            <Text
+                              as="p"
+                              secondaryBody
+                              text03
+                              className="text-sm"
+                            >
                               {titleLabel} · {orgLabel}
                             </Text>
 
-                            <Text as="p" secondaryBody text03>
+                            <Text
+                              as="p"
+                              secondaryBody
+                              text03
+                              className="text-sm"
+                            >
                               Latest activity:{" "}
                               <span className="font-medium text-text-04">
                                 {latestActivityDate}
@@ -256,14 +267,24 @@ export default function CrmHomePage() {
                                       size={10}
                                       className="stroke-text-03"
                                     />
-                                    <Text as="span" figureSmallLabel text02>
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text02
+                                      className="text-sm"
+                                    >
                                       {tag.name}
                                     </Text>
                                   </span>
                                 ))}
                                 {remainingTags > 0 && (
                                   <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
-                                    <Text as="span" figureSmallLabel text02>
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text02
+                                      className="text-sm"
+                                    >
                                       +{remainingTags}
                                     </Text>
                                   </span>
@@ -289,7 +310,7 @@ export default function CrmHomePage() {
                 <Text
                   as="span"
                   secondaryBody
-                  className="text-text-04 hover:underline"
+                  className="text-sm text-text-04 hover:underline"
                 >
                   View all
                 </Text>
@@ -297,12 +318,12 @@ export default function CrmHomePage() {
             </div>
 
             {loadingOrgs ? (
-              <Text as="p" secondaryBody text03>
+              <Text as="p" secondaryBody text03 className="text-sm">
                 Loading...
               </Text>
             ) : organizations.length === 0 ? (
               <Card variant="tertiary">
-                <Text as="p" secondaryBody text03>
+                <Text as="p" secondaryBody text03 className="text-sm">
                   No organizations yet. Create your first organization to get
                   started.
                 </Text>
@@ -324,7 +345,7 @@ export default function CrmHomePage() {
                       <Text as="p" mainUiAction text02>
                         {organization.name}
                       </Text>
-                      <Text as="p" secondaryBody text03>
+                      <Text as="p" secondaryBody text03 className="text-sm">
                         {[organization.sector, organization.location]
                           .filter(Boolean)
                           .join(" · ") || "No details"}

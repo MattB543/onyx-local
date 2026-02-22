@@ -241,8 +241,8 @@ class HubPeriodicTask(bootsteps.StartStopStep):
     a queue of existing work would starve the task from running.
     """
 
-    # it's unclear to me whether using the hub's timer or the bootstep timer is better
-    requires = {"celery.worker.components:Hub"}
+    # Use worker timer so this works across worker pools/platforms where hub may be unset.
+    requires = {"celery.worker.components:Timer"}
 
     def __init__(self, worker: Any, **kwargs: Any) -> None:  # noqa: ARG002
         self.interval = CELERY_PRIMARY_WORKER_LOCK_TIMEOUT / 8  # Interval in seconds
@@ -252,14 +252,20 @@ class HubPeriodicTask(bootsteps.StartStopStep):
         if not celery_is_worker_primary(worker):
             return
 
-        # Access the worker's event loop (hub)
-        hub = worker.consumer.controller.hub
+        if not getattr(worker, "timer", None):
+            task_logger.warning(
+                "Worker timer not available; skipping primary lock renewal task."
+            )
+            return
 
-        # Schedule the periodic task
-        self.task_tref = hub.call_repeatedly(
-            self.interval, self.run_periodic_task, worker
+        # Schedule periodic lock renewal independent of queue load.
+        self.task_tref = worker.timer.call_repeatedly(
+            self.interval,
+            self.run_periodic_task,
+            (worker,),
+            priority=10,
         )
-        task_logger.info("Scheduled periodic task with hub.")
+        task_logger.info("Scheduled periodic task with worker timer.")
 
     def run_periodic_task(self, worker: Any) -> None:
         try:
@@ -304,7 +310,7 @@ class HubPeriodicTask(bootsteps.StartStopStep):
         # Cancel the scheduled task when the worker stops
         if self.task_tref:
             self.task_tref.cancel()
-            task_logger.info("Canceled periodic task with hub.")
+            task_logger.info("Canceled periodic task with worker timer.")
 
 
 celery_app.steps["worker"].add(HubPeriodicTask)
@@ -326,6 +332,7 @@ celery_app.autodiscover_tasks(
             "onyx.background.celery.tasks.vespa",
             "onyx.background.celery.tasks.llm_model_update",
             "onyx.background.celery.tasks.user_file_processing",
+            "onyx.background.celery.tasks.custom_jobs",
         ]
     )
 )

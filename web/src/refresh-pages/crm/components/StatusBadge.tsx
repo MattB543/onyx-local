@@ -1,44 +1,90 @@
-import { CrmContactStatus } from "@/app/app/crm/crmService";
 import { cn } from "@/lib/utils";
+import { formatCrmLabel } from "@/refresh-pages/crm/crmOptions";
 
-const STATUS_CONFIG: Record<
-  CrmContactStatus,
-  { bg: string; text: string; dot: string }
-> = {
+interface StatusColorConfig {
+  bg: string;
+  text: string;
+  dot: string;
+}
+
+const STATUS_CONFIG: Record<string, StatusColorConfig> = {
   lead: {
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    dot: "bg-blue-500",
+    bg: "bg-status-info-00",
+    text: "text-status-text-info-05",
+    dot: "bg-status-info-05",
   },
   active: {
-    bg: "bg-green-50",
-    text: "text-green-700",
-    dot: "bg-green-500",
+    bg: "bg-status-success-00",
+    text: "text-status-text-success-05",
+    dot: "bg-status-success-05",
   },
   inactive: {
-    bg: "bg-gray-100",
-    text: "text-gray-600",
-    dot: "bg-gray-400",
+    bg: "bg-status-warning-00",
+    text: "text-status-text-warning-05",
+    dot: "bg-status-warning-05",
   },
   archived: {
-    bg: "bg-gray-50",
-    text: "text-gray-500",
-    dot: "bg-gray-400",
+    bg: "bg-background-neutral-02",
+    text: "text-text-03",
+    dot: "bg-border-03",
   },
 };
 
+const STATUS_COLOR_FALLBACKS: [StatusColorConfig, ...StatusColorConfig[]] = [
+  {
+    bg: "bg-status-info-00",
+    text: "text-status-text-info-05",
+    dot: "bg-status-info-05",
+  },
+  {
+    bg: "bg-status-success-00",
+    text: "text-status-text-success-05",
+    dot: "bg-status-success-05",
+  },
+  {
+    bg: "bg-status-warning-00",
+    text: "text-status-text-warning-05",
+    dot: "bg-status-warning-05",
+  },
+  {
+    bg: "bg-background-tint-02",
+    text: "text-action-text-link-05",
+    dot: "bg-action-link-05",
+  },
+];
+
+function hashStage(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function getStatusColorConfig(status: string): StatusColorConfig {
+  const normalized = status.trim().toLowerCase();
+  if (STATUS_CONFIG[normalized]) {
+    return STATUS_CONFIG[normalized];
+  }
+  return (
+    STATUS_COLOR_FALLBACKS[
+      hashStage(normalized) % STATUS_COLOR_FALLBACKS.length
+    ] || STATUS_COLOR_FALLBACKS[0]
+  );
+}
+
 interface StatusBadgeProps {
-  status: CrmContactStatus;
+  status: string;
 }
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.lead;
-  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  const config = getStatusColorConfig(status);
+  const label = formatCrmLabel(status);
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-sm font-medium",
         config.bg,
         config.text
       )}

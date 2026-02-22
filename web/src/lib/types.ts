@@ -1,7 +1,8 @@
 import { Persona } from "@/app/admin/assistants/interfaces";
-import { Credential } from "./connectors/credentials";
-import { Connector } from "./connectors/connectors";
 import { ConnectorCredentialPairStatus } from "@/app/admin/connector/[ccPairId]/types";
+
+import { Connector } from "./connectors/connectors";
+import { Credential } from "./connectors/credentials";
 
 export interface UserSpecificAssistantPreference {
   disabled_tool_ids?: number[];
@@ -134,6 +135,7 @@ export interface InvitedUserSnapshot {
 export interface MinimalUserSnapshot {
   id: string;
   email: string;
+  full_name?: string | null;
 }
 
 export type ValidInputTypes =

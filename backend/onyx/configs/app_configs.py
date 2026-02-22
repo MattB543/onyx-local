@@ -870,6 +870,9 @@ SYSTEM_RECURSION_LIMIT = int(os.environ.get("SYSTEM_RECURSION_LIMIT") or "1000")
 
 PARSE_WITH_TRAFILATURA = os.environ.get("PARSE_WITH_TRAFILATURA", "").lower() == "true"
 
+# Feature flag for composable custom background jobs
+ENABLE_CUSTOM_JOBS = os.environ.get("ENABLE_CUSTOM_JOBS", "").lower() == "true"
+
 # allow for custom error messages for different errors returned by litellm
 # for example, can specify: {"Violated content safety policy": "EVIL REQUEST!!!"}
 # to make it so that if an LLM call returns an error containing "Violated content safety policy"

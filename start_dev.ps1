@@ -14,7 +14,12 @@ function Start-OnyxServiceWindow {
         [string]$ScriptPath
     )
 
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
+    $shellExe = (Get-Command pwsh -ErrorAction SilentlyContinue)?.Source
+    if (-not $shellExe) {
+        $shellExe = "powershell"
+    }
+
+    Start-Process $shellExe -ArgumentList "-NoExit", "-Command", @"
 `$Host.UI.RawUI.WindowTitle = '$Title'
 & '$ScriptPath'
 "@

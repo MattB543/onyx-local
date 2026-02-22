@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,13 +15,15 @@ from onyx.db.crm import add_tag_to_organization
 from onyx.db.crm import create_contact
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
+from onyx.db.crm import get_allowed_contact_stages
+from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_tags
 from onyx.db.crm import get_tag_by_id
 from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmContactStatus
 from onyx.db.enums import CrmOrganizationType
+from onyx.db.models import User
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolStart
@@ -32,6 +35,7 @@ from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
 from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
+from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_organization
@@ -47,7 +51,7 @@ class CrmCreateTool(Tool[None]):
     DESCRIPTION = (
         "Create a new CRM contact, organization, or tag. Always search first to avoid duplicates. "
         "When creating a contact, set organization_id to link them to an existing org, and include "
-        "tag_ids to apply tags. New contacts default to 'lead' status. "
+        "tag_ids to apply tags. New contacts default to the workspace's default stage. "
         "Confirm what you created back to the user with key details."
     )
 
@@ -62,6 +66,7 @@ class CrmCreateTool(Tool[None]):
         self._id = tool_id
         self._user_id = user_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
+        self._stage_options = get_allowed_contact_stages(db_session)
 
     @property
     def id(self) -> int:
@@ -126,9 +131,14 @@ class CrmCreateTool(Tool[None]):
                                     "type": "string",
                                     "description": "UUID of an existing organization to link this contact to.",
                                 },
-                                "owner_id": {
-                                    "type": "string",
-                                    "description": "UUID of the team member who owns this contact.",
+                                "owner_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": (
+                                        "UUIDs of team members who own this contact. "
+                                        "If omitted, defaults to the user invoking this tool. "
+                                        "Use [] to intentionally set no owners."
+                                    ),
                                 },
                                 "source": {
                                     "type": "string",
@@ -137,8 +147,12 @@ class CrmCreateTool(Tool[None]):
                                 },
                                 "status": {
                                     "type": "string",
-                                    "enum": ["lead", "active", "inactive", "archived"],
-                                    "description": "Contact lifecycle status. Defaults to 'lead'.",
+                                    "enum": self._stage_options,
+                                    "description": "Contact lifecycle stage.",
+                                },
+                                "category": {
+                                    "type": "string",
+                                    "description": "Optional contact category label.",
                                 },
                                 "notes": {
                                     "type": "string",
@@ -242,11 +256,43 @@ class CrmCreateTool(Tool[None]):
                     llm_facing_message="Could not find the provided organization_id.",
                 )
 
-        owner_id = parse_uuid_maybe(contact_data.get("owner_id"), "contact.owner_id")
+        owner_ids: list[UUID] = []
+        if "owner_ids" in contact_data:
+            owner_ids_raw = contact_data.get("owner_ids")
+            if owner_ids_raw is None:
+                owner_ids = []
+            elif isinstance(owner_ids_raw, list):
+                owner_ids = [
+                    parsed_owner_id
+                    for owner_id_raw in owner_ids_raw
+                    if (parsed_owner_id := parse_uuid_maybe(owner_id_raw, "contact.owner_ids[]"))
+                    is not None
+                ]
+            else:
+                raise ToolCallException(
+                    message=f"Invalid owner_ids payload type: {type(owner_ids_raw)}",
+                    llm_facing_message="'contact.owner_ids' must be an array of UUID strings.",
+                )
+        else:
+            creator_id = parse_uuid_maybe(self._user_id, "user_id")
+            owner_ids = [creator_id] if creator_id is not None else []
+
+        for owner_id in owner_ids:
+            if db_session.get(User, owner_id) is not None:
+                continue
+            raise ToolCallException(
+                message=f"Owner user not found: {owner_id}",
+                llm_facing_message="Could not find one of the provided contact owner user IDs.",
+            )
+
         source = parse_enum_maybe(CrmContactSource, contact_data.get("source"), "contact.source")
-        status = parse_enum_maybe(CrmContactStatus, contact_data.get("status"), "contact.status")
+        status = parse_stage_maybe(
+            contact_data.get("status"),
+            allowed_stages=self._stage_options,
+            field_name="contact.status",
+        )
         if status is None:
-            status = CrmContactStatus.LEAD
+            status = self._stage_options[0]
 
         contact, created = create_contact(
             db_session=db_session,
@@ -256,9 +302,10 @@ class CrmCreateTool(Tool[None]):
             phone=contact_data.get("phone"),
             title=contact_data.get("title"),
             organization_id=organization_id,
-            owner_id=owner_id,
+            owner_ids=owner_ids,
             source=source,
             status=status,
+            category=contact_data.get("category"),
             notes=contact_data.get("notes"),
             linkedin_url=contact_data.get("linkedin_url"),
             location=contact_data.get("location"),
@@ -273,10 +320,15 @@ class CrmCreateTool(Tool[None]):
                 add_tag_to_contact(db_session=db_session, contact_id=contact.id, tag_id=tag_id)
 
         tags = get_contact_tags(contact.id, db_session)
+        resolved_owner_ids = get_contact_owner_ids(contact.id, db_session)
         return {
             "status": "created" if created else "already_exists",
             "entity_type": "contact",
-            "contact": serialize_contact(contact, tags=tags),
+            "contact": serialize_contact(
+                contact,
+                owner_ids=resolved_owner_ids,
+                tags=tags,
+            ),
         }
 
     def _create_organization(self, db_session: Session, organization_data: dict[str, Any]) -> dict[str, Any]:

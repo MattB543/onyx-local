@@ -90,6 +90,43 @@ def get_chat_sessions_by_slack_thread_id(
     return db_session.scalars(stmt).all()
 
 
+def get_chat_messages_in_time_range(
+    *,
+    db_session: Session,
+    window_start: datetime,
+    window_end: datetime,
+    message_types: list[MessageType] | None = None,
+    limit: int | None = None,
+) -> list[ChatMessage]:
+    """Fetch chat messages by time window across all sessions.
+
+    Results are ordered for summarization quality:
+    `chat_session_id`, then `time_sent`, then `id`.
+    """
+    stmt = (
+        select(ChatMessage)
+        .join(ChatSession, ChatSession.id == ChatMessage.chat_session_id)
+        .where(
+            ChatMessage.time_sent >= window_start,
+            ChatMessage.time_sent < window_end,
+            ChatSession.onyxbot_flow.is_(False),
+            ChatSession.deleted.is_(False),
+        )
+        .order_by(
+            ChatMessage.chat_session_id.asc(),
+            ChatMessage.time_sent.asc(),
+            ChatMessage.id.asc(),
+        )
+    )
+
+    if message_types:
+        stmt = stmt.where(ChatMessage.message_type.in_(message_types))
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    return list(db_session.scalars(stmt).all())
+
+
 # Retrieves chat sessions by user
 # Chat sessions do not include onyxbot flows
 def get_chat_sessions_by_user(

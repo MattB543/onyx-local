@@ -43,6 +43,9 @@ from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileRea
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
 )
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.mcp.mcp_tool import MCPTool
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import (
@@ -322,6 +325,16 @@ def construct_tools(
                         tool_id=db_tool_model.id,
                         db_session=db_session,
                         emitter=emitter,
+                    )
+                ]
+
+            elif tool_cls.__name__ == SearchCalendarTool.__name__:
+                tool_dict[db_tool_model.id] = [
+                    SearchCalendarTool(
+                        tool_id=db_tool_model.id,
+                        db_session=db_session,
+                        emitter=emitter,
+                        user_id=str(user.id) if user.id else None,
                     )
                 ]
 

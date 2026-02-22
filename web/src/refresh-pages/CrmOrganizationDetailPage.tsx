@@ -31,7 +31,7 @@ import TagManager from "@/refresh-pages/crm/components/TagManager";
 import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 
-import { SvgEdit } from "@opal/icons";
+import { SvgEdit, SvgOrganization } from "@opal/icons";
 
 const ORGANIZATION_TYPES: CrmOrganizationType[] = [
   "customer",
@@ -43,7 +43,6 @@ const ORGANIZATION_TYPES: CrmOrganizationType[] = [
 
 const INTERACTION_PAGE_SIZE = 25;
 const LINKED_CONTACTS_PAGE_SIZE = 5;
-const DETAILS_CARD_MIN_HEIGHT = "min-h-[26rem]";
 
 interface OrganizationEditValues {
   name: string;
@@ -57,7 +56,7 @@ interface OrganizationEditValues {
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().trim().required("Organization name is required."),
-  website: Yup.string().trim().url("Enter a valid URL.").optional(),
+  website: Yup.string().trim().optional(),
 });
 
 interface CrmOrganizationDetailPageProps {
@@ -120,7 +119,12 @@ export default function CrmOrganizationDetailPage({
         <div className="mx-auto flex w-[min(72rem,100%)] flex-col gap-6 px-4 pb-12 pt-8">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <CrmBreadcrumbs items={breadcrumbs} />
+              <div className="flex items-center gap-2">
+                <SvgOrganization className="h-[1.75rem] w-[1.75rem] stroke-text-04" />
+                <Text as="p" headingH2>
+                  CRM
+                </Text>
+              </div>
               <Button
                 action
                 tertiary
@@ -131,6 +135,7 @@ export default function CrmOrganizationDetailPage({
                 Back
               </Button>
             </div>
+            <CrmBreadcrumbs items={breadcrumbs} />
 
             <CrmNav
               rightContent={
@@ -160,18 +165,18 @@ export default function CrmOrganizationDetailPage({
           </div>
 
           {error && (
-            <Text as="p" secondaryBody className="text-status-error-03">
+            <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load organization.
             </Text>
           )}
 
           {isLoading ? (
-            <Text as="p" secondaryBody text03>
+            <Text as="p" secondaryBody text03 className="text-sm">
               Loading organization...
             </Text>
           ) : organization ? (
             <>
-              <Card variant="secondary" className="gap-3">
+              <Card variant="secondary" className="[&>div]:items-stretch">
                 <div className="flex items-start gap-3">
                   <OrgAvatar
                     name={organization.name}
@@ -179,15 +184,8 @@ export default function CrmOrganizationDetailPage({
                     size="lg"
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Text as="p" headingH3>
-                        {organization.name}
-                      </Text>
-                      <TypeBadge type={organization.type} />
-                    </div>
-                    <Text as="p" secondaryBody text03>
-                      Created {formatRelativeDate(organization.created_at)} ·
-                      Updated {formatRelativeDate(organization.updated_at)}
+                    <Text as="p" headingH3>
+                      {organization.name}
                     </Text>
                     <TagManager
                       entityType="organization"
@@ -199,11 +197,22 @@ export default function CrmOrganizationDetailPage({
                       }}
                     />
                   </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <TypeBadge type={organization.type} />
+                    <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                      <span>
+                        Created {formatRelativeDate(organization.created_at)}
+                      </span>
+                      <span>
+                        Updated {formatRelativeDate(organization.updated_at)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </Card>
 
-              <div className="flex flex-col gap-6 lg:flex-row">
-                <div className="flex min-w-0 flex-[11] flex-col gap-4">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+                <div className="flex min-w-0 flex-[12] flex-col gap-4">
                   {isEditing ? (
                     <Card variant="secondary" className="gap-3">
                       <Text as="p" mainUiAction text02>
@@ -288,7 +297,7 @@ export default function CrmOrganizationDetailPage({
                               <Text
                                 as="p"
                                 secondaryBody
-                                className="text-status-error-03"
+                                className="text-sm text-status-error-03"
                               >
                                 {status}
                               </Text>
@@ -312,10 +321,7 @@ export default function CrmOrganizationDetailPage({
                       </Formik>
                     </Card>
                   ) : (
-                    <Card
-                      variant="secondary"
-                      className={`gap-3 ${DETAILS_CARD_MIN_HEIGHT}`}
-                    >
+                    <Card variant="secondary" className="h-full gap-3">
                       <Text as="p" mainUiAction text02>
                         Details
                       </Text>
@@ -356,26 +362,110 @@ export default function CrmOrganizationDetailPage({
                           layout="stacked"
                         />
                       </div>
+
+                      <div className="w-full border-t border-border-subtle" />
+
+                      <div className="flex w-full flex-col gap-1">
+                        <Text as="p" mainUiAction text02>
+                          Notes
+                        </Text>
+                        {organization.notes ? (
+                          <Text
+                            as="p"
+                            className="whitespace-pre-wrap text-sm font-medium text-text-05"
+                          >
+                            {organization.notes}
+                          </Text>
+                        ) : (
+                          <Text as="p" className="text-sm italic text-text-03">
+                            -
+                          </Text>
+                        )}
+                      </div>
+
+                      <div className="w-full border-t border-border-subtle" />
+
+                      <div className="flex w-full flex-col gap-2">
+                        <Text as="p" mainUiAction text02>
+                          Contacts In This Organization
+                        </Text>
+
+                        {linkedContactsLoading ? (
+                          <Text as="p" secondaryBody text03 className="text-sm">
+                            Loading contacts...
+                          </Text>
+                        ) : linkedContacts.length === 0 ? (
+                          <Text
+                            as="p"
+                            secondaryBody
+                            text03
+                            className="text-sm italic"
+                          >
+                            No linked contacts yet.
+                          </Text>
+                        ) : (
+                          <div className="flex w-full flex-col gap-2">
+                            {linkedContacts.map((contact) => (
+                              <Link
+                                key={contact.id}
+                                href={`/app/crm/contacts/${contact.id}`}
+                                className="flex w-full items-center justify-between rounded-lg px-2 py-1 transition-colors hover:bg-background-tint-02"
+                              >
+                                <Text as="span" mainUiAction text02>
+                                  {contact.full_name || contact.first_name}
+                                </Text>
+                                <div className="flex items-center gap-3">
+                                  <Text
+                                    as="span"
+                                    secondaryBody
+                                    text03
+                                    className="text-sm"
+                                  >
+                                    {contact.title || "-"}
+                                  </Text>
+                                  <Text
+                                    as="span"
+                                    secondaryBody
+                                    text03
+                                    className="text-sm"
+                                  >
+                                    {contact.email || "-"}
+                                  </Text>
+                                </div>
+                              </Link>
+                            ))}
+                            <Link
+                              href={`/app/crm/contacts?organization_id=${organization.id}`}
+                              className="inline-flex"
+                            >
+                              <Text
+                                as="span"
+                                secondaryBody
+                                className="text-sm text-text-04 hover:underline"
+                              >
+                                View all contacts
+                              </Text>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </Card>
                   )}
                 </div>
 
-                <div className="flex min-w-0 flex-[9] flex-col gap-4">
+                <div className="flex min-w-0 flex-[8] flex-col gap-4">
                   {interactionsError ? (
                     <Card variant="secondary">
                       <Text
                         as="p"
                         secondaryBody
-                        className="text-status-error-03"
+                        className="text-sm text-status-error-03"
                       >
                         Failed to load activity.
                       </Text>
                     </Card>
                   ) : (
-                    <Card
-                      variant="secondary"
-                      className={DETAILS_CARD_MIN_HEIGHT}
-                    >
+                    <Card variant="secondary" className="h-full min-h-[26rem]">
                       <ActivityTimeline
                         interactions={interactions}
                         isLoading={interactionsLoading}
@@ -391,52 +481,6 @@ export default function CrmOrganizationDetailPage({
                       />
                     </Card>
                   )}
-
-                  <Card variant="secondary" className="gap-2">
-                    <Text as="p" mainUiAction text02>
-                      Contacts In This Organization
-                    </Text>
-
-                    {linkedContactsLoading ? (
-                      <Text as="p" secondaryBody text03>
-                        Loading contacts...
-                      </Text>
-                    ) : linkedContacts.length === 0 ? (
-                      <Text as="p" secondaryBody text03 className="italic">
-                        No linked contacts yet.
-                      </Text>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        {linkedContacts.map((contact) => (
-                          <Link
-                            key={contact.id}
-                            href={`/app/crm/contacts/${contact.id}`}
-                            className="inline-flex"
-                          >
-                            <Text
-                              as="span"
-                              secondaryBody
-                              className="text-text-04 hover:underline"
-                            >
-                              {contact.full_name || contact.first_name}
-                            </Text>
-                          </Link>
-                        ))}
-                        <Link
-                          href={`/app/crm/contacts?organization_id=${organization.id}`}
-                          className="inline-flex"
-                        >
-                          <Text
-                            as="span"
-                            secondaryBody
-                            className="text-text-04 hover:underline"
-                          >
-                            View all contacts
-                          </Text>
-                        </Link>
-                      </div>
-                    )}
-                  </Card>
                 </div>
               </div>
             </>

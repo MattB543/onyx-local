@@ -485,6 +485,7 @@ class GoogleCalendarConnector(
             source=DocumentSource.GOOGLE_CALENDAR,
             semantic_identifier=semantic_identifier,
             metadata=metadata,
+            doc_metadata=metadata,
             doc_updated_at=_parse_rfc3339(
                 event.get("updated") if isinstance(event.get("updated"), str) else None
             ),

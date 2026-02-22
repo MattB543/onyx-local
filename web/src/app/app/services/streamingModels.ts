@@ -39,6 +39,8 @@ export enum PacketType {
   CRM_UPDATE_TOOL_DELTA = "crm_update_tool_delta",
   CRM_LOG_INTERACTION_TOOL_START = "crm_log_interaction_tool_start",
   CRM_LOG_INTERACTION_TOOL_DELTA = "crm_log_interaction_tool_delta",
+  CALENDAR_SEARCH_TOOL_START = "calendar_search_tool_start",
+  CALENDAR_SEARCH_TOOL_DELTA = "calendar_search_tool_delta",
 
   // File reader tool packets
   FILE_READER_START = "file_reader_start",
@@ -224,6 +226,15 @@ export interface CrmLogInteractionToolDelta extends BaseObj {
   payload: Record<string, unknown>;
 }
 
+export interface CalendarSearchToolStart extends BaseObj {
+  type: "calendar_search_tool_start";
+}
+
+export interface CalendarSearchToolDelta extends BaseObj {
+  type: "calendar_search_tool_delta";
+  payload: Record<string, unknown>;
+}
+
 // File Reader Packets
 export interface FileReaderStart extends BaseObj {
   type: "file_reader_start";
@@ -365,6 +376,11 @@ export type CrmToolObj =
   | CrmLogInteractionToolDelta
   | SectionEnd
   | PacketError;
+export type CalendarToolObj =
+  | CalendarSearchToolStart
+  | CalendarSearchToolDelta
+  | SectionEnd
+  | PacketError;
 export type FileReaderToolObj =
   | FileReaderStart
   | FileReaderResult
@@ -383,6 +399,7 @@ export type NewToolObj =
   | FetchToolObj
   | CustomToolObj
   | CrmToolObj
+  | CalendarToolObj
   | FileReaderToolObj
   | MemoryToolObj;
 
@@ -482,6 +499,11 @@ export interface CustomToolPacket {
 export interface CrmToolPacket {
   placement: Placement;
   obj: CrmToolObj;
+}
+
+export interface CalendarToolPacket {
+  placement: Placement;
+  obj: CalendarToolObj;
 }
 
 export interface FileReaderToolPacket {

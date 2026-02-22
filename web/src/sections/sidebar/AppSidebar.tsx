@@ -1,15 +1,9 @@
 "use client";
 
-import { useCallback, memo, useMemo, useState, useEffect, useRef } from "react";
-import useSWR from "swr";
-import { useRouter } from "next/navigation";
-import { useSettingsContext } from "@/providers/SettingsProvider";
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
-import Text from "@/refresh-components/texts/Text";
-import ChatButton from "@/sections/sidebar/ChatButton";
-import AgentButton from "@/sections/sidebar/AgentButton";
-import { DragEndEvent } from "@dnd-kit/core";
+/* eslint-disable import-x/order */
+
 import {
+  DragEndEvent,
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -17,48 +11,59 @@ import {
   useSensor,
   useSensors,
   pointerWithin,
+  useDroppable,
 } from "@dnd-kit/core";
+import {
+  restrictToFirstScrollableAncestor,
+  restrictToVerticalAxis,
+} from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useDroppable } from "@dnd-kit/core";
-import {
-  restrictToFirstScrollableAncestor,
-  restrictToVerticalAxis,
-} from "@dnd-kit/modifiers";
-import SidebarSection from "@/sections/sidebar/SidebarSection";
-import useChatSessions from "@/hooks/useChatSessions";
-import { useProjects } from "@/lib/hooks/useProjects";
-import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { motion, AnimatePresence } from "motion/react";
+import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
+import { useCallback, memo, useMemo, useState, useEffect, useRef } from "react";
+import useSWR from "swr";
+
+import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import { useAgents, useCurrentAgent, usePinnedAgents } from "@/hooks/useAgents";
-import { useAppSidebarContext } from "@/providers/AppSidebarProvider";
-import ProjectFolderButton from "@/sections/sidebar/ProjectFolderButton";
-import CreateProjectModal from "@/components/modals/CreateProjectModal";
-import MoveCustomAgentChatModal from "@/components/modals/MoveCustomAgentChatModal";
-import { useProjectsContext } from "@/providers/ProjectsContext";
-import { removeChatSessionFromProject } from "@/app/app/projects/projectsService";
-import type { Project } from "@/app/app/projects/projectsService";
-import SidebarWrapper from "@/sections/sidebar/SidebarWrapper";
-import { Button as OpalButton } from "@opal/components";
-import { cn } from "@/lib/utils";
+import useChatSessions from "@/hooks/useChatSessions";
+import { useSettingsContext } from "@/providers/SettingsProvider";
+import SidebarTab from "@/refresh-components/buttons/SidebarTab";
+import { useCreateModal } from "@/refresh-components/contexts/ModalContext";
+import Text from "@/refresh-components/texts/Text";
+import ChatButton from "@/sections/sidebar/ChatButton";
+import AgentButton from "@/sections/sidebar/AgentButton";
+
+import ChatSearchCommandMenu from "@/sections/sidebar/ChatSearchCommandMenu";
 import {
   DRAG_TYPES,
   DEFAULT_PERSONA_ID,
   FEATURE_FLAGS,
   LOCAL_STORAGE_KEYS,
 } from "@/sections/sidebar/constants";
-import { showErrorNotification, handleMoveOperation } from "./sidebarUtils";
-import SidebarTab from "@/refresh-components/buttons/SidebarTab";
-import { ChatSession } from "@/app/app/interfaces";
+import ProjectFolderButton from "@/sections/sidebar/ProjectFolderButton";
 import SidebarBody from "@/sections/sidebar/SidebarBody";
-import { useUser } from "@/providers/UserProvider";
-import useAppFocus from "@/hooks/useAppFocus";
-import { useCreateModal } from "@/refresh-components/contexts/ModalContext";
-import { useModalContext } from "@/components/context/ModalContext";
-import useScreenSize from "@/hooks/useScreenSize";
+import SidebarSection from "@/sections/sidebar/SidebarSection";
+import { useProjects } from "@/lib/hooks/useProjects";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { useAppSidebarContext } from "@/providers/AppSidebarProvider";
+import CreateProjectModal from "@/components/modals/CreateProjectModal";
+import MoveCustomAgentChatModal from "@/components/modals/MoveCustomAgentChatModal";
+import { useProjectsContext } from "@/providers/ProjectsContext";
+import { removeChatSessionFromProject } from "@/app/app/projects/projectsService";
+import type { Project } from "@/app/app/projects/projectsService";
+import SidebarWrapper from "@/sections/sidebar/SidebarWrapper";
+import UserAvatarPopover from "@/sections/sidebar/UserAvatarPopover";
+
+import { Button as OpalButton } from "@opal/components";
+
+import { cn } from "@/lib/utils";
+
 import {
   SvgDevKit,
   SvgEditBig,
@@ -69,18 +74,22 @@ import {
   SvgSettings,
   SvgUser,
 } from "@opal/icons";
+
+import { showErrorNotification, handleMoveOperation } from "./sidebarUtils";
+
+import { ChatSession } from "@/app/app/interfaces";
+import { useUser } from "@/providers/UserProvider";
+import useAppFocus from "@/hooks/useAppFocus";
+import { useModalContext } from "@/components/context/ModalContext";
+import useScreenSize from "@/hooks/useScreenSize";
 import BuildModeIntroBackground from "@/app/craft/components/IntroBackground";
 import BuildModeIntroContent from "@/app/craft/components/IntroContent";
 import { CRAFT_PATH } from "@/app/craft/v1/constants";
-import { usePostHog } from "posthog-js/react";
-import { motion, AnimatePresence } from "motion/react";
 import {
   Notification,
   NotificationType,
 } from "@/app/admin/settings/interfaces";
 import { errorHandlingFetcher } from "@/lib/fetcher";
-import UserAvatarPopover from "@/sections/sidebar/UserAvatarPopover";
-import ChatSearchCommandMenu from "@/sections/sidebar/ChatSearchCommandMenu";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useQueryController } from "@/providers/QueryControllerProvider";
 
@@ -238,7 +247,7 @@ const MemoizedAppSidebarInner = memo(
         !isCraftAnimationDisabled
       ) {
         hasAutoTriggeredRef.current = true;
-        setShowIntroAnimation(true);
+        queueMicrotask(() => setShowIntroAnimation(true));
       }
     }, [
       buildModeNotification,
@@ -328,31 +337,35 @@ const MemoizedAppSidebarInner = memo(
     );
 
     // Perform the actual move
-    async function performChatMove(
-      targetProjectId: number,
-      chatSession: ChatSession
-    ) {
-      try {
-        await handleMoveOperation({
-          chatSession,
-          targetProjectId,
-          refreshChatSessions,
-          refreshCurrentProjectDetails,
-          fetchProjects: refreshProjects,
-          currentProjectId,
-        });
-        const projectRefreshPromise = currentProjectId
-          ? refreshCurrentProjectDetails()
-          : refreshProjects();
-        await Promise.all([refreshChatSessions(), projectRefreshPromise]);
-      } catch (error) {
-        console.error("Failed to move chat:", error);
-        throw error;
-      }
-    }
+    const performChatMove = useCallback(
+      async (targetProjectId: number, chatSession: ChatSession) => {
+        try {
+          await handleMoveOperation({
+            chatSession,
+            targetProjectId,
+            refreshChatSessions,
+            refreshCurrentProjectDetails,
+            fetchProjects: refreshProjects,
+            currentProjectId,
+          });
+          const projectRefreshPromise = currentProjectId
+            ? refreshCurrentProjectDetails()
+            : refreshProjects();
+          await Promise.all([refreshChatSessions(), projectRefreshPromise]);
+        } catch (error) {
+          console.error("Failed to move chat:", error);
+          throw error;
+        }
+      },
+      [
+        currentProjectId,
+        refreshChatSessions,
+        refreshCurrentProjectDetails,
+        refreshProjects,
+      ]
+    );
 
     // Handle chat to project drag and drop
-    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const handleChatProjectDragEnd = useCallback(
       async (event: DragEndEvent) => {
         const { active, over } = event;
@@ -397,7 +410,7 @@ const MemoizedAppSidebarInner = memo(
 
           try {
             await performChatMove(targetProject.id, chatSession);
-          } catch (error) {
+          } catch (_error) {
             showErrorNotification("Failed to move chat. Please try again.");
           }
         }
@@ -426,12 +439,12 @@ const MemoizedAppSidebarInner = memo(
       },
       [
         currentProjectId,
+        performChatMove,
         refreshChatSessions,
         refreshCurrentProjectDetails,
         refreshProjects,
       ]
     );
-    /* eslint-enable react-hooks/preserve-manual-memoization */
 
     const { isAdmin, isCurator, user } = useUser();
     const activeSidebarTab = useAppFocus();
@@ -440,7 +453,6 @@ const MemoizedAppSidebarInner = memo(
       (user?.preferences?.default_app_mode?.toLowerCase() as
         | "chat"
         | "search") ?? "chat";
-    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const newSessionButton = useMemo(() => {
       const href =
         combinedSettings?.settings?.disable_default_assistant && currentAgent
@@ -469,8 +481,9 @@ const MemoizedAppSidebarInner = memo(
       combinedSettings,
       currentAgent,
       defaultAppMode,
+      reset,
+      setAppMode,
     ]);
-    /* eslint-enable react-hooks/preserve-manual-memoization */
 
     const buildButton = useMemo(
       () => (
@@ -500,7 +513,7 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded]
     );
-    const isCrmEnabled = crmSettings?.enabled === true;
+    const isCrmEnabled = crmSettings != null && crmSettings.enabled !== false;
     const crmButton = useMemo(
       () => (
         <div data-testid="AppSidebar/crm">
@@ -536,7 +549,6 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded, activeSidebarTab, visibleAgents]
     );
-    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const newProjectButton = useMemo(
       () => (
         <SidebarTab
@@ -549,9 +561,8 @@ const MemoizedAppSidebarInner = memo(
           New Project
         </SidebarTab>
       ),
-      [folded, createProjectModal.toggle, createProjectModal.isOpen]
+      [createProjectModal, folded]
     );
-    /* eslint-enable react-hooks/preserve-manual-memoization */
     const handleShowBuildIntro = useCallback(() => {
       setShowIntroAnimation(true);
     }, []);
@@ -620,7 +631,7 @@ const MemoizedAppSidebarInner = memo(
               if (chat && target != null) {
                 try {
                   await performChatMove(target, chat);
-                } catch (error) {
+                } catch (_error) {
                   showErrorNotification(
                     "Failed to move chat. Please try again."
                   );

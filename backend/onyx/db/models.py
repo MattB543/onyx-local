@@ -35,6 +35,7 @@ from sqlalchemy import Sequence
 from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy import text
+from sqlalchemy import CheckConstraint
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.engine.interfaces import Dialect
@@ -62,27 +63,30 @@ from onyx.db.enums import (
     BuildSessionStatus,
     CrmAttendeeRole,
     CrmContactSource,
-    CrmContactStatus,
     CrmInteractionType,
     CrmOrganizationType,
+    CustomJobRunStatus,
+    CustomJobStepStatus,
+    CustomJobTriggerEventStatus,
+    CustomJobTriggerType,
     EmbeddingPrecision,
     HierarchyNodeType,
     IndexingMode,
+    LLMModelFlowType,
+    MCPAuthenticationPerformer,
+    MCPAuthenticationType,
+    MCPServerStatus,
+    MCPTransport,
     OpenSearchDocumentMigrationStatus,
     OpenSearchTenantMigrationStatus,
     ProcessingMode,
     SandboxStatus,
-    SyncType,
     SyncStatus,
-    MCPAuthenticationType,
-    UserFileStatus,
-    MCPAuthenticationPerformer,
-    MCPTransport,
-    MCPServerStatus,
-    LLMModelFlowType,
-    ThemePreference,
-    DefaultAppMode,
+    SyncType,
     SwitchoverType,
+    ThemePreference,
+    UserFileStatus,
+    DefaultAppMode,
 )
 from onyx.configs.constants import NotificationType
 from onyx.configs.constants import SearchFeedbackType
@@ -2608,6 +2612,8 @@ class ChatMessage(Base):
         back_populates="chat_messages",
     )
 
+    __table_args__ = (Index("ix_chat_message_time_sent", "time_sent"),)
+
 
 class ToolCall(Base):
     """Represents a Tool Call and Tool Response"""
@@ -4239,13 +4245,35 @@ class CrmSettings(Base):
     __tablename__ = "crm_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     tier2_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
     tier3_deals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     tier3_custom_fields: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
+    )
+    contact_stage_options: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String),
+        nullable=False,
+        default=lambda: ["lead", "active", "inactive", "archived"],
+        server_default=text("ARRAY['lead','active','inactive','archived']::varchar[]"),
+    )
+    contact_category_suggestions: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String),
+        nullable=False,
+        default=lambda: [
+            "Policy Maker",
+            "Journalist",
+            "Academic",
+            "Allied Org",
+            "Lab Member",
+        ],
+        server_default=text(
+            "ARRAY['Policy Maker','Journalist','Academic','Allied Org','Lab Member']::varchar[]"
+        ),
     )
     updated_by: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
@@ -4257,6 +4285,10 @@ class CrmSettings(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_crm_settings_singleton"),
     )
 
 
@@ -4315,20 +4347,17 @@ class CrmContact(Base):
         ForeignKey("crm_organization.id", ondelete="SET NULL"),
         nullable=True,
     )
-    owner_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("user.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     source: Mapped[CrmContactSource | None] = mapped_column(
         Enum(CrmContactSource, native_enum=False),
         nullable=True,
     )
-    status: Mapped[CrmContactStatus] = mapped_column(
-        Enum(CrmContactStatus, native_enum=False),
+    status: Mapped[str] = mapped_column(
+        String(64),
         nullable=False,
-        default=CrmContactStatus.LEAD,
+        default="lead",
+        server_default="lead",
     )
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -4357,6 +4386,37 @@ class CrmContact(Base):
             persisted=True,
         ),
         nullable=True,
+    )
+
+    owners: Mapped[list["CrmContactOwner"]] = relationship(
+        "CrmContactOwner", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    __table_args__ = (
+        Index("ix_crm_contact_organization_id", "organization_id"),
+        Index("ix_crm_contact_status", "status"),
+    )
+
+
+class CrmContactOwner(Base):
+    __tablename__ = "crm_contact_owner"
+
+    contact_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_crm_contact_owner_user_id", "user_id"),
     )
 
 
@@ -4407,6 +4467,11 @@ class CrmInteraction(Base):
         nullable=True,
     )
 
+    __table_args__ = (
+        Index("ix_crm_interaction_contact_id", "contact_id"),
+        Index("ix_crm_interaction_organization_id", "organization_id"),
+    )
+
 
 class CrmInteractionAttendee(Base):
     __tablename__ = "crm_interaction_attendee"
@@ -4436,6 +4501,28 @@ class CrmInteractionAttendee(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND contact_id IS NULL) OR "
+            "(user_id IS NULL AND contact_id IS NOT NULL)",
+            name="ck_crm_interaction_attendee_one_target",
+        ),
+        Index(
+            "uq_crm_interaction_attendee_user",
+            "interaction_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("user_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_crm_interaction_attendee_contact",
+            "interaction_id",
+            "contact_id",
+            unique=True,
+            postgresql_where=text("contact_id IS NOT NULL"),
+        ),
+    )
+
 
 class CrmTag(Base):
     __tablename__ = "crm_tag"
@@ -4445,6 +4532,10 @@ class CrmTag(Base):
     color: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_crm_tag_name_lower", func.lower(name), unique=True),
     )
 
 
@@ -4929,6 +5020,352 @@ class TenantUsage(Base):
     __table_args__ = (
         # Ensure only one row per window start (tenant_id is in the schema name)
         UniqueConstraint("window_start", name="uq_tenant_usage_window"),
+    )
+
+
+class CustomJobConfig(TypedDict, total=False):
+    steps: list[dict[str, Any]]
+    schedule_metadata: dict[str, Any]
+    input: dict[str, Any]
+    processing: dict[str, Any]
+    output: dict[str, Any]
+
+
+class CustomJobTriggerSourceConfig(TypedDict, total=False):
+    poll_interval_seconds: int
+    max_events_per_claim: int
+    max_concurrent_runs: int
+    source_key: str
+    payload: dict[str, Any]
+
+
+class CustomJob(Base):
+    __tablename__ = "custom_job"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    workflow_key: Mapped[str] = mapped_column(String, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    trigger_type: Mapped[CustomJobTriggerType] = mapped_column(
+        Enum(CustomJobTriggerType, native_enum=False), nullable=False
+    )
+
+    day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True)
+    next_run_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_scheduled_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    trigger_source_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    trigger_source_config: Mapped[CustomJobTriggerSourceConfig | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+
+    job_config: Mapped[CustomJobConfig] = mapped_column(
+        postgresql.JSONB(), nullable=False, default=dict
+    )
+
+    persona_id: Mapped[int | None] = mapped_column(
+        ForeignKey("persona.id", ondelete="SET NULL"), nullable=True
+    )
+    slack_bot_id: Mapped[int | None] = mapped_column(
+        ForeignKey("slack_bot.id", ondelete="SET NULL"), nullable=True
+    )
+    slack_channel_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    retention_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("90")
+    )
+
+    created_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    runs: Mapped[list["CustomJobRun"]] = relationship(
+        "CustomJobRun",
+        back_populates="custom_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    trigger_events: Mapped[list["CustomJobTriggerEvent"]] = relationship(
+        "CustomJobTriggerEvent",
+        back_populates="custom_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    trigger_states: Mapped[list["CustomJobTriggerState"]] = relationship(
+        "CustomJobTriggerState",
+        back_populates="custom_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    audit_logs: Mapped[list["CustomJobAuditLog"]] = relationship(
+        "CustomJobAuditLog",
+        back_populates="custom_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_custom_job_next_run_enabled",
+            "next_run_at",
+            postgresql_where=text("enabled = true"),
+        ),
+    )
+
+
+class CustomJobRun(Base):
+    __tablename__ = "custom_job_run"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    custom_job_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[CustomJobRunStatus] = mapped_column(
+        Enum(CustomJobRunStatus, native_enum=False), nullable=False
+    )
+    scheduled_for: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    trigger_event_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job_trigger_event.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    started_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metrics_json: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+    output_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    custom_job: Mapped["CustomJob"] = relationship("CustomJob", back_populates="runs")
+    steps: Mapped[list["CustomJobRunStep"]] = relationship(
+        "CustomJobRunStep",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    trigger_event: Mapped["CustomJobTriggerEvent | None"] = relationship(
+        "CustomJobTriggerEvent",
+        foreign_keys=[trigger_event_id],
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_custom_job_run_scheduled",
+            "custom_job_id",
+            "scheduled_for",
+            unique=True,
+            postgresql_where=text("scheduled_for IS NOT NULL"),
+        ),
+        Index(
+            "uq_custom_job_run_trigger_event",
+            "custom_job_id",
+            "trigger_event_id",
+            unique=True,
+            postgresql_where=text("trigger_event_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_custom_job_run_idempotency",
+            "custom_job_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_custom_job_run_job_created", "custom_job_id", desc("created_at")),
+        Index("ix_custom_job_run_status", "status"),
+    )
+
+
+class CustomJobRunStep(Base):
+    __tablename__ = "custom_job_run_step"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    run_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job_run.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_id: Mapped[str] = mapped_column(String, nullable=False)
+    step_key: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[CustomJobStepStatus] = mapped_column(
+        Enum(CustomJobStepStatus, native_enum=False), nullable=False
+    )
+    started_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_json: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+
+    run: Mapped["CustomJobRun"] = relationship("CustomJobRun", back_populates="steps")
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "step_index", name="uq_custom_job_run_step_index"),
+        UniqueConstraint("run_id", "step_id", name="uq_custom_job_run_step_id"),
+        Index("ix_custom_job_run_step_run", "run_id", "step_index"),
+    )
+
+
+class CustomJobTriggerEvent(Base):
+    __tablename__ = "custom_job_trigger_event"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    custom_job_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_type: Mapped[str] = mapped_column(String, nullable=False)
+    source_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String, nullable=False)
+    dedupe_key_prefix: Mapped[str | None] = mapped_column(String, nullable=True)
+    event_time: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    payload_json: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+    status: Mapped[CustomJobTriggerEventStatus] = mapped_column(
+        Enum(CustomJobTriggerEventStatus, native_enum=False), nullable=False
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    custom_job: Mapped["CustomJob"] = relationship(
+        "CustomJob", back_populates="trigger_events"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "custom_job_id",
+            "dedupe_key",
+            name="uq_custom_job_trigger_event_dedupe",
+        ),
+        Index(
+            "ix_custom_job_trigger_event_claim",
+            "custom_job_id",
+            "status",
+            "event_time",
+        ),
+        Index("ix_custom_job_trigger_event_status", "status"),
+    )
+
+
+class CustomJobTriggerState(Base):
+    __tablename__ = "custom_job_trigger_state"
+
+    custom_job_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source_key: Mapped[str] = mapped_column(String, primary_key=True)
+    cursor_json: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    custom_job: Mapped["CustomJob"] = relationship(
+        "CustomJob", back_populates="trigger_states"
+    )
+
+
+class CustomJobAuditLog(Base):
+    __tablename__ = "custom_job_audit_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    custom_job_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("custom_job.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    details_json: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB(), nullable=True
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    custom_job: Mapped["CustomJob"] = relationship(
+        "CustomJob", back_populates="audit_logs"
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_custom_job_audit_log_job_created",
+            "custom_job_id",
+            desc("created_at"),
+        ),
     )
 
 

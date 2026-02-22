@@ -124,7 +124,7 @@ export default function TagManager({
             className="inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
           >
             <SvgTag size={10} className="stroke-text-03" />
-            <Text as="span" figureSmallLabel text02>
+            <Text as="span" figureSmallLabel text02 className="text-sm">
               {tag.name}
             </Text>
             <button
@@ -147,7 +147,7 @@ export default function TagManager({
               )}
             >
               <SvgPlus size={10} className="stroke-text-03" />
-              <Text as="span" figureSmallLabel text02>
+              <Text as="span" figureSmallLabel text02 className="text-sm">
                 Add tag
               </Text>
             </button>
@@ -189,7 +189,7 @@ export default function TagManager({
                     as="p"
                     secondaryBody
                     text03
-                    className="px-2 py-1 italic"
+                    className="px-2 py-1 text-sm italic"
                   >
                     No matching tags
                   </Text>

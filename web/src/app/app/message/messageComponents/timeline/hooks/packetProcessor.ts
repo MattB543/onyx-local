@@ -1,3 +1,10 @@
+import { CitationMap } from "@/app/app/interfaces";
+import { parseToolKey } from "@/app/app/message/messageComponents/toolDisplayHelpers";
+import {
+  isActualToolCallPacket,
+  isToolPacket,
+  isDisplayPacket,
+} from "@/app/app/services/packetUtils";
 import {
   Packet,
   PacketType,
@@ -11,14 +18,7 @@ import {
   ImageGenerationToolDelta,
   MessageStart,
 } from "@/app/app/services/streamingModels";
-import { CitationMap } from "@/app/app/interfaces";
 import { OnyxDocument } from "@/lib/search/interfaces";
-import {
-  isActualToolCallPacket,
-  isToolPacket,
-  isDisplayPacket,
-} from "@/app/app/services/packetUtils";
-import { parseToolKey } from "@/app/app/message/messageComponents/toolDisplayHelpers";
 
 // Re-export parseToolKey for consumers that import from this module
 export { parseToolKey };
@@ -143,6 +143,7 @@ const CONTENT_PACKET_TYPES_SET = new Set<PacketType>([
   PacketType.CRM_CREATE_TOOL_START,
   PacketType.CRM_UPDATE_TOOL_START,
   PacketType.CRM_LOG_INTERACTION_TOOL_START,
+  PacketType.CALENDAR_SEARCH_TOOL_START,
   PacketType.FILE_READER_START,
   PacketType.FETCH_TOOL_START,
   PacketType.MEMORY_TOOL_START,

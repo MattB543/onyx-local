@@ -39,6 +39,9 @@ from onyx.tools.tool_implementations.images.image_generation_tool import (
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
@@ -198,11 +201,14 @@ def build_system_prompt(
     tools: Sequence[Tool] | None = None,
     should_cite_documents: bool = False,
     include_all_guidance: bool = False,
+    timezone: str | None = None,
 ) -> str:
     """Should only be called with the default behavior system prompt.
     If the user has replaced the default behavior prompt with their custom agent prompt, do not call this function.
     """
-    system_prompt = handle_onyx_date_awareness(base_system_prompt, datetime_aware)
+    system_prompt = handle_onyx_date_awareness(
+        base_system_prompt, datetime_aware, timezone=timezone
+    )
 
     # Replace citation guidance placeholder if present
     system_prompt, should_append_citation_guidance = replace_citation_guidance_tag(
@@ -287,5 +293,16 @@ def build_system_prompt(
         has_crm = any(isinstance(tool, CrmSearchTool) for tool in tools)
         if has_crm or include_all_guidance:
             system_prompt += CRM_GUIDANCE
+
+        # When the user's timezone is known and the calendar tool is available,
+        # instruct the LLM to always pass the timezone to search_calendar.
+        has_calendar = any(
+            isinstance(tool, SearchCalendarTool) for tool in tools
+        )
+        if has_calendar and timezone:
+            system_prompt += (
+                f'\n\nWhen using the search_calendar tool, always include '
+                f'the timezone parameter set to "{timezone}".'
+            )
 
     return system_prompt

@@ -1,6 +1,9 @@
 import { cn } from "@/lib/utils";
 
-const AVATAR_COLORS = [
+const AVATAR_COLORS: [
+  { bg: string; text: string },
+  ...{ bg: string; text: string }[],
+] = [
   { bg: "bg-blue-100", text: "text-blue-700" },
   { bg: "bg-green-100", text: "text-green-700" },
   { bg: "bg-purple-100", text: "text-purple-700" },
@@ -12,7 +15,7 @@ const AVATAR_COLORS = [
 ];
 
 const sizeClasses = {
-  sm: "w-8 h-8 text-xs",
+  sm: "w-8 h-8 text-sm",
   md: "w-10 h-10 text-sm",
   lg: "w-12 h-12 text-base",
 };
@@ -34,8 +37,8 @@ export default function ContactAvatar({
   const colorIndex =
     ((firstName?.charCodeAt(0) || 0) + (lastName?.charCodeAt(0) || 0)) %
     AVATAR_COLORS.length;
-  // colorIndex is always valid (modulo AVATAR_COLORS.length)
-  const color = AVATAR_COLORS[colorIndex]!;
+  const fallbackColor = AVATAR_COLORS[0];
+  const color = AVATAR_COLORS[colorIndex] || fallbackColor;
 
   return (
     <div

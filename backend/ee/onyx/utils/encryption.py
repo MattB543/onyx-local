@@ -31,7 +31,10 @@ def _get_trimmed_key(key: str) -> bytes:
 
 def _encrypt_string(input_str: str) -> bytes:
     if not ENCRYPTION_KEY_SECRET:
-        return input_str.encode()
+        raise RuntimeError(
+            "ENCRYPTION_KEY_SECRET is not set. Refusing to store credentials "
+            "as plaintext. Set this environment variable before creating credentials."
+        )
 
     key = _get_trimmed_key(ENCRYPTION_KEY_SECRET)
     iv = urandom(16)
@@ -47,7 +50,10 @@ def _encrypt_string(input_str: str) -> bytes:
 
 def _decrypt_bytes(input_bytes: bytes) -> str:
     if not ENCRYPTION_KEY_SECRET:
-        return input_bytes.decode()
+        raise RuntimeError(
+            "ENCRYPTION_KEY_SECRET is not set. Cannot decrypt credentials. "
+            "Set this environment variable before starting the server."
+        )
 
     # AES-CBC ciphertext is always at least 32 bytes (16-byte IV + 16-byte block).
     # Shorter data was stored before encryption was enabled — return as plain text.

@@ -1,14 +1,12 @@
-import { Packet,
+import {
+  Packet,
   MessageDelta,
   MessageStart,
   PacketType,
-  StreamingCitation } from "@/app/app/services/streamingModels";
+  StreamingCitation,
+} from "@/app/app/services/streamingModels";
 
-
-export function isToolPacket(
-  packet: Packet,
-  includeSectionEnd = true
-) {
+export function isToolPacket(packet: Packet, includeSectionEnd = true) {
   let toolPacketTypes = [
     PacketType.SEARCH_TOOL_START,
     PacketType.SEARCH_TOOL_QUERIES_DELTA,
@@ -25,6 +23,8 @@ export function isToolPacket(
     PacketType.CRM_UPDATE_TOOL_DELTA,
     PacketType.CRM_LOG_INTERACTION_TOOL_START,
     PacketType.CRM_LOG_INTERACTION_TOOL_DELTA,
+    PacketType.CALENDAR_SEARCH_TOOL_START,
+    PacketType.CALENDAR_SEARCH_TOOL_DELTA,
     PacketType.FILE_READER_START,
     PacketType.FILE_READER_RESULT,
     PacketType.REASONING_START,
@@ -133,7 +133,10 @@ export function groupPacketsByTurnIndex(
       if (!acc.has(key)) {
         acc.set(key, { turn_index, tab_index, packets: [] });
       }
-      acc.get(key)!.packets.push(packet);
+      const group = acc.get(key);
+      if (group) {
+        group.packets.push(packet);
+      }
       return acc;
     },
     new Map()

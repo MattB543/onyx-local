@@ -1,32 +1,33 @@
 import React, { JSX, memo, useMemo } from "react";
+
 import {
   ChatPacket,
   Packet,
   PacketType,
   ReasoningPacket,
   StopReason,
+  SearchToolStart,
 } from "../../services/streamingModels";
+
 import {
   FullChatState,
   MessageRenderer,
   RenderType,
-  RendererResult,
   RendererOutput,
 } from "./interfaces";
-import { MessageTextRenderer } from "./renderers/MessageTextRenderer";
-import { ImageToolRenderer } from "./renderers/ImageToolRenderer";
-import { PythonToolRenderer } from "./timeline/renderers/code/PythonToolRenderer";
-import { ReasoningRenderer } from "./timeline/renderers/reasoning/ReasoningRenderer";
 import { CustomToolRenderer } from "./renderers/CustomToolRenderer";
-import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
-import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
-import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
+import { ImageToolRenderer } from "./renderers/ImageToolRenderer";
+import { MessageTextRenderer } from "./renderers/MessageTextRenderer";
+import { PythonToolRenderer } from "./timeline/renderers/code/PythonToolRenderer";
 import { CrmToolRenderer } from "./timeline/renderers/crm/CrmToolRenderer";
 import { DeepResearchPlanRenderer } from "./timeline/renderers/deepresearch/DeepResearchPlanRenderer";
 import { ResearchAgentRenderer } from "./timeline/renderers/deepresearch/ResearchAgentRenderer";
-import { WebSearchToolRenderer } from "./timeline/renderers/search/WebSearchToolRenderer";
+import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
+import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
+import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
+import { ReasoningRenderer } from "./timeline/renderers/reasoning/ReasoningRenderer";
 import { InternalSearchToolRenderer } from "./timeline/renderers/search/InternalSearchToolRenderer";
-import { SearchToolStart } from "../../services/streamingModels";
+import { WebSearchToolRenderer } from "./timeline/renderers/search/WebSearchToolRenderer";
 
 // Different types of chat packets using discriminated unions
 export interface GroupedPackets {
@@ -68,7 +69,8 @@ function isCrmToolPacket(packet: Packet) {
     packet.obj.type === PacketType.CRM_SEARCH_TOOL_START ||
     packet.obj.type === PacketType.CRM_CREATE_TOOL_START ||
     packet.obj.type === PacketType.CRM_UPDATE_TOOL_START ||
-    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_START
+    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_START ||
+    packet.obj.type === PacketType.CALENDAR_SEARCH_TOOL_START
   );
 }
 
@@ -115,7 +117,7 @@ function isResearchAgentPacket(packet: Packet) {
 
 export function findRenderer(
   groupedPackets: GroupedPackets
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): MessageRenderer<any, any> | null {
   // Check for chat messages first
   if (groupedPackets.packets.some((packet) => isChatPacket(packet))) {

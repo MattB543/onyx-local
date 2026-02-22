@@ -4,7 +4,10 @@ import { Form, Formik } from "formik";
 import { useState } from "react";
 import * as Yup from "yup";
 
-import { createCrmInteraction, CrmInteractionType } from "@/app/app/crm/crmService";
+import {
+  createCrmInteraction,
+  CrmInteractionType,
+} from "@/app/app/crm/crmService";
 import { cn } from "@/lib/utils";
 import Button from "@/refresh-components/buttons/Button";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
@@ -86,7 +89,7 @@ export default function LogInteractionModal({
               <Modal.Body>
                 <div className="flex w-full flex-col gap-4">
                   <div>
-                    <Text as="p" secondaryBody text03 className="mb-2">
+                    <Text as="p" secondaryBody text03 className="mb-2 text-sm">
                       Type
                     </Text>
                     <div className="flex gap-2">
@@ -103,7 +106,7 @@ export default function LogInteractionModal({
                           )}
                         >
                           <InteractionTypeIcon type={type} size={18} />
-                          <span className="text-xs capitalize">{type}</span>
+                          <span className="text-sm capitalize">{type}</span>
                         </button>
                       ))}
                     </div>
@@ -120,7 +123,11 @@ export default function LogInteractionModal({
                   />
 
                   {status && (
-                    <Text as="p" secondaryBody className="text-status-error-03">
+                    <Text
+                      as="p"
+                      secondaryBody
+                      className="text-sm text-status-error-03"
+                    >
                       {status}
                     </Text>
                   )}

@@ -12,6 +12,7 @@ CRM_UPDATE_TOOL_NAME = "crm_update"
 CRM_LOG_INTERACTION_TOOL_NAME = "crm_log_interaction"
 CRM_LIST_TOOL_NAME = "crm_list"
 CRM_GET_TOOL_NAME = "crm_get"
+CALENDAR_SEARCH_TOOL_NAME = "search_calendar"
 
 # In-code tool IDs that also correspond to the tool's name when associated with a persona
 SEARCH_TOOL_ID = "SearchTool"
@@ -26,6 +27,7 @@ CRM_UPDATE_TOOL_ID = "CrmUpdateTool"
 CRM_LOG_INTERACTION_TOOL_ID = "CrmLogInteractionTool"
 CRM_LIST_TOOL_ID = "CrmListTool"
 CRM_GET_TOOL_ID = "CrmGetTool"
+CALENDAR_SEARCH_TOOL_ID = "SearchCalendarTool"
 
 # Tool names as referenced by tool results / tool calls (read_file)
 FILE_READER_TOOL_NAME = "read_file"

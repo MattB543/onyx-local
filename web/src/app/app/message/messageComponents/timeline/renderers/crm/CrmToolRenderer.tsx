@@ -1,17 +1,20 @@
 "use client";
 
-import {
-  CrmToolPacket,
-  PacketType,
-} from "@/app/app/services/streamingModels";
+import { JSX } from "react";
+
+import { BlinkingDot } from "@/app/app/message/BlinkingDot";
 import {
   MessageRenderer,
   RenderType,
 } from "@/app/app/message/messageComponents/interfaces";
-import { BlinkingDot } from "@/app/app/message/BlinkingDot";
+import {
+  CalendarToolPacket,
+  CrmToolPacket,
+  PacketType,
+} from "@/app/app/services/streamingModels";
 import Text from "@/refresh-components/texts/Text";
+
 import { SvgUser } from "@opal/icons";
-import { JSX } from "react";
 
 function getCrmToolLabel(packetType: PacketType): string {
   switch (packetType) {
@@ -23,6 +26,8 @@ function getCrmToolLabel(packetType: PacketType): string {
       return "CRM Update";
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return "CRM Log Interaction";
+    case PacketType.CALENDAR_SEARCH_TOOL_START:
+      return "Calendar Search";
     default:
       return "CRM";
   }
@@ -38,6 +43,8 @@ function getDeltaType(startType: PacketType): PacketType | null {
       return PacketType.CRM_UPDATE_TOOL_DELTA;
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return PacketType.CRM_LOG_INTERACTION_TOOL_DELTA;
+    case PacketType.CALENDAR_SEARCH_TOOL_START:
+      return PacketType.CALENDAR_SEARCH_TOOL_DELTA;
     default:
       return null;
   }
@@ -110,7 +117,7 @@ function renderPayload(payload: Record<string, unknown>): JSX.Element {
   if (entries.length === 0) {
     return (
       <Text as="p" text03 className="text-sm">
-        No CRM payload returned.
+        No tool payload returned.
       </Text>
     );
   }
@@ -137,12 +144,10 @@ function renderPayload(payload: Record<string, unknown>): JSX.Element {
 /**
  * CrmToolRenderer - Renders CRM built-in tool execution state.
  */
-export const CrmToolRenderer: MessageRenderer<CrmToolPacket, Record<string, never>> = ({
-  packets,
-  stopPacketSeen,
-  renderType,
-  children,
-}) => {
+export const CrmToolRenderer: MessageRenderer<
+  CrmToolPacket | CalendarToolPacket,
+  Record<string, never>
+> = ({ packets, stopPacketSeen, renderType, children }) => {
   const firstPacket = packets[0];
   const startType = firstPacket?.obj.type as PacketType | undefined;
 
@@ -177,7 +182,7 @@ export const CrmToolRenderer: MessageRenderer<CrmToolPacket, Record<string, neve
     <BlinkingDot />
   ) : (
     <Text as="p" text03 className="text-sm">
-      No CRM payload returned.
+      No tool payload returned.
     </Text>
   );
 

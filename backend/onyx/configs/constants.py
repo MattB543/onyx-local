@@ -443,6 +443,16 @@ class OnyxRedisLocks:
     CLOUD_BEAT_TASK_GENERATOR_LOCK = "da_lock:cloud_beat_task_generator"
     CLOUD_CHECK_ALEMBIC_BEAT_LOCK = "da_lock:cloud_check_alembic"
 
+    # Custom jobs
+    CHECK_CUSTOM_JOBS_BEAT_LOCK = "da_lock:check_custom_jobs_beat"
+    CHECK_CUSTOM_JOB_TRIGGER_EVENTS_BEAT_LOCK = (
+        "da_lock:check_custom_job_trigger_events_beat"
+    )
+    POLL_CUSTOM_JOB_TRIGGERS_BEAT_LOCK = "da_lock:poll_custom_job_triggers_beat"
+    CLEANUP_CUSTOM_JOB_HISTORY_BEAT_LOCK = (
+        "da_lock:cleanup_custom_job_history_beat"
+    )
+
     # User file processing
     USER_FILE_PROCESSING_BEAT_LOCK = "da_lock:check_user_file_processing_beat"
     USER_FILE_PROCESSING_LOCK_PREFIX = "da_lock:user_file_processing"
@@ -524,6 +534,11 @@ class OnyxCeleryTask:
     CHECK_FOR_DOC_PERMISSIONS_SYNC = "check_for_doc_permissions_sync"
     CHECK_FOR_EXTERNAL_GROUP_SYNC = "check_for_external_group_sync"
     CHECK_FOR_AUTO_LLM_UPDATE = "check_for_auto_llm_update"
+    CHECK_FOR_CUSTOM_JOBS = "check_for_custom_jobs"
+    CHECK_FOR_CUSTOM_JOB_TRIGGER_EVENTS = "check_for_custom_job_trigger_events"
+    POLL_CUSTOM_JOB_TRIGGERS = "poll_custom_job_triggers"
+    CLEANUP_CUSTOM_JOB_HISTORY = "cleanup_custom_job_history"
+    RUN_CUSTOM_JOB = "run_custom_job"
 
     # User file processing
     CHECK_FOR_USER_FILE_PROCESSING = "check_for_user_file_processing"

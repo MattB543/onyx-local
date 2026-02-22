@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { CrmContactStatus } from "@/app/app/crm/crmService";
+import { CrmContactStage } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
+import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { cn } from "@/lib/utils";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
@@ -20,27 +21,29 @@ import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
 import CreateContactModal from "@/refresh-pages/crm/components/CreateContactModal";
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
+import {
+  DEFAULT_CRM_STAGE_OPTIONS,
+  formatCrmLabel,
+} from "@/refresh-pages/crm/crmOptions";
 
 import { SvgPlusCircle, SvgTag, SvgUser } from "@opal/icons";
 
 const PAGE_SIZE = 25;
-const CONTACT_STATUSES: CrmContactStatus[] = [
-  "lead",
-  "active",
-  "inactive",
-  "archived",
-];
-
-function formatLabel(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 export default function CrmContactsPage() {
   const searchParams = useSearchParams();
   const organizationIdFilter = searchParams.get("organization_id") ?? undefined;
+  const { crmSettings } = useCrmSettings();
+  const stageOptions = useMemo(
+    () =>
+      crmSettings?.contact_stage_options?.length
+        ? crmSettings.contact_stage_options
+        : DEFAULT_CRM_STAGE_OPTIONS,
+    [crmSettings?.contact_stage_options]
+  );
 
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState<CrmContactStatus | "all">(
+  const [statusFilter, setStatusFilter] = useState<CrmContactStage | "all">(
     "all"
   );
   const [pageNum, setPageNum] = useState(0);
@@ -67,11 +70,12 @@ export default function CrmContactsPage() {
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="lg">
+      <SettingsLayouts.Root width="xl">
         <SettingsLayouts.Header
           icon={SvgUser}
           title="CRM"
           description="Manage contacts and organizations."
+          titleIconInline
         >
           <CrmNav
             rightContent={
@@ -90,7 +94,7 @@ export default function CrmContactsPage() {
         <SettingsLayouts.Body>
           {organizationIdFilter && (
             <Card variant="secondary" className="gap-2">
-              <Text as="p" secondaryBody text03>
+              <Text as="p" secondaryBody text03 className="text-sm">
                 Showing contacts linked to the selected organization.
               </Text>
               <div className="flex justify-end">
@@ -115,34 +119,39 @@ export default function CrmContactsPage() {
             <InputSelect
               value={statusFilter}
               onValueChange={(value) => {
-                setStatusFilter(value as CrmContactStatus | "all");
+                setStatusFilter(value as CrmContactStage | "all");
                 setPageNum(0);
               }}
             >
               <InputSelect.Trigger placeholder="Filter by status" />
               <InputSelect.Content>
                 <InputSelect.Item value="all">All statuses</InputSelect.Item>
-                {CONTACT_STATUSES.map((status) => (
+                {stageOptions.map((status) => (
                   <InputSelect.Item key={status} value={status}>
-                    {formatLabel(status)}
+                    {formatCrmLabel(status)}
                   </InputSelect.Item>
                 ))}
               </InputSelect.Content>
             </InputSelect>
 
-            <Text as="p" secondaryAction text03 className="md:justify-self-end">
+            <Text
+              as="p"
+              secondaryAction
+              text03
+              className="text-sm md:justify-self-end"
+            >
               {totalItems} total
             </Text>
           </div>
 
           {error && (
-            <Text as="p" secondaryBody className="text-status-error-03">
+            <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load contacts.
             </Text>
           )}
 
           {isLoading ? (
-            <Text as="p" secondaryBody text03>
+            <Text as="p" secondaryBody text03 className="text-sm">
               Loading contacts...
             </Text>
           ) : contacts.length === 0 ? (
@@ -169,60 +178,83 @@ export default function CrmContactsPage() {
                   >
                     <Card
                       variant="secondary"
-                      className="gap-2 transition-colors hover:bg-background-tint-02"
+                      className="gap-3 transition-colors hover:bg-background-tint-02"
                     >
-                      <div className="flex items-start gap-3">
-                        <ContactAvatar
-                          firstName={contact.first_name}
-                          lastName={contact.last_name}
-                        />
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <ContactAvatar
+                            firstName={contact.first_name}
+                            lastName={contact.last_name}
+                          />
 
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                             <Text as="p" mainUiAction text02>
                               {contact.full_name || contact.first_name}
                             </Text>
-                            <StatusBadge status={contact.status} />
+
+                            <Text
+                              as="p"
+                              secondaryBody
+                              text03
+                              className="text-sm"
+                            >
+                              {contact.email ||
+                                contact.phone ||
+                                "No contact info"}
+                            </Text>
+
+                            <Text
+                              as="p"
+                              secondaryBody
+                              text03
+                              className="text-sm"
+                            >
+                              {infoRow}
+                            </Text>
+
+                            {visibleTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {visibleTags.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
+                                    )}
+                                  >
+                                    <SvgTag
+                                      size={10}
+                                      className="stroke-text-03"
+                                    />
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text03
+                                      className="text-sm"
+                                    >
+                                      {tag.name}
+                                    </Text>
+                                  </span>
+                                ))}
+
+                                {remainingTagCount > 0 && (
+                                  <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
+                                    <Text
+                                      as="span"
+                                      figureSmallLabel
+                                      text03
+                                      className="text-sm"
+                                    >
+                                      +{remainingTagCount}
+                                    </Text>
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
+                        </div>
 
-                          <Text as="p" secondaryBody text03>
-                            {contact.email ||
-                              contact.phone ||
-                              "No contact info"}
-                          </Text>
-
-                          <Text as="p" secondaryBody text03>
-                            {infoRow}
-                          </Text>
-
-                          {visibleTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {visibleTags.map((tag) => (
-                                <span
-                                  key={tag.id}
-                                  className={cn(
-                                    "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
-                                  )}
-                                >
-                                  <SvgTag
-                                    size={10}
-                                    className="stroke-text-03"
-                                  />
-                                  <Text as="span" figureSmallLabel text03>
-                                    {tag.name}
-                                  </Text>
-                                </span>
-                              ))}
-
-                              {remainingTagCount > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
-                                  <Text as="span" figureSmallLabel text03>
-                                    +{remainingTagCount}
-                                  </Text>
-                                </span>
-                              )}
-                            </div>
-                          )}
+                        <div className="shrink-0">
+                          <StatusBadge status={contact.status} />
                         </div>
                       </div>
                     </Card>

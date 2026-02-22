@@ -36,6 +36,8 @@ from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_interaction
 
+ATTENDEES_NOT_PROVIDED = object()
+
 
 class CrmLogInteractionTool(Tool[None]):
     NAME = "crm_log_interaction"
@@ -124,7 +126,9 @@ class CrmLogInteractionTool(Tool[None]):
                             "description": (
                                 "People who attended. Each item can provide an email or name "
                                 "for automatic resolution to an existing contact or team member. "
-                                "The system will report what matched and at what confidence level."
+                                "The system will report what matched and at what confidence level. "
+                                "If omitted, defaults to the invoking user plus primary contact; "
+                                "pass [] for explicitly no attendees."
                             ),
                             "items": {
                                 "type": "object",
@@ -341,11 +345,15 @@ class CrmLogInteractionTool(Tool[None]):
         primary_contact_id = parse_uuid_maybe(
             llm_kwargs.get("primary_contact_id"), "primary_contact_id"
         )
+        actor_user_id = parse_uuid_maybe(self._user_id, "user_id")
 
-        attendees_raw = llm_kwargs.get("attendees", [])
-        if attendees_raw is None:
-            attendees_raw = []
-        if not isinstance(attendees_raw, list):
+        attendees_raw = llm_kwargs.get("attendees", ATTENDEES_NOT_PROVIDED)
+        attendees_were_omitted = attendees_raw is ATTENDEES_NOT_PROVIDED
+        if attendees_were_omitted or attendees_raw is None:
+            attendees_to_resolve: list[Any] = []
+        elif isinstance(attendees_raw, list):
+            attendees_to_resolve = attendees_raw
+        else:
             raise ToolCallException(
                 message=f"Invalid attendees payload in {self.name}: {type(attendees_raw)}",
                 llm_facing_message="'attendees' must be an array.",
@@ -372,7 +380,7 @@ class CrmLogInteractionTool(Tool[None]):
             needs_confirmation: list[dict[str, Any]] = []
             resolution_details: list[dict[str, Any]] = []
 
-            for attendee in attendees_raw:
+            for attendee in attendees_to_resolve:
                 role = CrmAttendeeRole.ATTENDEE
                 token_for_resolution: str | None = None
                 user_id: UUID | None = None
@@ -545,15 +553,20 @@ class CrmLogInteractionTool(Tool[None]):
                 elif existing_role != CrmAttendeeRole.ORGANIZER and next_role == CrmAttendeeRole.ORGANIZER:
                     deduped_attendees[key] = next_role
 
-            # Auto-add primary contact attendee if provided and absent.
+            # Default attendees only when 'attendees' is omitted entirely.
+            # Explicit [] or null means "no attendees".
             effective_primary_contact_id = primary_contact_id or contact_id
-            if effective_primary_contact_id:
+            if attendees_were_omitted:
+                if actor_user_id is not None:
+                    deduped_attendees[(actor_user_id, None)] = CrmAttendeeRole.ORGANIZER
+
                 if contact_id is None:
                     contact_id = effective_primary_contact_id
 
-                key = (None, effective_primary_contact_id)
-                if key not in deduped_attendees:
-                    deduped_attendees[key] = CrmAttendeeRole.ATTENDEE
+                if effective_primary_contact_id is not None:
+                    key = (None, effective_primary_contact_id)
+                    if key not in deduped_attendees:
+                        deduped_attendees[key] = CrmAttendeeRole.ATTENDEE
 
             if needs_confirmation:
                 payload = {
@@ -587,7 +600,7 @@ class CrmLogInteractionTool(Tool[None]):
                 db_session=db_session,
                 contact_id=contact_id,
                 organization_id=organization_id,
-                logged_by=parse_uuid_maybe(self._user_id, "user_id"),
+                logged_by=actor_user_id,
                 interaction_type=interaction_type,
                 title=title,
                 summary=summary,

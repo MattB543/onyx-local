@@ -1,16 +1,17 @@
 "use client";
 
 import useSWR from "swr";
+
 import {
   CrmContact,
-  CrmContactStatus,
+  CrmContactStage,
   PaginatedReturn,
   listCrmContacts,
 } from "@/app/app/crm/crmService";
 
 interface UseCrmContactsParams {
   q?: string;
-  status?: CrmContactStatus;
+  status?: CrmContactStage;
   organizationId?: string;
   pageNum: number;
   pageSize: number;
@@ -23,8 +24,17 @@ export function useCrmContacts({
   pageNum,
   pageSize,
 }: UseCrmContactsParams) {
-  const { data, error, isLoading, mutate } = useSWR<PaginatedReturn<CrmContact>>(
-    ["crm-contacts", q ?? "", status ?? "", organizationId ?? "", pageNum, pageSize],
+  const { data, error, isLoading, mutate } = useSWR<
+    PaginatedReturn<CrmContact>
+  >(
+    [
+      "crm-contacts",
+      q ?? "",
+      status ?? "",
+      organizationId ?? "",
+      pageNum,
+      pageSize,
+    ],
     () =>
       listCrmContacts({
         q: q || undefined,

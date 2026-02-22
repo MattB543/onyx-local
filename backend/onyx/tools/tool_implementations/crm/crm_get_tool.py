@@ -9,12 +9,14 @@ from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import get_contact_by_id
+from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_interaction_attendees
 from onyx.db.crm import get_interaction_by_id
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_tags
 from onyx.db.crm import get_tag_by_id
+from onyx.db.crm import list_contacts
 from onyx.db.crm import list_interactions
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmGetToolDelta
@@ -199,7 +201,11 @@ class CrmGetTool(Tool[None]):
         result: dict[str, Any] = {
             "status": "ok",
             "entity_type": "contact",
-            "contact": serialize_contact(contact, tags=tags),
+            "contact": serialize_contact(
+                contact,
+                owner_ids=get_contact_owner_ids(contact.id, db_session),
+                tags=tags,
+            ),
         }
 
         if "organization" in includes and contact.organization_id:
@@ -248,8 +254,6 @@ class CrmGetTool(Tool[None]):
         }
 
         if "contacts" in includes:
-            from onyx.db.crm import list_contacts
-
             contacts, total = list_contacts(
                 db_session=db_session,
                 page_num=0,
@@ -259,7 +263,11 @@ class CrmGetTool(Tool[None]):
             result["contacts"] = {
                 "total": total,
                 "items": [
-                    serialize_contact(c, tags=get_contact_tags(c.id, db_session))
+                    serialize_contact(
+                        c,
+                        owner_ids=get_contact_owner_ids(c.id, db_session),
+                        tags=get_contact_tags(c.id, db_session),
+                    )
                     for c in contacts
                 ],
             }
@@ -308,7 +316,9 @@ class CrmGetTool(Tool[None]):
             contact = get_contact_by_id(interaction.contact_id, db_session)
             if contact:
                 result["contact"] = serialize_contact(
-                    contact, tags=get_contact_tags(contact.id, db_session)
+                    contact,
+                    owner_ids=get_contact_owner_ids(contact.id, db_session),
+                    tags=get_contact_tags(contact.id, db_session),
                 )
 
         if interaction.organization_id:

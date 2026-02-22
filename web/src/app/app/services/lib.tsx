@@ -1,11 +1,12 @@
+import { ReadonlyURLSearchParams } from "next/navigation";
+
+import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import {
-  Filters,
-  DocumentInfoPacket,
-  StreamStopInfo,
-} from "@/lib/search/interfaces";
-import { handleSSEStream } from "@/lib/search/streamingUtils";
-import { FeedbackType } from "@/app/app/interfaces";
+  WEB_SEARCH_TOOL_ID,
+  SEARCH_TOOL_ID,
+} from "@/app/app/components/tools/constants";
 import {
+  FeedbackType,
   BackendMessage,
   DocumentsResponse,
   FileDescriptor,
@@ -17,12 +18,15 @@ import {
   StreamingError,
   ToolCallMetadata,
   UserKnowledgeFilePacket,
-} from "../interfaces";
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
-import { ReadonlyURLSearchParams } from "next/navigation";
+} from "@/app/app/interfaces";
+import {
+  Filters,
+  DocumentInfoPacket,
+  StreamStopInfo,
+} from "@/lib/search/interfaces";
+import { handleSSEStream } from "@/lib/search/streamingUtils";
+
 import { SEARCH_PARAM_NAMES } from "./searchParams";
-import { WEB_SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
-import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { Packet } from "./streamingModels";
 
 export async function updateLlmOverrideForChatSession(
@@ -163,6 +167,7 @@ export async function* sendMessage({
         : null,
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
   const body = JSON.stringify(payload);
@@ -360,9 +365,12 @@ export function processRawChatHistory(
       if (!parentMessageChildrenMap.has(messageInfo.parent_message)) {
         parentMessageChildrenMap.set(messageInfo.parent_message, []);
       }
-      parentMessageChildrenMap
-        .get(messageInfo.parent_message)!
-        .push(messageInfo.message_id);
+      const parentChildren = parentMessageChildrenMap.get(
+        messageInfo.parent_message
+      );
+      if (parentChildren) {
+        parentChildren.push(messageInfo.message_id);
+      }
     }
   });
 

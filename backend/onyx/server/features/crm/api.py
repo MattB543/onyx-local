@@ -10,12 +10,18 @@ from fastapi import Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from onyx.auth.users import current_admin_user
 from onyx.auth.users import current_user
+from onyx.db.crm import add_interaction_attendees
+from onyx.db.crm import add_tag_to_contact
+from onyx.db.crm import add_tag_to_organization
 from onyx.db.crm import create_contact
 from onyx.db.crm import create_interaction
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
+from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
+from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_interaction_attendees
 from onyx.db.crm import get_or_create_crm_settings
@@ -32,12 +38,9 @@ from onyx.db.crm import search_crm_entities
 from onyx.db.crm import update_contact
 from onyx.db.crm import update_crm_settings
 from onyx.db.crm import update_organization
-from onyx.db.crm import add_interaction_attendees
-from onyx.db.crm import add_tag_to_contact
-from onyx.db.crm import add_tag_to_organization
+from onyx.db.crm import validate_stage_string
 from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmContactStatus
 from onyx.db.models import User
 from onyx.server.documents.models import PaginatedReturn
 from onyx.server.features.crm.models import CrmContactCreateRequest
@@ -84,8 +87,13 @@ def _load_tag_or_404(tag_id: UUID, db_session: Session):
 
 
 def _serialize_contact(contact, db_session: Session) -> CrmContactSnapshot:
+    owner_ids = get_contact_owner_ids(contact.id, db_session)
     tags = get_contact_tags(contact.id, db_session)
-    return CrmContactSnapshot.from_model(contact=contact, tags=tags)
+    return CrmContactSnapshot.from_model(
+        contact=contact,
+        owner_ids=owner_ids,
+        tags=tags,
+    )
 
 
 def _serialize_organization(organization, db_session: Session) -> CrmOrganizationSnapshot:
@@ -96,6 +104,12 @@ def _serialize_organization(organization, db_session: Session) -> CrmOrganizatio
 def _serialize_interaction(interaction, db_session: Session) -> CrmInteractionSnapshot:
     attendees = get_interaction_attendees(interaction.id, db_session)
     return CrmInteractionSnapshot.from_model(interaction=interaction, attendees=attendees)
+
+
+def _ensure_user_exists(user_id: UUID, db_session: Session) -> None:
+    if db_session.get(User, user_id) is not None:
+        return
+    raise HTTPException(status_code=404, detail=f"CRM user not found: {user_id}")
 
 
 @router.get("/settings")
@@ -111,7 +125,7 @@ def get_settings(
 def patch_settings(
     settings_patch_request: CrmSettingsPatchRequest,
     db_session: Session = Depends(get_session),
-    user: User = Depends(current_user),
+    user: User = Depends(current_admin_user),
 ) -> CrmSettingsSnapshot:
     patches = settings_patch_request.model_dump(exclude_unset=True)
     settings = update_crm_settings(
@@ -161,7 +175,7 @@ def search_entities(
 @router.get("/contacts")
 def get_contacts(
     q: str | None = Query(None, description="Optional query filter."),
-    status: CrmContactStatus | None = Query(
+    status: str | None = Query(
         None,
         description="Filter by CRM contact status.",
     ),
@@ -174,12 +188,23 @@ def get_contacts(
     db_session: Session = Depends(get_session),
     _user: User = Depends(current_user),
 ) -> PaginatedReturn[CrmContactSnapshot]:
+    normalized_status: str | None = None
+    if status is not None:
+        allowed_stages = get_allowed_contact_stages(db_session)
+        try:
+            normalized_status = validate_stage_string(
+                status,
+                allowed_stages=allowed_stages,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     contacts, total_items = list_contacts(
         db_session=db_session,
         page_num=page_num,
         page_size=page_size,
         query=q,
-        status=status,
+        status=normalized_status,
         organization_id=organization_id,
         tag_ids=tag_ids,
     )
@@ -198,6 +223,31 @@ def post_contact(
     if contact_create_request.organization_id:
         _load_organization_or_404(contact_create_request.organization_id, db_session)
 
+    if "owner_ids" in contact_create_request.model_fields_set:
+        owner_ids = contact_create_request.owner_ids or []
+    else:
+        owner_ids = [user.id] if user.id is not None else []
+
+    for owner_uuid in owner_ids:
+        _ensure_user_exists(owner_uuid, db_session)
+
+    allowed_stages = get_allowed_contact_stages(db_session)
+    requested_status = (
+        contact_create_request.status
+        if "status" in contact_create_request.model_fields_set
+        else allowed_stages[0]
+    )
+    try:
+        normalized_stage = (
+            validate_stage_string(
+                requested_status,
+                allowed_stages=allowed_stages,
+            )
+            or allowed_stages[0]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     contact, created = create_contact(
         db_session=db_session,
         first_name=contact_create_request.first_name,
@@ -206,9 +256,10 @@ def post_contact(
         phone=contact_create_request.phone,
         title=contact_create_request.title,
         organization_id=contact_create_request.organization_id,
-        owner_id=contact_create_request.owner_id,
+        owner_ids=owner_ids,
         source=contact_create_request.source,
-        status=contact_create_request.status,
+        status=normalized_stage,
+        category=contact_create_request.category,
         notes=contact_create_request.notes,
         linkedin_url=contact_create_request.linkedin_url,
         location=contact_create_request.location,
@@ -244,6 +295,26 @@ def patch_contact(
     patches = contact_patch_request.model_dump(exclude_unset=True)
     if "organization_id" in patches and patches["organization_id"] is not None:
         _load_organization_or_404(patches["organization_id"], db_session)
+
+    if "status" in patches:
+        if patches["status"] is None:
+            raise HTTPException(status_code=400, detail="'status' cannot be null.")
+        allowed_stages = get_allowed_contact_stages(db_session)
+        try:
+            patches["status"] = validate_stage_string(
+                patches.get("status"),
+                allowed_stages=allowed_stages,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    if "owner_ids" in patches:
+        owner_ids_patch = patches["owner_ids"]
+        if owner_ids_patch is None:
+            patches["owner_ids"] = []
+        else:
+            for owner_uuid in owner_ids_patch:
+                _ensure_user_exists(owner_uuid, db_session)
 
     try:
         updated_contact = update_contact(
@@ -394,10 +465,23 @@ def post_interaction(
     if interaction_create_request.organization_id:
         _load_organization_or_404(interaction_create_request.organization_id, db_session)
 
+    attendees_were_omitted = (
+        "attendees" not in interaction_create_request.model_fields_set
+    )
+    attendee_inputs = interaction_create_request.attendees or []
+
     # Validate attendee references and collapse duplicate attendees before creating
     # the interaction to avoid partially persisted records.
     deduped_attendees: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
-    for attendee in interaction_create_request.attendees:
+    if attendees_were_omitted:
+        if user.id is not None:
+            deduped_attendees[(user.id, None)] = CrmAttendeeRole.ORGANIZER
+        if interaction_create_request.contact_id is not None:
+            deduped_attendees[(None, interaction_create_request.contact_id)] = (
+                CrmAttendeeRole.ATTENDEE
+            )
+
+    for attendee in attendee_inputs:
         if attendee.user_id:
             attendee_user = db_session.get(User, attendee.user_id)
             if attendee_user is None:

@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import cast
+from zoneinfo import ZoneInfo
 
 from langchain_core.messages import BaseMessage
 
@@ -27,8 +28,18 @@ def get_current_llm_day_time(
     include_day_of_week: bool = True,
     full_sentence: bool = True,
     include_hour_min: bool = False,
+    timezone: str | None = None,
 ) -> str:
-    current_datetime = datetime.now()
+    # Resolve the optional IANA timezone string to a ZoneInfo object.
+    tz_info = None
+    if timezone:
+        try:
+            tz_info = ZoneInfo(timezone)
+        except (KeyError, Exception):
+            # Invalid timezone string — fall back to server-local time.
+            tz_info = None
+
+    current_datetime = datetime.now(tz=tz_info)
     # Format looks like: "October 16, 2023 14:30" if include_hour_min, otherwise "October 16, 2023"
     formatted_datetime = (
         current_datetime.strftime("%B %d, %Y %H:%M")
@@ -36,11 +47,15 @@ def get_current_llm_day_time(
         else current_datetime.strftime("%B %d, %Y")
     )
     day_of_week = current_datetime.strftime("%A")
+
+    # Append the IANA timezone name when provided and valid.
+    tz_suffix = f" ({timezone})" if tz_info is not None else ""
+
     if full_sentence:
-        return f"The current day and time is {day_of_week} {formatted_datetime}"
+        return f"The current day and time is {day_of_week} {formatted_datetime}{tz_suffix}"
     if include_day_of_week:
-        return f"{day_of_week} {formatted_datetime}"
-    return f"{formatted_datetime}"
+        return f"{day_of_week} {formatted_datetime}{tz_suffix}"
+    return f"{formatted_datetime}{tz_suffix}"
 
 
 def replace_current_datetime_tag(
@@ -48,10 +63,12 @@ def replace_current_datetime_tag(
     *,
     full_sentence: bool = False,
     include_day_of_week: bool = True,
+    timezone: str | None = None,
 ) -> str:
     datetime_str = get_current_llm_day_time(
         full_sentence=full_sentence,
         include_day_of_week=include_day_of_week,
+        timezone=timezone,
     )
 
     if DATETIME_REPLACEMENT_PAT in prompt_str:
@@ -113,6 +130,7 @@ def handle_onyx_date_awareness(
     # We always replace the pattern {{CURRENT_DATETIME}} if it shows up
     # but if it doesn't show up and the prompt is datetime aware, add it to the prompt at the end.
     datetime_aware: bool = False,
+    timezone: str | None = None,
 ) -> str:
     """
     If there is a {{CURRENT_DATETIME}} tag, replace it with the current date and time no matter what.
@@ -125,6 +143,7 @@ def handle_onyx_date_awareness(
         prompt_str,
         full_sentence=False,
         include_day_of_week=True,
+        timezone=timezone,
     )
     if prompt_with_datetime != prompt_str:
         return prompt_with_datetime
@@ -132,7 +151,7 @@ def handle_onyx_date_awareness(
     if datetime_aware:
         return prompt_str + ADDITIONAL_INFO.format(
             datetime_info=_BASIC_TIME_STR.format(
-                datetime_info=get_current_llm_day_time()
+                datetime_info=get_current_llm_day_time(timezone=timezone)
             )
         )
 

@@ -10,7 +10,6 @@ from pydantic import model_validator
 
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmContactStatus
 from onyx.db.enums import CrmInteractionType
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import CrmContact
@@ -33,6 +32,8 @@ class CrmSettingsSnapshot(BaseModel):
     tier2_enabled: bool
     tier3_deals: bool
     tier3_custom_fields: bool
+    contact_stage_options: list[str]
+    contact_category_suggestions: list[str]
     updated_by: UUID | None
     updated_at: datetime
 
@@ -43,6 +44,8 @@ class CrmSettingsSnapshot(BaseModel):
             tier2_enabled=settings.tier2_enabled,
             tier3_deals=settings.tier3_deals,
             tier3_custom_fields=settings.tier3_custom_fields,
+            contact_stage_options=settings.contact_stage_options,
+            contact_category_suggestions=settings.contact_category_suggestions,
             updated_by=settings.updated_by,
             updated_at=settings.updated_at,
         )
@@ -53,6 +56,8 @@ class CrmSettingsPatchRequest(BaseModel):
     tier2_enabled: bool | None = None
     tier3_deals: bool | None = None
     tier3_custom_fields: bool | None = None
+    contact_stage_options: list[str] | None = None
+    contact_category_suggestions: list[str] | None = None
 
 
 class CrmTagSnapshot(BaseModel):
@@ -83,9 +88,10 @@ class CrmContactCreateRequest(BaseModel):
     phone: str | None = None
     title: str | None = None
     organization_id: UUID | None = None
-    owner_id: UUID | None = None
+    owner_ids: list[UUID] | None = None
     source: CrmContactSource | None = None
-    status: CrmContactStatus = CrmContactStatus.LEAD
+    status: str = "lead"
+    category: str | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -98,9 +104,10 @@ class CrmContactPatchRequest(BaseModel):
     phone: str | None = None
     title: str | None = None
     organization_id: UUID | None = None
-    owner_id: UUID | None = None
+    owner_ids: list[UUID] | None = None
     source: CrmContactSource | None = None
-    status: CrmContactStatus | None = None
+    status: str | None = None
+    category: str | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -115,9 +122,10 @@ class CrmContactSnapshot(BaseModel):
     phone: str | None
     title: str | None
     organization_id: UUID | None
-    owner_id: UUID | None
+    owner_ids: list[UUID]
     source: CrmContactSource | None
-    status: CrmContactStatus
+    status: str
+    category: str | None
     notes: str | None
     linkedin_url: str | None
     location: str | None
@@ -130,6 +138,7 @@ class CrmContactSnapshot(BaseModel):
     def from_model(
         cls,
         contact: CrmContact,
+        owner_ids: list[UUID],
         tags: list[CrmTag] | None = None,
     ) -> "CrmContactSnapshot":
         name_parts = [contact.first_name, contact.last_name or ""]
@@ -143,9 +152,10 @@ class CrmContactSnapshot(BaseModel):
             phone=contact.phone,
             title=contact.title,
             organization_id=contact.organization_id,
-            owner_id=contact.owner_id,
+            owner_ids=owner_ids,
             source=contact.source,
             status=contact.status,
+            category=contact.category,
             notes=contact.notes,
             linkedin_url=contact.linkedin_url,
             location=contact.location,
@@ -253,7 +263,7 @@ class CrmInteractionCreateRequest(BaseModel):
     title: str
     summary: str | None = None
     occurred_at: datetime | None = None
-    attendees: list[CrmInteractionAttendeeInput] = Field(default_factory=list)
+    attendees: list[CrmInteractionAttendeeInput] | None = Field(default=None)
 
 
 class CrmInteractionSnapshot(BaseModel):

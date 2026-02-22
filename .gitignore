@@ -77,3 +77,12 @@ web/eslint_output.json
 web/count_violations.js
 web/list_files_for_rule.js
 web/list_violations.js
+
+# local runtime directories
+log/
+.dev/
+.ruff_cache/
+
+# local ops scripts (machine- or prod-specific)
+scripts/check-prod-logs.sh
+scripts/reencrypt-credentials.sh

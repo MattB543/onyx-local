@@ -28,13 +28,18 @@ export default function TimelineInteractionCard({
         <Text as="p" mainUiAction text02>
           {interaction.title}
         </Text>
-        <Text as="p" secondaryBody text03>
+        <Text as="p" secondaryBody text03 className="text-sm">
           {timeLabel}
           {timeLabel && " \u00B7 "}
           {typeLabel}
         </Text>
         {interaction.summary && (
-          <Text as="p" secondaryBody text03 className="mt-1 line-clamp-2">
+          <Text
+            as="p"
+            secondaryBody
+            text03
+            className="mt-1 line-clamp-2 text-sm"
+          >
             {interaction.summary}
           </Text>
         )}
