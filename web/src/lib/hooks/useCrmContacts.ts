@@ -12,7 +12,9 @@ import {
 interface UseCrmContactsParams {
   q?: string;
   status?: CrmContactStage;
+  category?: string;
   organizationId?: string;
+  sortBy?: string;
   pageNum: number;
   pageSize: number;
 }
@@ -20,7 +22,9 @@ interface UseCrmContactsParams {
 export function useCrmContacts({
   q,
   status,
+  category,
   organizationId,
+  sortBy,
   pageNum,
   pageSize,
 }: UseCrmContactsParams) {
@@ -31,7 +35,9 @@ export function useCrmContacts({
       "crm-contacts",
       q ?? "",
       status ?? "",
+      category ?? "",
       organizationId ?? "",
+      sortBy ?? "",
       pageNum,
       pageSize,
     ],
@@ -39,7 +45,9 @@ export function useCrmContacts({
       listCrmContacts({
         q: q || undefined,
         status,
+        category,
         organization_id: organizationId,
+        sort_by: sortBy,
         page_num: pageNum,
         page_size: pageSize,
       }),

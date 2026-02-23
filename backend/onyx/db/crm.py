@@ -300,8 +300,10 @@ def list_contacts(
     page_size: int,
     query: str | None = None,
     status: str | None = None,
+    category: str | None = None,
     organization_id: UUID | None = None,
     tag_ids: list[UUID] | None = None,
+    sort_by: str | None = None,
 ) -> tuple[list[CrmContact], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
 
@@ -324,6 +326,9 @@ def list_contacts(
     if status:
         stmt = stmt.where(CrmContact.status == status.strip().lower())
 
+    if category:
+        stmt = stmt.where(CrmContact.category == category.strip())
+
     if organization_id:
         stmt = stmt.where(CrmContact.organization_id == organization_id)
 
@@ -335,9 +340,15 @@ def list_contacts(
         )
 
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    if sort_by == "created_at":
+        order_clauses = (CrmContact.created_at.desc(), CrmContact.updated_at.desc())
+    else:
+        order_clauses = (CrmContact.updated_at.desc(), CrmContact.created_at.desc())
+
     items = list(
         db_session.scalars(
-            stmt.order_by(CrmContact.updated_at.desc(), CrmContact.created_at.desc())
+            stmt.order_by(*order_clauses)
             .offset(page_num * page_size)
             .limit(page_size)
         )
@@ -517,7 +528,9 @@ def list_organizations(
     page_num: int,
     page_size: int,
     query: str | None = None,
+    org_type: CrmOrganizationType | None = None,
     tag_ids: list[UUID] | None = None,
+    sort_by: str | None = None,
 ) -> tuple[list[CrmOrganization], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
 
@@ -535,6 +548,9 @@ def list_organizations(
                 )
             )
 
+    if org_type is not None:
+        stmt = stmt.where(CrmOrganization.type == org_type)
+
     if tag_ids:
         stmt = (
             stmt.join(
@@ -546,11 +562,21 @@ def list_organizations(
         )
 
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    if sort_by == "created_at":
+        order_clauses = (
+            CrmOrganization.created_at.desc(),
+            CrmOrganization.updated_at.desc(),
+        )
+    else:
+        order_clauses = (
+            CrmOrganization.updated_at.desc(),
+            CrmOrganization.created_at.desc(),
+        )
+
     items = list(
         db_session.scalars(
-            stmt.order_by(
-                CrmOrganization.updated_at.desc(), CrmOrganization.created_at.desc()
-            )
+            stmt.order_by(*order_clauses)
             .offset(page_num * page_size)
             .limit(page_size)
         )

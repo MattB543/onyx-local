@@ -1,6 +1,6 @@
 import * as Yup from "yup";
 
-import { CrmContactSource } from "@/app/app/crm/crmService";
+import { CrmContactSource, CrmOrganizationType } from "@/app/app/crm/crmService";
 
 export const DEFAULT_CRM_STAGE_OPTIONS = [
   "lead",
@@ -15,6 +15,14 @@ export const DEFAULT_CRM_CATEGORY_SUGGESTIONS = [
   "Academic",
   "Allied Org",
   "Lab Member",
+];
+
+export const ORGANIZATION_TYPE_OPTIONS: CrmOrganizationType[] = [
+  "customer",
+  "prospect",
+  "partner",
+  "vendor",
+  "other",
 ];
 
 export const CONTACT_SOURCES: CrmContactSource[] = [

@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
-import { cn } from "@/lib/utils";
 import Card from "@/refresh-components/cards/Card";
+import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
@@ -18,33 +18,34 @@ import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 
-import { SvgActivity, SvgOrganization, SvgTag, SvgUser } from "@opal/icons";
+import { SvgActivity, SvgOrganization, SvgUser } from "@opal/icons";
 
 const RECENT_LIST_LIMIT = 5;
 const INTERACTION_LOOKUP_LIMIT = 150;
 const ORGANIZATION_LOOKUP_LIMIT = 150;
 
-interface LatestInteractionInfo {
-  timestamp: string;
-  title: string;
-}
-
-function toMs(value: string): number {
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
 export default function CrmHomePage() {
+  const [contactsSortBy, setContactsSortBy] = useState("updated_at");
+  const [orgsSortBy, setOrgsSortBy] = useState("updated_at");
+
   const {
     contacts,
     totalItems: totalContacts,
     isLoading: loadingContacts,
-  } = useCrmContacts({ pageNum: 0, pageSize: RECENT_LIST_LIMIT });
+  } = useCrmContacts({
+    pageNum: 0,
+    pageSize: RECENT_LIST_LIMIT,
+    sortBy: contactsSortBy,
+  });
   const {
     organizations,
     totalItems: totalOrgs,
     isLoading: loadingOrgs,
-  } = useCrmOrganizations({ pageNum: 0, pageSize: RECENT_LIST_LIMIT });
+  } = useCrmOrganizations({
+    pageNum: 0,
+    pageSize: RECENT_LIST_LIMIT,
+    sortBy: orgsSortBy,
+  });
   const { organizations: organizationLookup } = useCrmOrganizations({
     pageNum: 0,
     pageSize: ORGANIZATION_LOOKUP_LIMIT,
@@ -62,28 +63,6 @@ export default function CrmHomePage() {
       ])
     );
   }, [organizationLookup]);
-
-  const latestInteractionByContactId = useMemo(() => {
-    const latest = new Map<string, LatestInteractionInfo>();
-
-    for (const interaction of interactions) {
-      if (!interaction.contact_id) {
-        continue;
-      }
-
-      const timestamp = interaction.occurred_at || interaction.created_at;
-      const existing = latest.get(interaction.contact_id);
-
-      if (!existing || toMs(timestamp) > toMs(existing.timestamp)) {
-        latest.set(interaction.contact_id, {
-          timestamp,
-          title: interaction.title,
-        });
-      }
-    }
-
-    return latest;
-  }, [interactions]);
 
   return (
     <AppLayouts.Root>
@@ -159,19 +138,37 @@ export default function CrmHomePage() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Text as="p" mainUiAction text02>
                 Recent Contacts
               </Text>
-              <Link href="/app/crm/contacts">
-                <Text
-                  as="span"
-                  secondaryBody
-                  className="text-sm text-text-04 hover:underline"
-                >
-                  View all
-                </Text>
-              </Link>
+              <div className="flex items-center gap-2">
+                <div className="w-[160px]">
+                  <InputSelect
+                    value={contactsSortBy}
+                    onValueChange={setContactsSortBy}
+                  >
+                    <InputSelect.Trigger placeholder="Sort by" />
+                    <InputSelect.Content>
+                      <InputSelect.Item value="updated_at">
+                        Updated date
+                      </InputSelect.Item>
+                      <InputSelect.Item value="created_at">
+                        Created date
+                      </InputSelect.Item>
+                    </InputSelect.Content>
+                  </InputSelect>
+                </div>
+                <Link href="/app/crm/contacts">
+                  <Text
+                    as="span"
+                    secondaryBody
+                    className="text-sm text-text-04 hover:underline"
+                  >
+                    View all
+                  </Text>
+                </Link>
+              </div>
             </div>
 
             {loadingContacts ? (
@@ -187,19 +184,10 @@ export default function CrmHomePage() {
             ) : (
               <div className="flex flex-col gap-2">
                 {contacts.map((contact) => {
-                  const latestInteraction = latestInteractionByContactId.get(
-                    contact.id
-                  );
-                  const latestActivityDate = latestInteraction
-                    ? formatRelativeDate(latestInteraction.timestamp)
-                    : formatRelativeDate(contact.updated_at);
-                  const titleLabel = contact.title || "No title";
-                  const orgLabel = contact.organization_id
+                  const orgName = contact.organization_id
                     ? orgNameById.get(contact.organization_id) ||
                       "Linked organization"
-                    : "No organization";
-                  const visibleTags = contact.tags.slice(0, 2);
-                  const remainingTags = Math.max(0, contact.tags.length - 2);
+                    : null;
 
                   return (
                     <Link
@@ -208,89 +196,39 @@ export default function CrmHomePage() {
                     >
                       <Card
                         variant="secondary"
-                        className="gap-2 transition-colors hover:bg-background-tint-02"
+                        className="[&>div]:items-stretch transition-colors hover:bg-background-tint-02"
                       >
-                        <div className="flex items-start gap-3">
-                          <ContactAvatar
-                            firstName={contact.first_name}
-                            lastName={contact.last_name}
-                            size="sm"
-                          />
+                        <div className="flex w-full items-start gap-3">
+                          <div className="self-center">
+                            <ContactAvatar
+                              firstName={contact.first_name}
+                              lastName={contact.last_name}
+                              size="lg"
+                            />
+                          </div>
                           <div className="flex min-w-0 flex-1 flex-col gap-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <Text as="p" mainUiAction text02>
-                                {contact.full_name || contact.first_name}
-                              </Text>
-                              <StatusBadge status={contact.status} />
-                            </div>
-
-                            <Text
-                              as="p"
-                              secondaryBody
-                              text03
-                              className="text-sm"
-                            >
-                              {titleLabel} · {orgLabel}
-                            </Text>
-
-                            <Text
-                              as="p"
-                              secondaryBody
-                              text03
-                              className="text-sm"
-                            >
-                              Latest activity:{" "}
-                              <span className="font-medium text-text-04">
-                                {latestActivityDate}
+                            <span className="text-base font-semibold text-text-05">
+                              {contact.full_name || contact.first_name}
+                            </span>
+                            <span className="text-sm text-text-03">
+                              {contact.title || "No title"}
+                            </span>
+                            <span className="truncate text-sm text-text-03">
+                              {orgName || "No organization"}
+                            </span>
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <StatusBadge status={contact.status} />
+                            <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                              <span>
+                                Created{" "}
+                                {formatRelativeDate(contact.created_at)}
                               </span>
-                              {latestInteraction && (
-                                <>
-                                  {" "}
-                                  ·{" "}
-                                  <span className="font-medium text-text-04">
-                                    {latestInteraction.title}
-                                  </span>
-                                </>
-                              )}
-                            </Text>
-
-                            {visibleTags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {visibleTags.map((tag) => (
-                                  <span
-                                    key={tag.id}
-                                    className={cn(
-                                      "inline-flex items-center gap-1 rounded-full bg-background-tint-02 px-2 py-0.5"
-                                    )}
-                                  >
-                                    <SvgTag
-                                      size={10}
-                                      className="stroke-text-03"
-                                    />
-                                    <Text
-                                      as="span"
-                                      figureSmallLabel
-                                      text02
-                                      className="text-sm"
-                                    >
-                                      {tag.name}
-                                    </Text>
-                                  </span>
-                                ))}
-                                {remainingTags > 0 && (
-                                  <span className="inline-flex items-center rounded-full bg-background-tint-02 px-2 py-0.5">
-                                    <Text
-                                      as="span"
-                                      figureSmallLabel
-                                      text02
-                                      className="text-sm"
-                                    >
-                                      +{remainingTags}
-                                    </Text>
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                              <span>
+                                Updated{" "}
+                                {formatRelativeDate(contact.updated_at)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </Card>
@@ -302,19 +240,37 @@ export default function CrmHomePage() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Text as="p" mainUiAction text02>
                 Recent Organizations
               </Text>
-              <Link href="/app/crm/organizations">
-                <Text
-                  as="span"
-                  secondaryBody
-                  className="text-sm text-text-04 hover:underline"
-                >
-                  View all
-                </Text>
-              </Link>
+              <div className="flex items-center gap-2">
+                <div className="w-[160px]">
+                  <InputSelect
+                    value={orgsSortBy}
+                    onValueChange={setOrgsSortBy}
+                  >
+                    <InputSelect.Trigger placeholder="Sort by" />
+                    <InputSelect.Content>
+                      <InputSelect.Item value="updated_at">
+                        Updated date
+                      </InputSelect.Item>
+                      <InputSelect.Item value="created_at">
+                        Created date
+                      </InputSelect.Item>
+                    </InputSelect.Content>
+                  </InputSelect>
+                </div>
+                <Link href="/app/crm/organizations">
+                  <Text
+                    as="span"
+                    secondaryBody
+                    className="text-sm text-text-04 hover:underline"
+                  >
+                    View all
+                  </Text>
+                </Link>
+              </div>
             </div>
 
             {loadingOrgs ? (
@@ -329,31 +285,70 @@ export default function CrmHomePage() {
                 </Text>
               </Card>
             ) : (
-              <div className="flex flex-col gap-1.5">
-                {organizations.map((organization) => (
-                  <Link
-                    key={organization.id}
-                    href={`/app/crm/organizations/${organization.id}`}
-                    className="flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-background-tint-02"
-                  >
-                    <OrgAvatar
-                      name={organization.name}
-                      type={organization.type}
-                      size="sm"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <Text as="p" mainUiAction text02>
-                        {organization.name}
-                      </Text>
-                      <Text as="p" secondaryBody text03 className="text-sm">
-                        {[organization.sector, organization.location]
-                          .filter(Boolean)
-                          .join(" · ") || "No details"}
-                      </Text>
-                    </div>
-                    <TypeBadge type={organization.type} />
-                  </Link>
-                ))}
+              <div className="flex flex-col gap-2">
+                {organizations.map((organization) => {
+                  const websiteDisplay = organization.website
+                    ? organization.website.replace(/^https?:\/\//i, "")
+                    : "No website";
+
+                  return (
+                    <Link
+                      key={organization.id}
+                      href={`/app/crm/organizations/${organization.id}`}
+                    >
+                      <Card
+                        variant="secondary"
+                        className="[&>div]:items-stretch transition-colors hover:bg-background-tint-02"
+                      >
+                        <div className="flex w-full items-start gap-3">
+                          <OrgAvatar
+                            name={organization.name}
+                            type={organization.type}
+                            size="lg"
+                          />
+                          <div className="flex min-w-0 flex-1 flex-col gap-1">
+                            <span className="text-base font-semibold text-text-05">
+                              {organization.name}
+                            </span>
+                            {organization.website ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const href = organization.website!.startsWith("http")
+                                    ? organization.website!
+                                    : `https://${organization.website!}`;
+                                  window.open(href, "_blank", "noopener,noreferrer");
+                                }}
+                                className="truncate text-left text-sm text-text-04 hover:underline"
+                              >
+                                {websiteDisplay}
+                              </button>
+                            ) : (
+                              <span className="text-sm text-text-03">
+                                No website
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <TypeBadge type={organization.type} />
+                            <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                              <span>
+                                Created{" "}
+                                {formatRelativeDate(organization.created_at)}
+                              </span>
+                              <span>
+                                Updated{" "}
+                                {formatRelativeDate(organization.updated_at)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>

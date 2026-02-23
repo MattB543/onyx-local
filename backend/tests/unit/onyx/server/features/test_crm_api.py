@@ -1,3 +1,5 @@
+from datetime import datetime
+from datetime import timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -8,6 +10,7 @@ from fastapi import HTTPException
 
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
+from onyx.server.features.crm.api import _serialize_interaction
 from onyx.server.features.crm.api import get_contacts
 from onyx.server.features.crm.api import post_contact
 from onyx.server.features.crm.api import post_interaction
@@ -210,3 +213,68 @@ def test_post_interaction_explicit_null_attendees_adds_no_defaults() -> None:
         )
 
     mock_add_attendees.assert_not_called()
+
+
+def test_serialize_interaction_includes_attendee_display_names() -> None:
+    now = datetime.now(timezone.utc)
+    interaction_id = uuid4()
+    attendee_user_id = uuid4()
+    attendee_contact_id = uuid4()
+
+    interaction = SimpleNamespace(
+        id=interaction_id,
+        contact_id=None,
+        organization_id=None,
+        logged_by=attendee_user_id,
+        type=CrmInteractionType.MEETING,
+        title="Quarterly sync",
+        summary="Reviewed roadmap",
+        occurred_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    attendee_user = SimpleNamespace(
+        id=1,
+        user_id=attendee_user_id,
+        contact_id=None,
+        role=CrmAttendeeRole.ORGANIZER,
+        created_at=now,
+    )
+    attendee_contact = SimpleNamespace(
+        id=2,
+        user_id=None,
+        contact_id=attendee_contact_id,
+        role=CrmAttendeeRole.ATTENDEE,
+        created_at=now,
+    )
+    attendee_user_model = SimpleNamespace(
+        personal_name="Alex Smith",
+        email="alex@example.com",
+    )
+    attendee_contact_model = SimpleNamespace(
+        first_name="Sam",
+        last_name="Lee",
+        email="sam@example.com",
+    )
+    db_session = MagicMock()
+
+    def _mock_get(model, id):  # noqa: ANN001, ANN202
+        if id == attendee_user_id:
+            return attendee_user_model
+        return None
+
+    db_session.get.side_effect = _mock_get
+
+    with (
+        patch(
+            "onyx.server.features.crm.api.get_interaction_attendees",
+            return_value=[attendee_user, attendee_contact],
+        ),
+        patch(
+            "onyx.server.features.crm.api.get_contact_by_id",
+            return_value=attendee_contact_model,
+        ),
+    ):
+        serialized = _serialize_interaction(interaction, db_session)
+
+    assert [a.display_name for a in serialized.attendees] == ["Alex Smith", "Sam Lee"]

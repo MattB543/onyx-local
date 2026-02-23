@@ -240,17 +240,19 @@ class CrmInteractionAttendeeSnapshot(BaseModel):
     id: int
     user_id: UUID | None
     contact_id: UUID | None
+    display_name: str | None = None
     role: CrmAttendeeRole
     created_at: datetime
 
     @classmethod
     def from_model(
-        cls, attendee: CrmInteractionAttendee
+        cls, attendee: CrmInteractionAttendee, display_name: str | None = None
     ) -> "CrmInteractionAttendeeSnapshot":
         return CrmInteractionAttendeeSnapshot(
             id=attendee.id,
             user_id=attendee.user_id,
             contact_id=attendee.contact_id,
+            display_name=display_name,
             role=attendee.role,
             created_at=attendee.created_at,
         )
@@ -284,7 +286,15 @@ class CrmInteractionSnapshot(BaseModel):
         cls,
         interaction: CrmInteraction,
         attendees: list[CrmInteractionAttendee] | None = None,
+        attendee_snapshots: list[CrmInteractionAttendeeSnapshot] | None = None,
     ) -> "CrmInteractionSnapshot":
+        resolved_attendees = attendee_snapshots
+        if resolved_attendees is None:
+            resolved_attendees = [
+                CrmInteractionAttendeeSnapshot.from_model(attendee)
+                for attendee in (attendees or [])
+            ]
+
         return CrmInteractionSnapshot(
             id=interaction.id,
             contact_id=interaction.contact_id,
@@ -296,10 +306,7 @@ class CrmInteractionSnapshot(BaseModel):
             occurred_at=interaction.occurred_at,
             created_at=interaction.created_at,
             updated_at=interaction.updated_at,
-            attendees=[
-                CrmInteractionAttendeeSnapshot.from_model(attendee)
-                for attendee in (attendees or [])
-            ],
+            attendees=resolved_attendees,
         )
 
 

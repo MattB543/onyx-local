@@ -1,15 +1,24 @@
 import contextlib
+from functools import lru_cache
+import hashlib
 from collections.abc import Generator
+from datetime import datetime
+from datetime import timezone
+from uuid import UUID
 
 from sqlalchemy.engine.util import TransactionalContext
 from sqlalchemy.orm import Session
 
 from onyx.access.access import get_access_for_documents
 from onyx.access.models import DocumentAccess
+from onyx.configs.app_configs import EMAIL_CRM_CUSTOM_JOB_ID
 from onyx.configs.constants import DEFAULT_BOOST
+from onyx.configs.constants import DocumentSource
 from onyx.connectors.models import Document
 from onyx.connectors.models import IndexAttemptMetadata
+from onyx.connectors.models import TextSection
 from onyx.db.chunk import update_chunk_boost_components__no_commit
+from onyx.db.custom_jobs import create_trigger_event
 from onyx.db.document import fetch_chunk_counts_for_documents
 from onyx.db.document import mark_document_as_indexed_for_cc_pair__no_commit
 from onyx.db.document import prepare_to_modify_documents
@@ -28,6 +37,65 @@ from onyx.redis.redis_pool import get_redis_client
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()
+
+_EMAIL_SOURCES = {DocumentSource.GMAIL, DocumentSource.IMAP}
+_EMAIL_CRM_PAYLOAD_TEXT_LIMIT = 10_000
+_EMAIL_TRIGGER_SOURCE_TYPE = "email_indexed"
+
+
+@lru_cache(maxsize=1)
+def _get_email_crm_custom_job_uuid() -> UUID | None:
+    if not EMAIL_CRM_CUSTOM_JOB_ID:
+        return None
+
+    try:
+        return UUID(EMAIL_CRM_CUSTOM_JOB_ID)
+    except ValueError:
+        logger.error(
+            "Invalid EMAIL_CRM_CUSTOM_JOB_ID '%s'; skipping email trigger emission.",
+            EMAIL_CRM_CUSTOM_JOB_ID,
+        )
+        return None
+
+
+def _build_email_crm_dedupe_key(doc: Document) -> str:
+    """Build a source-aware dedupe key for email trigger events.
+
+    IMAP uses a stable message-level key since IMAP message IDs don't change.
+    Gmail uses the doc ID plus an update fingerprint so thread updates
+    produce new trigger events.
+    """
+    if doc.source == DocumentSource.IMAP:
+        return f"imap:{doc.id}"
+
+    # Gmail: include an update fingerprint so re-indexed thread updates
+    # are not suppressed by deduplication.
+    if doc.doc_updated_at is not None:
+        update_token = doc.doc_updated_at.isoformat()
+    else:
+        update_token = hashlib.sha256(doc.id.encode()).hexdigest()[:12]
+    return f"gmail:{doc.id}:{update_token}"
+
+
+def _extract_document_text(doc: Document, limit: int) -> str:
+    """Concatenate text sections from a Document, truncated to *limit* characters."""
+    parts: list[str] = []
+    total = 0
+    for section in doc.sections:
+        if isinstance(section, TextSection) and section.text:
+            remaining = limit - total
+            if remaining <= 0:
+                break
+            parts.append(section.text[:remaining])
+            total += len(parts[-1])
+    return "\n\n".join(parts)
+
+
+def _owner_emails(owners: list | None) -> list[str]:
+    """Extract non-None email addresses from a list of BasicExpertInfo."""
+    if not owners:
+        return []
+    return [o.email for o in owners if o.email]
 
 
 class DocumentIndexingBatchAdapter:
@@ -251,4 +319,90 @@ class DocumentIndexingBatchAdapter:
             chunk_data=updatable_chunk_data, db_session=self.db_session
         )
 
+        # --- Email-to-CRM trigger event emission ---
+        # Only runs when EMAIL_CRM_CUSTOM_JOB_ID is configured.
+        custom_job_id = _get_email_crm_custom_job_uuid()
+        if custom_job_id is not None:
+            try:
+                self._emit_email_crm_trigger_events(
+                    context=context,
+                    custom_job_id=custom_job_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to emit email-CRM trigger events; "
+                    "indexing will proceed without them."
+                )
+
         self.db_session.commit()
+
+    def _emit_email_crm_trigger_events(
+        self,
+        context: DocumentBatchPrepareContext,
+        custom_job_id: UUID,
+    ) -> None:
+        """Emit CustomJobTriggerEvents for GMAIL/IMAP documents.
+
+        Called at the end of post_index() when EMAIL_CRM_CUSTOM_JOB_ID is set.
+        Each qualifying document produces one trigger event. Deduplication is
+        handled at the DB level via a unique constraint on (custom_job_id, dedupe_key).
+        """
+        email_docs = [
+            doc
+            for doc in context.updatable_docs
+            if doc.source in _EMAIL_SOURCES
+        ]
+        if not email_docs:
+            return
+
+        for doc in email_docs:
+            dedupe_key = _build_email_crm_dedupe_key(doc)
+            primary_owner_emails = _owner_emails(doc.primary_owners)
+            secondary_owner_emails = _owner_emails(doc.secondary_owners)
+            extracted_text = _extract_document_text(doc, _EMAIL_CRM_PAYLOAD_TEXT_LIMIT)
+
+            payload: dict[str, object] = {
+                "document_id": doc.id,
+                "source": doc.source.value,
+                "semantic_identifier": doc.semantic_identifier,
+                "doc_updated_at": (
+                    doc.doc_updated_at.isoformat() if doc.doc_updated_at else None
+                ),
+                "primary_owner_emails": primary_owner_emails,
+                "secondary_owner_emails": secondary_owner_emails,
+                "text": extracted_text,
+                # Explicit fields consumed by downstream CRM prompt construction.
+                # Keep these in addition to legacy fields for compatibility.
+                "from": primary_owner_emails[0] if primary_owner_emails else "",
+                "to": ", ".join(secondary_owner_emails),
+                "subject": doc.semantic_identifier,
+                "date": doc.doc_updated_at.isoformat() if doc.doc_updated_at else "",
+                "body": extracted_text,
+            }
+
+            event = create_trigger_event(
+                db_session=self.db_session,
+                custom_job_id=custom_job_id,
+                source_type=_EMAIL_TRIGGER_SOURCE_TYPE,
+                source_event_id=doc.id,
+                dedupe_key=dedupe_key,
+                dedupe_key_prefix=_EMAIL_TRIGGER_SOURCE_TYPE,
+                event_time=doc.doc_updated_at or datetime.now(timezone.utc),
+                payload_json=payload,
+            )
+
+            if event is not None:
+                logger.info(
+                    "Email-CRM trigger event created for doc '%s' "
+                    "(dedupe_key=%s, event_id=%s)",
+                    doc.id,
+                    dedupe_key,
+                    event.id,
+                )
+            else:
+                logger.debug(
+                    "Email-CRM trigger event dedupe-suppressed for doc '%s' "
+                    "(dedupe_key=%s)",
+                    doc.id,
+                    dedupe_key,
+                )

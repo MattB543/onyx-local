@@ -77,6 +77,7 @@ export interface CrmInteractionAttendee {
   id: number;
   user_id: string | null;
   contact_id: string | null;
+  display_name: string | null;
   role: CrmAttendeeRole;
   created_at: string;
 }
@@ -220,16 +221,20 @@ export async function searchCrmEntities(args: {
 export async function listCrmContacts(args?: {
   q?: string;
   status?: CrmContactStage;
+  category?: string;
   organization_id?: string;
   tag_ids?: string[];
+  sort_by?: string;
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmContact>> {
   const path = withQueryParams("/api/user/crm/contacts", {
     q: args?.q,
     status: args?.status,
+    category: args?.category,
     organization_id: args?.organization_id,
     tag_ids: args?.tag_ids,
+    sort_by: args?.sort_by,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -260,13 +265,17 @@ export async function patchCrmContact(
 
 export async function listCrmOrganizations(args?: {
   q?: string;
+  type?: CrmOrganizationType;
   tag_ids?: string[];
+  sort_by?: string;
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmOrganization>> {
   const path = withQueryParams("/api/user/crm/organizations", {
     q: args?.q,
+    type: args?.type,
     tag_ids: args?.tag_ids,
+    sort_by: args?.sort_by,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -320,7 +329,7 @@ export async function listCrmInteractions(args?: {
 }
 
 export async function createCrmInteraction(
-  body: Partial<CrmInteraction> &
+  body: Omit<Partial<CrmInteraction>, "attendees"> &
     Pick<CrmInteraction, "title" | "type"> & {
       attendees?:
         | {

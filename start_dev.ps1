@@ -14,8 +14,10 @@ function Start-OnyxServiceWindow {
         [string]$ScriptPath
     )
 
-    $shellExe = (Get-Command pwsh -ErrorAction SilentlyContinue)?.Source
-    if (-not $shellExe) {
+    $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $shellExe = $cmd.Source
+    } else {
         $shellExe = "powershell"
     }
 

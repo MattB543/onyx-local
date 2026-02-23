@@ -7,8 +7,10 @@ from onyx.custom_jobs.steps import STEP_CLASS_MAP
 from onyx.custom_jobs.steps import STEP_DESCRIPTION_MAP
 from onyx.custom_jobs.types import WorkflowDefinition
 from onyx.custom_jobs.workflows import DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY
+from onyx.custom_jobs.workflows import EMAIL_CRM_PROCESSOR_WORKFLOW_KEY
 from onyx.custom_jobs.workflows import WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY
 from onyx.custom_jobs.workflows import build_daily_slack_web_drive_brief_workflow
+from onyx.custom_jobs.workflows import build_email_crm_processor_workflow
 from onyx.custom_jobs.workflows import build_weekly_content_summary_workflow
 
 WorkflowBuilder = Callable[..., WorkflowDefinition]
@@ -16,6 +18,7 @@ WorkflowBuilder = Callable[..., WorkflowDefinition]
 WORKFLOW_REGISTRY: dict[str, WorkflowBuilder] = {
     WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY: build_weekly_content_summary_workflow,
     DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY: build_daily_slack_web_drive_brief_workflow,
+    EMAIL_CRM_PROCESSOR_WORKFLOW_KEY: build_email_crm_processor_workflow,
 }
 
 STEP_CONFIG_SCHEMAS: dict[str, dict[str, Any]] = {
@@ -70,6 +73,17 @@ STEP_CONFIG_SCHEMAS: dict[str, dict[str, Any]] = {
             "title": {"type": "string"},
             "folder_id": {"type": "string"},
             "share_with": {"type": "array", "items": {"type": "string"}},
+        },
+    },
+    "fetch_email_trigger_payload": {
+        "type": "object",
+        "properties": {},
+    },
+    "process_email_crm": {
+        "type": "object",
+        "properties": {
+            "persona_id": {"type": "integer"},
+            "input_step_id": {"type": "string"},
         },
     },
 }

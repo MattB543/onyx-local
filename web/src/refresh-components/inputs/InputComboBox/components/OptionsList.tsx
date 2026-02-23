@@ -3,7 +3,7 @@ import Text from "@/refresh-components/texts/Text";
 import { OptionItem } from "./OptionItem";
 import { ComboBoxOption } from "../types";
 import { cn } from "@/lib/utils";
-import { SvgPlus } from "@opal/icons";
+import { SvgPlus, SvgX } from "@opal/icons";
 import { sanitizeOptionId } from "../utils/aria";
 
 interface OptionsListProps {
@@ -24,6 +24,8 @@ interface OptionsListProps {
   allowCreate: boolean;
   /** Whether to show create option (pre-computed by parent) */
   showCreateOption: boolean;
+  /** Callback to clear selection */
+  onClear?: () => void;
 }
 
 /**
@@ -45,6 +47,7 @@ export const OptionsList: React.FC<OptionsListProps> = ({
   inputValue,
   allowCreate,
   showCreateOption,
+  onClear,
 }) => {
   // Index offset for other options when create option is shown
   const indexOffset = showCreateOption ? 1 : 0;
@@ -115,6 +118,29 @@ export const OptionsList: React.FC<OptionsListProps> = ({
           />
         );
       })}
+
+      {/* Clear filter row */}
+      {onClear && value && (
+        <div
+          role="option"
+          aria-selected={false}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            "px-3 py-1.5 cursor-pointer transition-colors",
+            "flex items-center gap-1.5 rounded-08",
+            "hover:bg-background-tint-02"
+          )}
+        >
+          <SvgX className="w-3 h-3 text-text-03 flex-shrink-0" />
+          <span className="font-secondary-body text-text-03 text-sm">
+            Clear filter
+          </span>
+        </div>
+      )}
 
       {/* Separator - only show if there are unmatched options and a search term */}
       {hasSearchTerm && unmatchedOptions.length > 0 && (

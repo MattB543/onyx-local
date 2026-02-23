@@ -11,6 +11,7 @@ import {
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
+import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
@@ -115,55 +116,52 @@ export default function CrmOrganizationDetailPage({
 
   return (
     <AppLayouts.Root>
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex w-[min(72rem,100%)] flex-col gap-6 px-4 pb-12 pt-8">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <SvgOrganization className="h-[1.75rem] w-[1.75rem] stroke-text-04" />
-                <Text as="p" headingH2>
-                  CRM
-                </Text>
-              </div>
-              <Button
-                action
-                tertiary
-                size="md"
-                type="button"
-                onClick={() => router.back()}
-              >
-                Back
-              </Button>
-            </div>
-            <CrmBreadcrumbs items={breadcrumbs} />
+      <SettingsLayouts.Root width="xl">
+        <SettingsLayouts.Header
+          icon={SvgOrganization}
+          title="CRM"
+          description={<CrmBreadcrumbs items={breadcrumbs} />}
+          titleIconInline
+          rightChildren={
+            <Button
+              action
+              tertiary
+              size="md"
+              type="button"
+              onClick={() => router.back()}
+            >
+              Back
+            </Button>
+          }
+        >
+          <CrmNav
+            rightContent={
+              organization &&
+              (isEditing ? (
+                <Button
+                  action
+                  secondary
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel Edit
+                </Button>
+              ) : (
+                <Button
+                  action
+                  primary
+                  type="button"
+                  leftIcon={SvgEdit}
+                  onClick={() => setIsEditing(true)}
+                >
+                  Edit
+                </Button>
+              ))
+            }
+          />
+        </SettingsLayouts.Header>
 
-            <CrmNav
-              rightContent={
-                organization &&
-                (isEditing ? (
-                  <Button
-                    action
-                    secondary
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                  >
-                    Cancel Edit
-                  </Button>
-                ) : (
-                  <Button
-                    action
-                    primary
-                    type="button"
-                    leftIcon={SvgEdit}
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit
-                  </Button>
-                ))
-              }
-            />
-          </div>
-
+        <SettingsLayouts.Body>
           {error && (
             <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load organization.
@@ -214,7 +212,10 @@ export default function CrmOrganizationDetailPage({
               <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
                 <div className="flex min-w-0 flex-[12] flex-col gap-4">
                   {isEditing ? (
-                    <Card variant="secondary" className="gap-3">
+                    <Card
+                      variant="secondary"
+                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                    >
                       <Text as="p" mainUiAction text02>
                         Edit Organization
                       </Text>
@@ -250,48 +251,120 @@ export default function CrmOrganizationDetailPage({
                         }}
                       >
                         {({ isSubmitting, status }) => (
-                          <Form className="flex flex-col gap-3">
-                            <div className="grid gap-2 md:grid-cols-2">
-                              <InputTypeInField
-                                name="name"
-                                placeholder="Organization name *"
-                              />
-                              <InputTypeInField
-                                name="website"
-                                placeholder="Website URL"
-                              />
-                              <InputSelectField name="type">
-                                <InputSelect.Trigger placeholder="Type" />
-                                <InputSelect.Content>
-                                  {ORGANIZATION_TYPES.map((typeOption) => (
-                                    <InputSelect.Item
-                                      key={typeOption}
-                                      value={typeOption}
-                                    >
-                                      {formatLabel(typeOption)}
-                                    </InputSelect.Item>
-                                  ))}
-                                </InputSelect.Content>
-                              </InputSelectField>
-                              <InputTypeInField
-                                name="sector"
-                                placeholder="Sector"
-                              />
-                              <InputTypeInField
-                                name="location"
-                                placeholder="Location"
-                              />
-                              <InputTypeInField
-                                name="size"
-                                placeholder="Size"
-                              />
+                          <Form className="flex h-full flex-col gap-3">
+                            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:[&>*]:min-w-0">
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Name
+                                </Text>
+                                <InputTypeInField
+                                  name="name"
+                                  placeholder="Organization name *"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Website
+                                </Text>
+                                <InputTypeInField
+                                  name="website"
+                                  placeholder="Website URL"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Type
+                                </Text>
+                                <InputSelectField name="type">
+                                  <InputSelect.Trigger placeholder="Type" />
+                                  <InputSelect.Content>
+                                    {ORGANIZATION_TYPES.map((typeOption) => (
+                                      <InputSelect.Item
+                                        key={typeOption}
+                                        value={typeOption}
+                                      >
+                                        {formatLabel(typeOption)}
+                                      </InputSelect.Item>
+                                    ))}
+                                  </InputSelect.Content>
+                                </InputSelectField>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Sector
+                                </Text>
+                                <InputTypeInField
+                                  name="sector"
+                                  placeholder="Sector"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Location
+                                </Text>
+                                <InputTypeInField
+                                  name="location"
+                                  placeholder="Location"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Size
+                                </Text>
+                                <InputTypeInField
+                                  name="size"
+                                  placeholder="Size"
+                                />
+                              </div>
                             </div>
 
-                            <InputTextAreaField
-                              name="notes"
-                              placeholder="Notes"
-                              rows={4}
-                            />
+                            <div className="mt-auto w-full border-t border-border-subtle" />
+
+                            <div className="flex w-full flex-col gap-1">
+                              <Text
+                                as="p"
+                                secondaryBody
+                                text03
+                                className="text-sm"
+                              >
+                                Notes
+                              </Text>
+                              <InputTextAreaField
+                                name="notes"
+                                placeholder="Notes"
+                                rows={4}
+                              />
+                            </div>
 
                             {status && (
                               <Text
@@ -321,7 +394,7 @@ export default function CrmOrganizationDetailPage({
                       </Formik>
                     </Card>
                   ) : (
-                    <Card variant="secondary" className="h-full gap-3">
+                    <Card variant="secondary" className="h-full gap-3 [&>div]:items-stretch">
                       <Text as="p" mainUiAction text02>
                         Details
                       </Text>
@@ -485,8 +558,8 @@ export default function CrmOrganizationDetailPage({
               </div>
             </>
           ) : null}
-        </div>
-      </div>
+        </SettingsLayouts.Body>
+      </SettingsLayouts.Root>
 
       <LogInteractionModal
         open={logInteractionModalOpen}

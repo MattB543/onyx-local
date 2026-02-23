@@ -1,17 +1,24 @@
 "use client";
 
 import { Form, Formik } from "formik";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Yup from "yup";
 
 import {
   createCrmInteraction,
+  listCrmContacts,
   CrmInteractionType,
 } from "@/app/app/crm/crmService";
+import type { CrmAttendeeRole } from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import InputMultiSelect, {
+  InputMultiSelectOption,
+} from "@/refresh-components/inputs/InputMultiSelect";
 import Modal from "@/refresh-components/Modal";
 import Text from "@/refresh-components/texts/Text";
 
@@ -34,6 +41,8 @@ const validationSchema = Yup.object().shape({
 interface LogInteractionFormValues {
   title: string;
   summary: string;
+  contact_attendee_ids: string[];
+  user_attendee_ids: string[];
 }
 
 interface LogInteractionModalProps {
@@ -51,7 +60,89 @@ export default function LogInteractionModal({
   organizationId,
   onSuccess,
 }: LogInteractionModalProps) {
+  const { user } = useUser();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [selectedType, setSelectedType] = useState<CrmInteractionType>("note");
+  const [contactOptions, setContactOptions] = useState<
+    InputMultiSelectOption[]
+  >([]);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [contactLoadError, setContactLoadError] = useState<string | null>(null);
+
+  const userOptions = useMemo<InputMultiSelectOption[]>(
+    () =>
+      (usersData || []).map((candidate) => ({
+        value: candidate.id,
+        label: candidate.full_name?.trim() || candidate.email,
+      })),
+    [usersData]
+  );
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let canceled = false;
+
+    async function fetchAllContacts() {
+      setIsLoadingContacts(true);
+      setContactLoadError(null);
+
+      try {
+        const allOptions: InputMultiSelectOption[] = [];
+        const pageSize = 200;
+        let pageNum = 0;
+        let totalItems = 0;
+
+        do {
+          const response = await listCrmContacts({
+            page_num: pageNum,
+            page_size: pageSize,
+          });
+          totalItems = response.total_items;
+
+          for (const contact of response.items) {
+            const fullName = contact.full_name?.trim();
+            const composedName = `${contact.first_name} ${
+              contact.last_name || ""
+            }`.trim();
+            allOptions.push({
+              value: contact.id,
+              label: fullName || composedName || contact.email || contact.id,
+            });
+          }
+
+          if (response.items.length === 0) {
+            break;
+          }
+
+          pageNum += 1;
+        } while (allOptions.length < totalItems);
+
+        if (canceled) {
+          return;
+        }
+
+        setContactOptions(allOptions);
+      } catch {
+        if (canceled) {
+          return;
+        }
+        setContactLoadError("Failed to load contacts for attendees.");
+      } finally {
+        if (!canceled) {
+          setIsLoadingContacts(false);
+        }
+      }
+    }
+
+    void fetchAllContacts();
+
+    return () => {
+      canceled = true;
+    };
+  }, [open]);
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
@@ -62,12 +153,29 @@ export default function LogInteractionModal({
           onClose={() => onOpenChange(false)}
         />
         <Formik<LogInteractionFormValues>
+          enableReinitialize
           initialValues={{
             title: "",
             summary: "",
+            contact_attendee_ids: contactId ? [contactId] : [],
+            user_attendee_ids: user?.id ? [user.id] : [],
           }}
           validationSchema={validationSchema}
-          onSubmit={async (values, { setStatus }) => {
+          onSubmit={async (values, { setStatus, resetForm }) => {
+            const attendees = [
+              ...values.contact_attendee_ids.map((attendeeContactId) => ({
+                contact_id: attendeeContactId,
+                role: "attendee" as CrmAttendeeRole,
+              })),
+              ...values.user_attendee_ids.map((attendeeUserId) => ({
+                user_id: attendeeUserId,
+                role:
+                  attendeeUserId === user?.id
+                    ? ("organizer" as CrmAttendeeRole)
+                    : ("attendee" as CrmAttendeeRole),
+              })),
+            ];
+
             try {
               await createCrmInteraction({
                 type: selectedType,
@@ -76,7 +184,9 @@ export default function LogInteractionModal({
                 contact_id: contactId || undefined,
                 organization_id: organizationId || undefined,
                 occurred_at: new Date().toISOString(),
+                attendees,
               });
+              resetForm();
               onSuccess();
               onOpenChange(false);
             } catch {
@@ -84,7 +194,7 @@ export default function LogInteractionModal({
             }
           }}
         >
-          {({ isSubmitting, status }) => (
+          {({ isSubmitting, status, values, setFieldValue }) => (
             <Form>
               <Modal.Body>
                 <div className="flex w-full flex-col gap-4">
@@ -121,6 +231,42 @@ export default function LogInteractionModal({
                     placeholder="Summary / notes"
                     rows={4}
                   />
+                  <div className="flex w-full flex-col gap-1">
+                    <Text as="p" secondaryBody text03 className="text-sm">
+                      Contact attendees
+                    </Text>
+                    <InputMultiSelect
+                      value={values.contact_attendee_ids}
+                      onChange={(nextContactIds) => {
+                        setFieldValue("contact_attendee_ids", nextContactIds);
+                      }}
+                      options={contactOptions}
+                      placeholder="Select contact attendee(s)"
+                      disabled={isLoadingContacts}
+                    />
+                    {contactLoadError && (
+                      <Text
+                        as="p"
+                        secondaryBody
+                        className="text-sm text-status-error-03"
+                      >
+                        {contactLoadError}
+                      </Text>
+                    )}
+                  </div>
+                  <div className="flex w-full flex-col gap-1">
+                    <Text as="p" secondaryBody text03 className="text-sm">
+                      Onyx user attendees
+                    </Text>
+                    <InputMultiSelect
+                      value={values.user_attendee_ids}
+                      onChange={(nextUserIds) => {
+                        setFieldValue("user_attendee_ids", nextUserIds);
+                      }}
+                      options={userOptions}
+                      placeholder="Select user attendee(s)"
+                    />
+                  </div>
 
                   {status && (
                     <Text

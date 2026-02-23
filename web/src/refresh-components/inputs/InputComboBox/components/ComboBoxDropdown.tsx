@@ -27,6 +27,8 @@ interface ComboBoxDropdownProps {
   allowCreate: boolean;
   /** Whether to show create option (pre-computed by parent) */
   showCreateOption: boolean;
+  /** Callback to clear selection */
+  onClear?: () => void;
 }
 
 /**
@@ -58,6 +60,7 @@ export const ComboBoxDropdown = forwardRef<
       inputValue,
       allowCreate,
       showCreateOption,
+      onClear,
     },
     ref
   ) => {
@@ -132,6 +135,7 @@ export const ComboBoxDropdown = forwardRef<
           inputValue={inputValue}
           allowCreate={allowCreate}
           showCreateOption={showCreateOption}
+          onClear={onClear}
         />
       </div>,
       document.body

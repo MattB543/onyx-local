@@ -44,6 +44,8 @@ interface ActivityTimelineProps {
   hasMore: boolean;
   onLoadMore: () => void;
   onLogInteraction: () => void;
+  attendeeUserNameById?: Map<string, string>;
+  attendeeContactNameById?: Map<string, string>;
 }
 
 export default function ActivityTimeline({
@@ -52,13 +54,15 @@ export default function ActivityTimeline({
   hasMore,
   onLoadMore,
   onLogInteraction,
+  attendeeUserNameById,
+  attendeeContactNameById,
 }: ActivityTimelineProps) {
   const grouped = groupInteractionsByDate(interactions);
 
   return (
     <div className="flex flex-col gap-0">
       <div className="mb-4 flex items-center gap-2">
-        <Text as="p" mainUiAction text02>
+        <Text as="p" mainUiAction text05>
           Activity
         </Text>
         <Button
@@ -73,7 +77,7 @@ export default function ActivityTimeline({
       </div>
 
       {isLoading ? (
-        <Text as="p" secondaryBody text03 className="text-sm">
+        <Text as="p" secondaryBody text05 className="text-sm">
           Loading activity...
         </Text>
       ) : interactions.length === 0 ? (
@@ -94,9 +98,9 @@ export default function ActivityTimeline({
                 </div>
                 <Text
                   as="p"
-                  secondaryBody
-                  text03
-                  className="text-sm font-medium"
+                  mainUiAction
+                  text05
+                  className="text-sm"
                 >
                   {group.label}
                 </Text>
@@ -106,6 +110,8 @@ export default function ActivityTimeline({
                 <TimelineInteractionCard
                   key={interaction.id}
                   interaction={interaction}
+                  attendeeUserNameById={attendeeUserNameById}
+                  attendeeContactNameById={attendeeContactNameById}
                 />
               ))}
             </div>

@@ -40,4 +40,6 @@ export interface InputComboBoxProps
   rightSection?: React.ReactNode;
   /** Label for the separator between matched and unmatched options */
   separatorLabel?: string;
+  /** Callback to clear selection — renders a "Clear filter" row in the dropdown */
+  onClear?: () => void;
 }

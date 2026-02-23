@@ -129,6 +129,7 @@ const InputComboBox = ({
   leftSearchIcon = false,
   rightSection,
   separatorLabel = "Other options",
+  onClear,
   ...rest
 }: WithoutStyles<InputComboBoxProps>) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -437,6 +438,7 @@ const InputComboBox = ({
           inputValue={inputValue}
           allowCreate={!strict}
           showCreateOption={showCreateOption}
+          onClear={onClear}
         />
       </>
 

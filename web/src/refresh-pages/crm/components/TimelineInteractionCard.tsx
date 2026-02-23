@@ -6,16 +6,44 @@ import InteractionTypeIcon from "./InteractionTypeIcon";
 
 interface TimelineInteractionCardProps {
   interaction: CrmInteraction;
+  attendeeUserNameById?: Map<string, string>;
+  attendeeContactNameById?: Map<string, string>;
 }
 
 export default function TimelineInteractionCard({
   interaction,
+  attendeeUserNameById,
+  attendeeContactNameById,
 }: TimelineInteractionCardProps) {
   const timeLabel = formatTime(
     interaction.occurred_at || interaction.created_at
   );
   const typeLabel =
     interaction.type.charAt(0).toUpperCase() + interaction.type.slice(1);
+  const attendeeNames = Array.from(
+    new Set(
+      interaction.attendees
+        .map((attendee) => {
+          const providedName = attendee.display_name?.trim();
+          if (providedName) {
+            return providedName;
+          }
+
+          if (attendee.user_id) {
+            return attendeeUserNameById?.get(attendee.user_id)?.trim() || null;
+          }
+
+          if (attendee.contact_id) {
+            return (
+              attendeeContactNameById?.get(attendee.contact_id)?.trim() || null
+            );
+          }
+
+          return null;
+        })
+        .filter((name): name is string => Boolean(name))
+    )
+  );
 
   return (
     <div className="relative mb-4 ml-0 flex gap-3">
@@ -25,10 +53,10 @@ export default function TimelineInteractionCard({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <Text as="p" mainUiAction text02>
+        <Text as="p" mainUiAction text05>
           {interaction.title}
         </Text>
-        <Text as="p" secondaryBody text03 className="text-sm">
+        <Text as="p" secondaryBody text05 className="text-sm">
           {timeLabel}
           {timeLabel && " \u00B7 "}
           {typeLabel}
@@ -37,10 +65,20 @@ export default function TimelineInteractionCard({
           <Text
             as="p"
             secondaryBody
-            text03
+            text05
             className="mt-1 line-clamp-2 text-sm"
           >
             {interaction.summary}
+          </Text>
+        )}
+        {attendeeNames.length > 0 && (
+          <Text
+            as="p"
+            secondaryBody
+            text05
+            className="mt-1 line-clamp-2 text-sm"
+          >
+            {attendeeNames.join(", ")}
           </Text>
         )}
       </div>

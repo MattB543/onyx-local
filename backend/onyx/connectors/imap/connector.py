@@ -142,7 +142,7 @@ class ImapConnector(
             # This is the dummy checkpoint.
             # Fill it with mailboxes first.
             if self._mailboxes:
-                checkpoint.todo_mailboxes = _sanitize_mailbox_names(self._mailboxes)
+                checkpoint.todo_mailboxes = [m for m in self._mailboxes if m]
             else:
                 fetched_mailboxes = _fetch_all_mailboxes_for_email_account(
                     mail_client=mail_client
@@ -151,7 +151,7 @@ class ImapConnector(
                     raise RuntimeError(
                         "Failed to find any mailboxes for this email account"
                     )
-                checkpoint.todo_mailboxes = _sanitize_mailbox_names(fetched_mailboxes)
+                checkpoint.todo_mailboxes = [m for m in fetched_mailboxes if m]
 
             return checkpoint
 
@@ -248,7 +248,7 @@ class ImapConnector(
 
 
 def _fetch_all_mailboxes_for_email_account(mail_client: imaplib.IMAP4_SSL) -> list[str]:
-    status, mailboxes_data = mail_client.list(directory="*", pattern="*")
+    status, mailboxes_data = mail_client.list(directory='""', pattern="*")
     if status != _IMAP_OKAY_STATUS:
         raise RuntimeError(f"Failed to fetch mailboxes; {status=}")
 
@@ -272,21 +272,37 @@ def _fetch_all_mailboxes_for_email_account(mail_client: imaplib.IMAP4_SSL) -> li
         # `(<name-attributes>) <hierarchy-delimiter> <mailbox-name>`
         #
         # The below regex matches on that pattern; from there, we select the 3rd match (index 2), which is the mailbox-name.
-        match = re.match(r'\([^)]*\)\s+"([^"]+)"\s+"?(.+?)"?$', mailboxes_str)
+        match = re.match(r'\(([^)]*)\)\s+"([^"]+)"\s+"?(.+?)"?$', mailboxes_str)
         if not match:
             logger.warn(
                 f"Invalid mailbox-data formatting structure: {mailboxes_str=}; skipping"
             )
             continue
 
-        mailbox = match.group(2)
+        attributes = match.group(1)
+        if r"\Noselect" in attributes:
+            continue
+
+        mailbox = match.group(3).strip('"')
         mailboxes.append(mailbox)
 
     return mailboxes
 
 
+def _imap_quote_mailbox(mailbox: str) -> str:
+    """Quote a mailbox name for IMAP protocol use.
+
+    Python 3's imaplib does NOT auto-quote mailbox names (CPython bug #92835),
+    so names with spaces (e.g. '[Gmail]/Sent Mail') must be explicitly quoted.
+    Strips any existing quotes first to handle stale checkpoint data.
+    """
+    mailbox = mailbox.strip('"')
+    return f'"{mailbox}"'
+
+
 def _select_mailbox(mail_client: imaplib.IMAP4_SSL, mailbox: str) -> None:
-    status, _ids = mail_client.select(mailbox=mailbox, readonly=True)
+    quoted = _imap_quote_mailbox(mailbox)
+    status, _ids = mail_client.select(mailbox=quoted, readonly=True)
     if status != _IMAP_OKAY_STATUS:
         raise RuntimeError(f"Failed to select {mailbox=}")
 
@@ -297,7 +313,11 @@ def _fetch_email_ids_in_mailbox(
     start: SecondsSinceUnixEpoch,
     end: SecondsSinceUnixEpoch,
 ) -> list[str]:
-    _select_mailbox(mail_client=mail_client, mailbox=mailbox)
+    try:
+        _select_mailbox(mail_client=mail_client, mailbox=mailbox)
+    except RuntimeError:
+        logger.warning(f"Skipping non-selectable mailbox: {mailbox}")
+        return []
 
     start_str = datetime.fromtimestamp(start, tz=timezone.utc).strftime("%d-%b-%Y")
     end_str = datetime.fromtimestamp(end, tz=timezone.utc).strftime("%d-%b-%Y")
@@ -363,13 +383,23 @@ def _convert_email_headers_and_body_into_document(
         else None
     )
 
+    # Prepend structured header context so the LLM (and search) can see
+    # who the email is from/to, matching the pattern used by the Gmail connector.
+    header_lines = f"from: {email_headers.sender}\n"
+    if email_headers.recipients:
+        header_lines += f"to: {email_headers.recipients}\n"
+    header_lines += f"subject: {email_headers.subject}\n"
+    header_lines += f"date: {email_headers.date.isoformat()}\n"
+    section_text = f"{header_lines}\n{email_body}"
+
     return Document(
         id=email_headers.id,
         title=email_headers.subject,
         semantic_identifier=email_headers.subject,
         metadata={},
         source=DocumentSource.IMAP,
-        sections=[TextSection(text=email_body)],
+        sections=[TextSection(text=section_text)],
+        doc_updated_at=email_headers.date.astimezone(timezone.utc) if email_headers.date else None,
         primary_owners=primary_owners,
         external_access=external_access,
     )
@@ -412,13 +442,6 @@ def _parse_email_body(
 
     return " ".join(str_section for str_section in soup.stripped_strings)
 
-
-def _sanitize_mailbox_names(mailboxes: list[str]) -> list[str]:
-    """
-    Mailboxes with special characters in them must be enclosed by double-quotes, as per the IMAP protocol.
-    Just to be safe, we wrap *all* mailboxes with double-quotes.
-    """
-    return [f'"{mailbox}"' for mailbox in mailboxes if mailbox]
 
 
 def _parse_addrs(raw_header: str) -> list[tuple[str, str]]:

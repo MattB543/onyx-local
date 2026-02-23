@@ -873,6 +873,10 @@ PARSE_WITH_TRAFILATURA = os.environ.get("PARSE_WITH_TRAFILATURA", "").lower() ==
 # Feature flag for composable custom background jobs
 ENABLE_CUSTOM_JOBS = os.environ.get("ENABLE_CUSTOM_JOBS", "").lower() == "true"
 
+# Custom Job ID for Email-to-CRM automation.
+# When set, the indexing adapter will emit trigger events for GMAIL/IMAP documents.
+EMAIL_CRM_CUSTOM_JOB_ID = os.environ.get("EMAIL_CRM_CUSTOM_JOB_ID") or ""
+
 # allow for custom error messages for different errors returned by litellm
 # for example, can specify: {"Violated content safety policy": "EVIL REQUEST!!!"}
 # to make it so that if an LLM call returns an error containing "Violated content safety policy"

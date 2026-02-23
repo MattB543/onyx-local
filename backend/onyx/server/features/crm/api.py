@@ -41,12 +41,14 @@ from onyx.db.crm import update_organization
 from onyx.db.crm import validate_stage_string
 from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import CrmAttendeeRole
+from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import User
 from onyx.server.documents.models import PaginatedReturn
 from onyx.server.features.crm.models import CrmContactCreateRequest
 from onyx.server.features.crm.models import CrmContactPatchRequest
 from onyx.server.features.crm.models import CrmContactSnapshot
 from onyx.server.features.crm.models import CrmEntityType
+from onyx.server.features.crm.models import CrmInteractionAttendeeSnapshot
 from onyx.server.features.crm.models import CrmInteractionCreateRequest
 from onyx.server.features.crm.models import CrmInteractionSnapshot
 from onyx.server.features.crm.models import CrmOrganizationCreateRequest
@@ -103,7 +105,50 @@ def _serialize_organization(organization, db_session: Session) -> CrmOrganizatio
 
 def _serialize_interaction(interaction, db_session: Session) -> CrmInteractionSnapshot:
     attendees = get_interaction_attendees(interaction.id, db_session)
-    return CrmInteractionSnapshot.from_model(interaction=interaction, attendees=attendees)
+    user_name_by_id: dict[UUID, str | None] = {}
+    contact_name_by_id: dict[UUID, str | None] = {}
+    attendee_snapshots: list[CrmInteractionAttendeeSnapshot] = []
+
+    for attendee in attendees:
+        display_name: str | None = None
+
+        if attendee.user_id is not None:
+            if attendee.user_id not in user_name_by_id:
+                attendee_user = db_session.get(User, attendee.user_id)
+                user_name_by_id[attendee.user_id] = (
+                    (attendee_user.personal_name or attendee_user.email)
+                    if attendee_user
+                    else None
+                )
+            display_name = user_name_by_id[attendee.user_id]
+
+        if attendee.contact_id is not None:
+            if attendee.contact_id not in contact_name_by_id:
+                attendee_contact = get_contact_by_id(attendee.contact_id, db_session)
+                if attendee_contact is None:
+                    contact_name_by_id[attendee.contact_id] = None
+                else:
+                    name_parts = [
+                        attendee_contact.first_name,
+                        attendee_contact.last_name or "",
+                    ]
+                    full_name = " ".join(part for part in name_parts if part).strip()
+                    contact_name_by_id[attendee.contact_id] = (
+                        full_name or attendee_contact.email
+                    )
+            display_name = contact_name_by_id[attendee.contact_id]
+
+        attendee_snapshots.append(
+            CrmInteractionAttendeeSnapshot.from_model(
+                attendee=attendee,
+                display_name=display_name,
+            )
+        )
+
+    return CrmInteractionSnapshot.from_model(
+        interaction=interaction,
+        attendee_snapshots=attendee_snapshots,
+    )
 
 
 def _ensure_user_exists(user_id: UUID, db_session: Session) -> None:
@@ -179,10 +224,18 @@ def get_contacts(
         None,
         description="Filter by CRM contact status.",
     ),
+    category: str | None = Query(
+        None,
+        description="Filter by CRM contact category.",
+    ),
     organization_id: UUID | None = Query(
         None, description="Filter by CRM organization."
     ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
+    sort_by: str | None = Query(
+        None,
+        description="Sort field: 'updated_at' (default) or 'created_at'.",
+    ),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
@@ -199,14 +252,22 @@ def get_contacts(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    normalized_category: str | None = None
+    if category is not None:
+        stripped = category.strip()
+        if stripped:
+            normalized_category = stripped
+
     contacts, total_items = list_contacts(
         db_session=db_session,
         page_num=page_num,
         page_size=page_size,
         query=q,
         status=normalized_status,
+        category=normalized_category,
         organization_id=organization_id,
         tag_ids=tag_ids,
+        sort_by=sort_by,
     )
     return PaginatedReturn(
         items=[_serialize_contact(contact, db_session) for contact in contacts],
@@ -340,7 +401,15 @@ def patch_contact(
 @router.get("/organizations")
 def get_organizations(
     q: str | None = Query(None, description="Optional query filter."),
+    type: CrmOrganizationType | None = Query(
+        None,
+        description="Filter by organization type.",
+    ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
+    sort_by: str | None = Query(
+        None,
+        description="Sort field: 'updated_at' (default) or 'created_at'.",
+    ),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
@@ -351,7 +420,9 @@ def get_organizations(
         page_num=page_num,
         page_size=page_size,
         query=q,
+        org_type=type,
         tag_ids=tag_ids,
+        sort_by=sort_by,
     )
     return PaginatedReturn(
         items=[

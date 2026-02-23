@@ -12,6 +12,7 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
+import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
@@ -134,6 +135,28 @@ export default function CrmContactDetailPage({
       ),
     [ownerOptions]
   );
+  const attendeeUserNameById = useMemo(
+    () =>
+      new Map(
+        (usersData || []).map((candidate) => [
+          candidate.id,
+          candidate.full_name?.trim() || candidate.email,
+        ])
+      ),
+    [usersData]
+  );
+  const attendeeContactNameById = useMemo(() => {
+    const labelById = new Map<string, string>();
+    if (contact) {
+      const fullName =
+        contact.full_name?.trim() ||
+        `${contact.first_name} ${contact.last_name || ""}`.trim() ||
+        contact.email ||
+        contact.id;
+      labelById.set(contact.id, fullName);
+    }
+    return labelById;
+  }, [contact]);
 
   const hasMoreInteractions = interactions.length < totalInteractions;
 
@@ -148,55 +171,52 @@ export default function CrmContactDetailPage({
 
   return (
     <AppLayouts.Root>
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex w-[min(72rem,100%)] flex-col gap-6 px-4 pb-12 pt-8">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <SvgUser className="h-[1.75rem] w-[1.75rem] stroke-text-04" />
-                <Text as="p" headingH2>
-                  CRM
-                </Text>
-              </div>
-              <Button
-                action
-                tertiary
-                size="md"
-                type="button"
-                onClick={() => router.back()}
-              >
-                Back
-              </Button>
-            </div>
-            <CrmBreadcrumbs items={breadcrumbs} />
+      <SettingsLayouts.Root width="xl">
+        <SettingsLayouts.Header
+          icon={SvgUser}
+          title="CRM"
+          description={<CrmBreadcrumbs items={breadcrumbs} />}
+          titleIconInline
+          rightChildren={
+            <Button
+              action
+              tertiary
+              size="md"
+              type="button"
+              onClick={() => router.back()}
+            >
+              Back
+            </Button>
+          }
+        >
+          <CrmNav
+            rightContent={
+              contact &&
+              (isEditing ? (
+                <Button
+                  action
+                  secondary
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel Edit
+                </Button>
+              ) : (
+                <Button
+                  action
+                  primary
+                  type="button"
+                  leftIcon={SvgEdit}
+                  onClick={() => setIsEditing(true)}
+                >
+                  Edit
+                </Button>
+              ))
+            }
+          />
+        </SettingsLayouts.Header>
 
-            <CrmNav
-              rightContent={
-                contact &&
-                (isEditing ? (
-                  <Button
-                    action
-                    secondary
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                  >
-                    Cancel Edit
-                  </Button>
-                ) : (
-                  <Button
-                    action
-                    primary
-                    type="button"
-                    leftIcon={SvgEdit}
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit
-                  </Button>
-                ))
-              }
-            />
-          </div>
-
+        <SettingsLayouts.Body>
           {error && (
             <Text as="p" secondaryBody className="text-sm text-status-error-03">
               Failed to load contact.
@@ -221,7 +241,7 @@ export default function CrmContactDetailPage({
                       {contact.full_name || contact.first_name}
                     </span>
                     <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-text-03">
-                      <span>{contact.title || "-"}</span>
+                      <span>{contact.title || "No title"}</span>
                       {contact.organization_id && (
                         <>
                           <span>·</span>
@@ -683,6 +703,8 @@ export default function CrmContactDetailPage({
                         interactions={interactions}
                         isLoading={interactionsLoading}
                         hasMore={hasMoreInteractions}
+                        attendeeUserNameById={attendeeUserNameById}
+                        attendeeContactNameById={attendeeContactNameById}
                         onLoadMore={() =>
                           setInteractionPageSize(
                             (value) => value + INTERACTION_PAGE_SIZE
@@ -698,8 +720,8 @@ export default function CrmContactDetailPage({
               </div>
             </>
           ) : null}
-        </div>
-      </div>
+        </SettingsLayouts.Body>
+      </SettingsLayouts.Root>
 
       <LogInteractionModal
         open={logInteractionModalOpen}
