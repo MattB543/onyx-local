@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from onyx.configs.app_configs import AWS_ENCRYPTED_DEK_PARAM
 from onyx.configs.app_configs import AWS_KMS_KEY_ID
 from onyx.configs.app_configs import AWS_REGION_NAME
+from onyx.configs.app_configs import ENCRYPTION_KEY_SECRET
 from onyx.configs.app_configs import SECRET_ENCRYPTION_MODE
 from onyx.configs.app_configs import SECRET_ENCRYPTION_REQUIRED
 from onyx.configs.app_configs import SECRET_KEY_VERSION
@@ -239,6 +240,44 @@ def _encrypt_string(input_str: str) -> bytes:
     return keyring.encrypt(input_str.encode("utf-8"))
 
 
+def _decrypt_legacy_aes_cbc(input_bytes: bytes) -> str:
+    """Decrypt data encrypted with the old AES-CBC scheme (ENCRYPTION_KEY_SECRET).
+    Used as a fallback during migration from the legacy EE encryption to KMS."""
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import algorithms
+    from cryptography.hazmat.primitives.ciphers import Cipher
+    from cryptography.hazmat.primitives.ciphers import modes
+
+    if not ENCRYPTION_KEY_SECRET:
+        raise RuntimeError(
+            "Cannot decrypt legacy AES-CBC data: ENCRYPTION_KEY_SECRET is not set."
+        )
+
+    encoded_key = ENCRYPTION_KEY_SECRET.encode()
+    key_length = len(encoded_key)
+    if key_length > 32:
+        key = ENCRYPTION_KEY_SECRET[:32].encode()
+    elif key_length not in (16, 24, 32):
+        valid_lengths = [16, 24, 32]
+        trim_to = min(valid_lengths, key=lambda x: abs(x - key_length))
+        key = ENCRYPTION_KEY_SECRET[:trim_to].encode()
+    else:
+        key = encoded_key
+
+    iv = input_bytes[:16]
+    encrypted_data = input_bytes[16:]
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_padded = decryptor.update(encrypted_data) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+    decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
+
+    return decrypted.decode()
+
+
 # IMPORTANT DO NOT DELETE, THIS IS USED BY fetch_versioned_implementation
 def _decrypt_bytes(input_bytes: bytes) -> str:
     _validate_encryption_mode()
@@ -251,8 +290,12 @@ def _decrypt_bytes(input_bytes: bytes) -> str:
 
     keyring = _load_envelope_keyring()
     if not keyring.is_encrypted_payload(input_bytes):
-        # Legacy plaintext fallback for migration compatibility.
-        return input_bytes.decode("utf-8")
+        # Legacy fallback for migration compatibility.
+        # Try plaintext UTF-8 first, then old AES-CBC decryption.
+        try:
+            return input_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            return _decrypt_legacy_aes_cbc(input_bytes)
 
     return keyring.decrypt(input_bytes).decode("utf-8")
 
