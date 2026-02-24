@@ -1163,5 +1163,5 @@ def find_users_for_attendee_resolution(
             )
             .order_by(priority.asc(), User.email.asc())
             .limit(max_results)
-        )
+        ).unique()
     )
