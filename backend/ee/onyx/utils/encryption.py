@@ -40,8 +40,7 @@ def _warn_on_secret_encryption_mode_mismatch() -> None:
         )
 
 
-def _encrypt_string(input_str: str) -> bytes:
-    _warn_on_secret_encryption_mode_mismatch()
+def _encrypt_string_aes_cbc(input_str: str) -> bytes:
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(
             "ENCRYPTION_KEY_SECRET is not set. Refusing to store credentials "
@@ -60,8 +59,7 @@ def _encrypt_string(input_str: str) -> bytes:
     return iv + encrypted_data
 
 
-def _decrypt_bytes(input_bytes: bytes) -> str:
-    _warn_on_secret_encryption_mode_mismatch()
+def _decrypt_bytes_aes_cbc(input_bytes: bytes) -> str:
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(
             "ENCRYPTION_KEY_SECRET is not set. Cannot decrypt credentials. "
@@ -87,16 +85,43 @@ def _decrypt_bytes(input_bytes: bytes) -> str:
     return decrypted_data.decode()
 
 
+def _encrypt_string(input_str: str) -> bytes:
+    # When KMS envelope encryption is active, delegate to the OSS KMS path.
+    if SECRET_ENCRYPTION_MODE != "disabled":
+        from onyx.utils.encryption import _encrypt_string as _kms_encrypt
+
+        return _kms_encrypt(input_str)
+
+    return _encrypt_string_aes_cbc(input_str)
+
+
+def _decrypt_bytes(input_bytes: bytes) -> str:
+    # When KMS envelope encryption is active, delegate to the OSS KMS path.
+    # The OSS path handles KMS payloads and falls back to legacy AES-CBC.
+    if SECRET_ENCRYPTION_MODE != "disabled":
+        from onyx.utils.encryption import _decrypt_bytes as _kms_decrypt
+
+        return _kms_decrypt(input_bytes)
+
+    return _decrypt_bytes_aes_cbc(input_bytes)
+
+
 def _ensure_secret_encryption_ready() -> None:
-    _warn_on_secret_encryption_mode_mismatch()
+    if SECRET_ENCRYPTION_MODE != "disabled":
+        from onyx.utils.encryption import (
+            _ensure_secret_encryption_ready as _kms_ready,
+        )
+
+        return _kms_ready()
+
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(
             "ENCRYPTION_KEY_SECRET is not set. Cannot validate secret encryption readiness."
         )
 
     test_payload = "onyx-secret-readiness-check"
-    encrypted = _encrypt_string(test_payload)
-    decrypted = _decrypt_bytes(encrypted)
+    encrypted = _encrypt_string_aes_cbc(test_payload)
+    decrypted = _decrypt_bytes_aes_cbc(encrypted)
     if decrypted != test_payload:
         raise RuntimeError("Secret encryption readiness check failed")
 
