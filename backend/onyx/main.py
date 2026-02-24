@@ -58,6 +58,7 @@ from onyx.db.engine.connection_warmup import warm_up_connections
 from onyx.db.engine.sql_engine import get_session_with_current_tenant
 from onyx.db.engine.sql_engine import SqlEngine
 from onyx.file_store.file_store import get_default_file_store
+from onyx.key_value_store.store import cleanup_legacy_kv_store_redis_cache
 from onyx.server.api_key.api import router as api_key_router
 from onyx.server.auth_check import check_router_auth
 from onyx.server.documents.cc_pair import router as cc_pair_router
@@ -141,6 +142,7 @@ from onyx.tracing.setup import setup_tracing
 from onyx.utils.logger import setup_logger
 from onyx.utils.logger import setup_uvicorn_logger
 from onyx.utils.middleware import add_onyx_request_id_middleware
+from onyx.utils.encryption import ensure_secret_encryption_ready
 from onyx.utils.telemetry import get_or_generate_uuid
 from onyx.utils.telemetry import optional_telemetry
 from onyx.utils.telemetry import RecordType
@@ -279,6 +281,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
 
     # Will throw exception if an issue is found
     verify_auth()
+
+    # Remove potentially stale plaintext KV cache entries from pre-encryption deployments.
+    cleanup_legacy_kv_store_redis_cache()
+
+    # Validate encryption setup early to fail closed when required.
+    ensure_secret_encryption_ready()
 
     if OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET:
         logger.notice("Both OAuth Client ID and Secret are configured.")

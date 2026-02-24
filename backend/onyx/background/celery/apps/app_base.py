@@ -36,6 +36,7 @@ from onyx.document_index.opensearch.client import (
 )
 from onyx.document_index.vespa.shared_utils.utils import wait_for_vespa_with_timeout
 from onyx.httpx.httpx_pool import HttpxPool
+from onyx.key_value_store.store import cleanup_legacy_kv_store_redis_cache
 from onyx.redis.redis_connector import RedisConnector
 from onyx.redis.redis_connector_delete import RedisConnectorDelete
 from onyx.redis.redis_connector_doc_perm_sync import RedisConnectorPermissionSync
@@ -45,6 +46,7 @@ from onyx.redis.redis_document_set import RedisDocumentSet
 from onyx.redis.redis_pool import get_redis_client
 from onyx.redis.redis_usergroup import RedisUserGroup
 from onyx.tracing.setup import setup_tracing
+from onyx.utils.encryption import ensure_secret_encryption_ready
 from onyx.utils.logger import ColoredFormatter
 from onyx.utils.logger import LoggerContextVars
 from onyx.utils.logger import PlainFormatter
@@ -244,6 +246,9 @@ def on_celeryd_init(
     # Initialize tracing in workers if credentials are available.
     setup_tracing()
 
+    # Validate encryption setup before worker task execution begins.
+    ensure_secret_encryption_ready()
+
 
 def wait_for_redis(sender: Any, **kwargs: Any) -> None:  # noqa: ARG001
     """Waits for redis to become ready subject to a hardcoded timeout.
@@ -285,6 +290,7 @@ def wait_for_redis(sender: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise WorkerShutdown(msg)
 
     logger.info("Redis: Readiness probe succeeded. Continuing...")
+    cleanup_legacy_kv_store_redis_cache(redis_client=r)
     return
 
 

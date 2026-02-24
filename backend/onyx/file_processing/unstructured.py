@@ -25,7 +25,7 @@ def get_unstructured_api_key() -> str | None:
 
 def update_unstructured_api_key(api_key: str) -> None:
     kv_store = get_kv_store()
-    kv_store.store(KV_UNSTRUCTURED_API_KEY, api_key)
+    kv_store.store(KV_UNSTRUCTURED_API_KEY, api_key, encrypt=True)
 
 
 def delete_unstructured_api_key() -> None:

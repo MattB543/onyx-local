@@ -118,10 +118,73 @@ PASSWORD_REQUIRE_SPECIAL_CHAR = (
     os.environ.get("PASSWORD_REQUIRE_SPECIAL_CHAR", "false").lower() == "true"
 )
 
-# Encryption key secret is used to encrypt connector credentials, api keys, and other sensitive
-# information. This provides an extra layer of security on top of Postgres access controls
-# and is available in Onyx EE
+# Legacy key used by EE encryption flow. OSS encryption now uses
+# SECRET_ENCRYPTION_MODE + AWS KMS envelope configuration.
 ENCRYPTION_KEY_SECRET = os.environ.get("ENCRYPTION_KEY_SECRET") or ""
+
+# Secret encryption mode for OSS:
+# - disabled: store plaintext bytes (legacy behavior)
+# - aws_kms_envelope: AES-GCM payload encryption with KMS-decrypted DEK from SSM
+SECRET_ENCRYPTION_MODE = (
+    os.environ.get("SECRET_ENCRYPTION_MODE", "disabled").strip().lower()
+)
+# If true, startup fails when encryption is not fully configured/usable.
+SECRET_ENCRYPTION_REQUIRED = (
+    os.environ.get("SECRET_ENCRYPTION_REQUIRED", "false").strip().lower() == "true"
+)
+
+# Active key version used for encryption writes.
+_SECRET_KEY_VERSION_RAW = os.environ.get("SECRET_KEY_VERSION", "1").strip()
+try:
+    SECRET_KEY_VERSION = int(_SECRET_KEY_VERSION_RAW)
+except ValueError:
+    if SECRET_ENCRYPTION_MODE == "disabled":
+        logger.warning(
+            "Invalid SECRET_KEY_VERSION '%s'. Falling back to 1 because "
+            "SECRET_ENCRYPTION_MODE=disabled.",
+            _SECRET_KEY_VERSION_RAW,
+        )
+        SECRET_KEY_VERSION = 1
+    else:
+        raise RuntimeError(
+            f"Invalid SECRET_KEY_VERSION '{_SECRET_KEY_VERSION_RAW}'. "
+            "Expected an integer."
+        )
+
+
+def _parse_secret_old_key_versions() -> list[int]:
+    raw = os.environ.get("SECRET_OLD_KEY_VERSIONS", "").strip()
+    if not raw:
+        return []
+    versions: list[int] = []
+    for item in raw.split(","):
+        candidate = item.strip()
+        if not candidate:
+            continue
+        try:
+            versions.append(int(candidate))
+        except ValueError:
+            if SECRET_ENCRYPTION_MODE == "disabled":
+                logger.warning(
+                    "Ignoring invalid SECRET_OLD_KEY_VERSIONS item '%s'. "
+                    "Expected an integer.",
+                    candidate,
+                )
+            else:
+                raise RuntimeError(
+                    "Invalid SECRET_OLD_KEY_VERSIONS item "
+                    f"'{candidate}'. Expected an integer."
+                )
+    return versions
+
+
+SECRET_OLD_KEY_VERSIONS = _parse_secret_old_key_versions()
+
+# SSM parameter name containing base64-encoded encrypted DEK.
+# Supports "{version}" placeholder when using multiple key versions.
+AWS_ENCRYPTED_DEK_PARAM = os.environ.get("AWS_ENCRYPTED_DEK_PARAM", "").strip()
+# Optional: explicit KMS key ID to constrain decrypt requests.
+AWS_KMS_KEY_ID = os.environ.get("AWS_KMS_KEY_ID", "").strip()
 
 # Turn off mask if admin users should see full credentials for data connectors.
 MASK_CREDENTIAL_PREFIX = (

@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers import modes
 
 from onyx.configs.app_configs import ENCRYPTION_KEY_SECRET
+from onyx.configs.app_configs import SECRET_ENCRYPTION_MODE
 from onyx.utils.logger import setup_logger
 from onyx.utils.variable_functionality import fetch_versioned_implementation
 
@@ -29,7 +30,18 @@ def _get_trimmed_key(key: str) -> bytes:
     return key.encode()
 
 
+@lru_cache(maxsize=1)
+def _warn_on_secret_encryption_mode_mismatch() -> None:
+    if SECRET_ENCRYPTION_MODE != "disabled":
+        logger.warning(
+            "SECRET_ENCRYPTION_MODE=%s is configured, but EE currently uses "
+            "ENCRYPTION_KEY_SECRET for credential encryption.",
+            SECRET_ENCRYPTION_MODE,
+        )
+
+
 def _encrypt_string(input_str: str) -> bytes:
+    _warn_on_secret_encryption_mode_mismatch()
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(
             "ENCRYPTION_KEY_SECRET is not set. Refusing to store credentials "
@@ -49,6 +61,7 @@ def _encrypt_string(input_str: str) -> bytes:
 
 
 def _decrypt_bytes(input_bytes: bytes) -> str:
+    _warn_on_secret_encryption_mode_mismatch()
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(
             "ENCRYPTION_KEY_SECRET is not set. Cannot decrypt credentials. "
@@ -72,6 +85,20 @@ def _decrypt_bytes(input_bytes: bytes) -> str:
     decrypted_data = unpadder.update(decrypted_padded_data) + unpadder.finalize()
 
     return decrypted_data.decode()
+
+
+def _ensure_secret_encryption_ready() -> None:
+    _warn_on_secret_encryption_mode_mismatch()
+    if not ENCRYPTION_KEY_SECRET:
+        raise RuntimeError(
+            "ENCRYPTION_KEY_SECRET is not set. Cannot validate secret encryption readiness."
+        )
+
+    test_payload = "onyx-secret-readiness-check"
+    encrypted = _encrypt_string(test_payload)
+    decrypted = _decrypt_bytes(encrypted)
+    if decrypted != test_payload:
+        raise RuntimeError("Secret encryption readiness check failed")
 
 
 def encrypt_string_to_bytes(input_str: str) -> bytes:

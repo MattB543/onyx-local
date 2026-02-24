@@ -3,6 +3,7 @@ import json
 from typing import Any
 from typing import Literal
 from typing import NotRequired
+from typing import cast
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -204,6 +205,44 @@ class EncryptedJson(TypeDecorator):
         return x == y
 
 
+class EncryptedStringUnmasked(TypeDecorator):
+    impl = LargeBinary
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: str | None, dialect: Dialect  # noqa: ARG002
+    ) -> bytes | None:
+        if value is None:
+            return None
+        return encrypt_string_to_bytes(value)
+
+    def process_result_value(
+        self, value: bytes | bytearray | memoryview | None, dialect: Dialect  # noqa: ARG002
+    ) -> str | None:
+        if value is None:
+            return None
+        return decrypt_bytes_to_string(bytes(value))
+
+
+class EncryptedJsonUnmasked(TypeDecorator):
+    impl = LargeBinary
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: dict[str, Any] | None, dialect: Dialect  # noqa: ARG002
+    ) -> bytes | None:
+        if value is None:
+            return None
+        return encrypt_string_to_bytes(json.dumps(value))
+
+    def process_result_value(
+        self, value: bytes | bytearray | memoryview | None, dialect: Dialect  # noqa: ARG002
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        return cast(dict[str, Any], json.loads(decrypt_bytes_to_string(bytes(value))))
+
+
 class NullFilteredString(TypeDecorator):
     impl = String
     # This type's behavior is fully deterministic and doesn't depend on any external factors.
@@ -230,8 +269,12 @@ Auth/Authz (users, permissions, access) Tables
 
 class OAuthAccount(SQLAlchemyBaseOAuthAccountTableUUID, Base):
     # even an almost empty token from keycloak will not fit the default 1024 bytes
-    access_token: Mapped[str] = mapped_column(Text, nullable=False)  # type: ignore
-    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)  # type: ignore
+    access_token: Mapped[str] = mapped_column(
+        EncryptedStringUnmasked(), nullable=False
+    )  # type: ignore
+    refresh_token: Mapped[str] = mapped_column(
+        EncryptedStringUnmasked(), nullable=False
+    )  # type: ignore
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
@@ -2825,7 +2868,7 @@ class LLMProvider(Base):
     # custom configs that should be passed to the LLM provider at inference time
     # (e.g. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, etc. for bedrock)
     custom_config: Mapped[dict[str, str] | None] = mapped_column(
-        postgresql.JSONB(), nullable=True
+        EncryptedJsonUnmasked(), nullable=True
     )
     default_model_name: Mapped[str] = mapped_column(String)
 
