@@ -86,3 +86,5 @@ log/
 # local ops scripts (machine- or prod-specific)
 scripts/check-prod-logs.sh
 scripts/reencrypt-credentials.sh
+
+private_docs/

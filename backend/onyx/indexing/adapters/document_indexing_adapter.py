@@ -1,9 +1,11 @@
 import contextlib
 from functools import lru_cache
 import hashlib
+import re
 from collections.abc import Generator
 from datetime import datetime
 from datetime import timezone
+from email.utils import getaddresses
 from uuid import UUID
 
 from sqlalchemy.engine.util import TransactionalContext
@@ -12,6 +14,7 @@ from sqlalchemy.orm import Session
 from onyx.access.access import get_access_for_documents
 from onyx.access.models import DocumentAccess
 from onyx.configs.app_configs import EMAIL_CRM_CUSTOM_JOB_ID
+from onyx.configs.app_configs import VALID_EMAIL_DOMAINS
 from onyx.configs.constants import DEFAULT_BOOST
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.models import Document
@@ -96,6 +99,46 @@ def _owner_emails(owners: list | None) -> list[str]:
     if not owners:
         return []
     return [o.email for o in owners if o.email]
+
+
+def _parse_email_address(value: str) -> str | None:
+    for _display_name, address in getaddresses([value]):
+        normalized = address.strip().lower()
+        if normalized.count("@") == 1:
+            return normalized
+    return None
+
+
+def _extract_sender_from_imap_sections(doc: Document) -> str | None:
+    for section in doc.sections:
+        if not isinstance(section, TextSection) or not section.text:
+            continue
+        from_match = re.search(r"(?im)^from:\s*(.+)$", section.text)
+        if not from_match:
+            continue
+        sender_email = _parse_email_address(from_match.group(1))
+        if sender_email:
+            return sender_email
+    return None
+
+
+def _extract_sender_email(doc: Document) -> str | None:
+    if doc.source == DocumentSource.IMAP:
+        sender_from_header = _extract_sender_from_imap_sections(doc)
+        if sender_from_header:
+            return sender_from_header
+
+    for owner_email in _owner_emails(doc.primary_owners):
+        sender_email = _parse_email_address(owner_email)
+        if sender_email:
+            return sender_email
+    return None
+
+
+def _extract_email_domain(email_address: str | None) -> str | None:
+    if not email_address or email_address.count("@") != 1:
+        return None
+    return email_address.rsplit("@", 1)[1].lower()
 
 
 class DocumentIndexingBatchAdapter:
@@ -355,7 +398,25 @@ class DocumentIndexingBatchAdapter:
         if not email_docs:
             return
 
+        valid_sender_domains = {
+            domain.strip().lower()
+            for domain in VALID_EMAIL_DOMAINS
+            if domain.strip()
+        }
+
         for doc in email_docs:
+            sender_email = _extract_sender_email(doc)
+            sender_domain = _extract_email_domain(sender_email)
+            if valid_sender_domains and sender_domain not in valid_sender_domains:
+                logger.info(
+                    "Skipping email-CRM trigger event for doc '%s' "
+                    "(sender='%s', sender_domain='%s' not in VALID_EMAIL_DOMAINS).",
+                    doc.id,
+                    sender_email or "",
+                    sender_domain or "",
+                )
+                continue
+
             dedupe_key = _build_email_crm_dedupe_key(doc)
             primary_owner_emails = _owner_emails(doc.primary_owners)
             secondary_owner_emails = _owner_emails(doc.secondary_owners)
@@ -373,7 +434,8 @@ class DocumentIndexingBatchAdapter:
                 "text": extracted_text,
                 # Explicit fields consumed by downstream CRM prompt construction.
                 # Keep these in addition to legacy fields for compatibility.
-                "from": primary_owner_emails[0] if primary_owner_emails else "",
+                "from": sender_email
+                or (primary_owner_emails[0] if primary_owner_emails else ""),
                 "to": ", ".join(secondary_owner_emails),
                 "subject": doc.semantic_identifier,
                 "date": doc.doc_updated_at.isoformat() if doc.doc_updated_at else "",

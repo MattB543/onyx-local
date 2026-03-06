@@ -1,114 +1,217 @@
-EC2
+# EC2 Deployment Guide
 
-Deploy Onyx on AWS EC2
-Using AWS EC2 is the recommended way of deploying Onyx. It is simple to set up and should meet the performance needs of 90% of organizations looking to use Onyx!
-​
-Guide
-1
+Deploy Onyx on AWS EC2 with KMS envelope encryption for secrets at rest.
 
-Create an EC2 instance
-Create an EC2 instance with the appropriate resources. For this guide, we will use the recommended m7g.xlarge instance.
-Read our Resourcing guide for more details.
+---
 
-    Give your instance a descriptive name like onyx-prod
-    Select the Amazon Linux 2023 AMI
-    Select the 64-bit (Arm) architecture
-    Select the m7g.xlarge instance type
-    Select Allow HTTPS traffic from the internet in the Network settings section
-    Configure storage following the Resourcing Guide
+## Part 1: EC2 Instance Setup
 
-EC2 Instance CreationEC2 Security Group Configuration
-2
+### 1. Create an EC2 instance
 
-Create the instance
-Click Launch instance and then view your instance details.
-Save the Public IPv4 address of the instance!
-EC2 Public IPv4 Address
-3
+- **AMI:** Amazon Linux 2023
+- **Architecture:** 64-bit (Arm)
+- **Instance type:** m7g.xlarge (recommended)
+- **Network:** Allow HTTPS traffic from the internet
+- **Storage:** See the [Resourcing Guide](https://docs.onyx.app)
 
-Point domain to the instance
-If you don’t have a domain, buy one from a DNS provider like GoDaddy or just skip HTTPS for now.
-To point our domain to the new instance, we need to add an A and CNAME record to our DNS provider.The A record should be the subdomain that you would like to use for the Onyx instance like prod.The CNAME record should be the same name with the www. in front resulting in www.prod pointing to the full domain like prod.onyx.app.DNS A Record ConfigurationDNS CNAME Record Configuration
-4
+Save the **Public IPv4 address** after launch.
 
-Install Onyx requirements
-Onyx requires git, docker, and docker compose.To install these on Amazon Linux 2023, run the following:
+### 2. Point your domain to the instance
 
+Add DNS records with your provider:
+
+| Type  | Name       | Value                    |
+|-------|------------|--------------------------|
+| A     | `prod`     | `<EC2 Public IPv4>`      |
+| CNAME | `www.prod` | `prod.yourdomain.com`    |
+
+Skip this if you don't have a domain (HTTP-only setup).
+
+### 3. Install dependencies
+
+```bash
 sudo yum update -y
-
-sudo yum install docker -y
+sudo yum install docker git -y
 sudo service docker start
 
-sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) \
+  -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
+```
 
-sudo yum install git
+### 4. Install Onyx
 
-5
-
-Install and Configure Onyx
-To install Onyx, we’ll need to clone the repo and set the necessary environment variables.
-
+```bash
 git clone --depth 1 https://github.com/onyx-dot-app/onyx.git
-
 cd onyx/deployment/docker_compose
 cp env.prod.template .env
 cp env.nginx.template .env.nginx
+```
 
-Fill out the .env and .env.nginx files.
-.env
+Edit `.env`:
 
-WEB_DOMAIN=<YOUR_DOMAIN> # Something like "onyx.app"
+```
+WEB_DOMAIN=<YOUR_DOMAIN>
+VALID_EMAIL_DOMAINS=<YOUR_COMPANY_EMAIL_DOMAIN>
+AUTH_TYPE=basic
+```
 
-# If your email is something like "chris@onyx.app", then this should be "onyx.app"
+Edit `.env.nginx`:
 
-# This prevents people outside your company from creating an account
+```
+DOMAIN=<YOUR_DOMAIN>
+```
 
-VALID_EMAIL_DOMAINS=<YOUR_COMPANIES_EMAIL_DOMAIN>
+### 5. Launch Onyx
 
-# See our auth guides for options here
+With HTTPS (requires domain):
 
-AUTH_TYPE=
-
-.env.nginx
-
-DOMAIN=<YOUR_DOMAIN> # Something like "onyx.app"
-
-6
-
-Launch Onyx
-Running the init-letsencrypt.sh script will get us a SSL certificate from letsencrypt and launch the Onyx stack.
-
+```bash
 ./init-letsencrypt.sh
+```
 
-You will hit an error if you fail the letsencrypt workflow more than 5 times. You will need to wait 72 hours or request a new domain.
-If you are skipping the HTTPS setup, start Onyx manually:
+Without HTTPS:
 
+```bash
 docker compose -f docker-compose.prod.yml -p onyx-stack up -d --build --force-recreate
+```
 
-Give Onyx a few minutes to start up.You can monitor the progress with docker logs onyx-stack-api_server-1 -f.
-You can access Onyx from the instance Public IPv4 or from the domain you set up earlier!
+---
 
-7
+## Part 2: KMS Envelope Encryption
 
-Enable secret encryption (recommended)
-Configure KMS + SSM + IAM so Onyx encrypts secrets at rest (credentials, OAuth tokens, API keys).
-Note: the `SECRET_ENCRYPTION_MODE=aws_kms_envelope` flow applies to OSS encryption paths.
-EE encryption currently uses `ENCRYPTION_KEY_SECRET`.
+Encrypts credentials, OAuth tokens, API keys, and LLM config at rest using AWS KMS envelope encryption. A data encryption key (DEK) is generated by KMS, stored encrypted in SSM Parameter Store, and decrypted at runtime by the application.
 
-Create a KMS key
+> **Important:** All AWS resources (KMS key, SSM parameter, EC2 instance) must be in the **same region**. The examples below use `eu-west-1` — replace with your actual region throughout.
 
-Use an existing customer-managed key or create one:
+### Step 1: Take a database backup
 
-aws kms create-key --description "Onyx secret encryption key" --region us-east-2
+**If using RDS:**
 
-Store an encrypted data key in SSM Parameter Store
+1. Go to **RDS** in the AWS Console
+2. Select your database -> **Actions** -> **Take snapshot**
+3. Wait for status to become "available"
 
-KMS_KEY_ID=<your-kms-key-id-or-arn>
-AWS_REGION=us-east-2
+**If using Postgres in Docker:**
+
+```bash
+docker exec onyx-stack-relational_db-1 pg_dump -U postgres -d postgres > onyx-backup-$(date +%Y%m%d).sql
+```
+
+### Step 2: Create a KMS key (AWS Console)
+
+1. Open **KMS** in the AWS Console
+2. **Verify your region** in the top-right corner (e.g. `eu-west-1`)
+3. Click **Customer managed keys** -> **Create key**
+4. **Key type:** Symmetric | **Key usage:** Encrypt and decrypt
+5. **Alias:** e.g. `onyx-secrets-key`
+6. **Key administrators:** Select your admin IAM user/role
+7. **Key usage permissions:** Add the IAM role attached to your EC2 instance
+8. Click **Create key**
+9. **Copy the Key ID** (UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+
+### Step 3: Set up the IAM policy (AWS Console)
+
+The EC2 instance's IAM role needs permissions for KMS and SSM. IAM is a global service (the console always shows "Global" in the region selector — this is normal), but **the resource ARNs in the policy must specify the correct region**.
+
+**If your EC2 instance already has an IAM role:**
+
+1. Go to **IAM** -> **Roles** -> select the role
+2. Add an inline or managed policy with the JSON below
+
+**If your EC2 instance does NOT have an IAM role:**
+
+1. Go to **IAM** -> **Roles** -> **Create role**
+2. Trusted entity: **AWS service** -> **EC2**
+3. Attach the policy below
+4. Go to **EC2** -> select instance -> **Actions** -> **Security** -> **Modify IAM role** -> attach it
+
+#### Policy JSON
+
+Replace `REGION`, `ACCOUNT_ID`, and `KMS_KEY_ID` with your values.
+
+- **REGION:** The region where your EC2, KMS key, and SSM parameter live (e.g. `eu-west-1`)
+- **ACCOUNT_ID:** Your 12-digit AWS account number (click your username in the top-right of the AWS Console to find it)
+- **KMS_KEY_ID:** The Key ID UUID you copied in Step 2
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowKMSForEnvelopeEncryption",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "arn:aws:kms:REGION:ACCOUNT_ID:key/KMS_KEY_ID"
+    },
+    {
+      "Sid": "AllowSSMParameterAccess",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:PutParameter"
+      ],
+      "Resource": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/onyx/prod/encrypted_dek/*"
+    }
+  ]
+}
+```
+
+**Example** (eu-west-1):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowKMSForEnvelopeEncryption",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "arn:aws:kms:eu-west-1:123456789012:key/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    },
+    {
+      "Sid": "AllowSSMParameterAccess",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:PutParameter"],
+      "Resource": "arn:aws:ssm:eu-west-1:123456789012:parameter/onyx/prod/encrypted_dek/*"
+    }
+  ]
+}
+```
+
+### Step 4: Configure IMDS hop limit (AWS Console or CLI)
+
+Docker containers need an extra network hop to reach the EC2 metadata service for IAM credentials. The default hop limit of 1 blocks this — it must be set to 2.
+
+**Console:** EC2 -> select instance -> **Actions** -> **Instance settings** -> **Modify instance metadata options**:
+- IMDSv2: **Required**
+- Put response hop limit: **2**
+
+**CLI:**
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id <INSTANCE_ID> \
+  --http-tokens required \
+  --http-put-response-hop-limit 2 \
+  --region <REGION>
+```
+
+> Without hop limit 2, all KMS/SSM calls from inside Docker containers will fail with `AccessDeniedException` even though the IAM policy is correct. This is the most common gotcha.
+
+### Step 5: Generate and store the DEK (SSH into EC2)
+
+SSH into the EC2 instance and run:
+
+```bash
+KMS_KEY_ID=<your-kms-key-id>
+AWS_REGION=<your-region>
 SSM_PARAM=/onyx/prod/encrypted_dek/v1
 
-# Returns a base64 CiphertextBlob that can be safely stored in SSM.
+# Generate a data encryption key — KMS returns the encrypted (wrapped) copy
 ENCRYPTED_DEK_B64=$(aws kms generate-data-key \
   --key-id "$KMS_KEY_ID" \
   --key-spec AES_256 \
@@ -116,53 +219,146 @@ ENCRYPTED_DEK_B64=$(aws kms generate-data-key \
   --output text \
   --region "$AWS_REGION")
 
+# Store the encrypted DEK in SSM Parameter Store
 aws ssm put-parameter \
   --name "$SSM_PARAM" \
   --type SecureString \
   --value "$ENCRYPTED_DEK_B64" \
   --overwrite \
   --region "$AWS_REGION"
+```
 
-Create and attach an EC2 instance profile
+Expected output:
 
-Grant the instance role at least:
+```
+{
+    "Version": 1,
+    "Tier": "Standard"
+}
+```
 
-- `ssm:GetParameter` on the SSM parameter above
-- `kms:Decrypt` on the KMS key above
+**Verify it's readable:**
 
-Prefer using the instance profile instead of static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+```bash
+aws ssm get-parameter \
+  --name "$SSM_PARAM" \
+  --with-decryption \
+  --region "$AWS_REGION" \
+  --query "Parameter.Name" \
+  --output text
+```
 
-If your instance uses IMDSv2 (recommended), set EC2 metadata option `HttpPutResponseHopLimit` to at least `2`.
-Docker bridge networking adds a hop, and a value of `1` can block containerized boto3 calls to IMDS.
-Example:
+Should print: `/onyx/prod/encrypted_dek/v1`
 
-aws ec2 modify-instance-metadata-options \
-  --instance-id <your-instance-id> \
-  --http-tokens required \
-  --http-put-response-hop-limit 2 \
-  --region us-east-2
+### Step 6: Update `.env` on EC2
 
-Update `.env`
+Add these to `deployment/docker_compose/.env`:
 
-Add these settings:
-
+```bash
+# --- KMS Envelope Encryption ---
 SECRET_ENCRYPTION_MODE=aws_kms_envelope
 SECRET_ENCRYPTION_REQUIRED=true
-AWS_REGION_NAME=us-east-2
-AWS_KMS_KEY_ID=<your-kms-key-id-or-arn>
+AWS_REGION_NAME=<your-region>
+AWS_KMS_KEY_ID=<your-kms-key-id>
 AWS_ENCRYPTED_DEK_PARAM=/onyx/prod/encrypted_dek/v{version}
 SECRET_KEY_VERSION=1
 SECRET_OLD_KEY_VERSIONS=
+```
 
-Deploy and migrate
+> `{version}` is a literal placeholder — the application replaces it with `SECRET_KEY_VERSION` at runtime.
 
-Take a DB snapshot/backup before running `--apply`.
+### Step 7: Rebuild containers
 
-Run migrations, then backfill old plaintext blobs:
+```bash
+cd /home/ec2-user/onyx-local
+ONYX_VERSION=$(git rev-parse --short HEAD) \
+  docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  up -d --build --force-recreate api_server background web_server
 
-docker compose -f docker-compose.prod.yml -p onyx-stack up -d --build --force-recreate
-docker compose -f docker-compose.prod.yml -p onyx-stack exec -T api_server alembic upgrade head
-docker compose -f docker-compose.prod.yml -p onyx-stack exec -T api_server python -m onyx.db.reencrypt_secret_values
-docker compose -f docker-compose.prod.yml -p onyx-stack exec -T api_server python -m onyx.db.reencrypt_secret_values --apply
+docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx
+```
 
-Finally restart `api_server` and `background` containers so both startup paths validate encryption readiness.
+### Step 8: Run database migrations
+
+```bash
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  exec -T api_server alembic upgrade head
+```
+
+### Step 9: Re-encrypt existing secrets
+
+**Dry run** (read-only, shows what would change):
+
+```bash
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  exec -T api_server python -m onyx.db.reencrypt_secret_values
+```
+
+Review the output. Each table/column shows counts:
+- `legacy` = rows that will be re-encrypted
+- `already_versioned` = rows already using KMS (skipped)
+- `errors` = rows that failed (investigate before applying)
+
+**Apply** (writes re-encrypted values to the database):
+
+```bash
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  exec -T api_server python -m onyx.db.reencrypt_secret_values --apply
+```
+
+### Step 10: Restart and verify
+
+```bash
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  restart api_server background
+
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  restart nginx
+
+# Check that all containers are running
+docker compose -f deployment/docker_compose/docker-compose.prod.yml ps
+
+# Check api_server logs for "Application startup complete"
+docker compose -f deployment/docker_compose/docker-compose.prod.yml \
+  logs api_server --tail=30
+```
+
+Load the site in a browser and confirm it works.
+
+---
+
+## Troubleshooting
+
+### `AccessDeniedException` on `ssm:GetParameter` or `kms:Decrypt`
+
+1. **Check the region in your IAM policy ARNs.** The resource ARNs must match the region where the KMS key and SSM parameter were created. IAM is global, but resources are regional.
+2. **Check the IMDS hop limit.** If the AWS CLI works on the EC2 host but fails inside Docker containers, the hop limit is almost certainly still at 1. Set it to 2 (see Step 4).
+3. **Wait a moment.** IAM policy changes can take a few seconds to propagate.
+
+### `ValueError: The length of the provided data is not a multiple of the block length`
+
+The application is trying to decrypt KMS-encrypted data with the old AES-CBC path. This means the EE encryption module isn't delegating to the KMS path. Ensure the EE `_decrypt_bytes` checks `SECRET_ENCRYPTION_MODE` and delegates to the OSS KMS implementation when the mode is not `disabled`.
+
+### `RuntimeError: Failed to fetch encrypted DEK from AWS SSM Parameter Store`
+
+The container can't read the SSM parameter. Check:
+- IAM policy has `ssm:GetParameter` with the correct region in the ARN
+- IMDS hop limit is 2
+- `AWS_REGION_NAME` in `.env` matches the region where the SSM parameter was created
+
+### `502 Bad Gateway` after rebuild
+
+Nginx caches container IPs. Always restart nginx after rebuilding any service:
+
+```bash
+docker compose -f deployment/docker_compose/docker-compose.prod.yml restart nginx
+```
+
+### How the encryption delegation works
+
+Onyx uses `fetch_versioned_implementation` to select between OSS and EE versions of functions. When EE is enabled, the EE `_decrypt_bytes` and `_encrypt_string` are loaded at runtime. These functions check `SECRET_ENCRYPTION_MODE`:
+
+- **When `aws_kms_envelope`:** Delegate to the OSS KMS envelope encryption path, which handles KMS payloads and falls back to legacy AES-CBC decryption (using `ENCRYPTION_KEY_SECRET`) for data encrypted before the migration.
+- **When `disabled`:** Use the legacy AES-CBC path with `ENCRYPTION_KEY_SECRET` directly.
+
+This means both `ENCRYPTION_KEY_SECRET` (for legacy fallback) and the KMS env vars should remain set after migration until you're confident all data has been re-encrypted.

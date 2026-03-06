@@ -35,16 +35,21 @@ def _make_doc(
     doc_id: str,
     source: DocumentSource,
     doc_updated_at: datetime | None = None,
+    section_text: str = "from: alice@example.com\nbody text",
+    primary_owner_emails: list[str] | None = None,
+    secondary_owner_emails: list[str] | None = None,
 ) -> Document:
+    primary_emails = primary_owner_emails or ["alice@example.com"]
+    secondary_emails = secondary_owner_emails or ["sales@example.com"]
     return Document(
         id=doc_id,
         source=source,
         semantic_identifier="Quarterly Renewal",
         metadata={},
         doc_updated_at=doc_updated_at,
-        sections=[TextSection(text="from: alice@example.com\nbody text")],
-        primary_owners=[BasicExpertInfo(email="alice@example.com")],
-        secondary_owners=[BasicExpertInfo(email="sales@example.com")],
+        sections=[TextSection(text=section_text)],
+        primary_owners=[BasicExpertInfo(email=email) for email in primary_emails],
+        secondary_owners=[BasicExpertInfo(email=email) for email in secondary_emails],
     )
 
 
@@ -156,6 +161,10 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
             return_value=UUID("11111111-1111-1111-1111-111111111111"),
         ),
         patch(
+            "onyx.indexing.adapters.document_indexing_adapter.VALID_EMAIL_DOMAINS",
+            ["example.com"],
+        ),
+        patch(
             "onyx.indexing.adapters.document_indexing_adapter.create_trigger_event",
             side_effect=_capture_event,
         ),
@@ -182,6 +191,61 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
     assert payload["date"] == updated_at.isoformat()
     assert payload["body"]
     assert payload["source"] == "gmail"
+
+
+def test_post_index_skips_trigger_for_non_allowlisted_sender_domain() -> None:
+    db_session = MagicMock()
+    adapter = _make_adapter(db_session=db_session)
+    email_doc = _make_doc(
+        doc_id="imap-msg-7",
+        source=DocumentSource.IMAP,
+        section_text="from: Attacker <attacker@evil.com>\nbody text",
+        # IMAP primary owners can include recipients as well; ensure we enforce
+        # sender domain from the `from:` header instead of recipient owners.
+        primary_owner_emails=["employee@example.com", "attacker@evil.com"],
+    )
+    context = DocumentBatchPrepareContext(
+        updatable_docs=[email_doc],
+        id_to_boost_map={},
+    )
+
+    with (
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_updated_at__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_last_modified__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_chunk_count__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.mark_document_as_indexed_for_cc_pair__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_chunk_boost_components__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter._get_email_crm_custom_job_uuid",
+            return_value=UUID("11111111-1111-1111-1111-111111111111"),
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.VALID_EMAIL_DOMAINS",
+            ["example.com"],
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.create_trigger_event"
+        ) as mock_create_trigger_event,
+    ):
+        adapter.post_index(
+            context=context,
+            updatable_chunk_data=[],
+            filtered_documents=[email_doc],
+            result=_make_result(),
+        )
+
+    mock_create_trigger_event.assert_not_called()
+    db_session.commit.assert_called_once()
 
 
 def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:

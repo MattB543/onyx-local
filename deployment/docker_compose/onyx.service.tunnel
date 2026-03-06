@@ -1,0 +1,26 @@
+[Unit]
+Description=Onyx Docker Compose Service (Cloudflare tunnel origin)
+Requires=docker.service
+PartOf=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ec2-user
+Group=ec2-user
+SupplementaryGroups=docker
+Environment=HOME=/home/ec2-user
+WorkingDirectory=/home/ec2-user/onyx/deployment/docker_compose
+ExecStartPre=/home/ec2-user/onyx/deployment/docker_compose/bootstrap-env.sh
+ExecStart=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack down
+TimeoutStartSec=600
+TimeoutStopSec=120
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=onyx
+
+[Install]
+WantedBy=multi-user.target
