@@ -1,6 +1,8 @@
 import json
 from typing import cast
 
+from redis.client import Redis
+
 from onyx.cache.interface import CacheBackend
 from onyx.db.engine.sql_engine import get_session_with_current_tenant
 from onyx.db.models import KVStore
@@ -15,6 +17,52 @@ logger = setup_logger()
 
 REDIS_KEY_PREFIX = "onyx_kv_store:"
 KV_REDIS_KEY_EXPIRATION = 60 * 60 * 24  # 1 Day
+KV_REDIS_LEGACY_CLEANUP_MARKER_KEY = "onyx_kv_store_cleanup_v2_done"
+_REDIS_DELETE_BATCH_SIZE = 256
+
+
+def cleanup_legacy_kv_store_redis_cache(redis_client: Redis | None = None) -> None:
+    """Remove pre-upgrade KV Redis entries that may contain plaintext for
+    encrypted values.  This runs at startup and marks completion in Redis to
+    avoid repeated scans.
+
+    The scan is inherently Redis-specific (uses ``scan_iter``), so this
+    function accepts a ``Redis`` client directly rather than going through
+    the ``CacheBackend`` abstraction.
+    """
+    if redis_client is None:
+        from onyx.redis.redis_pool import get_redis_client
+
+        redis_client = get_redis_client()
+
+    try:
+        if redis_client.get(KV_REDIS_LEGACY_CLEANUP_MARKER_KEY):
+            return
+    except Exception as e:
+        logger.error("Failed to read KV Redis cleanup marker: %s", str(e))
+        return
+
+    deleted_count = 0
+    keys_to_delete: list[bytes | str] = []
+    try:
+        for redis_key in redis_client.scan_iter(match=f"{REDIS_KEY_PREFIX}*"):
+            if not isinstance(redis_key, (bytes, str)):
+                continue
+            keys_to_delete.append(redis_key)
+            if len(keys_to_delete) >= _REDIS_DELETE_BATCH_SIZE:
+                deleted_count += redis_client.delete(*keys_to_delete)
+                keys_to_delete = []
+
+        if keys_to_delete:
+            deleted_count += redis_client.delete(*keys_to_delete)
+
+        redis_client.set(KV_REDIS_LEGACY_CLEANUP_MARKER_KEY, "1")
+        logger.notice(  # type: ignore[attr-defined]
+            "Completed legacy KV Redis cleanup; deleted %s key(s).",
+            deleted_count,
+        )
+    except Exception as e:
+        logger.error("Failed to clean up legacy KV Redis cache: %s", str(e))
 
 
 class PgRedisKVStore(KeyValueStore):

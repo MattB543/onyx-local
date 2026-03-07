@@ -414,7 +414,9 @@ def test_find_users_for_attendee_resolution_returns_matches() -> None:
     user.id = uuid4()
     user.email = "alice@example.com"
     user.personal_name = "Alice Smith"
-    db_session.scalars.return_value = [user]
+    scalars_result = MagicMock()
+    scalars_result.unique.return_value = [user]
+    db_session.scalars.return_value = scalars_result
     token = "ali_ce%"
     expected_like = "%ali\\_ce\\%%"
 

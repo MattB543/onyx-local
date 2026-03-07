@@ -24,7 +24,7 @@ def test_store_encrypted_value_never_writes_plaintext_to_redis(
         lambda: _yield_session(db_session),
     )
 
-    kv_store = PgRedisKVStore(redis_client=redis_client)
+    kv_store = PgRedisKVStore(cache=redis_client)
     kv_store.store("secret-key", "sensitive", encrypt=True)
 
     redis_client.set.assert_not_called()
@@ -50,7 +50,7 @@ def test_load_encrypted_value_does_not_cache_plaintext_in_redis(
         lambda: _yield_session(db_session),
     )
 
-    kv_store = PgRedisKVStore(redis_client=redis_client)
+    kv_store = PgRedisKVStore(cache=redis_client)
     value = kv_store.load("secret-key")
 
     assert value == {"token": "abc"}
@@ -75,7 +75,7 @@ def test_load_plain_value_still_uses_redis_cache(
         lambda: _yield_session(db_session),
     )
 
-    kv_store = PgRedisKVStore(redis_client=redis_client)
+    kv_store = PgRedisKVStore(cache=redis_client)
     value = kv_store.load("plain-key")
 
     assert value == {"feature": True}
@@ -104,12 +104,12 @@ def test_cleanup_legacy_cache_skips_when_marker_exists() -> None:
     redis_client.delete.assert_not_called()
 
 
-def test_delete_commits_db_before_redis_delete(
+def test_delete_invalidates_cache_then_commits_db(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     order: list[str] = []
-    redis_client = MagicMock()
-    redis_client.delete.side_effect = lambda *_: order.append("redis_delete")
+    cache = MagicMock()
+    cache.delete.side_effect = lambda *_: order.append("cache_delete")
 
     db_session = MagicMock()
     delete_chain = db_session.query.return_value.filter_by.return_value
@@ -121,7 +121,7 @@ def test_delete_commits_db_before_redis_delete(
         lambda: _yield_session(db_session),
     )
 
-    kv_store = PgRedisKVStore(redis_client=redis_client)
+    kv_store = PgRedisKVStore(cache=cache)
     kv_store.delete("plain-key")
 
-    assert order == ["db_commit", "redis_delete"]
+    assert order == ["cache_delete", "db_commit"]
