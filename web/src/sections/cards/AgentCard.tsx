@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useCallback } from "react";
 import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import AgentAvatar from "@/refresh-components/avatars/AgentAvatar";
 import Button from "@/refresh-components/buttons/Button";
@@ -46,7 +46,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const { user } = useUser();
   const isPaidEnterpriseFeaturesEnabled = usePaidEnterpriseFeaturesEnabled();
   const isOwnedByUser = checkUserOwnsAssistant(user, agent);
-  const [hovered, setHovered] = useState(false);
   const shareAgentModal = useCreateModal();
   const agentViewerModal = useCreateModal();
   const { agent: fullAgent, refresh: refreshAgent } = useAgent(agent.id);
@@ -60,7 +59,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
   }, [pinned, togglePinnedAgent, agent, route]);
 
   // Handle sharing agent
-  /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
   const handleShare = useCallback(
     async (userIds: string[], groupIds: number[], isPublic: boolean) => {
       const error = await updateAgentSharedStatus(
@@ -81,7 +79,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
     },
     [agent.id, isPaidEnterpriseFeaturesEnabled, refreshAgent]
   );
-  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   return (
     <>
@@ -102,8 +99,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
       <Interactive.Base
         onClick={() => agentViewerModal.toggle(true)}
         group="group/AgentCard"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         variant="none"
       >
         <Card padding={0} gap={0} height="full">
@@ -150,7 +145,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
                     tertiary
                     onClick={noProp(() => togglePinnedAgent(agent, !pinned))}
                     tooltip={pinned ? "Unpin from Sidebar" : "Pin to Sidebar"}
-                    transient={hovered && pinned}
                     className={cn(
                       !pinned && "hidden group-hover/AgentCard:flex"
                     )}

@@ -340,7 +340,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
     # relationships
     credentials: Mapped[list["Credential"]] = relationship(
-        "Credential", back_populates="user", lazy="joined"
+        "Credential", back_populates="user"
     )
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
         "ChatSession", back_populates="user"
@@ -374,7 +374,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         "Memory",
         back_populates="user",
         cascade="all, delete-orphan",
-        lazy="selectin",
         order_by="desc(Memory.id)",
     )
     oauth_user_tokens: Mapped[list["OAuthUserToken"]] = relationship(
@@ -5675,6 +5674,7 @@ class ScimUserMapping(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), unique=True, nullable=False
     )
+    scim_username: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -5713,3 +5713,12 @@ class ScimGroupMapping(Base):
     user_group: Mapped[UserGroup] = relationship(
         "UserGroup", foreign_keys=[user_group_id]
     )
+
+
+class CodeInterpreterServer(Base):
+    """Details about the code interpreter server"""
+
+    __tablename__ = "code_interpreter_server"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    server_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -317,7 +317,9 @@ DEFAULT_OPENSEARCH_QUERY_TIMEOUT_S = int(
     os.environ.get("DEFAULT_OPENSEARCH_QUERY_TIMEOUT_S") or 50
 )
 OPENSEARCH_ADMIN_USERNAME = os.environ.get("OPENSEARCH_ADMIN_USERNAME", "admin")
-OPENSEARCH_ADMIN_PASSWORD = os.environ.get("OPENSEARCH_ADMIN_PASSWORD", "")
+OPENSEARCH_ADMIN_PASSWORD = os.environ.get(
+    "OPENSEARCH_ADMIN_PASSWORD", "StrongPassword123!"
+)
 USING_AWS_MANAGED_OPENSEARCH = (
     os.environ.get("USING_AWS_MANAGED_OPENSEARCH", "").lower() == "true"
 )
@@ -348,6 +350,9 @@ OPENSEARCH_TEXT_ANALYZER = os.environ.get("OPENSEARCH_TEXT_ANALYZER") or "englis
 ENABLE_OPENSEARCH_INDEXING_FOR_ONYX = (
     os.environ.get("ENABLE_OPENSEARCH_INDEXING_FOR_ONYX", "").lower() == "true"
 )
+# NOTE: This effectively does nothing anymore, admins can now toggle whether
+# retrieval is through OpenSearch. This value is only used as a final fallback
+# in case that doesn't work for whatever reason.
 # Given that the "base" config above is true, this enables whether we want to
 # retrieve from OpenSearch or Vespa. We want to be able to quickly toggle this
 # in the event we see issues with OpenSearch retrieval in our dev environments.
@@ -701,6 +706,14 @@ DRUPAL_WIKI_ATTACHMENT_SIZE_THRESHOLD = int(
 # Default size threshold for SharePoint files (20MB)
 SHAREPOINT_CONNECTOR_SIZE_THRESHOLD = int(
     os.environ.get("SHAREPOINT_CONNECTOR_SIZE_THRESHOLD", 20 * 1024 * 1024)
+)
+
+# When True, group sync enumerates every Azure AD group in the tenant (expensive).
+# When False (default), only groups found in site role assignments are synced.
+# Can be overridden per-connector via the "exhaustive_ad_enumeration" key in
+# connector_specific_config.
+SHAREPOINT_EXHAUSTIVE_AD_ENUMERATION = (
+    os.environ.get("SHAREPOINT_EXHAUSTIVE_AD_ENUMERATION", "").lower() == "true"
 )
 
 BLOB_STORAGE_SIZE_THRESHOLD = int(
