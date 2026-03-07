@@ -14,7 +14,8 @@ from onyx.utils.sensitive import SensitiveValue
 from onyx.utils.variable_functionality import fetch_versioned_implementation
 from shared_configs.enums import EmbeddingProvider
 
-_TEST_ENCRYPTION_KEY = "test-encrypt-key-for-unittests!"  # exactly 32 bytes / 256-bit AES
+_TEST_ENCRYPTION_KEY = "test-encrypt-key-for-unittests!!"
+assert len(_TEST_ENCRYPTION_KEY) == 32
 
 
 @pytest.fixture(autouse=True)
