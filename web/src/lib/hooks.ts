@@ -30,7 +30,7 @@ import { SettingsContext } from "@/providers/SettingsProvider";
 import {
   MinimalPersonaSnapshot,
   PersonaLabel,
-} from "@/app/admin/assistants/interfaces";
+} from "@/app/admin/agents/interfaces";
 import { DefaultModel, LLMProviderDescriptor } from "@/interfaces/llm";
 import { isAnthropic } from "@/app/admin/configuration/llm/utils";
 import { getSourceMetadataForSources } from "./sources";
@@ -224,9 +224,12 @@ export const useConnectorStatus = (refreshInterval = 30000) => {
   };
 };
 
-export const useBasicConnectorStatus = () => {
+export const useBasicConnectorStatus = (enabled: boolean = true) => {
   const url = "/api/manage/connector-status";
-  const swrResponse = useSWR<CCPairBasicInfo[]>(url, errorHandlingFetcher);
+  const swrResponse = useSWR<CCPairBasicInfo[]>(
+    enabled ? url : null,
+    errorHandlingFetcher
+  );
   return {
     ...swrResponse,
     refreshIndexingStatus: () => mutate(url),
@@ -485,7 +488,7 @@ export interface LlmManager {
   updateModelOverrideBasedOnChatSession: (chatSession?: ChatSession) => void;
   imageFilesPresent: boolean;
   updateImageFilesPresent: (present: boolean) => void;
-  liveAssistant: MinimalPersonaSnapshot | null;
+  liveAgent: MinimalPersonaSnapshot | null;
   maxTemperature: number;
   llmProviders: LLMProviderDescriptor[] | undefined;
   isLoadingProviders: boolean;
@@ -513,8 +516,8 @@ Thus, the input should be
 - Current assistant
 
 Changes take place as
-- liveAssistant or currentChatSession changes (and the associated model override is set)
-- (updateCurrentLlm) User explicitly setting a model override (and we explicitly override and set the userSpecifiedOverride which we'll use in place of the user preferences unless overridden by an assistant)
+- liveAgent or currentChatSession changes (and the associated model override is set)
+- (updateCurrentLlm) User explicitly setting a model override (and we explicitly override and set the userSpecifiedOverride which we'll use in place of the user preferences unless overridden by an agent)
 
 If we have a live assistant, we should use that model override
 
@@ -637,7 +640,7 @@ export function getValidLlmDescriptorForProviders(
 
 export function useLlmManager(
   currentChatSession?: ChatSession,
-  liveAssistant?: MinimalPersonaSnapshot
+  liveAgent?: MinimalPersonaSnapshot
 ): LlmManager {
   const { user } = useUser();
 
@@ -649,9 +652,8 @@ export function useLlmManager(
     isLoading: isLoadingAllProviders,
   } = useLLMProviders();
   // Fetch persona-specific providers to enforce RBAC restrictions per assistant
-  // Only fetch if we have an assistant selected
-  const personaId =
-    liveAssistant?.id !== undefined ? liveAssistant.id : undefined;
+  // Only fetch if we have an agent selected
+  const personaId = liveAgent?.id !== undefined ? liveAgent.id : undefined;
   const {
     llmProviders: personaProviders,
     defaultText: personaDefaultText,
@@ -673,20 +675,20 @@ export function useLlmManager(
   });
 
   // Track the previous assistant ID to detect when it changes
-  const prevAssistantIdRef = useRef<number | undefined>(undefined);
+  const prevAgentIdRef = useRef<number | undefined>(undefined);
 
   // Reset manual override when switching to a different assistant
   useEffect(() => {
     if (
-      liveAssistant?.id !== undefined &&
-      prevAssistantIdRef.current !== undefined &&
-      liveAssistant.id !== prevAssistantIdRef.current
+      liveAgent?.id !== undefined &&
+      prevAgentIdRef.current !== undefined &&
+      liveAgent.id !== prevAgentIdRef.current
     ) {
       // User switched to a different assistant - reset manual override
       setUserHasManuallyOverriddenLLM(false);
     }
-    prevAssistantIdRef.current = liveAssistant?.id;
-  }, [liveAssistant?.id]);
+    prevAgentIdRef.current = liveAgent?.id;
+  }, [liveAgent?.id]);
 
   const llmUpdate = () => {
     /* Should be called when the live assistant or current chat session changes */
@@ -709,9 +711,9 @@ export function useLlmManager(
         setCurrentLlm(
           getValidLlmDescriptor(currentChatSession.current_alternate_model)
         );
-      } else if (liveAssistant?.llm_model_version_override) {
+      } else if (liveAgent?.llm_model_version_override) {
         setCurrentLlm(
-          getValidLlmDescriptor(liveAssistant.llm_model_version_override)
+          getValidLlmDescriptor(liveAgent.llm_model_version_override)
         );
       } else if (userHasManuallyOverriddenLLM) {
         // if the user has an override and there's nothing special about the
@@ -773,9 +775,7 @@ export function useLlmManager(
         currentChatSession.current_temperature_override,
         isAnthropicModel ? 1.0 : 2.0
       );
-    } else if (
-      liveAssistant?.tools.some((tool) => tool.name === SEARCH_TOOL_ID)
-    ) {
+    } else if (liveAgent?.tools.some((tool) => tool.name === SEARCH_TOOL_ID)) {
       return 0;
     }
     return 0.5;
@@ -822,15 +822,13 @@ export function useLlmManager(
 
     if (currentChatSession?.current_temperature_override) {
       setTemperature(currentChatSession.current_temperature_override);
-    } else if (
-      liveAssistant?.tools.some((tool) => tool.name === SEARCH_TOOL_ID)
-    ) {
+    } else if (liveAgent?.tools.some((tool) => tool.name === SEARCH_TOOL_ID)) {
       setTemperature(0);
     } else {
       setTemperature(0.5);
     }
   }, [
-    liveAssistant,
+    liveAgent,
     currentChatSession,
     llmProviders,
     user?.preferences?.default_model,
@@ -846,8 +844,10 @@ export function useLlmManager(
     }
   };
 
-  // Track if any provider exists (for onboarding checks)
-  const hasAnyProvider = (allUserProviders?.length ?? 0) > 0;
+  // Track if any provider exists for the current persona context.
+  // Uses the persona-aware list so chat input reflects actual access,
+  // falling back to the global list when no persona is selected.
+  const hasAnyProvider = (llmProviders?.length ?? 0) > 0;
 
   return {
     updateModelOverrideBasedOnChatSession,
@@ -857,7 +857,7 @@ export function useLlmManager(
     updateTemperature,
     imageFilesPresent,
     updateImageFilesPresent,
-    liveAssistant: liveAssistant ?? null,
+    liveAgent: liveAgent ?? null,
     maxTemperature,
     llmProviders,
     isLoadingProviders:

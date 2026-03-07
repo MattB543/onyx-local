@@ -724,41 +724,6 @@ def translate_assistant_message_to_packets(
                                 )
                             )
 
-                    elif tool.in_code_tool_id == PythonTool.__name__:
-                        code = cast(
-                            str,
-                            tool_call.tool_call_arguments.get("code", ""),
-                        )
-                        stdout = ""
-                        stderr = ""
-                        file_ids: list[str] = []
-                        if tool_call.tool_call_response:
-                            try:
-                                response_data = json.loads(tool_call.tool_call_response)
-                                stdout = response_data.get("stdout", "")
-                                stderr = response_data.get("stderr", "")
-                                generated_files = response_data.get(
-                                    "generated_files", []
-                                )
-                                file_ids = [
-                                    f.get("file_link", "").split("/")[-1]
-                                    for f in generated_files
-                                    if f.get("file_link")
-                                ]
-                            except (json.JSONDecodeError, KeyError):
-                                # Fall back to raw response as stdout
-                                stdout = tool_call.tool_call_response
-                        turn_tool_packets.extend(
-                            create_python_tool_packets(
-                                code=code,
-                                stdout=stdout,
-                                stderr=stderr,
-                                file_ids=file_ids,
-                                turn_index=turn_num,
-                                tab_index=tool_call.tab_index,
-                            )
-                        )
-
                     elif tool.in_code_tool_id == CrmSearchTool.__name__:
                         turn_tool_packets.extend(
                             create_crm_search_packets(
@@ -799,6 +764,41 @@ def translate_assistant_message_to_packets(
                         turn_tool_packets.extend(
                             create_calendar_search_packets(
                                 tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == PythonTool.__name__:
+                        code = cast(
+                            str,
+                            tool_call.tool_call_arguments.get("code", ""),
+                        )
+                        stdout = ""
+                        stderr = ""
+                        file_ids: list[str] = []
+                        if tool_call.tool_call_response:
+                            try:
+                                response_data = json.loads(tool_call.tool_call_response)
+                                stdout = response_data.get("stdout", "")
+                                stderr = response_data.get("stderr", "")
+                                generated_files = response_data.get(
+                                    "generated_files", []
+                                )
+                                file_ids = [
+                                    f.get("file_link", "").split("/")[-1]
+                                    for f in generated_files
+                                    if f.get("file_link")
+                                ]
+                            except (json.JSONDecodeError, KeyError):
+                                # Fall back to raw response as stdout
+                                stdout = tool_call.tool_call_response
+                        turn_tool_packets.extend(
+                            create_python_tool_packets(
+                                code=code,
+                                stdout=stdout,
+                                stderr=stderr,
+                                file_ids=file_ids,
                                 turn_index=turn_num,
                                 tab_index=tool_call.tab_index,
                             )

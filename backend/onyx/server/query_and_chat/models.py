@@ -195,6 +195,7 @@ class ChatSessionDetails(BaseModel):
 
 class ChatSessionsResponse(BaseModel):
     sessions: list[ChatSessionDetails]
+    has_more: bool = False
 
 
 class ChatMessageDetail(BaseModel):

@@ -1,6 +1,6 @@
 import { ReadonlyURLSearchParams } from "next/navigation";
 
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
+import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
 import {
   WEB_SEARCH_TOOL_ID,
   SEARCH_TOOL_ID,
@@ -311,12 +311,12 @@ export function processRawChatHistory(
   const messages = new Map<number, Message>();
   const parentMessageChildrenMap = new Map<number, number[]>();
 
-  let assistantMessageInd = 0;
+  let agentMessageInd = 0;
 
   rawMessages.forEach((messageInfo, _ind) => {
-    const packetsForMessage = packets[assistantMessageInd];
+    const packetsForMessage = packets[agentMessageInd];
     if (messageInfo.message_type === "assistant") {
-      assistantMessageInd++;
+      agentMessageInd++;
     }
 
     const hasContextDocs = (messageInfo?.context_docs || []).length > 0;
@@ -339,11 +339,11 @@ export function processRawChatHistory(
       message: messageInfo.message,
       type: messageInfo.message_type as "user" | "assistant",
       files: messageInfo.files,
-      alternateAssistantID:
+      alternateAgentID:
         messageInfo.alternate_assistant_id !== null
           ? Number(messageInfo.alternate_assistant_id)
           : null,
-      // only include these fields if this is an assistant message so that
+      // only include these fields if this is an agent message so that
       // this is identical to what is computed at streaming time
       ...(messageInfo.message_type === "assistant"
         ? {

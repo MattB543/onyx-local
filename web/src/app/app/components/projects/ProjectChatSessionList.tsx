@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { ChatSessionMorePopup } from "@/components/sidebar/ChatSessionMorePopup";
 import { useProjectsContext } from "@/providers/ProjectsContext";
@@ -21,11 +21,11 @@ export default function ProjectChatSessionList() {
     refreshCurrentProjectDetails,
     isLoadingProjectDetails,
   } = useProjectsContext();
-  const { agents: assistants } = useAgents();
-  const [isRenamingChat, setIsRenamingChat] = useState<string | null>(
+  const { agents } = useAgents();
+  const [isRenamingChat, setIsRenamingChat] = React.useState<string | null>(
     null
   );
-  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const [hoveredChatId, setHoveredChatId] = React.useState<string | null>(null);
 
   const projectChats: ChatSession[] = useMemo(() => {
     const sessions = currentProjectDetails?.project?.chat_sessions || [];
@@ -74,17 +74,17 @@ export default function ProjectChatSessionList() {
                 <div className="flex gap-3 min-w-0 w-full">
                   <div className="flex h-full w-fit pt-1 pl-1">
                     {(() => {
-                      const personaIdToDefault =
-                        currentProjectDetails?.persona_id_to_is_default || {};
-                      const isDefault = personaIdToDefault[chat.persona_id];
-                      if (isDefault === false) {
-                        const assistant = assistants.find(
+                      const personaIdToFeatured =
+                        currentProjectDetails?.persona_id_to_featured || {};
+                      const isFeatured = personaIdToFeatured[chat.persona_id];
+                      if (isFeatured === false) {
+                        const agent = agents.find(
                           (a) => a.id === chat.persona_id
                         );
-                        if (assistant) {
+                        if (agent) {
                           return (
                             <div className="h-full pt-1">
-                              <AgentAvatar agent={assistant} size={18} />
+                              <AgentAvatar agent={agent} size={18} />
                             </div>
                           );
                         }

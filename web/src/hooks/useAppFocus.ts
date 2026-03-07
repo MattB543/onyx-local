@@ -13,8 +13,7 @@ export type AppFocusType =
   | "new-session"
   | "more-agents"
   | "crm"
-  | "user-settings"
-  | "shared-chat";
+  | "user-settings";
 
 export class AppFocus {
   constructor(public value: AppFocusType) {}
@@ -29,10 +28,6 @@ export class AppFocus {
 
   isChat(): boolean {
     return typeof this.value === "object" && this.value.type === "chat";
-  }
-
-  isSharedChat(): boolean {
-    return this.value === "shared-chat";
   }
 
   isNewSession(): boolean {
@@ -59,7 +54,6 @@ export class AppFocus {
     | "agent"
     | "project"
     | "chat"
-    | "shared-chat"
     | "new-session"
     | "more-agents"
     | "crm"
@@ -71,11 +65,6 @@ export class AppFocus {
 export default function useAppFocus(): AppFocus {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  // Check if we're viewing a shared chat
-  if (pathname.startsWith("/app/shared/")) {
-    return new AppFocus("shared-chat");
-  }
 
   // Check if we're on the user settings page
   if (pathname.startsWith("/app/settings")) {

@@ -77,7 +77,7 @@ export interface BuildMessage {
   /** Structured ACP event data (tool calls, thinking, plans) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   message_metadata?: Record<string, any> | null;
-  /** Tool calls associated with this message (for assistant messages) */
+  /** Tool calls associated with this message (for agent messages) */
   toolCalls?: ToolCall[];
 }
 

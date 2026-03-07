@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import * as GeneralLayouts from "@/layouts/general-layouts";
 import Button from "@/refresh-components/buttons/Button";
-import { FullPersona } from "@/app/admin/assistants/interfaces";
+import { FullPersona } from "@/app/admin/agents/interfaces";
 import { buildImgUrl } from "@/app/app/components/files/images/utils";
 import { Formik, Form, FieldArray } from "formik";
 import * as Yup from "yup";
@@ -24,7 +24,6 @@ import {
   STARTER_MESSAGES_EXAMPLES,
   MAX_CHARACTERS_STARTER_MESSAGE,
   MAX_CHARACTERS_AGENT_DESCRIPTION,
-  MAX_CHUNKS_FED_TO_CHAT,
 } from "@/lib/constants";
 import {
   IMAGE_GENERATION_TOOL_ID,
@@ -70,7 +69,7 @@ import {
   createPersona,
   updatePersona,
   PersonaUpsertParameters,
-} from "@/app/admin/assistants/lib";
+} from "@/app/admin/agents/lib";
 import useMcpServersForAgentEditor from "@/hooks/useMcpServersForAgentEditor";
 import useOpenApiTools from "@/hooks/useOpenApiTools";
 import { useAvailableTools } from "@/hooks/useAvailableTools";
@@ -565,9 +564,12 @@ export default function AgentEditorPage({
       (_, i) => existingAgent?.starter_messages?.[i]?.message ?? ""
     ),
 
-    // Knowledge - enabled if num_chunks is greater than 0
-    // (num_chunks of 0 or null means knowledge is disabled)
-    enable_knowledge: (existingAgent?.num_chunks ?? 0) > 0,
+    // Knowledge - enabled if agent has any knowledge sources attached
+    enable_knowledge:
+      (existingAgent?.document_sets?.length ?? 0) > 0 ||
+      (existingAgent?.hierarchy_nodes?.length ?? 0) > 0 ||
+      (existingAgent?.attached_documents?.length ?? 0) > 0 ||
+      (existingAgent?.user_file_ids?.length ?? 0) > 0,
     document_set_ids: existingAgent?.document_sets?.map((ds) => ds.id) ?? [],
     // Individual document IDs from hierarchy browsing
     document_ids: existingAgent?.attached_documents?.map((doc) => doc.id) ?? [],
@@ -589,9 +591,9 @@ export default function AgentEditorPage({
     replace_base_system_prompt:
       existingAgent?.replace_base_system_prompt ?? false,
     reminders: existingAgent?.task_prompt ?? "",
-    // For new assistants, default to false for optional tools to avoid
+    // For new agents, default to false for optional tools to avoid
     // "Tool not available" errors when the tool isn't configured.
-    // For existing assistants, preserve the current tool configuration.
+    // For existing agents, preserve the current tool configuration.
     image_generation:
       !!imageGenTool &&
       (existingAgent?.tools?.some(
@@ -657,7 +659,7 @@ export default function AgentEditorPage({
     shared_group_ids: existingAgent?.groups ?? [],
     is_public: existingAgent?.is_public ?? true,
     label_ids: existingAgent?.labels?.map((l) => l.id) ?? [],
-    is_default_persona: existingAgent?.is_default_persona ?? false,
+    featured: existingAgent?.featured ?? false,
   };
 
   const validationSchema = Yup.object().shape({
@@ -689,19 +691,6 @@ export default function AgentEditorPage({
     hierarchy_node_ids: Yup.array().of(Yup.number()),
     user_file_ids: Yup.array().of(Yup.string()),
     selected_sources: Yup.array().of(Yup.string()),
-    num_chunks: Yup.number()
-      .nullable()
-      .transform((value, originalValue) =>
-        originalValue === "" || originalValue === null ? null : value
-      )
-      .test(
-        "is-non-negative-integer",
-        "The number of chunks must be a non-negative integer (0, 1, 2, etc.)",
-        (value) =>
-          value === null ||
-          value === undefined ||
-          (Number.isInteger(value) && value >= 0)
-      ),
 
     // Advanced
     llm_model_provider_override: Yup.string().nullable().optional(),
@@ -740,9 +729,6 @@ export default function AgentEditorPage({
       // Send null instead of empty array if no starter messages
       const finalStarterMessages =
         starterMessages.length > 0 ? starterMessages : null;
-
-      // Determine knowledge settings
-      const numChunks = values.enable_knowledge ? MAX_CHUNKS_FED_TO_CHAT : 0;
 
       // Always look up tools in availableTools to ensure we can find all tools
 
@@ -805,11 +791,7 @@ export default function AgentEditorPage({
         document_set_ids: values.enable_knowledge
           ? values.document_set_ids
           : [],
-        num_chunks: numChunks,
         is_public: values.is_public,
-        // recency_bias: ...,
-        // llm_filter_extraction: ...,
-        llm_relevance_filter: false,
         llm_model_provider_override: values.llm_model_provider_override || null,
         llm_model_version_override: values.llm_model_version_override || null,
         starter_messages: finalStarterMessages,
@@ -822,7 +804,7 @@ export default function AgentEditorPage({
         icon_name: values.icon_name,
         search_start_date: values.knowledge_cutoff_date || null,
         label_ids: values.label_ids,
-        is_default_persona: values.is_default_persona,
+        featured: values.featured,
         // display_priority: ...,
 
         user_file_ids: values.enable_knowledge ? values.user_file_ids : [],
@@ -1067,7 +1049,7 @@ export default function AgentEditorPage({
                     userIds={values.shared_user_ids}
                     groupIds={values.shared_group_ids}
                     isPublic={values.is_public}
-                    isFeatured={values.is_default_persona}
+                    isFeatured={values.featured}
                     labelIds={values.label_ids}
                     onShare={(
                       userIds,
@@ -1079,7 +1061,7 @@ export default function AgentEditorPage({
                       setFieldValue("shared_user_ids", userIds);
                       setFieldValue("shared_group_ids", groupIds);
                       setFieldValue("is_public", isPublic);
-                      setFieldValue("is_default_persona", isFeatured);
+                      setFieldValue("featured", isFeatured);
                       setFieldValue("label_ids", labelIds);
                       shareAgentModal.toggle(false);
                     }}
@@ -1396,13 +1378,13 @@ export default function AgentEditorPage({
                               {canUpdateFeaturedStatus && (
                                 <>
                                   <InputLayouts.Horizontal
-                                    name="is_default_persona"
+                                    name="featured"
                                     title="Feature This Agent"
                                     description="Show this agent at the top of the explore agents list and automatically pin it to the sidebar for new users with access."
                                   >
-                                    <SwitchField name="is_default_persona" />
+                                    <SwitchField name="featured" />
                                   </InputLayouts.Horizontal>
-                                  {values.is_default_persona && !isShared && (
+                                  {values.featured && !isShared && (
                                     <Message
                                       static
                                       close={false}

@@ -1,21 +1,17 @@
 import { memo, useState, useCallback } from "react";
-
-import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
-import { ProviderIcon } from "@/app/admin/configuration/llm/ProviderIcon";
-import Button from "@/refresh-components/buttons/Button";
-import { Disabled } from "@/refresh-components/Disabled";
-import Separator from "@/refresh-components/Separator";
 import Text from "@/refresh-components/texts/Text";
-
-import { SvgCheckCircle, SvgCpu, SvgExternalLink } from "@opal/icons";
-
+import Button from "@/refresh-components/buttons/Button";
+import Separator from "@/refresh-components/Separator";
 import LLMProviderCard from "../components/LLMProviderCard";
+import { OnboardingActions, OnboardingState, OnboardingStep } from "../types";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import {
   getOnboardingForm,
   getProviderDisplayInfo,
 } from "../forms/getOnboardingForm";
-import { OnboardingActions, OnboardingState, OnboardingStep } from "../types";
-
+import { Disabled } from "@/refresh-components/Disabled";
+import { ProviderIcon } from "@/app/admin/configuration/llm/ProviderIcon";
+import { SvgCheckCircle, SvgCpu, SvgExternalLink } from "@opal/icons";
 
 type LLMStepProps = {
   state: OnboardingState;
@@ -101,7 +97,7 @@ const LLMStepInner = ({
   const handleProviderClick = useCallback(
     (
       llmDescriptor?: WellKnownLLMProviderDescriptor,
-      isCustomProvider = false
+      isCustomProvider: boolean = false
     ) => {
       setSelectedProvider({ llmDescriptor, isCustomProvider });
       setIsModalOpen(true);

@@ -1,32 +1,26 @@
 "use client";
 
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import React, {
-  Children,
   createContext,
-  forwardRef,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
+  useCallback,
   useRef,
-  useState,
+  useMemo,
 } from "react";
-
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import useContainerCenter from "@/hooks/useContainerCenter";
-import { Section } from "@/layouts/general-layouts";
 import { cn } from "@/lib/utils";
+import Text from "@/refresh-components/texts/Text";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import LineItem from "@/refresh-components/buttons/LineItem";
 import Tag from "@/refresh-components/buttons/Tag";
-import Divider from "@/refresh-components/Divider";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import ScrollIndicatorDiv from "@/refresh-components/ScrollIndicatorDiv";
-import Text from "@/refresh-components/texts/Text";
-
 import { Button } from "@opal/components";
+import ScrollIndicatorDiv from "@/refresh-components/ScrollIndicatorDiv";
+import Divider from "@/refresh-components/Divider";
+import { Section } from "@/layouts/general-layouts";
 import { SvgSearch, SvgX } from "@opal/icons";
-
 import type {
   CommandMenuProps,
   CommandMenuContentProps,
@@ -93,11 +87,11 @@ function getOrderedItems(): string[] {
  * ```
  */
 function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
-  const [highlightedValue, setHighlightedValue] = useState<string | null>(
+  const [highlightedValue, setHighlightedValue] = React.useState<string | null>(
     null
   );
-  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
-  const [itemsRevision, setItemsRevision] = useState(0);
+  const [isKeyboardNav, setIsKeyboardNav] = React.useState(false);
+  const [itemsRevision, setItemsRevision] = React.useState(0);
 
   // Centralized callback registry - items register their onSelect callback, type, and defaultHighlight
   const itemCallbacks = useRef<
@@ -165,7 +159,7 @@ function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
       value: string,
       onSelect: () => void,
       type: "filter" | "item" | "action" = "item",
-      defaultHighlight = true
+      defaultHighlight: boolean = true
     ) => {
       if (
         process.env.NODE_ENV === "development" &&
@@ -368,15 +362,16 @@ function CommandMenuRoot({ open, onOpenChange, children }: CommandMenuProps) {
  * Modal container with overlay, sizing, and animations.
  * Keyboard handling is centralized in Root and accessed via context.
  */
-const CommandMenuContent = forwardRef<
+const CommandMenuContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   CommandMenuContentProps
 >(({ children }, ref) => {
   const { handleKeyDown } = useCommandMenuContext();
+  const { centerX, hasContainerCenter } = useContainerCenter();
 
   return (
     <DialogPrimitive.Portal>
-      {/* Overlay - hidden from assistive technology */}
+      {/* Overlay - fixed to full viewport, hidden from assistive technology */}
       <DialogPrimitive.Overlay
         aria-hidden="true"
         className={cn(
@@ -385,12 +380,23 @@ const CommandMenuContent = forwardRef<
           "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
         )}
       />
-      {/* Content */}
+      {/* Content - centered within the main container when available,
+          otherwise falls back to viewport centering */}
       <DialogPrimitive.Content
         ref={ref}
         onKeyDown={handleKeyDown}
+        style={
+          hasContainerCenter
+            ? ({
+                left: centerX,
+                "--tw-enter-translate-x": "-50%",
+                "--tw-exit-translate-x": "-50%",
+              } as React.CSSProperties)
+            : undefined
+        }
         className={cn(
-          "fixed inset-x-0 top-[72px] mx-auto",
+          "fixed top-[72px]",
+          hasContainerCenter ? "-translate-x-1/2" : "inset-x-0 mx-auto",
           "z-modal",
           "bg-background-tint-00 border rounded-16 shadow-2xl outline-none",
           "flex flex-col overflow-hidden",
@@ -512,7 +518,7 @@ function CommandMenuHeader({
  */
 function CommandMenuList({ children, emptyMessage }: CommandMenuListProps) {
   const { isKeyboardNav, onListMouseLeave } = useCommandMenuContext();
-  const childCount = Children.count(children);
+  const childCount = React.Children.count(children);
 
   if (childCount === 0 && emptyMessage) {
     return (

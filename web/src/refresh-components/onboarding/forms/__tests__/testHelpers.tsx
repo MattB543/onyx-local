@@ -1,6 +1,7 @@
 /**
  * Shared test helpers and mocks for onboarding form tests
  */
+import React from "react";
 
 // Mock Element.prototype.scrollIntoView for JSDOM (not implemented in jsdom)
 Element.prototype.scrollIntoView = jest.fn();
@@ -9,7 +10,6 @@ import {
   LLMProviderName,
   ModelConfiguration,
 } from "@/interfaces/llm";
-
 import {
   OnboardingState,
   OnboardingActions,
@@ -98,18 +98,18 @@ export function createMockFetchResponses() {
       ok: true,
       json: async () => ({}),
     } as Response,
-    testApiError: (message = "Invalid API key") =>
+    testApiError: (message: string = "Invalid API key") =>
       ({
         ok: false,
         status: 400,
         json: async () => ({ detail: message }),
       }) as Response,
-    createProviderSuccess: (id = 1) =>
+    createProviderSuccess: (id: number = 1) =>
       ({
         ok: true,
         json: async () => ({ id, name: "test-provider" }),
       }) as Response,
-    createProviderError: (message = "Failed to create provider") =>
+    createProviderError: (message: string = "Failed to create provider") =>
       ({
         ok: false,
         status: 500,
@@ -124,7 +124,7 @@ export function createMockFetchResponses() {
         ok: true,
         json: async () => models,
       }) as Response,
-    fetchModelsError: (message = "Failed to fetch models") =>
+    fetchModelsError: (message: string = "Failed to fetch models") =>
       ({
         ok: false,
         status: 400,
@@ -152,7 +152,6 @@ export const FORM_LABELS = {
 /**
  * Waits for the modal to be open and visible
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function waitForModalOpen(screen: any, waitFor: any) {
   await waitFor(() => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
