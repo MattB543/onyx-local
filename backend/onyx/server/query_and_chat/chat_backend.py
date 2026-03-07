@@ -152,10 +152,20 @@ def get_user_chat_sessions(
     project_id: int | None = None,
     only_non_project_chats: bool = True,
     include_failed_chats: bool = False,
+    page_size: int = Query(default=50, ge=1, le=100),
+    before: str | None = Query(default=None),
 ) -> ChatSessionsResponse:
     user_id = user.id
 
     try:
+        before_dt = (
+            datetime.datetime.fromisoformat(before) if before is not None else None
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid 'before' timestamp format")
+
+    try:
+        # Fetch one extra to determine if there are more results
         chat_sessions = get_chat_sessions_by_user(
             user_id=user_id,
             deleted=False,
@@ -163,10 +173,15 @@ def get_user_chat_sessions(
             project_id=project_id,
             only_non_project_chats=only_non_project_chats,
             include_failed_chats=include_failed_chats,
+            limit=page_size + 1,
+            before=before_dt,
         )
 
     except ValueError:
         raise ValueError("Chat session does not exist or has been deleted")
+
+    has_more = len(chat_sessions) > page_size
+    chat_sessions = chat_sessions[:page_size]
 
     return ChatSessionsResponse(
         sessions=[
@@ -181,7 +196,8 @@ def get_user_chat_sessions(
                 current_temperature_override=chat.temperature_override,
             )
             for chat in chat_sessions
-        ]
+        ],
+        has_more=has_more,
     )
 
 
@@ -349,6 +365,7 @@ def get_chat_session(
         shared_status=chat_session.shared_status,
         current_temperature_override=chat_session.temperature_override,
         deleted=chat_session.deleted,
+        owner_name=chat_session.user.personal_name if chat_session.user else None,
         # Packets are now directly serialized as Packet Pydantic models
         packets=replay_packet_lists,
     )
@@ -586,6 +603,7 @@ def handle_send_chat_message(
                     request.headers
                 ),
                 mcp_headers=chat_message_req.mcp_headers,
+                additional_context=chat_message_req.additional_context,
                 external_state_container=state_container,
             )
             result = gather_stream_full(packets, state_container)
@@ -608,6 +626,7 @@ def handle_send_chat_message(
                         request.headers
                     ),
                     mcp_headers=chat_message_req.mcp_headers,
+                    additional_context=chat_message_req.additional_context,
                     external_state_container=state_container,
                 ):
                     yield get_json_line(obj.model_dump())

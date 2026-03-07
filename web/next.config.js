@@ -105,9 +105,40 @@ const nextConfig = {
         destination: "/app",
         permanent: true,
       },
+      // NRF routes: Redirect to /nrf which doesn't require auth
+      // (NRFPage handles unauthenticated users gracefully with a login modal)
+      {
+        source: "/app/nrf/side-panel",
+        destination: "/nrf/side-panel",
+        permanent: true,
+      },
+      {
+        source: "/app/nrf",
+        destination: "/nrf",
+        permanent: true,
+      },
       {
         source: "/chat/:path*",
         destination: "/app/:path*",
+        permanent: true,
+      },
+      // Legacy /assistants → /agents redirects (added in PR #8869).
+      // Preserves backward compatibility for bookmarks, shared links, and
+      // hardcoded URLs that still reference the old /assistants paths.
+      // TODO: Remove these redirects in v4.0 — https://linear.app/onyx-app/issue/ENG-3771
+      {
+        source: "/admin/assistants",
+        destination: "/admin/agents",
+        permanent: true,
+      },
+      {
+        source: "/admin/assistants/:path*",
+        destination: "/admin/agents/:path*",
+        permanent: true,
+      },
+      {
+        source: "/ee/assistants/:path*",
+        destination: "/ee/agents/:path*",
         permanent: true,
       },
     ];

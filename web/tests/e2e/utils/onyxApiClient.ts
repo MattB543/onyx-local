@@ -8,6 +8,7 @@ const E2E_LLM_PROVIDER_API_KEY =
 const E2E_WEB_SEARCH_API_KEY =
   process.env.E2E_WEB_SEARCH_API_KEY ||
   process.env.EXA_API_KEY ||
+  process.env.BRAVE_SEARCH_API_KEY ||
   process.env.SERPER_API_KEY ||
   "e2e-placeholder-web-search-key";
 
@@ -442,7 +443,10 @@ export class OnyxApiClient {
     }>
   > {
     const response = await this.get("/admin/llm/provider");
-    return await this.handleResponse(response, "Failed to list LLM providers");
+    const data = await this.handleResponse<{
+      providers: Array<{ id: number; is_public?: boolean }>;
+    }>(response, "Failed to list LLM providers");
+    return data.providers;
   }
 
   /**
@@ -464,6 +468,7 @@ export class OnyxApiClient {
       return null;
     }
 
+    const defaultModelName = "gpt-4o";
     const response = await this.request.put(
       `${this.baseUrl}/admin/llm/provider?is_creation=true`,
       {
@@ -471,10 +476,10 @@ export class OnyxApiClient {
           name: providerName,
           provider: "openai",
           api_key: E2E_LLM_PROVIDER_API_KEY,
-          default_model_name: "gpt-4o",
           is_public: true,
           groups: [],
           personas: [],
+          model_configurations: [{ name: defaultModelName, is_visible: true }],
         },
       }
     );
@@ -485,7 +490,7 @@ export class OnyxApiClient {
     );
 
     // Set as default so get_default_llm() works (needed for tokenization, etc.)
-    await this.setProviderAsDefault(responseData.id);
+    await this.setProviderAsDefault(responseData.id, defaultModelName);
 
     this.log(
       `Created public LLM provider: ${providerName} (ID: ${responseData.id})`
@@ -494,14 +499,19 @@ export class OnyxApiClient {
   }
 
   /**
-   * Sets an LLM provider as the default for chat.
+   * Sets an LLM provider + model as the default for chat.
    *
    * @param providerId - The provider ID to set as default
+   * @param modelName - The model name to set as default
    */
-  async setProviderAsDefault(providerId: number): Promise<void> {
-    const response = await this.post(
-      `/admin/llm/provider/${providerId}/default`
-    );
+  async setProviderAsDefault(
+    providerId: number,
+    modelName: string
+  ): Promise<void> {
+    const response = await this.post("/admin/llm/default", {
+      provider_id: providerId,
+      model_name: modelName,
+    });
 
     await this.handleResponseSoft(
       response,
@@ -630,28 +640,28 @@ export class OnyxApiClient {
     return tools.find((tool) => tool.name === name) ?? null;
   }
 
-  async deleteAssistant(assistantId: number): Promise<boolean> {
+  async deleteAgent(agentId: number): Promise<boolean> {
     const response = await this.request.delete(
-      `${this.baseUrl}/persona/${assistantId}`
+      `${this.baseUrl}/persona/${agentId}`
     );
     const success = await this.handleResponseSoft(
       response,
-      `Failed to delete assistant ${assistantId}`
+      `Failed to delete assistant ${agentId}`
     );
     if (success) {
-      this.log(`Deleted assistant ${assistantId}`);
+      this.log(`Deleted assistant ${agentId}`);
     }
     return success;
   }
 
-  async getAssistant(assistantId: number): Promise<{
+  async getAssistant(agentId: number): Promise<{
     id: number;
     tools: Array<{ id: number; mcp_server_id?: number | null }>;
   }> {
-    const response = await this.get(`/persona/${assistantId}`);
+    const response = await this.get(`/persona/${agentId}`);
     return await this.handleResponse(
       response,
-      `Failed to fetch assistant ${assistantId}`
+      `Failed to fetch assistant ${agentId}`
     );
   }
 
@@ -664,7 +674,7 @@ export class OnyxApiClient {
     return data.mcp_servers;
   }
 
-  async listAssistants(options?: {
+  async listAgents(options?: {
     includeDeleted?: boolean;
     getEditable?: boolean;
   }): Promise<any[]> {
@@ -685,11 +695,11 @@ export class OnyxApiClient {
     );
   }
 
-  async findAssistantByName(
+  async findAgentByName(
     name: string,
     options?: { includeDeleted?: boolean; getEditable?: boolean }
   ): Promise<any | null> {
-    const assistants = await this.listAssistants(options);
+    const assistants = await this.listAgents(options);
     return assistants.find((assistant) => assistant.name === name) ?? null;
   }
 
@@ -760,12 +770,12 @@ export class OnyxApiClient {
    * Create and activate a web search provider for testing.
    * Uses env-backed keys when available and falls back to a placeholder key.
    *
-   * @param providerType - Type of provider: "exa", "serper", "google_pse", "searxng"
+   * @param providerType - Type of provider: "exa", "brave", "serper", "google_pse", "searxng"
    * @param name - Optional name for the provider (defaults to "Test Provider")
    * @returns The created provider ID
    */
   async createWebSearchProvider(
-    providerType: "exa" | "serper" | "google_pse" | "searxng" = "exa",
+    providerType: "exa" | "brave" | "serper" | "google_pse" | "searxng" = "exa",
     name: string = "Test Provider"
   ): Promise<number> {
     const config: Record<string, string> = {};
@@ -1113,5 +1123,24 @@ export class OnyxApiClient {
       `Failed to delete project ${projectId}`
     );
     this.log(`Deleted project: ${projectId}`);
+  }
+
+  /**
+   * Sets the current user's default app mode preference.
+   *
+   * @param mode - The default mode to persist ("CHAT" or "SEARCH")
+   */
+  async setDefaultAppMode(mode: "CHAT" | "SEARCH"): Promise<void> {
+    const response = await this.request.patch(
+      `${this.baseUrl}/user/default-app-mode`,
+      {
+        data: { default_app_mode: mode },
+      }
+    );
+    await this.handleResponse(
+      response,
+      `Failed to set default app mode to ${mode}`
+    );
+    this.log(`Set default app mode: ${mode}`);
   }
 }

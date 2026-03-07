@@ -7,25 +7,23 @@ import ListInput from "./ConnectorInput/ListInput";
 import FileInput from "./ConnectorInput/FileInput";
 import { ConfigurableSources } from "@/lib/types";
 import { Credential } from "@/lib/connectors/credentials";
-import CollapsibleSection from "@/app/admin/assistants/CollapsibleSection";
+import CollapsibleSection from "@/app/admin/agents/CollapsibleSection";
 import Tabs from "@/refresh-components/Tabs";
 import { useFormikContext } from "formik";
 import * as GeneralLayouts from "@/layouts/general-layouts";
 import * as InputLayouts from "@/layouts/input-layouts";
-import { CheckboxField } from "@/refresh-components/form/LabeledCheckboxField";
+import { Content } from "@opal/layouts";
+import CheckboxField from "@/refresh-components/form/LabeledCheckboxField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import Text from "@/refresh-components/texts/Text";
 
 // Define a general type for form values
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FormValues = Record<string, any>;
 
 interface TabsFieldProps {
   tabField: TabOption;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   values: any;
   connector: ConfigurableSources;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentCredential: Credential<any> | null;
 }
 
@@ -49,9 +47,11 @@ const TabsField: FC<TabsFieldProps> = ({
   return (
     <GeneralLayouts.Section gap={0.5} alignItems="start">
       {tabField.label && (
-        <InputLayouts.Title
+        <Content
           title={resolvedLabel ?? ""}
           description={resolvedDescription}
+          sizePreset="main-content"
+          variant="section"
         />
       )}
 
@@ -116,12 +116,9 @@ const TabsField: FC<TabsFieldProps> = ({
 };
 
 interface RenderFieldProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   field: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   values: any;
   connector: ConfigurableSources;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentCredential: Credential<any> | null;
 }
 

@@ -11,7 +11,7 @@ import Text from "@/refresh-components/texts/Text";
 import { Button } from "@opal/components";
 import { cn, noProp } from "@/lib/utils";
 import { SvgAlertCircle, SvgRefreshCw } from "@opal/icons";
-import { WellKnownLLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import {
   OnboardingFormWrapper,
   OnboardingFormChildProps,
@@ -326,7 +326,7 @@ function BedrockFormFields(props: OnboardingFormChildProps<BedrockFormValues>) {
         />
       )}
 
-      <Separator className="my-0" />
+      <Separator className="py-0" />
 
       <FormikField<string>
         name={FIELD_DEFAULT_MODEL_NAME}

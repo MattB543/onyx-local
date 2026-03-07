@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import * as GeneralLayouts from "@/layouts/general-layouts";
 import Button from "@/refresh-components/buttons/Button";
-import { FullPersona } from "@/app/admin/assistants/interfaces";
+import { FullPersona } from "@/app/admin/agents/interfaces";
 import { buildImgUrl } from "@/app/app/components/files/images/utils";
 import { Formik, Form, FieldArray } from "formik";
 import * as Yup from "yup";
@@ -13,17 +13,17 @@ import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInElementField from "@/refresh-components/form/InputTypeInElementField";
 import InputDatePickerField from "@/refresh-components/form/InputDatePickerField";
+import Message from "@/refresh-components/messages/Message";
 import Separator from "@/refresh-components/Separator";
 import * as InputLayouts from "@/layouts/input-layouts";
 import { useFormikContext } from "formik";
 import LLMSelector from "@/components/llm/LLMSelector";
-import { parseLlmDescriptor, structureValue } from "@/lib/llm/utils";
-import { useLLMProviders } from "@/lib/hooks/useLLMProviders";
+import { parseLlmDescriptor, structureValue } from "@/lib/llmConfig/utils";
+import { useLLMProviders } from "@/hooks/useLLMProviders";
 import {
   STARTER_MESSAGES_EXAMPLES,
   MAX_CHARACTERS_STARTER_MESSAGE,
   MAX_CHARACTERS_AGENT_DESCRIPTION,
-  MAX_CHUNKS_FED_TO_CHAT,
 } from "@/lib/constants";
 import {
   IMAGE_GENERATION_TOOL_ID,
@@ -31,7 +31,6 @@ import {
   PYTHON_TOOL_ID,
   SEARCH_TOOL_ID,
   OPEN_URL_TOOL_ID,
-  FILE_READER_TOOL_ID,
 } from "@/app/app/components/tools/constants";
 import Text from "@/refresh-components/texts/Text";
 import { Card } from "@/refresh-components/cards";
@@ -57,6 +56,7 @@ import {
   SvgLock,
   SvgOnyxOctagon,
   SvgSliders,
+  SvgUsers,
   SvgTrash,
 } from "@opal/icons";
 import CustomAgentAvatar, {
@@ -69,7 +69,7 @@ import {
   createPersona,
   updatePersona,
   PersonaUpsertParameters,
-} from "@/app/admin/assistants/lib";
+} from "@/app/admin/agents/lib";
 import useMcpServersForAgentEditor from "@/hooks/useMcpServersForAgentEditor";
 import useOpenApiTools from "@/hooks/useOpenApiTools";
 import { useAvailableTools } from "@/hooks/useAvailableTools";
@@ -87,6 +87,8 @@ import ShareAgentModal from "@/sections/modals/ShareAgentModal";
 import AgentKnowledgePane from "@/sections/knowledge/AgentKnowledgePane";
 import { ValidSources } from "@/lib/types";
 import { useSettingsContext } from "@/providers/SettingsProvider";
+import { useUser } from "@/providers/UserProvider";
+import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
 
 interface AgentIconEditorProps {
   existingAgent?: FullPersona | null;
@@ -312,7 +314,11 @@ function MCPServerCard({
         description={server.description}
         icon={getActionIcon(server.server_url, server.name)}
         rightChildren={
-          <GeneralLayouts.Section flexDirection="row" gap={0.5}>
+          <GeneralLayouts.Section
+            flexDirection="row"
+            gap={0.5}
+            alignItems="start"
+          >
             <EnabledCount
               enabledCount={enabledCount}
               totalCount={enabledTools.length}
@@ -351,18 +357,9 @@ function MCPServerCard({
       </ActionsLayouts.Header>
       {isLoading ? (
         <ActionsLayouts.Content>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index} padding={0.75}>
-              <GeneralLayouts.LineItemLayout
-                // We provide dummy values here.
-                // The `loading` prop will always render a pulsing box instead, so the dummy-values will actually NOT be rendered at all.
-                title="..."
-                description="..."
-                rightChildren={<></>}
-                loading
-              />
-            </Card>
-          ))}
+          <GeneralLayouts.Section padding={1}>
+            <SimpleLoader />
+          </GeneralLayouts.Section>
         </ActionsLayouts.Content>
       ) : (
         enabledTools.length > 0 &&
@@ -452,6 +449,8 @@ export default function AgentEditorPage({
   const shareAgentModal = useCreateModal();
   const deleteAgentModal = useCreateModal();
   const settings = useSettingsContext();
+  const { isAdmin, isCurator } = useUser();
+  const canUpdateFeaturedStatus = isAdmin || isCurator;
   const vectorDbEnabled = settings?.settings.vector_db_enabled !== false;
 
   // LLM Model Selection
@@ -529,9 +528,6 @@ export default function AgentEditorPage({
   const codeInterpreterTool = availableTools?.find(
     (t) => t.in_code_tool_id === PYTHON_TOOL_ID
   );
-  const fileReaderTool = availableTools?.find(
-    (t) => t.in_code_tool_id === FILE_READER_TOOL_ID
-  );
   const isImageGenerationAvailable = !!imageGenTool;
   const imageGenerationDisabledTooltip = isImageGenerationAvailable
     ? undefined
@@ -568,9 +564,12 @@ export default function AgentEditorPage({
       (_, i) => existingAgent?.starter_messages?.[i]?.message ?? ""
     ),
 
-    // Knowledge - enabled if num_chunks is greater than 0
-    // (num_chunks of 0 or null means knowledge is disabled)
-    enable_knowledge: (existingAgent?.num_chunks ?? 0) > 0,
+    // Knowledge - enabled if agent has any knowledge sources attached
+    enable_knowledge:
+      (existingAgent?.document_sets?.length ?? 0) > 0 ||
+      (existingAgent?.hierarchy_nodes?.length ?? 0) > 0 ||
+      (existingAgent?.attached_documents?.length ?? 0) > 0 ||
+      (existingAgent?.user_file_ids?.length ?? 0) > 0,
     document_set_ids: existingAgent?.document_sets?.map((ds) => ds.id) ?? [],
     // Individual document IDs from hierarchy browsing
     document_ids: existingAgent?.attached_documents?.map((doc) => doc.id) ?? [],
@@ -592,9 +591,9 @@ export default function AgentEditorPage({
     replace_base_system_prompt:
       existingAgent?.replace_base_system_prompt ?? false,
     reminders: existingAgent?.task_prompt ?? "",
-    // For new assistants, default to false for optional tools to avoid
+    // For new agents, default to false for optional tools to avoid
     // "Tool not available" errors when the tool isn't configured.
-    // For existing assistants, preserve the current tool configuration.
+    // For existing agents, preserve the current tool configuration.
     image_generation:
       !!imageGenTool &&
       (existingAgent?.tools?.some(
@@ -619,14 +618,6 @@ export default function AgentEditorPage({
         (tool) => tool.in_code_tool_id === PYTHON_TOOL_ID
       ) ??
         false),
-    file_reader:
-      !!fileReaderTool &&
-      (existingAgent?.tools?.some(
-        (tool) => tool.in_code_tool_id === FILE_READER_TOOL_ID
-      ) ??
-        // Default to enabled for new assistants when the tool is available
-        !!fileReaderTool),
-
     // MCP servers - dynamically add fields for each server with nested tool fields
     ...Object.fromEntries(
       mcpServersWithTools.map(({ server, tools }) => {
@@ -667,6 +658,8 @@ export default function AgentEditorPage({
     shared_user_ids: existingAgent?.users?.map((user) => user.id) ?? [],
     shared_group_ids: existingAgent?.groups ?? [],
     is_public: existingAgent?.is_public ?? true,
+    label_ids: existingAgent?.labels?.map((l) => l.id) ?? [],
+    featured: existingAgent?.featured ?? false,
   };
 
   const validationSchema = Yup.object().shape({
@@ -698,19 +691,6 @@ export default function AgentEditorPage({
     hierarchy_node_ids: Yup.array().of(Yup.number()),
     user_file_ids: Yup.array().of(Yup.string()),
     selected_sources: Yup.array().of(Yup.string()),
-    num_chunks: Yup.number()
-      .nullable()
-      .transform((value, originalValue) =>
-        originalValue === "" || originalValue === null ? null : value
-      )
-      .test(
-        "is-non-negative-integer",
-        "The number of chunks must be a non-negative integer (0, 1, 2, etc.)",
-        (value) =>
-          value === null ||
-          value === undefined ||
-          (Number.isInteger(value) && value >= 0)
-      ),
 
     // Advanced
     llm_model_provider_override: Yup.string().nullable().optional(),
@@ -750,9 +730,6 @@ export default function AgentEditorPage({
       const finalStarterMessages =
         starterMessages.length > 0 ? starterMessages : null;
 
-      // Determine knowledge settings
-      const numChunks = values.enable_knowledge ? MAX_CHUNKS_FED_TO_CHAT : 0;
-
       // Always look up tools in availableTools to ensure we can find all tools
 
       const toolIds = [];
@@ -760,9 +737,6 @@ export default function AgentEditorPage({
         if (vectorDbEnabled && searchTool) {
           toolIds.push(searchTool.id);
         }
-      }
-      if (values.file_reader && fileReaderTool) {
-        toolIds.push(fileReaderTool.id);
       }
       if (values.image_generation && imageGenTool) {
         toolIds.push(imageGenTool.id);
@@ -817,11 +791,7 @@ export default function AgentEditorPage({
         document_set_ids: values.enable_knowledge
           ? values.document_set_ids
           : [],
-        num_chunks: numChunks,
         is_public: values.is_public,
-        // recency_bias: ...,
-        // llm_filter_extraction: ...,
-        llm_relevance_filter: false,
         llm_model_provider_override: values.llm_model_provider_override || null,
         llm_model_version_override: values.llm_model_version_override || null,
         starter_messages: finalStarterMessages,
@@ -833,8 +803,8 @@ export default function AgentEditorPage({
         uploaded_image_id: values.uploaded_image_id,
         icon_name: values.icon_name,
         search_start_date: values.knowledge_cutoff_date || null,
-        label_ids: null,
-        is_default_persona: false,
+        label_ids: values.label_ids,
+        featured: values.featured,
         // display_priority: ...,
 
         user_file_ids: values.enable_knowledge ? values.user_file_ids : [],
@@ -1016,6 +986,10 @@ export default function AgentEditorPage({
               (fileId: string) =>
                 fileStatusMap.get(fileId) === UserFileStatus.PROCESSING
             );
+            const isShared =
+              values.is_public ||
+              values.shared_user_ids.length > 0 ||
+              values.shared_group_ids.length > 0;
 
             return (
               <>
@@ -1075,10 +1049,20 @@ export default function AgentEditorPage({
                     userIds={values.shared_user_ids}
                     groupIds={values.shared_group_ids}
                     isPublic={values.is_public}
-                    onShare={(userIds, groupIds, isPublic) => {
+                    isFeatured={values.featured}
+                    labelIds={values.label_ids}
+                    onShare={(
+                      userIds,
+                      groupIds,
+                      isPublic,
+                      isFeatured,
+                      labelIds
+                    ) => {
                       setFieldValue("shared_user_ids", userIds);
                       setFieldValue("shared_group_ids", groupIds);
                       setFieldValue("is_public", isPublic);
+                      setFieldValue("featured", isFeatured);
+                      setFieldValue("label_ids", labelIds);
                       shareAgentModal.toggle(false);
                     }}
                   />
@@ -1168,7 +1152,6 @@ export default function AgentEditorPage({
                           <InputLayouts.Vertical
                             name="agent_avatar"
                             title="Agent Avatar"
-                            center
                           >
                             <AgentIconEditor existingAgent={existingAgent} />
                           </InputLayouts.Vertical>
@@ -1329,24 +1312,6 @@ export default function AgentEditorPage({
                               </InputLayouts.Horizontal>
                             </Card>
 
-                            <Card
-                              variant={
-                                !!fileReaderTool ? undefined : "disabled"
-                              }
-                            >
-                              <InputLayouts.Horizontal
-                                name="file_reader"
-                                title="File Reader"
-                                description="Read sections of uploaded files. Required for files that exceed the context window."
-                                disabled={!fileReaderTool}
-                              >
-                                <SwitchField
-                                  name="file_reader"
-                                  disabled={!fileReaderTool}
-                                />
-                              </InputLayouts.Horizontal>
-                            </Card>
-
                             {/* Tools */}
                             <>
                               {/* render the separator if there is at least one mcp-server or open-api-tool */}
@@ -1399,17 +1364,36 @@ export default function AgentEditorPage({
                             <Card>
                               <InputLayouts.Horizontal
                                 title="Share This Agent"
-                                description="Share this agent with other users, groups, or everyone in your organization."
+                                description="with other users, groups, or everyone in your organization."
                                 center
                               >
                                 <Button
                                   secondary
-                                  leftIcon={SvgLock}
+                                  leftIcon={isShared ? SvgUsers : SvgLock}
                                   onClick={() => shareAgentModal.toggle(true)}
                                 >
                                   Share
                                 </Button>
                               </InputLayouts.Horizontal>
+                              {canUpdateFeaturedStatus && (
+                                <>
+                                  <InputLayouts.Horizontal
+                                    name="featured"
+                                    title="Feature This Agent"
+                                    description="Show this agent at the top of the explore agents list and automatically pin it to the sidebar for new users with access."
+                                  >
+                                    <SwitchField name="featured" />
+                                  </InputLayouts.Horizontal>
+                                  {values.featured && !isShared && (
+                                    <Message
+                                      static
+                                      close={false}
+                                      className="w-full"
+                                      text="This agent is private to you and will only be featured for yourself."
+                                    />
+                                  )}
+                                </>
+                              )}
                             </Card>
 
                             <Card>

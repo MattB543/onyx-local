@@ -1,21 +1,17 @@
 import { memo, useState, useCallback } from "react";
-
-import { WellKnownLLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
-import { ProviderIcon } from "@/app/admin/configuration/llm/ProviderIcon";
-import Button from "@/refresh-components/buttons/Button";
-import { Disabled } from "@/refresh-components/Disabled";
-import Separator from "@/refresh-components/Separator";
 import Text from "@/refresh-components/texts/Text";
-
-import { SvgCheckCircle, SvgCpu, SvgExternalLink } from "@opal/icons";
-
+import Button from "@/refresh-components/buttons/Button";
+import Separator from "@/refresh-components/Separator";
 import LLMProviderCard from "../components/LLMProviderCard";
+import { OnboardingActions, OnboardingState, OnboardingStep } from "../types";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import {
   getOnboardingForm,
   getProviderDisplayInfo,
 } from "../forms/getOnboardingForm";
-import { OnboardingActions, OnboardingState, OnboardingStep } from "../types";
-
+import { Disabled } from "@/refresh-components/Disabled";
+import { ProviderIcon } from "@/app/admin/configuration/llm/ProviderIcon";
+import { SvgCheckCircle, SvgCpu, SvgExternalLink } from "@opal/icons";
 
 type LLMStepProps = {
   state: OnboardingState;
@@ -101,7 +97,7 @@ const LLMStepInner = ({
   const handleProviderClick = useCallback(
     (
       llmDescriptor?: WellKnownLLMProviderDescriptor,
-      isCustomProvider = false
+      isCustomProvider: boolean = false
     ) => {
       setSelectedProvider({ llmDescriptor, isCustomProvider });
       setIsModalOpen(true);
@@ -122,7 +118,10 @@ const LLMStepInner = ({
   ) {
     return (
       <Disabled disabled={disabled} allowClick>
-        <div className="flex flex-col items-center justify-between w-full max-w-[800px] p-1 rounded-16 border border-border-01 bg-background-tint-00">
+        <div
+          className="flex flex-col items-center justify-between w-full p-1 rounded-16 border border-border-01 bg-background-tint-00"
+          aria-label="onboarding-llm-step"
+        >
           <div className="flex gap-2 justify-between h-full w-full">
             <div className="flex mx-2 mt-2 gap-1">
               <div className="h-full p-0.5">
@@ -220,7 +219,7 @@ const LLMStepInner = ({
     return (
       <button
         type="button"
-        className="flex items-center justify-between w-full max-w-[800px] p-3 bg-background-tint-00 rounded-16 border border-border-01 opacity-50"
+        className="flex items-center justify-between w-full p-3 bg-background-tint-00 rounded-16 border border-border-01 opacity-50"
         onClick={() => {
           onboardingActions.setButtonActive(true);
           onboardingActions.goToStep(OnboardingStep.LlmSetup);

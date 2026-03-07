@@ -8,7 +8,7 @@ import Separator from "@/refresh-components/Separator";
 import { Button } from "@opal/components";
 import { cn, noProp } from "@/lib/utils";
 import { SvgRefreshCw } from "@opal/icons";
-import { WellKnownLLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import {
   OnboardingFormWrapper,
   OnboardingFormChildProps,
@@ -117,7 +117,7 @@ function OpenRouterFormFields(
         )}
       />
 
-      <Separator className="my-0" />
+      <Separator className="py-0" />
 
       <FormikField<string>
         name={FIELD_DEFAULT_MODEL_NAME}
