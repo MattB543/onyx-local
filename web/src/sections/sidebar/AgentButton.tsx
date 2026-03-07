@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
+import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
 import { usePinnedAgents, useCurrentAgent } from "@/hooks/useAgents";
 import { cn, noProp } from "@/lib/utils";
 import SidebarTab from "@/refresh-components/buttons/SidebarTab";
@@ -63,10 +63,10 @@ const AgentButton = memo(({ agent }: AgentButtonProps) => {
       <div className="flex flex-col w-full h-full">
         <SidebarTab
           key={agent.id}
-          leftIcon={() => <AgentAvatar agent={agent} />}
-          href={`/app?assistantId=${agent.id}`}
+          icon={() => <AgentAvatar agent={agent} />}
+          href={`/app?agentId=${agent.id}`}
           onClick={handleClick}
-          transient={isCurrentAgent}
+          selected={isCurrentAgent}
           rightChildren={
             // Hide unpin button for current agent since auto-pin would immediately re-pin
             isCurrentAgent ? null : (

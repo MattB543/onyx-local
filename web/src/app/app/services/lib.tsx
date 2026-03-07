@@ -1,12 +1,11 @@
-import { ReadonlyURLSearchParams } from "next/navigation";
-
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import {
-  WEB_SEARCH_TOOL_ID,
-  SEARCH_TOOL_ID,
-} from "@/app/app/components/tools/constants";
+  Filters,
+  DocumentInfoPacket,
+  StreamStopInfo,
+} from "@/lib/search/interfaces";
+import { handleSSEStream } from "@/lib/search/streamingUtils";
+import { FeedbackType } from "@/app/app/interfaces";
 import {
-  FeedbackType,
   BackendMessage,
   DocumentsResponse,
   FileDescriptor,
@@ -18,15 +17,12 @@ import {
   StreamingError,
   ToolCallMetadata,
   UserKnowledgeFilePacket,
-} from "@/app/app/interfaces";
-import {
-  Filters,
-  DocumentInfoPacket,
-  StreamStopInfo,
-} from "@/lib/search/interfaces";
-import { handleSSEStream } from "@/lib/search/streamingUtils";
-
+} from "../interfaces";
+import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
+import { ReadonlyURLSearchParams } from "next/navigation";
 import { SEARCH_PARAM_NAMES } from "./searchParams";
+import { WEB_SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
+import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { Packet } from "./streamingModels";
 
 export async function updateLlmOverrideForChatSession(
@@ -130,6 +126,9 @@ export interface SendMessageParams {
   temperature?: number;
   // Origin of the message for telemetry tracking
   origin?: MessageOrigin;
+  // Additional context injected into the LLM call but not stored/shown in chat.
+  // Used e.g. by Chrome extension "Read this tab" feature.
+  additionalContext?: string;
 }
 
 export async function* sendMessage({
@@ -146,6 +145,7 @@ export async function* sendMessage({
   modelVersion,
   temperature,
   origin,
+  additionalContext,
 }: SendMessageParams): AsyncGenerator<PacketType, void, unknown> {
   // Build payload for new send-chat-message API
   const payload = {
@@ -167,6 +167,7 @@ export async function* sendMessage({
         : null,
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
+    additional_context: additionalContext ?? null,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
@@ -303,15 +304,15 @@ export function processRawChatHistory(
   rawMessages: BackendMessage[],
   packets: Packet[][]
 ): Map<number, Message> {
-  const messages = new Map<number, Message>();
-  const parentMessageChildrenMap = new Map<number, number[]>();
+  const messages: Map<number, Message> = new Map();
+  const parentMessageChildrenMap: Map<number, number[]> = new Map();
 
-  let assistantMessageInd = 0;
+  let agentMessageInd = 0;
 
   rawMessages.forEach((messageInfo, _ind) => {
-    const packetsForMessage = packets[assistantMessageInd];
+    const packetsForMessage = packets[agentMessageInd];
     if (messageInfo.message_type === "assistant") {
-      assistantMessageInd++;
+      agentMessageInd++;
     }
 
     const hasContextDocs = (messageInfo?.context_docs || []).length > 0;
@@ -334,11 +335,11 @@ export function processRawChatHistory(
       message: messageInfo.message,
       type: messageInfo.message_type as "user" | "assistant",
       files: messageInfo.files,
-      alternateAssistantID:
+      alternateAgentID:
         messageInfo.alternate_assistant_id !== null
           ? Number(messageInfo.alternate_assistant_id)
           : null,
-      // only include these fields if this is an assistant message so that
+      // only include these fields if this is an agent message so that
       // this is identical to what is computed at streaming time
       ...(messageInfo.message_type === "assistant"
         ? {
@@ -365,12 +366,9 @@ export function processRawChatHistory(
       if (!parentMessageChildrenMap.has(messageInfo.parent_message)) {
         parentMessageChildrenMap.set(messageInfo.parent_message, []);
       }
-      const parentChildren = parentMessageChildrenMap.get(
-        messageInfo.parent_message
-      );
-      if (parentChildren) {
-        parentChildren.push(messageInfo.message_id);
-      }
+      parentMessageChildrenMap
+        .get(messageInfo.parent_message)!
+        .push(messageInfo.message_id);
     }
   });
 

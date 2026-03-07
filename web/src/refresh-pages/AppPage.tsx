@@ -1,7 +1,6 @@
 "use client";
 
 import { redirect, useRouter, useSearchParams } from "next/navigation";
-import { HealthCheckBanner } from "@/components/health/healthcheck";
 import {
   personaIncludesRetrieval,
   getAvailableContextTokens,
@@ -24,8 +23,8 @@ import { useAgents } from "@/hooks/useAgents";
 import { AppPopup } from "@/app/app/components/AppPopup";
 import ExceptionTraceModal from "@/components/modals/ExceptionTraceModal";
 import { useUser } from "@/providers/UserProvider";
-import NoAssistantModal from "@/components/modals/NoAssistantModal";
-import TextViewModal from "@/sections/modals/TextViewModal";
+import NoAgentModal from "@/components/modals/NoAgentModal";
+import PreviewModal from "@/sections/modals/PreviewModal";
 import Modal from "@/refresh-components/Modal";
 import { useSendMessageToParent } from "@/lib/extension/utils";
 import { SUBMIT_MESSAGE_TYPES } from "@/lib/extension/constants";
@@ -38,6 +37,7 @@ import useAgentController from "@/hooks/useAgentController";
 import useChatSessionController from "@/hooks/useChatSessionController";
 import useDeepResearchToggle from "@/hooks/useDeepResearchToggle";
 import useIsDefaultAgent from "@/hooks/useIsDefaultAgent";
+import AgentDescription from "@/app/app/components/AgentDescription";
 import {
   useChatSessionStore,
   useCurrentMessageHistory,
@@ -60,8 +60,8 @@ import {
 import ProjectChatSessionList from "@/app/app/components/projects/ProjectChatSessionList";
 import { cn } from "@/lib/utils";
 import Suggestions from "@/sections/Suggestions";
-import OnboardingFlow from "@/refresh-components/onboarding/OnboardingFlow";
-import { OnboardingStep } from "@/refresh-components/onboarding/types";
+import OnboardingFlow from "@/sections/onboarding/OnboardingFlow";
+import { OnboardingStep } from "@/interfaces/onboarding";
 import { useShowOnboarding } from "@/hooks/useShowOnboarding";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { SvgChevronDown, SvgFileText } from "@opal/icons";
@@ -137,7 +137,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     currentChatSessionId,
     isLoading: isLoadingChatSessions,
   } = useChatSessions();
-  const { ccPairs } = useCCPairs();
+  // handle redirect if chat page is disabled
+  // NOTE: this must be done here, in a client component since
+  // settings are passed in via Context and therefore aren't
+  // available in server-side components
+  const settings = useSettingsContext();
+  const vectorDbEnabled = settings?.settings.vector_db_enabled !== false;
+  const { ccPairs } = useCCPairs(vectorDbEnabled);
   const { tags } = useTags();
   const { documentSets } = useDocumentSets();
   const {
@@ -154,12 +160,6 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   useEffect(() => {
     setForcedToolIds([]);
   }, [currentProjectId, setForcedToolIds]);
-
-  // handle redirect if chat page is disabled
-  // NOTE: this must be done here, in a client component since
-  // settings are passed in via Context and therefore aren't
-  // available in server-side components
-  const settings = useSettingsContext();
 
   const isInitialLoad = useRef(true);
 
@@ -196,12 +196,12 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     }
   }
 
-  const { selectedAssistant, setSelectedAssistantFromId, liveAssistant } =
+  const { selectedAgent, setSelectedAgentFromId, liveAgent } =
     useAgentController({
       selectedChatSession: currentChatSession,
-      onAssistantSelect: () => {
-        // Only remove project context if user explicitly selected an assistant
-        // (i.e., assistantId is present). Avoid clearing project when assistantId was removed.
+      onAgentSelect: () => {
+        // Only remove project context if user explicitly selected an agent
+        // (i.e., agentId is present). Avoid clearing project when agentId was removed.
         const newSearchParams = new URLSearchParams(
           searchParams?.toString() || ""
         );
@@ -214,19 +214,17 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
 
   const { deepResearchEnabled, toggleDeepResearch } = useDeepResearchToggle({
     chatSessionId: currentChatSessionId,
-    assistantId: selectedAssistant?.id,
+    agentId: selectedAgent?.id,
   });
 
   const [presentingDocument, setPresentingDocument] =
     useState<MinimalOnyxDocument | null>(null);
 
-  const llmManager = useLlmManager(
-    currentChatSession ?? undefined,
-    liveAssistant
-  );
+  const llmManager = useLlmManager(currentChatSession ?? undefined, liveAgent);
 
   const {
     showOnboarding,
+    onboardingDismissed,
     onboardingState,
     onboardingActions,
     llmDescriptors,
@@ -234,15 +232,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     finishOnboarding,
     hideOnboarding,
   } = useShowOnboarding({
-    liveAssistant,
-    isLoadingProviders: llmManager.isLoadingProviders,
-    hasAnyProvider: llmManager.hasAnyProvider,
+    liveAgent,
     isLoadingChatSessions,
     chatSessionsCount: chatSessions.length,
     userId: user?.id,
   });
 
-  const noAssistants = liveAssistant === null || liveAssistant === undefined;
+  const noAgents = liveAgent === null || liveAgent === undefined;
 
   const availableSources: ValidSources[] = useMemo(() => {
     return ccPairs.map((ccPair) => ccPair.source);
@@ -291,7 +287,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   const filterManager = useFilters();
 
   const isDefaultAgent = useIsDefaultAgent({
-    liveAssistant,
+    liveAgent,
     existingChatSessionId: currentChatSessionId,
     selectedChatSession: currentChatSession ?? undefined,
     settings,
@@ -371,13 +367,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     useChatController({
       filterManager,
       llmManager,
-      availableAssistants: agents,
-      liveAssistant,
+      availableAgents: agents,
+      liveAgent,
       existingChatSessionId: currentChatSessionId,
       selectedDocuments,
       searchParams,
       resetInputBar,
-      setSelectedAssistantFromId,
+      setSelectedAgentFromId,
     });
 
   const { onMessageSelection, currentSessionFileTokenCount } =
@@ -386,7 +382,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       searchParams,
       filterManager,
       firstMessage,
-      setSelectedAssistantFromId,
+      setSelectedAgentFromId,
       setSelectedDocuments,
       setCurrentMessageFiles,
       chatSessionIdRef,
@@ -401,11 +397,11 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   useSendMessageToParent();
 
   const retrievalEnabled = useMemo(() => {
-    if (liveAssistant) {
-      return personaIncludesRetrieval(liveAssistant);
+    if (liveAgent) {
+      return personaIncludesRetrieval(liveAgent);
     }
     return false;
-  }, [liveAssistant]);
+  }, [liveAgent]);
 
   useEffect(() => {
     if (
@@ -462,7 +458,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
         currentMessageFiles,
         deepResearch: deepResearchEnabled,
       });
-      if (showOnboarding) {
+      if (showOnboarding || !onboardingDismissed) {
         finishOnboarding();
       }
     },
@@ -472,6 +468,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       currentMessageFiles,
       deepResearchEnabled,
       showOnboarding,
+      onboardingDismissed,
       finishOnboarding,
     ]
   );
@@ -481,13 +478,14 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     (user?.preferences?.default_app_mode?.toLowerCase() as "chat" | "search") ??
     "chat";
 
+  const isNewSession = appFocus.isNewSession();
+
   // 1. Reset the app-mode back to the user's default when navigating back to the "New Sessions" tab.
   // 2. If we're navigating away from the "New Session" tab after performing a search, we reset the app-input-bar.
   useEffect(() => {
-    if (appFocus.isNewSession()) setAppMode(defaultAppMode);
-    if (!appFocus.isNewSession() && classification === "search")
-      resetInputBar();
-  }, [appFocus.isNewSession()]);
+    if (isNewSession) setAppMode(defaultAppMode);
+    if (!isNewSession && classification === "search") resetInputBar();
+  }, [isNewSession, defaultAppMode, classification, resetInputBar, setAppMode]);
 
   const handleSearchDocumentClick = useCallback(
     (doc: MinimalOnyxDocument) => setPresentingDocument(doc),
@@ -505,7 +503,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
           currentMessageFiles,
           deepResearch: deepResearchEnabled,
         });
-        if (showOnboarding) {
+        if (showOnboarding || !onboardingDismissed) {
           finishOnboarding();
         }
         return;
@@ -526,6 +524,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       currentMessageFiles,
       deepResearchEnabled,
       showOnboarding,
+      onboardingDismissed,
       finishOnboarding,
     ]
   );
@@ -604,7 +603,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
             (available ?? DEFAULT_CONTEXT_TOKENS) * 0.5;
           if (!cancelled) setAvailableContextTokens(capped_context_tokens);
         } else {
-          const personaId = (selectedAssistant || liveAssistant)?.id;
+          const personaId = (selectedAgent || liveAgent)?.id;
           if (personaId !== undefined && personaId !== null) {
             const maxTokens = await getMaxSelectedDocumentTokens(personaId);
             const capped_context_tokens =
@@ -622,20 +621,15 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [currentChatSessionId, selectedAssistant?.id, liveAssistant?.id]);
+  }, [currentChatSessionId, selectedAgent?.id, liveAgent?.id]);
 
   // handle error case where no assistants are available
   // Only show this after agents have loaded to prevent flash during initial load
-  if (noAssistants && !isLoadingAgents) {
-    return (
-      <>
-        <HealthCheckBanner />
-        <NoAssistantModal />
-      </>
-    );
+  if (noAgents && !isLoadingAgents) {
+    return <NoAgentModal />;
   }
 
-  const hasStarterMessages = (liveAssistant?.starter_messages?.length ?? 0) > 0;
+  const hasStarterMessages = (liveAgent?.starter_messages?.length ?? 0) > 0;
 
   const isSearch = classification === "search";
   const gridStyle = {
@@ -644,15 +638,15 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       ? "0fr auto 1fr"
       : appFocus.isChat()
         ? "1fr auto 0fr"
-        : "1fr auto 1fr",
+        : appFocus.isProject()
+          ? "auto auto 1fr"
+          : "1fr auto 1fr",
   };
 
   if (!isReady) return <OnyxInitializingLoader />;
 
   return (
     <>
-      <HealthCheckBanner />
-
       <AppPopup />
 
       {retrievalEnabled && documentSidebarVisible && settings.isMobile && (
@@ -684,7 +678,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       )}
 
       {presentingDocument && (
-        <TextViewModal
+        <PreviewModal
           presentingDocument={presentingDocument}
           onClose={() => setPresentingDocument(null)}
         />
@@ -699,7 +693,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
 
       <FederatedOAuthModal />
 
-      <AppLayouts.Root enableBackground>
+      <AppLayouts.Root enableBackground={!appFocus.isProject()}>
         <Dropzone
           onDrop={(acceptedFiles) =>
             handleMessageSpecificFileUpload(acceptedFiles)
@@ -721,9 +715,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                   {/* ChatUI */}
                   <Fade
                     show={
-                      appFocus.isChat() &&
-                      !!currentChatSessionId &&
-                      !!liveAssistant
+                      appFocus.isChat() && !!currentChatSessionId && !!liveAgent
                     }
                     className="h-full w-full flex flex-col items-center"
                   >
@@ -736,7 +728,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                       onScrollButtonVisibilityChange={setShowScrollButton}
                     >
                       <ChatUI
-                        liveAssistant={liveAssistant!}
+                        liveAgent={liveAgent!}
                         llmManager={llmManager}
                         deepResearchEnabled={deepResearchEnabled}
                         currentMessageFiles={currentMessageFiles}
@@ -752,11 +744,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
 
                   {/* ProjectUI */}
                   {appFocus.isProject() && (
-                    <ProjectContextPanel
-                      projectTokenCount={projectContextTokenCount}
-                      availableContextTokens={availableContextTokens}
-                      setPresentingDocument={setPresentingDocument}
-                    />
+                    <div className="w-full max-h-[50vh] overflow-y-auto overscroll-y-none">
+                      <ProjectContextPanel
+                        projectTokenCount={projectContextTokenCount}
+                        availableContextTokens={availableContextTokens}
+                        setPresentingDocument={setPresentingDocument}
+                      />
+                    </div>
                   )}
 
                   {/* WelcomeMessageUI */}
@@ -768,7 +762,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                     className="w-full flex-1 flex flex-col items-center justify-end"
                   >
                     <WelcomeMessage
-                      agent={liveAssistant}
+                      agent={liveAgent}
                       isDefaultAgent={isDefaultAgent}
                     />
                     <Spacer rem={1.5} />
@@ -793,10 +787,10 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                     {/* OnboardingUI */}
                     {(appFocus.isNewSession() || appFocus.isAgent()) &&
                       !classification &&
-                      (showOnboarding ||
-                        (user?.role !== UserRole.ADMIN &&
-                          !user?.personalization?.name)) && (
+                      (showOnboarding || !user?.personalization?.name) &&
+                      !onboardingDismissed && (
                         <OnboardingFlow
+                          showOnboarding={showOnboarding}
                           handleHideOnboarding={hideOnboarding}
                           handleFinishOnboarding={finishOnboarding}
                           state={onboardingState}
@@ -853,13 +847,16 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                             : projectContextTokenCount
                         }
                         availableContextTokens={availableContextTokens}
-                        selectedAssistant={selectedAssistant || liveAssistant}
+                        selectedAgent={selectedAgent || liveAgent}
                         handleFileUpload={handleMessageSpecificFileUpload}
                         setPresentingDocument={setPresentingDocument}
+                        // Intentionally enabled during name-only onboarding (showOnboarding=false)
+                        // since LLM providers are already configured and the user can chat.
                         disabled={
                           (!llmManager.isLoadingProviders &&
                             llmManager.hasAnyProvider === false) ||
-                          (!isLoadingOnboarding &&
+                          (showOnboarding &&
+                            !isLoadingOnboarding &&
                             onboardingState.currentStep !==
                               OnboardingStep.Complete)
                         }
@@ -871,19 +868,27 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         )}
                       />
                     </div>
-
-                    {/* ProjectChatSessionsUI */}
-                    {appFocus.isProject() && (
-                      <>
-                        <Spacer rem={0.5} />
-                        <ProjectChatSessionList />
-                      </>
-                    )}
                   </div>
                 </div>
 
-                {/* ── Bottom: SearchResults + SourceFilter / Suggestions ── */}
+                {/* ── Bottom: SearchResults + SourceFilter / Suggestions / ProjectChatList ── */}
                 <div className="row-start-3 min-h-0 overflow-hidden flex flex-col items-center w-full">
+                  {/* Agent description below input */}
+                  {(appFocus.isNewSession() || appFocus.isAgent()) &&
+                    !isDefaultAgent && (
+                      <>
+                        <Spacer rem={1} />
+                        <AgentDescription agent={liveAgent} />
+                        <Spacer rem={1.5} />
+                      </>
+                    )}
+                  {/* ProjectChatSessionList */}
+                  {appFocus.isProject() && (
+                    <div className="w-full max-w-[var(--app-page-main-content-width)] h-full overflow-y-auto overscroll-y-none mx-auto">
+                      <ProjectChatSessionList />
+                    </div>
+                  )}
+
                   {/* SuggestionsUI */}
                   <Fade
                     show={

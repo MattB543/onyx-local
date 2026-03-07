@@ -18,7 +18,7 @@ import {
 import { useProjectsContext } from "@/providers/ProjectsContext";
 import MoveCustomAgentChatModal from "@/components/modals/MoveCustomAgentChatModal";
 import { UNNAMED_CHAT } from "@/lib/constants";
-import ShareChatSessionModal from "@/app/app/components/modal/ShareChatSessionModal";
+import ShareChatSessionModal from "@/sections/modals/ShareChatSessionModal";
 import SidebarTab from "@/refresh-components/buttons/SidebarTab";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import { Button as OpalButton } from "@opal/components";
@@ -122,7 +122,7 @@ const ChatButton = memo(
     const [showShareModal, setShowShareModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [popoverItems, setPopoverItems] = useState<React.ReactNode[]>([]);
-    const { refreshChatSessions } = useChatSessions();
+    const { refreshChatSessions, removeSession } = useChatSessions();
     const {
       refreshCurrentProjectDetails,
       projects,
@@ -302,6 +302,7 @@ const ChatButton = memo(
     async function handleChatDelete() {
       try {
         await deleteChatSession(chatSession.id);
+        removeSession(chatSession.id);
 
         if (project) {
           await fetchProjects();
@@ -428,9 +429,8 @@ const ChatButton = memo(
           <SidebarTab
             href={isDragging ? undefined : `/app?chatId=${chatSession.id}`}
             onClick={handleClick}
-            transient={active}
+            selected={active}
             rightChildren={rightMenu}
-            focused={renaming}
             nested={!!project}
           >
             {renaming ? (

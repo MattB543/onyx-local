@@ -1,6 +1,6 @@
 "use client";
 
-import { FunctionComponent, memo, useCallback, useMemo } from "react";
+import React, { FunctionComponent, useMemo, useCallback } from "react";
 import { StopReason } from "@/app/app/services/streamingModels";
 import { FullChatState } from "../interfaces";
 import { TurnGroup, TransformedStep } from "./transformers";
@@ -37,9 +37,7 @@ interface TimelineStepProps {
   isStreaming?: boolean;
 }
 
-const noopCallback = () => {};
-
-const TimelineStep = memo(function TimelineStep({
+const TimelineStep = React.memo(function TimelineStep({
   step,
   chatState,
   stopPacketSeen,
@@ -104,7 +102,6 @@ const TimelineStep = memo(function TimelineStep({
     <TimelineRendererComponent
       packets={step.packets}
       chatState={chatState}
-      onComplete={noopCallback}
       animate={!stopPacketSeen}
       stopPacketSeen={stopPacketSeen}
       stopReason={stopReason}
@@ -132,7 +129,7 @@ export interface ExpandedTimelineContentProps {
   hasDoneIndicator: boolean;
 }
 
-export const ExpandedTimelineContent = memo(
+export const ExpandedTimelineContent = React.memo(
   function ExpandedTimelineContent({
     turnGroups,
     chatState,

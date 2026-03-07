@@ -303,6 +303,7 @@ jobs:
           # TODO(Nik): https://linear.app/onyx-app/issue/ENG-1/update-test-infra-to-use-test-license
           LICENSE_ENFORCEMENT_ENABLED=false
           AUTH_TYPE=basic
+          INTEGRATION_TESTS_MODE=true
           GEN_AI_API_KEY=${OPENAI_API_KEY_VALUE}
           EXA_API_KEY=${EXA_API_KEY_VALUE}
           REQUIRE_EMAIL_VERIFICATION=false
@@ -592,14 +593,17 @@ jobs:
   # Post a single combined visual regression comment after all matrix jobs finish
   visual-regression-comment:
     needs: [playwright-tests]
-    if: always() && github.event_name == 'pull_request'
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.playwright-tests.result != 'cancelled'
     runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
       pull-requests: write
     steps:
       - name: Download visual diff summaries
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # ratchet:actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           pattern: screenshot-diff-summary-*
           path: summaries/

@@ -13,13 +13,13 @@ from fastapi import Request
 from fastapi import Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from redis.client import Redis
 from sqlalchemy.orm import Session
 
 from onyx.auth.api_key import get_hashed_api_key_from_request
 from onyx.auth.pat import get_hashed_pat_from_request
 from onyx.auth.users import current_chat_accessible_user
 from onyx.auth.users import current_user
+from onyx.cache.factory import get_cache_backend
 from onyx.chat.chat_processing_checker import is_chat_session_processing
 from onyx.chat.chat_state import ChatStateContainer
 from onyx.chat.chat_utils import convert_chat_history_basic
@@ -67,7 +67,6 @@ from onyx.llm.constants import LlmProviderNames
 from onyx.llm.factory import get_default_llm
 from onyx.llm.factory import get_llm_for_persona
 from onyx.llm.factory import get_llm_token_counter
-from onyx.redis.redis_pool import get_redis_client
 from onyx.secondary_llm_flows.chat_session_naming import generate_chat_session_name
 from onyx.server.api_key_usage import check_api_key_usage
 from onyx.server.query_and_chat.models import ChatFeedbackRequest
@@ -152,10 +151,20 @@ def get_user_chat_sessions(
     project_id: int | None = None,
     only_non_project_chats: bool = True,
     include_failed_chats: bool = False,
+    page_size: int = Query(default=50, ge=1, le=100),
+    before: str | None = Query(default=None),
 ) -> ChatSessionsResponse:
     user_id = user.id
 
     try:
+        before_dt = (
+            datetime.datetime.fromisoformat(before) if before is not None else None
+        )
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid 'before' timestamp format")
+
+    try:
+        # Fetch one extra to determine if there are more results
         chat_sessions = get_chat_sessions_by_user(
             user_id=user_id,
             deleted=False,
@@ -163,10 +172,15 @@ def get_user_chat_sessions(
             project_id=project_id,
             only_non_project_chats=only_non_project_chats,
             include_failed_chats=include_failed_chats,
+            limit=page_size + 1,
+            before=before_dt,
         )
 
     except ValueError:
         raise ValueError("Chat session does not exist or has been deleted")
+
+    has_more = len(chat_sessions) > page_size
+    chat_sessions = chat_sessions[:page_size]
 
     return ChatSessionsResponse(
         sessions=[
@@ -181,7 +195,8 @@ def get_user_chat_sessions(
                 current_temperature_override=chat.temperature_override,
             )
             for chat in chat_sessions
-        ]
+        ],
+        has_more=has_more,
     )
 
 
@@ -314,7 +329,7 @@ def get_chat_session(
     ]
 
     try:
-        is_processing = is_chat_session_processing(session_id, get_redis_client())
+        is_processing = is_chat_session_processing(session_id, get_cache_backend())
         # Edit the last message to indicate loading (Overriding default message value)
         if is_processing and chat_message_details:
             last_msg = chat_message_details[-1]
@@ -349,6 +364,7 @@ def get_chat_session(
         shared_status=chat_session.shared_status,
         current_temperature_override=chat_session.temperature_override,
         deleted=chat_session.deleted,
+        owner_name=chat_session.user.personal_name if chat_session.user else None,
         # Packets are now directly serialized as Packet Pydantic models
         packets=replay_packet_lists,
     )
@@ -586,6 +602,7 @@ def handle_send_chat_message(
                     request.headers
                 ),
                 mcp_headers=chat_message_req.mcp_headers,
+                additional_context=chat_message_req.additional_context,
                 external_state_container=state_container,
             )
             result = gather_stream_full(packets, state_container)
@@ -608,6 +625,7 @@ def handle_send_chat_message(
                         request.headers
                     ),
                     mcp_headers=chat_message_req.mcp_headers,
+                    additional_context=chat_message_req.additional_context,
                     external_state_container=state_container,
                 ):
                     yield get_json_line(obj.model_dump())
@@ -908,11 +926,10 @@ async def search_chats(
 def stop_chat_session(
     chat_session_id: UUID,
     user: User = Depends(current_user),  # noqa: ARG001
-    redis_client: Redis = Depends(get_redis_client),
 ) -> dict[str, str]:
     """
-    Stop a chat session by setting a stop signal in Redis.
+    Stop a chat session by setting a stop signal.
     This endpoint is called by the frontend when the user clicks the stop button.
     """
-    set_fence(chat_session_id, redis_client, True)
+    set_fence(chat_session_id, get_cache_backend(), True)
     return {"message": "Chat session stopped"}

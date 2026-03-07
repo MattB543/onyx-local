@@ -114,7 +114,7 @@ export const MODAL_ROOT_ID = "modal-root";
 export const ANONYMOUS_USER_NAME = "Anonymous";
 export const UNNAMED_CHAT = "New Chat";
 
-export const DEFAULT_ASSISTANT_ID = 0;
+export const DEFAULT_AGENT_ID = 0;
 export const GENERAL_ASSISTANT_ID = -1;
 export const IMAGE_ASSISTANT_ID = -2;
 export const ART_ASSISTANT_ID = -3;
@@ -125,6 +125,7 @@ export const MAX_FILES_TO_SHOW = 3;
 
 // SIZES
 export const MOBILE_SIDEBAR_BREAKPOINT_PX = 640;
+export const DESKTOP_SMALL_BREAKPOINT_PX = 912;
 export const DEFAULT_AGENT_AVATAR_SIZE_PX = 18;
 export const HORIZON_DISTANCE_PX = 800;
 export const LOGO_FOLDED_SIZE_PX = 24;
