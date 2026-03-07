@@ -526,6 +526,12 @@ export const connectorConfigs: Record<
     values: [],
     advanced_values: [],
   },
+  google_calendar: {
+    description: "Configure Google Calendar connector",
+    values: [],
+    advanced_values: [],
+    overrideDefaultFreq: 60,
+  },
   bookstack: {
     description: "Configure Bookstack connector",
     values: [],
@@ -1913,6 +1919,8 @@ export interface GoogleDriveConfig {
 }
 
 export interface GmailConfig {}
+
+export interface GoogleCalendarConfig {}
 
 export interface BookstackConfig {}
 

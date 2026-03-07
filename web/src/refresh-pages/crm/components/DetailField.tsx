@@ -46,10 +46,7 @@ export default function DetailField({
         );
       case "phone":
         return (
-          <a
-            href={`tel:${value}`}
-            className={cn(valueBase, "hover:underline")}
-          >
+          <a href={`tel:${value}`} className={cn(valueBase, "hover:underline")}>
             {value}
           </a>
         );

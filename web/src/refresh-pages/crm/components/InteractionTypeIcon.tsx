@@ -1,6 +1,12 @@
 import { CrmInteractionType } from "@/app/app/crm/crmService";
 
-import { SvgBubbleText, SvgCalendar, SvgFileText, SvgHeadsetMic, SvgUsers } from "@opal/icons";
+import {
+  SvgBubbleText,
+  SvgCalendar,
+  SvgFileText,
+  SvgHeadsetMic,
+  SvgUsers,
+} from "@opal/icons";
 import type { IconProps } from "@opal/types";
 
 const INTERACTION_ICONS: Record<

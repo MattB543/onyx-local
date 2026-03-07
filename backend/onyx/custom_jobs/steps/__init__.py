@@ -23,7 +23,10 @@ STEP_DESCRIPTION_MAP = {
     "fetch_weekly_chat_content": "Fetches chat USER/ASSISTANT messages for a time window.",
     "summarize_weekly_content": "Generates a weekly summary with token-aware single-pass/map-reduce behavior.",
     "post_slack_digest": "Posts a markdown summary to Slack and threads long chunks.",
-    "process_email_crm": "Sends an email through the chat pipeline with a CRM persona to search/create contacts, orgs, and log interactions.",
+    "process_email_crm": (
+        "Sends an email through the chat pipeline with a CRM persona"
+        " to search/create contacts, orgs, and log interactions."
+    ),
     "slack_channel_input": "Reads channel messages via Slack conversations.history.",
     "web_search": "Runs configured web queries with partial-failure tolerance.",
     "google_doc_output": "Creates a Google Doc and writes output content.",

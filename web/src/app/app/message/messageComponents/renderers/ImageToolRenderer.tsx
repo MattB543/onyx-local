@@ -7,7 +7,7 @@ import {
   ImageGenerationToolDelta,
   SectionEnd,
 } from "../../../services/streamingModels";
-import { MessageRenderer, RenderType } from "../interfaces";
+import { FullChatState, MessageRenderer, RenderType } from "../interfaces";
 import { InMessageImage } from "../../../components/files/images/InMessageImage";
 import GeneratingImageDisplay from "../../../components/tools/GeneratingImageDisplay";
 
@@ -43,7 +43,7 @@ function constructCurrentImageState(packets: ImageGenerationToolPacket[]) {
 
 export const ImageToolRenderer: MessageRenderer<
   ImageGenerationToolPacket,
-  Record<string, never>
+  Partial<FullChatState>
 > = ({ packets, onComplete, renderType, children }) => {
   const { prompt, images, isGenerating, isComplete, error } =
     constructCurrentImageState(packets);

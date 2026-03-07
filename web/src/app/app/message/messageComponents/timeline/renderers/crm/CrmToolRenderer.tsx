@@ -2,7 +2,6 @@
 
 import { JSX } from "react";
 
-import { BlinkingDot } from "@/app/app/message/BlinkingDot";
 import {
   MessageRenderer,
   RenderType,
@@ -15,6 +14,12 @@ import {
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgUser } from "@opal/icons";
+
+function BlinkingDot() {
+  return (
+    <span className="animate-pulse flex-none bg-theme-primary-05 inline-block rounded-full h-3 w-3 ml-2 mt-2" />
+  );
+}
 
 function getCrmToolLabel(packetType: PacketType): string {
   switch (packetType) {

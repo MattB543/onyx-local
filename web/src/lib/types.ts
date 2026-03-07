@@ -518,6 +518,9 @@ export enum ValidSources {
   Bitbucket = "bitbucket",
   TestRail = "testrail",
 
+  // Custom sources
+  GoogleCalendar = "google_calendar",
+
   // Craft-specific sources
   CraftFile = "craft_file",
 
@@ -544,6 +547,7 @@ export const validAutoSyncSources = [
   ValidSources.GitHub,
   ValidSources.Sharepoint,
   ValidSources.Teams,
+  ValidSources.GoogleCalendar,
 ] as const;
 
 // Create a type from the array elements

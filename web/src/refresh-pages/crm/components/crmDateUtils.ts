@@ -68,5 +68,8 @@ export function formatDateGroupLabel(value: string): string {
 export function getDateKey(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getDate()).padStart(2, "0")}`;
 }

@@ -96,12 +96,7 @@ export default function ActivityTimeline({
                 <div className="relative z-10 flex w-[31px] justify-center">
                   <div className="h-2 w-2 rounded-full bg-border-02" />
                 </div>
-                <Text
-                  as="p"
-                  mainUiAction
-                  text05
-                  className="text-sm"
-                >
+                <Text as="p" mainUiAction text05 className="text-sm">
                   {group.label}
                 </Text>
               </div>

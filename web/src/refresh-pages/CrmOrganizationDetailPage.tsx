@@ -116,12 +116,11 @@ export default function CrmOrganizationDetailPage({
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="xl">
+      <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgOrganization}
           title="CRM"
-          description={<CrmBreadcrumbs items={breadcrumbs} />}
-          titleIconInline
+          description="Organization Details"
           rightChildren={
             <Button
               action

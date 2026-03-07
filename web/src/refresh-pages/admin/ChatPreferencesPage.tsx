@@ -224,7 +224,8 @@ function ChatPreferencesForm() {
     refreshCrmSettings,
   } = useCrmSettings();
   const [crmStageOptionsRaw, setCrmStageOptionsRaw] = useState("");
-  const [crmCategorySuggestionsRaw, setCrmCategorySuggestionsRaw] = useState("");
+  const [crmCategorySuggestionsRaw, setCrmCategorySuggestionsRaw] =
+    useState("");
   const [crmSaveInProgress, setCrmSaveInProgress] = useState(false);
 
   useEffect(() => {
@@ -373,8 +374,14 @@ function ChatPreferencesForm() {
   );
 
   const handleSaveCrmSettings = useCallback(async () => {
-    const parsedStageOptions = parseMultiLineValues({ rawValue: crmStageOptionsRaw, lowerCase: true });
-    const parsedCategorySuggestions = parseMultiLineValues({ rawValue: crmCategorySuggestionsRaw, lowerCase: false });
+    const parsedStageOptions = parseMultiLineValues({
+      rawValue: crmStageOptionsRaw,
+      lowerCase: true,
+    });
+    const parsedCategorySuggestions = parseMultiLineValues({
+      rawValue: crmCategorySuggestionsRaw,
+      lowerCase: false,
+    });
     if (parsedStageOptions.length === 0) {
       toast.error("CRM stages must include at least one value.");
       return;
@@ -385,8 +392,12 @@ function ChatPreferencesForm() {
         contact_stage_options: parsedStageOptions,
         contact_category_suggestions: parsedCategorySuggestions,
       });
-      setCrmStageOptionsRaw((updatedCrmSettings.contact_stage_options || []).join("\n"));
-      setCrmCategorySuggestionsRaw((updatedCrmSettings.contact_category_suggestions || []).join("\n"));
+      setCrmStageOptionsRaw(
+        (updatedCrmSettings.contact_stage_options || []).join("\n")
+      );
+      setCrmCategorySuggestionsRaw(
+        (updatedCrmSettings.contact_category_suggestions || []).join("\n")
+      );
       await refreshCrmSettings();
       toast.success("CRM settings updated successfully!");
     } catch (error) {
@@ -838,7 +849,9 @@ function ChatPreferencesForm() {
             <SimpleCollapsible.Content>
               <Section gap={1}>
                 {isCrmSettingsLoading && (
-                  <div className="text-sm text-text-03">Loading CRM settings...</div>
+                  <div className="text-sm text-text-03">
+                    Loading CRM settings...
+                  </div>
                 )}
                 {crmSettingsError && (
                   <div className="text-sm text-status-error-03">
@@ -862,26 +875,30 @@ function ChatPreferencesForm() {
                 >
                   <InputTextArea
                     value={crmCategorySuggestionsRaw}
-                    onChange={(e) => setCrmCategorySuggestionsRaw(e.target.value)}
+                    onChange={(e) =>
+                      setCrmCategorySuggestionsRaw(e.target.value)
+                    }
                     placeholder={"Policy Maker\nJournalist\nAcademic"}
                     rows={6}
                   />
                 </InputLayouts.Vertical>
                 <Section flexDirection="row" gap={0.5}>
-                  <Button
-                    prominence="primary"
-                    onClick={() => void handleSaveCrmSettings()}
-                    disabled={crmSaveInProgress}
-                  >
-                    {crmSaveInProgress ? "Saving..." : "Save CRM Settings"}
-                  </Button>
-                  <Button
-                    prominence="secondary"
-                    onClick={handleResetCrmSettingsToDefaults}
-                    disabled={crmSaveInProgress}
-                  >
-                    Reset CRM Defaults
-                  </Button>
+                  <Disabled disabled={crmSaveInProgress}>
+                    <Button
+                      prominence="primary"
+                      onClick={() => void handleSaveCrmSettings()}
+                    >
+                      {crmSaveInProgress ? "Saving..." : "Save CRM Settings"}
+                    </Button>
+                  </Disabled>
+                  <Disabled disabled={crmSaveInProgress}>
+                    <Button
+                      prominence="secondary"
+                      onClick={handleResetCrmSettingsToDefaults}
+                    >
+                      Reset CRM Defaults
+                    </Button>
+                  </Disabled>
                 </Section>
               </Section>
             </SimpleCollapsible.Content>

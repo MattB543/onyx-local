@@ -121,7 +121,7 @@ export default function CrmContactDetailPage({
     () =>
       (usersData || []).map((candidate) => ({
         value: candidate.id,
-        label: candidate.full_name?.trim() || candidate.email,
+        label: candidate.email,
       })),
     [usersData]
   );
@@ -140,7 +140,7 @@ export default function CrmContactDetailPage({
       new Map(
         (usersData || []).map((candidate) => [
           candidate.id,
-          candidate.full_name?.trim() || candidate.email,
+          candidate.email,
         ])
       ),
     [usersData]
@@ -171,12 +171,11 @@ export default function CrmContactDetailPage({
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="xl">
+      <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgUser}
           title="CRM"
-          description={<CrmBreadcrumbs items={breadcrumbs} />}
-          titleIconInline
+          description="Contact Details"
           rightChildren={
             <Button
               action

@@ -1,6 +1,9 @@
 import * as Yup from "yup";
 
-import { CrmContactSource, CrmOrganizationType } from "@/app/app/crm/crmService";
+import {
+  CrmContactSource,
+  CrmOrganizationType,
+} from "@/app/app/crm/crmService";
 
 export const DEFAULT_CRM_STAGE_OPTIONS = [
   "lead",

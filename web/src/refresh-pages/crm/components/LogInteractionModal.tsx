@@ -73,7 +73,7 @@ export default function LogInteractionModal({
     () =>
       (usersData || []).map((candidate) => ({
         value: candidate.id,
-        label: candidate.full_name?.trim() || candidate.email,
+        label: candidate.email,
       })),
     [usersData]
   );

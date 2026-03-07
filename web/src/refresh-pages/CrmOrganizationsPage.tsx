@@ -56,12 +56,11 @@ export default function CrmOrganizationsPage() {
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="xl">
+      <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgOrganization}
           title="CRM"
           description="Manage contacts and organizations."
-          titleIconInline
         >
           <CrmNav
             rightContent={

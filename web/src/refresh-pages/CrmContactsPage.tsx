@@ -102,12 +102,11 @@ export default function CrmContactsPage() {
 
   return (
     <AppLayouts.Root>
-      <SettingsLayouts.Root width="xl">
+      <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgUser}
           title="CRM"
           description="Manage contacts and organizations."
-          titleIconInline
         >
           <CrmNav
             rightContent={

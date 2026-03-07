@@ -47,6 +47,7 @@ import {
   DrupalWikiIcon,
   EmailIcon,
   TestRailIcon,
+  GoogleCalendarIcon,
 } from "@/components/icons/icons";
 import { ValidSources } from "./types";
 import { SourceCategory, SourceMetadata } from "./search/interfaces";
@@ -305,6 +306,11 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     displayName: "Gmail",
     category: SourceCategory.Messaging,
     docs: `${DOCS_ADMINS_PATH}/connectors/official/gmail/overview`,
+  },
+  google_calendar: {
+    icon: GoogleCalendarIcon,
+    displayName: "Google Calendar",
+    category: SourceCategory.Messaging,
   },
   drupal_wiki: {
     icon: DrupalWikiIcon,
