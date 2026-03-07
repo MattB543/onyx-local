@@ -46,7 +46,7 @@ export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string
     return children([
       {
         icon: SvgEditBig,
-        status: null,
+        status: "Memory",
         content: <div />,
         supportsCollapsible: false,
         timelineLayout: "timeline",

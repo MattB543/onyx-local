@@ -1,11 +1,7 @@
 import "@opal/components/buttons/Button/styles.css";
 import "@opal/components/tooltip.css";
-import {
-  Interactive,
-  type InteractiveBaseProps,
-  type InteractiveContainerWidthVariant,
-} from "@opal/core";
-import type { SizeVariant } from "@opal/shared";
+import { Interactive, type InteractiveBaseProps } from "@opal/core";
+import type { SizeVariant, WidthVariant } from "@opal/shared";
 import type { TooltipSide } from "@opal/components";
 import type { IconFunctionComponent } from "@opal/types";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
@@ -59,18 +55,21 @@ type ButtonContentProps =
       icon: IconFunctionComponent;
       children: string;
       rightIcon?: IconFunctionComponent;
+      responsiveHideText?: never;
     }
   | {
       foldable?: false;
       icon?: IconFunctionComponent;
       children: string;
       rightIcon?: IconFunctionComponent;
+      responsiveHideText?: never;
     }
   | {
       foldable?: false;
       icon: IconFunctionComponent;
       children?: string;
       rightIcon?: IconFunctionComponent;
+      responsiveHideText?: boolean;
     };
 
 type ButtonProps = InteractiveBaseProps &
@@ -88,7 +87,7 @@ type ButtonProps = InteractiveBaseProps &
     tooltip?: string;
 
     /** Width preset. `"auto"` shrink-wraps, `"full"` stretches to parent width. */
-    width?: InteractiveContainerWidthVariant;
+    width?: WidthVariant;
 
     /** Which side the tooltip appears on. */
     tooltipSide?: TooltipSide;
@@ -108,6 +107,7 @@ function Button({
   width,
   tooltip,
   tooltipSide = "top",
+  responsiveHideText = false,
   ...interactiveBaseProps
 }: ButtonProps) {
   const isLarge = size === "lg";
@@ -116,7 +116,8 @@ function Button({
     <span
       className={cn(
         "opal-button-label",
-        isLarge ? "font-main-ui-body " : "font-secondary-body"
+        isLarge ? "font-main-ui-body " : "font-secondary-body",
+        responsiveHideText && "hidden md:inline"
       )}
     >
       {children}
@@ -146,13 +147,25 @@ function Button({
             <div className="opal-button-foldable">
               <div className="opal-button-foldable-inner">
                 {labelEl}
-                {iconWrapper(RightIcon, size, !!children)}
+                {responsiveHideText ? (
+                  <span className="hidden md:inline-flex">
+                    {iconWrapper(RightIcon, size, !!children)}
+                  </span>
+                ) : (
+                  iconWrapper(RightIcon, size, !!children)
+                )}
               </div>
             </div>
           ) : (
             <>
               {labelEl}
-              {iconWrapper(RightIcon, size, !!children)}
+              {responsiveHideText ? (
+                <span className="hidden md:inline-flex">
+                  {iconWrapper(RightIcon, size, !!children)}
+                </span>
+              ) : (
+                iconWrapper(RightIcon, size, !!children)
+              )}
             </>
           )}
         </div>

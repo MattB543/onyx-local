@@ -1,6 +1,6 @@
 import { memo, useState, useCallback } from "react";
 
-import { WellKnownLLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import { ProviderIcon } from "@/app/admin/configuration/llm/ProviderIcon";
 import Button from "@/refresh-components/buttons/Button";
 import { Disabled } from "@/refresh-components/Disabled";

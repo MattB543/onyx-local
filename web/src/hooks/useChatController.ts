@@ -56,7 +56,7 @@ import {
   getFinalLLM,
   modelSupportsImageInput,
   structureValue,
-} from "@/lib/llm/utils";
+} from "@/lib/llmConfig/utils";
 import { buildFilters } from "@/lib/search/utils";
 import { toast } from "@/hooks/useToast";
 import { getExtensionContext } from "@/lib/extension/utils";

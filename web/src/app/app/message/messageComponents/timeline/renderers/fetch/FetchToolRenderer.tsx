@@ -63,7 +63,7 @@ export const FetchToolRenderer: MessageRenderer<FetchToolPacket, Record<string, 
     return children([
       {
         icon: SvgCircle,
-        status: null,
+        status: "Reading",
         content: <div />,
         supportsCollapsible: false,
         timelineLayout: "timeline",
