@@ -82,7 +82,11 @@ export async function fetchSettingsSS(): Promise<CombinedSettings | null> {
       }
 
       if (!result_1.ok) {
-        if (result_1.status !== 403 && result_1.status !== 401) {
+        if (
+          result_1.status !== 404 &&
+          result_1.status !== 403 &&
+          result_1.status !== 401
+        ) {
           throw new Error(
             `fetchEnterpriseSettingsSS failed: status=${
               result_1.status
@@ -102,7 +106,7 @@ export async function fetchSettingsSS(): Promise<CombinedSettings | null> {
       }
 
       if (!result_2.ok) {
-        if (result_2.status !== 403) {
+        if (result_2.status !== 404 && result_2.status !== 403) {
           throw new Error(
             `fetchCustomAnalyticsScriptSS failed: status=${
               result_2.status

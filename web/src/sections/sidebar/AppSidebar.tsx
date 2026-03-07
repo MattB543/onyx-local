@@ -64,6 +64,7 @@ import {
   SvgFolderPlus,
   SvgMoreHorizontal,
   SvgOnyxOctagon,
+  SvgOrganization,
   SvgSearchMenu,
   SvgSettings,
 } from "@opal/icons";
@@ -561,6 +562,21 @@ const MemoizedAppSidebarInner = memo(
       ),
       [folded]
     );
+    const crmButton = useMemo(
+      () => (
+        <div data-testid="AppSidebar/crm">
+          <SidebarTab
+            icon={SvgOrganization}
+            folded={folded}
+            href="/app/crm"
+            selected={activeSidebarTab.isCrm()}
+          >
+            CRM
+          </SidebarTab>
+        </div>
+      ),
+      [folded, activeSidebarTab]
+    );
     const moreAgentsButton = useMemo(
       () => (
         <div data-testid="AppSidebar/more-agents">
@@ -707,6 +723,7 @@ const MemoizedAppSidebarInner = memo(
               <div className="flex flex-col">
                 {newSessionButton}
                 {searchChatsButton}
+                {crmButton}
                 {isOnyxCraftEnabled && buildButton}
               </div>
             }
