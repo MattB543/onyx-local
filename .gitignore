@@ -88,4 +88,4 @@ log/
 scripts/check-prod-logs.sh
 scripts/reencrypt-credentials.sh
 
-private_docs/
+private_docs/.claude/worktrees/
