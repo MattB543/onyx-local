@@ -182,10 +182,8 @@ def construct_tools(
                 if not search_tool_config:
                     search_tool_config = SearchToolConfig()
 
-                # TODO concerning passing the db_session here.
                 search_tool = SearchTool(
                     tool_id=db_tool_model.id,
-                    db_session=db_session,
                     emitter=emitter,
                     user=user,
                     persona=persona,
@@ -499,7 +497,6 @@ def construct_tools(
 
         search_tool = SearchTool(
             tool_id=search_tool_db_model.id,
-            db_session=db_session,
             emitter=emitter,
             user=user,
             persona=persona,

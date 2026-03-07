@@ -349,6 +349,7 @@ def get_chat_session(
         shared_status=chat_session.shared_status,
         current_temperature_override=chat_session.temperature_override,
         deleted=chat_session.deleted,
+        owner_name=chat_session.user.personal_name if chat_session.user else None,
         # Packets are now directly serialized as Packet Pydantic models
         packets=replay_packet_lists,
     )
@@ -586,6 +587,7 @@ def handle_send_chat_message(
                     request.headers
                 ),
                 mcp_headers=chat_message_req.mcp_headers,
+                additional_context=chat_message_req.additional_context,
                 external_state_container=state_container,
             )
             result = gather_stream_full(packets, state_container)
@@ -608,6 +610,7 @@ def handle_send_chat_message(
                         request.headers
                     ),
                     mcp_headers=chat_message_req.mcp_headers,
+                    additional_context=chat_message_req.additional_context,
                     external_state_container=state_container,
                 ):
                     yield get_json_line(obj.model_dump())

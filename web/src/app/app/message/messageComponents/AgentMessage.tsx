@@ -162,7 +162,7 @@ const AgentMessage = memo(function AgentMessage({
 
   return (
     <div
-      className="pb-5 md:pt-5 flex flex-col gap-3 pr-1"
+      className="flex flex-col gap-3"
       data-testid={isComplete ? "onyx-ai-message" : undefined}
     >
       {/* Row 1: Two-column layout for tool steps */}

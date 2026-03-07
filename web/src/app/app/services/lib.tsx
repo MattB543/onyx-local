@@ -130,6 +130,9 @@ export interface SendMessageParams {
   temperature?: number;
   // Origin of the message for telemetry tracking
   origin?: MessageOrigin;
+  // Additional context injected into the LLM call but not stored/shown in chat.
+  // Used e.g. by Chrome extension "Read this tab" feature.
+  additionalContext?: string;
 }
 
 export async function* sendMessage({
@@ -146,6 +149,7 @@ export async function* sendMessage({
   modelVersion,
   temperature,
   origin,
+  additionalContext,
 }: SendMessageParams): AsyncGenerator<PacketType, void, unknown> {
   // Build payload for new send-chat-message API
   const payload = {
@@ -168,6 +172,7 @@ export async function* sendMessage({
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    additional_context: additionalContext ?? null,
   };
 
   const body = JSON.stringify(payload);

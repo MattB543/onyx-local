@@ -11,7 +11,6 @@ import Separator from "@/refresh-components/Separator";
 import { SvgChevronUp, SvgChevronDown, SvgEdit } from "@opal/icons";
 import Truncated from "@/refresh-components/texts/Truncated";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertObjectToString(obj: any): string | any {
   if (typeof obj === "object" && obj !== null) {
     if (!Array.isArray(obj)) {
@@ -30,10 +29,9 @@ function convertObjectToString(obj: any): string | any {
 }
 
 export function buildConfigEntries(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   obj: any,
   sourceType: ValidSources
-): Record<string, string> {
+): { [key: string]: string } {
   if (sourceType === ValidSources.File) {
     return {};
   } else if (sourceType === ValidSources.GoogleSites) {
@@ -46,7 +44,6 @@ export function buildConfigEntries(
 
 interface ConfigItemProps {
   label: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
   onEdit?: () => void;
 }
@@ -238,7 +235,7 @@ export function ConfigDisplay({
   configEntries,
   onEdit,
 }: {
-  configEntries: Record<string, string>;
+  configEntries: { [key: string]: string };
   onEdit?: (key: string) => void;
 }) {
   const entries = Object.entries(configEntries);
