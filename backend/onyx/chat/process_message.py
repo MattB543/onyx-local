@@ -4,7 +4,6 @@ An overview can be found in the README.md file in this directory.
 """
 
 import re
-import time
 import traceback
 from collections.abc import Callable
 from contextvars import Token
@@ -89,6 +88,7 @@ from onyx.server.query_and_chat.streaming_models import Packet
 from onyx.server.usage_limits import check_llm_cost_limit_for_provider
 from onyx.tools.constants import SEARCH_TOOL_ID
 from onyx.tools.interface import Tool
+from onyx.tools.models import ChatFile
 from onyx.tools.models import SearchToolUsage
 from onyx.tools.tool_constructor import construct_tools
 from onyx.tools.tool_constructor import CustomToolConfig
@@ -167,6 +167,29 @@ def _should_enable_slack_search(
     return (source_types is not None and DocumentSource.SLACK in source_types) or (
         persona.id == DEFAULT_PERSONA_ID and source_types is None
     )
+
+
+def _convert_loaded_files_to_chat_files(
+    loaded_files: list[ChatLoadedFile],
+) -> list[ChatFile]:
+    """Convert ChatLoadedFile objects to ChatFile for tool usage (e.g., PythonTool).
+
+    Args:
+        loaded_files: List of ChatLoadedFile objects from the chat history
+
+    Returns:
+        List of ChatFile objects that can be passed to tools
+    """
+    chat_files = []
+    for loaded_file in loaded_files:
+        if len(loaded_file.content) > 0:
+            chat_files.append(
+                ChatFile(
+                    filename=loaded_file.filename or f"file_{loaded_file.file_id}",
+                    content=loaded_file.content,
+                )
+            )
+    return chat_files
 
 
 def _extract_project_file_texts_and_images(
@@ -431,7 +454,6 @@ def handle_stream_message_objects(
     external_state_container: ChatStateContainer | None = None,
 ) -> AnswerStream:
     tenant_id = get_current_tenant_id()
-    processing_start_time = time.monotonic()
     mock_response_token: Token[str | None] | None = None
 
     llm: LLM | None = None
@@ -735,6 +757,9 @@ def handle_stream_message_objects(
         # load all files needed for this chat chain in memory
         files = load_all_chat_files(chat_history, db_session)
 
+        # Convert loaded files to ChatFile format for tools like PythonTool
+        chat_files_for_tools = _convert_loaded_files_to_chat_files(files)
+
         # TODO Need to think of some way to support selected docs from the sidebar
 
         # Reserve a message id for the assistant response for frontend to track packets
@@ -829,7 +854,6 @@ def handle_stream_message_objects(
                 assistant_message=assistant_response,
                 llm=llm,
                 reserved_tokens=reserved_token_count,
-                processing_start_time=processing_start_time,
             )
 
         # The stream generator can resume on a different worker thread after early yields.
@@ -886,6 +910,7 @@ def handle_stream_message_objects(
                 forced_tool_id=forced_tool_id,
                 user_identity=user_identity,
                 chat_session_id=str(chat_session.id),
+                chat_files=chat_files_for_tools,
                 include_citations=new_msg_req.include_citations,
                 all_injected_file_metadata=all_injected_file_metadata,
                 inject_memories_in_prompt=user.use_memories,
@@ -963,7 +988,6 @@ def llm_loop_completion_handle(
     assistant_message: ChatMessage,
     llm: LLM,
     reserved_tokens: int,
-    processing_start_time: float | None = None,  # noqa: ARG001
 ) -> None:
     chat_session_id = assistant_message.chat_session_id
 

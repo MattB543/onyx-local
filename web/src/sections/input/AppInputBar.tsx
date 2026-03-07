@@ -30,7 +30,7 @@ import { getFormattedDateRangeString } from "@/lib/dateUtils";
 import { FilterManager, LlmManager, useFederatedConnectors } from "@/lib/hooks";
 import { useForcedTools } from "@/lib/hooks/useForcedTools";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
-import { truncateString, cn } from "@/lib/utils";
+import { truncateString, cn, isImageFile } from "@/lib/utils";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useProjectsContext } from "@/providers/ProjectsContext";
 import { useQueryController } from "@/providers/QueryControllerProvider";

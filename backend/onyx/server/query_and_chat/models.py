@@ -227,6 +227,7 @@ class ChatSessionDetailResponse(BaseModel):
     current_alternate_model: str | None
     current_temperature_override: float | None
     deleted: bool = False
+    owner_name: str | None = None
     packets: list[list[Packet]]
 
 
