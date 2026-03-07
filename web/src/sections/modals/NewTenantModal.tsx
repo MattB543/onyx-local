@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Modal, { BasicModalFooter } from "@/refresh-components/Modal";
-import Button from "@/refresh-components/buttons/Button";
+import { Button } from "@opal/components";
+import { Disabled } from "@opal/core";
 import { toast } from "@/hooks/useToast";
 import { SvgArrowRight, SvgUsers, SvgX } from "@opal/icons";
 import { logout } from "@/lib/user";
@@ -119,7 +120,7 @@ export default function NewTenantModal({
     : `Your request to join ${tenantInfo.number_of_users} other users of ${APP_DOMAIN} has been approved.`;
 
   const description = isInvite
-    ? `By accepting this invitation, you will join the existing ${APP_DOMAIN} team and lose access to your current team. Note: you will lose access to your current assistants, prompts, chats, and connected sources.`
+    ? `By accepting this invitation, you will join the existing ${APP_DOMAIN} team and lose access to your current team. Note: you will lose access to your current agents, prompts, chats, and connected sources.`
     : `To finish joining your team, please reauthenticate with ${user?.email}.`;
 
   return (
@@ -136,30 +137,29 @@ export default function NewTenantModal({
           <BasicModalFooter
             cancel={
               isInvite ? (
-                <Button
-                  onClick={handleRejectInvite}
-                  secondary
-                  disabled={isLoading}
-                  leftIcon={SvgX}
-                >
-                  Decline
-                </Button>
+                <Disabled disabled={isLoading}>
+                  <Button
+                    prominence="secondary"
+                    onClick={handleRejectInvite}
+                    icon={SvgX}
+                  >
+                    Decline
+                  </Button>
+                </Disabled>
               ) : undefined
             }
             submit={
-              <Button
-                onClick={handleJoinTenant}
-                disabled={isLoading}
-                rightIcon={SvgArrowRight}
-              >
-                {isLoading
-                  ? isInvite
-                    ? "Accepting..."
-                    : "Joining..."
-                  : isInvite
-                    ? "Accept Invitation"
-                    : "Reauthenticate"}
-              </Button>
+              <Disabled disabled={isLoading}>
+                <Button onClick={handleJoinTenant} rightIcon={SvgArrowRight}>
+                  {isLoading
+                    ? isInvite
+                      ? "Accepting..."
+                      : "Joining..."
+                    : isInvite
+                      ? "Accept Invitation"
+                      : "Reauthenticate"}
+                </Button>
+              </Disabled>
             }
           />
         </Modal.Footer>

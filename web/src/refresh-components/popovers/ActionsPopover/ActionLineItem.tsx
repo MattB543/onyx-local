@@ -25,7 +25,7 @@ export interface ActionItemProps {
   disabled: boolean;
   isForced: boolean;
   isUnavailable?: boolean;
-  unavailableReason?: string;
+  tooltip?: string;
   showAdminConfigure?: boolean;
   adminConfigureHref?: string;
   adminConfigureTooltip?: string;
@@ -47,7 +47,7 @@ export default function ActionLineItem({
   disabled,
   isForced,
   isUnavailable = false,
-  unavailableReason,
+  tooltip,
   showAdminConfigure = false,
   adminConfigureHref,
   adminConfigureTooltip = "Configure",
@@ -88,7 +88,7 @@ export default function ActionLineItem({
     sourceCounts.enabled > 0 &&
     sourceCounts.enabled < sourceCounts.total;
 
-  const tooltipText = isUnavailable ? unavailableReason : tool?.description;
+  const tooltipText = tooltip || tool?.description;
 
   return (
     <SimpleTooltip tooltip={tooltipText} className="max-w-[30rem]">
@@ -115,14 +115,9 @@ export default function ActionLineItem({
             <Section gap={0.25} flexDirection="row">
               {!isUnavailable && tool?.oauth_config_id && toolAuthStatus && (
                 <Button
-                  icon={({ className }) => (
-                    <SvgKey
-                      className={cn(
-                        className,
-                        "stroke-yellow-500 hover:stroke-yellow-600"
-                      )}
-                    />
-                  )}
+                  icon={SvgKey}
+                  prominence="secondary"
+                  size="sm"
                   onClick={noProp(() => {
                     if (
                       !toolAuthStatus.hasToken ||
@@ -135,6 +130,7 @@ export default function ActionLineItem({
               )}
 
               {!isSearchToolWithNoConnectors && !isUnavailable && (
+                // TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved
                 <IconButton
                   icon={SvgSlash}
                   onClick={noProp(onToggle)}
@@ -184,7 +180,7 @@ export default function ActionLineItem({
               )}
 
               {isSearchToolAndNotInProject && (
-                <IconButton
+                <Button
                   icon={
                     isSearchToolWithNoConnectors ? SvgSettings : SvgChevronRight
                   }
@@ -193,11 +189,8 @@ export default function ActionLineItem({
                       router.push("/admin/add-connector");
                     else onSourceManagementOpen?.();
                   })}
-                  internal
-                  className={cn(
-                    isSearchToolWithNoConnectors &&
-                      "invisible group-hover/LineItem:visible"
-                  )}
+                  prominence="tertiary"
+                  size="sm"
                   tooltip={
                     isSearchToolWithNoConnectors
                       ? "Add Connectors"

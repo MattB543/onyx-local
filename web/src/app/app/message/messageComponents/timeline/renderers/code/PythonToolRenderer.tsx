@@ -140,7 +140,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, Record<string
       {stdout && (
         <div className="rounded-md bg-background-neutral-02 p-3">
           <div className="text-xs font-semibold mb-1 text-text-03">Output:</div>
-          <pre className="text-sm whitespace-pre-wrap font-mono text-text-01">
+          <pre className="text-sm whitespace-pre-wrap font-mono text-text-01 overflow-x-auto">
             {stdout}
           </pre>
         </div>
@@ -152,7 +152,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, Record<string
           <div className="text-xs font-semibold mb-1 text-status-error-05">
             Error:
           </div>
-          <pre className="text-sm whitespace-pre-wrap font-mono text-status-error-05">
+          <pre className="text-sm whitespace-pre-wrap font-mono text-status-error-05 overflow-x-auto">
             {stderr}
           </pre>
         </div>
@@ -183,6 +183,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, Record<string
         status,
         content,
         supportsCollapsible: true,
+        alwaysCollapsible: true,
       },
     ]);
   }
@@ -193,6 +194,7 @@ export const PythonToolRenderer: MessageRenderer<PythonToolPacket, Record<string
       icon: SvgTerminal,
       status,
       supportsCollapsible: true,
+      alwaysCollapsible: true,
       content: (
         <FadingEdgeContainer
           direction="bottom"

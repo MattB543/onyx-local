@@ -1,9 +1,3 @@
-import type { Route } from "next";
-import { redirect } from "next/navigation";
-
-import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
-import { HealthCheckBanner } from "@/components/health/healthcheck";
-import { AuthType } from "@/lib/constants";
 import { User } from "@/lib/types";
 import {
   getCurrentUserSS,
@@ -11,13 +5,14 @@ import {
   getAuthTypeMetadataSS,
   AuthTypeMetadata,
 } from "@/lib/userSS";
-
-
+import { redirect } from "next/navigation";
+import type { Route } from "next";
+import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 import LoginPage from "./LoginPage";
-
+import { AuthType } from "@/lib/constants";
 
 export interface PageProps {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function Page(props: PageProps) {
@@ -109,10 +104,6 @@ export default async function Page(props: PageProps) {
         authState="login"
         footerContent={ssoLoginFooterContent}
       >
-        <div className="absolute top-10x w-full">
-          <HealthCheckBanner />
-        </div>
-
         <LoginPage
           authUrl={authUrl}
           authTypeMetadata={authTypeMetadata}

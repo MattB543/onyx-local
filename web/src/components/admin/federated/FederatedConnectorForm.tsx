@@ -1,23 +1,8 @@
 "use client";
 
-import { AlertTriangle, Check, Loader2, Trash2Icon, Info } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-
-import { SourceIcon } from "@/components/SourceIcon";
-import { toast } from "@/hooks/useToast";
-
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DropdownMenuItemWithTooltip } from "@/components/ui/dropdown-menu-with-tooltip";
-import { Input } from "@/components/ui/input";
-import Title from "@/components/ui/title";
-import { getSourceMetadata } from "@/lib/sources";
+import Button from "@/refresh-components/buttons/Button";
+import { Button as OpalButton } from "@opal/components";
 import {
   ConfigurableSources,
   CredentialFieldSpec,
@@ -26,15 +11,29 @@ import {
   FederatedConnectorDetail,
   CredentialSchemaResponse,
 } from "@/lib/types";
-import BackButton from "@/refresh-components/buttons/BackButton";
-import Button from "@/refresh-components/buttons/Button";
-import Checkbox from "@/refresh-components/inputs/Checkbox";
-import { ListFieldInput } from "@/refresh-components/inputs/ListFieldInput";
-import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
-import Separator from "@/refresh-components/Separator";
-import SimpleTooltip from "@/refresh-components/SimpleTooltip";
+import { getSourceMetadata } from "@/lib/sources";
+import { SourceIcon } from "@/components/SourceIcon";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
 import Text from "@/refresh-components/texts/Text";
+import { AlertTriangle, Check, Loader2, Trash2Icon, Info } from "lucide-react";
+import BackButton from "@/refresh-components/buttons/BackButton";
+import Title from "@/components/ui/title";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItemWithTooltip } from "@/components/ui/dropdown-menu-with-tooltip";
+import { toast } from "@/hooks/useToast";
 
+import { Badge } from "@/components/ui/badge";
+import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
+import SimpleTooltip from "@/refresh-components/SimpleTooltip";
+import { ListFieldInput } from "@/refresh-components/inputs/ListFieldInput";
+import Checkbox from "@/refresh-components/inputs/Checkbox";
+import Separator from "@/refresh-components/Separator";
 import { SvgSettings } from "@opal/icons";
 
 export interface FederatedConnectorFormProps {
@@ -44,9 +43,13 @@ export interface FederatedConnectorFormProps {
   preloadedCredentialSchema?: CredentialSchemaResponse;
 }
 
-type CredentialForm = Record<string, string>;
+interface CredentialForm {
+  [key: string]: string;
+}
 
-type ConfigForm = Record<string, string | boolean | string[] | number | undefined>;
+interface ConfigForm {
+  [key: string]: string | boolean | string[] | number | undefined;
+}
 
 interface FormState {
   credentials: CredentialForm;
@@ -275,9 +278,7 @@ export function FederatedConnectorForm({
         // Initialize config with defaults - merge with existing config
         // This ensures boolean fields like search_all_channels have explicit values for UI state
         if (configurationSchema) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const configWithDefaults: Record<string, any> = {};
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (Object.entries(configurationSchema) as [string, any][]).forEach(
             ([key, field]) => {
               if (field.default !== undefined) {
@@ -341,7 +342,6 @@ export function FederatedConnectorForm({
     }));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleConfigChange = (key: string, value: any) => {
     setFormState((prev) => ({
       ...prev,
@@ -781,9 +781,9 @@ export function FederatedConnectorForm({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <div>
-                  <Button secondary leftIcon={SvgSettings}>
+                  <OpalButton prominence="secondary" icon={SvgSettings}>
                     Manage
-                  </Button>
+                  </OpalButton>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -840,6 +840,7 @@ export function FederatedConnectorForm({
                 </div>
               )}
 
+              {/* TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved */}
               <Button
                 type="button"
                 secondary
@@ -849,6 +850,7 @@ export function FederatedConnectorForm({
               >
                 {isValidating ? "Validating..." : "Validate"}
               </Button>
+              {/* TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved */}
               <Button
                 type="submit"
                 disabled={isSubmitting || !formState.schema}

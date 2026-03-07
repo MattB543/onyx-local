@@ -1,16 +1,15 @@
 "use client";
 
 import { ArrayHelpers, FieldArray, FormikProps, useField } from "formik";
-import { useEffect, useState } from "react";
-
+import { ModelConfiguration } from "@/interfaces/llm";
 import { ManualErrorMessage, TextFormField } from "@/components/Field";
+import { useEffect, useState } from "react";
 import CreateButton from "@/refresh-components/buttons/CreateButton";
+import { Button } from "@opal/components";
+import { Disabled } from "@opal/core";
+import { SvgX } from "@opal/icons";
 import Text from "@/refresh-components/texts/Text";
 
-import { Button } from "@opal/components";
-import { SvgX } from "@opal/icons";
-
-import { ModelConfiguration } from "./interfaces";
 function ModelConfigurationRow({
   name,
   index,
@@ -57,17 +56,20 @@ function ModelConfigurationRow({
         />
       </div>
       <div className="flex flex-col justify-center">
-        <Button
+        <Disabled
           disabled={formikProps.values.model_configurations.length <= 1}
-          onClick={() => {
-            if (formikProps.values.model_configurations.length > 1) {
-              setError(null);
-              arrayHelpers.remove(index);
-            }
-          }}
-          icon={SvgX}
-          prominence="secondary"
-        />
+        >
+          <Button
+            onClick={() => {
+              if (formikProps.values.model_configurations.length > 1) {
+                setError(null);
+                arrayHelpers.remove(index);
+              }
+            }}
+            icon={SvgX}
+            prominence="secondary"
+          />
+        </Disabled>
       </div>
     </div>
   );
@@ -80,7 +82,7 @@ export function ModelConfigurationField({
   name: string;
   formikProps: FormikProps<{ model_configurations: ModelConfiguration[] }>;
 }) {
-  const [errorMap, setErrorMap] = useState<Record<number, string>>({});
+  const [errorMap, setErrorMap] = useState<{ [index: number]: string }>({});
   const [finalError, setFinalError] = useState<string | undefined>();
 
   return (
@@ -115,22 +117,22 @@ export function ModelConfigurationField({
                   arrayHelpers={arrayHelpers}
                   index={index}
                   setError={(message: string | null) => {
-                    let newErrors: Record<string, string>;
+                    const newErrors = { ...errorMap };
                     if (message) {
-                      newErrors = { ...errorMap, [index]: message };
+                      newErrors[index] = message;
                     } else {
-                      // Remove the error at index and shift higher indices down
-                      newErrors = Object.fromEntries(
-                        Object.entries(errorMap)
-                          .filter(([key]) => Number(key) !== index)
-                          .map(([key, value]) => {
-                            const numKey = Number(key);
-                            return [
-                              numKey > index ? numKey - 1 : numKey,
-                              value,
-                            ];
-                          })
-                      );
+                      delete newErrors[index];
+                      for (const key in newErrors) {
+                        const numKey = Number(key);
+                        if (numKey > index) {
+                          const errorValue = newErrors[key];
+                          if (errorValue !== undefined) {
+                            // Ensure the value is not undefined
+                            newErrors[numKey - 1] = errorValue;
+                            delete newErrors[numKey];
+                          }
+                        }
+                      }
                     }
                     setErrorMap(newErrors);
                     setFinalError(

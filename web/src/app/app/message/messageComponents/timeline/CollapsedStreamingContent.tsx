@@ -25,7 +25,6 @@ export const CollapsedStreamingContent = memo(
     stopReason,
     renderTypeOverride,
   }: CollapsedStreamingContentProps) {
-    const noopComplete = useCallback(() => {}, []);
     const renderContentOnly = useCallback(
       (results: TimelineRendererOutput) => (
         <>
@@ -44,7 +43,6 @@ export const CollapsedStreamingContent = memo(
             key={`${step.key}-compact`}
             packets={step.packets}
             chatState={chatState}
-            onComplete={noopComplete}
             animate={true}
             stopPacketSeen={false}
             stopReason={stopReason}
