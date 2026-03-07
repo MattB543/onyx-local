@@ -85,10 +85,11 @@ from onyx.db.enums import (
     SyncStatus,
     SyncType,
     SwitchoverType,
-    SharingScope,
     ThemePreference,
     UserFileStatus,
     DefaultAppMode,
+    SharingScope,
+)
 )
 from onyx.configs.constants import NotificationType
 from onyx.configs.constants import SearchFeedbackType
@@ -2876,13 +2877,17 @@ class LLMProvider(Base):
     custom_config: Mapped[dict[str, str] | None] = mapped_column(
         EncryptedJsonUnmasked(), nullable=True
     )
-    default_model_name: Mapped[str] = mapped_column(String)
+
+    # Deprecated: use LLMModelFlow with CHAT flow type instead
+    default_model_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     deployment_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # should only be set for a single provider
-    is_default_provider: Mapped[bool | None] = mapped_column(Boolean, unique=True)
+    # Deprecated: use LLMModelFlow.is_default with CHAT flow type instead
+    is_default_provider: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Deprecated: use LLMModelFlow.is_default with VISION flow type instead
     is_default_vision_provider: Mapped[bool | None] = mapped_column(Boolean)
+    # Deprecated: use LLMModelFlow with VISION flow type instead
     default_vision_model: Mapped[str | None] = mapped_column(String, nullable=True)
     # EE only
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -2933,6 +2938,7 @@ class ModelConfiguration(Base):
     # - The end-user is configuring a model and chooses not to set a max-input-tokens limit.
     max_input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Deprecated: use LLMModelFlow with VISION flow type instead
     supports_image_input: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # Human-readable display name for the model.
@@ -4642,6 +4648,9 @@ class UserFile(Base):
     needs_project_sync: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    needs_persona_sync: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     last_project_sync_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -5660,6 +5669,11 @@ class ScimUserMapping(Base):
         ForeignKey("user.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     scim_username: Mapped[str | None] = mapped_column(String, nullable=True)
+    department: Mapped[str | None] = mapped_column(String, nullable=True)
+    manager: Mapped[str | None] = mapped_column(String, nullable=True)
+    given_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    family_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    scim_emails_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

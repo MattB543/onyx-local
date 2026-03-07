@@ -15,6 +15,63 @@ logger = setup_logger()
 
 REDIS_KEY_PREFIX = "onyx_kv_store:"
 KV_REDIS_KEY_EXPIRATION = 60 * 60 * 24  # 1 Day
+KV_REDIS_LEGACY_CLEANUP_MARKER_KEY = "onyx_kv_store_cleanup_v2_done"
+_REDIS_DELETE_BATCH_SIZE = 256
+
+
+def cleanup_legacy_kv_store_redis_cache(
+    cache: "CacheBackend | None" = None,
+) -> None:
+    """
+    Remove pre-upgrade KV Redis entries that may contain plaintext for encrypted values.
+    This runs at startup and marks completion in the cache to avoid repeated scans.
+    """
+    if cache is None:
+        from onyx.cache.factory import get_cache_backend
+
+        cache = get_cache_backend()
+
+    try:
+        if cache.get(KV_REDIS_LEGACY_CLEANUP_MARKER_KEY):
+            return
+    except Exception as e:
+        logger.error("Failed to read KV cache cleanup marker: %s", str(e))
+        return
+
+    deleted_count = 0
+    try:
+        # Scan and delete all keys matching REDIS_KEY_PREFIX
+        # CacheBackend may not have scan_iter, so we try it and fall back
+        try:
+            keys_to_delete: list[bytes | str] = []
+            for redis_key in cache.scan_iter(match=f"{REDIS_KEY_PREFIX}*"):  # type: ignore[attr-defined]
+                if not isinstance(redis_key, (bytes, str)):
+                    continue
+                keys_to_delete.append(redis_key)
+                if len(keys_to_delete) >= _REDIS_DELETE_BATCH_SIZE:
+                    for k in keys_to_delete:
+                        cache.delete(
+                            k.decode("utf-8") if isinstance(k, bytes) else k
+                        )
+                        deleted_count += 1
+                    keys_to_delete = []
+
+            for k in keys_to_delete:
+                cache.delete(k.decode("utf-8") if isinstance(k, bytes) else k)
+                deleted_count += 1
+        except AttributeError:
+            # CacheBackend doesn't support scan_iter; skip bulk cleanup
+            logger.warning(
+                "Cache backend does not support scan_iter; skipping legacy cleanup"
+            )
+
+        cache.set(KV_REDIS_LEGACY_CLEANUP_MARKER_KEY, "1")
+        logger.notice(
+            "Completed legacy KV cache cleanup; deleted %s key(s).",
+            deleted_count,
+        )
+    except Exception as e:
+        logger.error("Failed to clean up legacy KV cache: %s", str(e))
 
 
 class PgRedisKVStore(KeyValueStore):
@@ -29,17 +86,6 @@ class PgRedisKVStore(KeyValueStore):
         return self._cache
 
     def store(self, key: str, val: JSON_ro, encrypt: bool = False) -> None:
-        # Not encrypted in Cache backend (typically Redis), but encrypted in Postgres
-        try:
-            self._get_cache().set(
-                REDIS_KEY_PREFIX + key, json.dumps(val), ex=KV_REDIS_KEY_EXPIRATION
-            )
-        except Exception as e:
-            # Fallback gracefully to Postgres if Cache backend fails
-            logger.error(
-                f"Failed to set value in Cache backend for key '{key}': {str(e)}"
-            )
-
         encrypted_val = val if encrypt else None
         plain_val = val if not encrypt else None
         with get_session_with_current_tenant() as db_session:
@@ -52,6 +98,28 @@ class PgRedisKVStore(KeyValueStore):
                 db_session.query(KVStore).filter_by(key=key).delete()  # just in case
                 db_session.add(obj)
             db_session.commit()
+
+        if encrypt:
+            # Never cache decrypted encrypted values.
+            try:
+                self._get_cache().delete(REDIS_KEY_PREFIX + key)
+            except Exception as e:
+                logger.error(
+                    f"Failed to delete cache value for encrypted key '{key}': {str(e)}"
+                )
+        else:
+            # Not encrypted in Cache backend (typically Redis), but encrypted in Postgres
+            try:
+                self._get_cache().set(
+                    REDIS_KEY_PREFIX + key,
+                    json.dumps(val),
+                    ex=KV_REDIS_KEY_EXPIRATION,
+                )
+            except Exception as e:
+                # Fallback gracefully to Postgres if Cache backend fails
+                logger.error(
+                    f"Failed to set value in Cache backend for key '{key}': {str(e)}"
+                )
 
     def load(self, key: str, refresh_cache: bool = False) -> JSON_ro:
         if not refresh_cache:
@@ -71,20 +139,33 @@ class PgRedisKVStore(KeyValueStore):
 
             if obj.value is not None:
                 value = obj.value
+                should_cache_in_redis = True
             elif obj.encrypted_value is not None:
                 # Unwrap SensitiveValue - this is internal backend use
                 value = obj.encrypted_value.get_value(apply_mask=False)
+                should_cache_in_redis = False
             else:
                 value = None
+                should_cache_in_redis = True
 
-            try:
-                self._get_cache().set(
-                    REDIS_KEY_PREFIX + key,
-                    json.dumps(value),
-                    ex=KV_REDIS_KEY_EXPIRATION,
-                )
-            except Exception as e:
-                logger.error(f"Failed to set value in cache for key '{key}': {str(e)}")
+            if should_cache_in_redis:
+                try:
+                    self._get_cache().set(
+                        REDIS_KEY_PREFIX + key,
+                        json.dumps(value),
+                        ex=KV_REDIS_KEY_EXPIRATION,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to set value in cache for key '{key}': {str(e)}"
+                    )
+            else:
+                try:
+                    self._get_cache().delete(REDIS_KEY_PREFIX + key)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to delete cache value for encrypted key '{key}': {str(e)}"
+                    )
 
             return cast(JSON_ro, value)
 

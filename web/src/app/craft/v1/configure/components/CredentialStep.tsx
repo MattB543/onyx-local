@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Section } from "@/layouts/general-layouts";
-import Button from "@/refresh-components/buttons/Button";
+import { Button } from "@opal/components";
 import Modal from "@/refresh-components/Modal";
 import { SvgKey } from "@opal/icons";
 import {
@@ -235,7 +235,7 @@ export default function CredentialStep({
                   ) &&
                     (NEXT_PUBLIC_CLOUD_ENABLED || NEXT_PUBLIC_TEST_ENV) && (
                       <Button
-                        action
+                        variant="action"
                         onClick={handleAuthorize}
                         disabled={isAuthorizing}
                         hidden={!isAuthorizeVisible}
@@ -250,7 +250,6 @@ export default function CredentialStep({
                 </div>
                 {hasCredentials && (
                   <Button
-                    primary
                     onClick={isSingleStep ? handleConnect : onContinue}
                     disabled={!selectedCredential || isConnecting}
                   >

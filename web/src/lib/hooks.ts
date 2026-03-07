@@ -93,7 +93,8 @@ const CONNECTOR_STATUS_URL = "/api/manage/admin/connector/status";
 
 export const useConnectorIndexingStatusWithPagination = (
   filters: Omit<IndexingStatusRequest, "source" | "source_to_page"> = {},
-  refreshInterval = 30000
+  refreshInterval = 30000,
+  enabled: boolean = true
 ) => {
   const { mutate } = useSWRConfig();
   //maintains the current page for each source
@@ -125,7 +126,9 @@ export const useConnectorIndexingStatusWithPagination = (
     [filters]
   );
 
-  const swrKey = [INDEXING_STATUS_URL, JSON.stringify(mainRequest)];
+  const swrKey = enabled
+    ? [INDEXING_STATUS_URL, JSON.stringify(mainRequest)]
+    : null;
 
   // Main data fetch with auto-refresh
   const { data, isLoading, error } = useSWR<
@@ -188,7 +191,7 @@ export const useConnectorIndexingStatusWithPagination = (
 
   // Function to refresh all data (maintains current pagination)
   const refreshAllData = useCallback(() => {
-    mutate(swrKey);
+    if (swrKey) mutate(swrKey);
   }, [mutate, swrKey]);
 
   // Reset pagination when filters change (but not search)
@@ -208,19 +211,22 @@ export const useConnectorIndexingStatusWithPagination = (
   };
 };
 
-export const useConnectorStatus = (refreshInterval = 30000) => {
+export const useConnectorStatus = (
+  refreshInterval = 30000,
+  enabled: boolean = true
+) => {
   const { mutate } = useSWRConfig();
   const url = CONNECTOR_STATUS_URL;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swrResponse = useSWR<ConnectorStatus<any, any>[]>(
-    url,
+    enabled ? url : null,
     errorHandlingFetcher,
     { refreshInterval: refreshInterval }
   );
 
   return {
     ...swrResponse,
-    refreshIndexingStatus: () => mutate(url),
+    refreshIndexingStatus: enabled ? () => mutate(url) : () => {},
   };
 };
 
@@ -232,7 +238,7 @@ export const useBasicConnectorStatus = (enabled: boolean = true) => {
   );
   return {
     ...swrResponse,
-    refreshIndexingStatus: () => mutate(url),
+    refreshIndexingStatus: enabled ? () => mutate(url) : () => {},
   };
 };
 

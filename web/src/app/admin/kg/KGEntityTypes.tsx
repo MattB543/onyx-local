@@ -1,17 +1,16 @@
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FaCircleQuestion } from "react-icons/fa6";
-
+import { SourceIcon } from "@/components/SourceIcon";
+import Switch from "@/refresh-components/inputs/Switch";
+import Link from "next/link";
 import { EntityType, SourceAndEntityTypeView } from "@/app/admin/kg/interfaces";
 import CollapsibleCard from "@/components/CollapsibleCard";
-import { CheckmarkIcon } from "@/components/icons/icons";
-import { SourceIcon } from "@/components/SourceIcon";
 import { ValidSources } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import Button from "@/refresh-components/buttons/Button";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import Switch from "@/refresh-components/inputs/Switch";
+import { FaCircleQuestion } from "react-icons/fa6";
+import { CheckmarkIcon } from "@/components/icons/icons";
+import { Button } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { cn } from "@/lib/utils";
 
 // Utility: Convert capitalized snake case to human readable case
 function snakeToHumanReadable(str: string): string {
@@ -198,13 +197,13 @@ export default function KGEntityTypes({
   sourceAndEntityTypes,
 }: KGEntityTypesProps) {
   // State to control open/close of all CollapsibleCards
-  const [openCards, setOpenCards] = useState<Record<string, boolean>>({});
+  const [openCards, setOpenCards] = useState<{ [key: string]: boolean }>({});
   // State for search query
   const [search, setSearch] = useState("");
 
   // Initialize openCards state when data changes
   useEffect(() => {
-    const initialState: Record<string, boolean> = {};
+    const initialState: { [key: string]: boolean } = {};
     Object.keys(sourceAndEntityTypes.entity_types).forEach((key) => {
       initialState[key] = true;
     });
@@ -213,14 +212,14 @@ export default function KGEntityTypes({
 
   // Handlers for expand/collapse all
   const handleExpandAll = () => {
-    const newState: Record<string, boolean> = {};
+    const newState: { [key: string]: boolean } = {};
     Object.keys(sourceAndEntityTypes.entity_types).forEach((key) => {
       newState[key] = true;
     });
     setOpenCards(newState);
   };
   const handleCollapseAll = () => {
-    const newState: Record<string, boolean> = {};
+    const newState: { [key: string]: boolean } = {};
     Object.keys(sourceAndEntityTypes.entity_types).forEach((key) => {
       newState[key] = false;
     });
@@ -238,10 +237,7 @@ export default function KGEntityTypes({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <Button
-          className="h-9"
-          onClick={allClosed ? handleExpandAll : handleCollapseAll}
-        >
+        <Button onClick={allClosed ? handleExpandAll : handleCollapseAll}>
           {allClosed ? "Expand All" : "Collapse All"}
         </Button>
       </div>
