@@ -724,7 +724,6 @@ def translate_assistant_message_to_packets(
                                 )
                             )
 
-
                     elif tool.in_code_tool_id == CrmSearchTool.__name__:
                         turn_tool_packets.extend(
                             create_crm_search_packets(

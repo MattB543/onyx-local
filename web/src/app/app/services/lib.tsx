@@ -1,12 +1,11 @@
-import { ReadonlyURLSearchParams } from "next/navigation";
-
-import { MinimalPersonaSnapshot } from "@/app/admin/assistants/interfaces";
 import {
-  WEB_SEARCH_TOOL_ID,
-  SEARCH_TOOL_ID,
-} from "@/app/app/components/tools/constants";
+  Filters,
+  DocumentInfoPacket,
+  StreamStopInfo,
+} from "@/lib/search/interfaces";
+import { handleSSEStream } from "@/lib/search/streamingUtils";
+import { FeedbackType } from "@/app/app/interfaces";
 import {
-  FeedbackType,
   BackendMessage,
   DocumentsResponse,
   FileDescriptor,
@@ -22,6 +21,8 @@ import {
 import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
 import { ReadonlyURLSearchParams } from "next/navigation";
 import { SEARCH_PARAM_NAMES } from "./searchParams";
+import { WEB_SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
+import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { Packet } from "./streamingModels";
 
 export async function updateLlmOverrideForChatSession(

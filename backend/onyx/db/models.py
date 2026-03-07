@@ -90,7 +90,6 @@ from onyx.db.enums import (
     DefaultAppMode,
     SharingScope,
 )
-)
 from onyx.configs.constants import NotificationType
 from onyx.configs.constants import SearchFeedbackType
 from onyx.configs.constants import TokenRateLimitScope

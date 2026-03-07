@@ -28,10 +28,14 @@ export const NEXT_PUBLIC_DO_NOT_USE_TOGGLE_OFF_DANSWER_POWERED =
 
 export const TENANT_ID_COOKIE_NAME = "onyx_tid";
 
+export const GMAIL_AUTH_IS_ADMIN_COOKIE_NAME = "gmail_auth_is_admin";
 
-export const GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME = "google_calendar_auth_is_admin";
+export const GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME =
+  "google_drive_auth_is_admin";
 
->>>>>>> 2b82743bf514071dadc8eb784d08d14fb32248c4
+export const GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME =
+  "google_calendar_auth_is_admin";
+
 export const SEARCH_TYPE_COOKIE_NAME = "search_type";
 export const AGENTIC_SEARCH_TYPE_COOKIE_NAME = "agentic_type";
 

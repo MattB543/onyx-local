@@ -4,8 +4,8 @@ import { memo, useCallback, useState } from "react";
 import Text from "@/refresh-components/texts/Text";
 import Truncated from "@/refresh-components/texts/Truncated";
 import IconButton from "@/refresh-components/buttons/IconButton";
-import { cn } from "@/lib/utils";
-import { Disabled } from "@/refresh-components/Disabled";
+import { cn, noProp } from "@/lib/utils";
+import { Disabled } from "@opal/core";
 import {
   SvgArrowExchange,
   SvgCheckCircle,
@@ -49,10 +49,7 @@ function LLMProviderCardInner({
   }, [disabled, isConnected, onClick]);
 
   const handleSettingsClick = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation();
-      window.location.href = "/admin/configuration/llm";
-    },
+    noProp(() => (window.location.href = "/admin/configuration/llm")),
     []
   );
 

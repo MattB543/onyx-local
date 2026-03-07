@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   memo,
   forwardRef,
@@ -13,7 +12,9 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
-
+import { useRouter } from "next/navigation";
+import { cn, isImageFile } from "@/lib/utils";
+import { Disabled } from "@opal/core";
 import {
   useUploadFilesContext,
   BuildFile,
@@ -21,13 +22,10 @@ import {
 } from "@/app/craft/contexts/UploadFilesContext";
 import { useDemoDataEnabled } from "@/app/craft/hooks/useBuildSessionStore";
 import { CRAFT_CONFIGURE_PATH } from "@/app/craft/v1/constants";
-import { cn, isImageFile } from "@/lib/utils";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import SelectButton from "@/refresh-components/buttons/SelectButton";
-import { Disabled } from "@/refresh-components/Disabled";
-import SimpleTooltip from "@/refresh-components/SimpleTooltip";
-
 import { Button } from "@opal/components";
+import SimpleTooltip from "@/refresh-components/SimpleTooltip";
 import {
   SvgArrowUp,
   SvgClock,
@@ -235,7 +233,8 @@ const InputBar = memo(
           const items = event.clipboardData?.items;
           if (items) {
             const pastedFiles: File[] = [];
-            for (const item of Array.from(items)) {
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
               if (item && item.kind === "file") {
                 const file = item.getAsFile();
                 if (file) pastedFiles.push(file);
@@ -291,7 +290,6 @@ const InputBar = memo(
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             !(event.nativeEvent as any).isComposing
           ) {
             event.preventDefault();
@@ -375,13 +373,14 @@ const InputBar = memo(
               {/* Bottom left controls */}
               <div className="flex flex-row items-center gap-1">
                 {/* (+) button for file upload */}
-                <Button
-                  icon={SvgPaperclip}
-                  tooltip="Attach Files"
-                  prominence="tertiary"
-                  disabled={disabled}
-                  onClick={() => fileInputRef.current?.click()}
-                />
+                <Disabled disabled={disabled}>
+                  <Button
+                    icon={SvgPaperclip}
+                    tooltip="Attach Files"
+                    prominence="tertiary"
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                </Disabled>
                 {/* Demo Data indicator pill - only show on welcome page (no session) when demo data is enabled */}
                 {demoDataEnabled && isWelcomePage && (
                   <SimpleTooltip
@@ -389,17 +388,18 @@ const InputBar = memo(
                     side="top"
                   >
                     <span>
-                      <SelectButton
-                        leftIcon={SvgOrganization}
-                        engaged={demoDataEnabled}
-                        action
-                        folded
-                        disabled={disabled}
-                        onClick={() => router.push(CRAFT_CONFIGURE_PATH)}
-                        className="bg-action-link-01"
-                      >
-                        Demo Data Active
-                      </SelectButton>
+                      <Disabled disabled={disabled}>
+                        <SelectButton
+                          leftIcon={SvgOrganization}
+                          engaged={demoDataEnabled}
+                          action
+                          folded
+                          onClick={() => router.push(CRAFT_CONFIGURE_PATH)}
+                          className="bg-action-link-01"
+                        >
+                          Demo Data Active
+                        </SelectButton>
+                      </Disabled>
                     </span>
                   </SimpleTooltip>
                 )}
