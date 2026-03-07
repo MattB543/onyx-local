@@ -764,10 +764,6 @@ def translate_assistant_message_to_packets(
                         turn_tool_packets.extend(
                             create_calendar_search_packets(
                                 tool_call_response=tool_call.tool_call_response,
-                                turn_index=turn_num,
-                                tab_index=tool_call.tab_index,
-                            )
-                        )
 
                     elif tool.in_code_tool_id == PythonTool.__name__:
                         code = cast(

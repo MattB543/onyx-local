@@ -1,15 +1,13 @@
 "use client";
 
-import type { Route } from "next";
 import {
-  ReadonlyURLSearchParams,
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
-import { usePostHog } from "posthog-js/react";
+  buildChatUrl,
+  nameChatSession,
+  updateLlmOverrideForChatSession,
+} from "@/app/app/services/lib";
+import { StreamStopInfo } from "@/lib/search/interfaces";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import type { Route } from "next";
 import {
   getLastSuccessfulMessageId,
   getLatestMessageChain,
@@ -22,6 +20,8 @@ import {
 import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
 import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
 import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
+import { OnyxDocument } from "@/lib/search/interfaces";
+import { FilterManager, LlmDescriptor, LlmManager } from "@/lib/hooks";
 import {
   BackendMessage,
   ChatFileType,
@@ -36,26 +36,26 @@ import {
   ToolCallMetadata,
   UserKnowledgeFilePacket,
 } from "@/app/app/interfaces";
-import {
-  CurrentMessageFIFO,
-  updateCurrentMessageFIFO,
-} from "@/app/app/services/currentMessageFIFO";
-import { projectFilesToFileDescriptors } from "@/app/app/services/fileUtils";
-import {
-  buildChatUrl,
-  nameChatSession,
-  updateLlmOverrideForChatSession, createChatSession 
-} from "@/app/app/services/lib";
-import { StreamStopInfo, OnyxDocument, StreamStopReason } from "@/lib/search/interfaces";
-import { FilterManager, LlmDescriptor, LlmManager } from "@/lib/hooks";
-
+import { StreamStopReason } from "@/lib/search/interfaces";
+import { createChatSession } from "@/app/app/services/lib";
 import {
   getFinalLLM,
   modelSupportsImageInput,
   structureValue,
 } from "@/lib/llmConfig/utils";
+import {
+  CurrentMessageFIFO,
+  updateCurrentMessageFIFO,
+} from "@/app/app/services/currentMessageFIFO";
 import { buildFilters } from "@/lib/search/utils";
 import { toast } from "@/hooks/useToast";
+import {
+  ReadonlyURLSearchParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { getExtensionContext } from "@/lib/extension/utils";
 import useChatSessions from "@/hooks/useChatSessions";
 import { usePinnedAgents } from "@/hooks/useAgents";
@@ -70,6 +70,7 @@ import useAgentPreferences from "@/hooks/useAgentPreferences";
 import { useForcedTools } from "@/lib/hooks/useForcedTools";
 import { ProjectFile, useProjectsContext } from "@/providers/ProjectsContext";
 import { useAppParams } from "@/hooks/appNavigation";
+import { projectFilesToFileDescriptors } from "@/app/app/services/fileUtils";
 
 const SYSTEM_MESSAGE_ID = -3;
 
@@ -650,8 +651,7 @@ export default function useChatController({
       let error: string | null = null;
       let stackTrace: string | null = null;
       let errorCode: string | null = null;
-      let isRetryable = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let isRetryable: boolean = true;
       let errorDetails: Record<string, any> | null = null;
 
       let finalMessage: BackendMessage | null = null;
@@ -802,7 +802,6 @@ export default function useChatController({
               );
             } else if (
               Object.hasOwn(packet, "error") &&
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (packet as any).error != null
             ) {
               const streamingError = packet as StreamingError;
@@ -860,7 +859,7 @@ export default function useChatController({
             // on initial message send, we insert a dummy system message
             // set this as the parent here if no parent is set
             parentMessage =
-              parentMessage || currentMessageTreeLocal!.get(SYSTEM_NODE_ID)!;
+              parentMessage || currentMessageTreeLocal?.get(SYSTEM_NODE_ID)!;
 
             currentMessageTreeLocal = upsertToCompleteMessageTree({
               messages: [
@@ -903,7 +902,6 @@ export default function useChatController({
             });
           }
         }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         console.log("Error:", e);
         const errorMsg = e.message;

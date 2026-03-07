@@ -23,6 +23,7 @@ from onyx.tools.interface import Tool
 from onyx.tools.models import LlmPythonExecutionResult
 from onyx.tools.models import PythonExecutionFile
 from onyx.tools.models import PythonToolOverrideKwargs
+from onyx.tools.models import PythonToolRichResponse
 from onyx.tools.models import ToolCallException
 from onyx.tools.models import ToolResponse
 from onyx.tools.tool_implementations.python.code_interpreter_client import (
@@ -107,7 +108,11 @@ class PythonTool(Tool[PythonToolOverrideKwargs]):
         if not CODE_INTERPRETER_BASE_URL:
             return False
         server = fetch_code_interpreter_server(db_session)
-        return server.server_enabled
+        if not server.server_enabled:
+            return False
+
+        client = CodeInterpreterClient()
+        return client.health(use_cache=True)
 
     def tool_definition(self) -> dict:
         return {
@@ -325,7 +330,9 @@ class PythonTool(Tool[PythonToolOverrideKwargs]):
             llm_response = adapter.dump_json(result).decode()
 
             return ToolResponse(
-                rich_response=None,  # No rich response needed for Python tool
+                rich_response=PythonToolRichResponse(
+                    generated_files=generated_files,
+                ),
                 llm_facing_response=llm_response,
             )
 

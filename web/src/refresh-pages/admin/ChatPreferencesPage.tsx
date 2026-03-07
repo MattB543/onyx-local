@@ -18,13 +18,13 @@ import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import {
-  SvgBubbleText,
   SvgAddLines,
   SvgActions,
   SvgExpand,
   SvgFold,
   SvgExternalLink,
 } from "@opal/icons";
+import { ADMIN_ROUTE_CONFIG, ADMIN_PATHS } from "@/lib/admin-routes";
 import { Content } from "@opal/layouts";
 import { useSettingsContext } from "@/providers/SettingsProvider";
 import useCCPairs from "@/hooks/useCCPairs";
@@ -60,6 +60,8 @@ import {
   DEFAULT_CRM_CATEGORY_SUGGESTIONS,
   DEFAULT_CRM_STAGE_OPTIONS,
 } from "@/refresh-pages/crm/crmOptions";
+
+const route = ADMIN_ROUTE_CONFIG[ADMIN_PATHS.CHAT_PREFERENCES]!;
 
 interface DefaultAgentConfiguration {
   tool_ids: number[];
@@ -401,8 +403,8 @@ function ChatPreferencesForm() {
     <>
       <SettingsLayouts.Root>
         <SettingsLayouts.Header
-          icon={SvgBubbleText}
-          title="Chat Preferences"
+          icon={route.icon}
+          title={route.title}
           description="Organization-wide chat settings and defaults. Users can override some of these in their personal settings."
           separator
         />
@@ -550,7 +552,7 @@ function ChatPreferencesForm() {
 
                   <Section
                     flexDirection="row"
-                    justifyContent="start"
+                    justifyContent="between"
                     alignItems="center"
                     gap={0.25}
                   >
@@ -558,22 +560,29 @@ function ChatPreferencesForm() {
                       <EmptyMessage title="No connectors set up" />
                     ) : (
                       <>
-                        {uniqueSources.slice(0, 3).map((source) => {
-                          const meta = getSourceMetadata(source);
-                          return (
-                            <Card
-                              key={source}
-                              padding={0.75}
-                              className="w-[10rem]"
-                            >
-                              <Content
-                                icon={meta.icon}
-                                title={meta.displayName}
-                                sizePreset="main-ui"
-                              />
-                            </Card>
-                          );
-                        })}
+                        <Section
+                          flexDirection="row"
+                          justifyContent="start"
+                          alignItems="center"
+                          gap={0.25}
+                        >
+                          {uniqueSources.slice(0, 3).map((source) => {
+                            const meta = getSourceMetadata(source);
+                            return (
+                              <Card
+                                key={source}
+                                padding={0.75}
+                                className="w-[10rem]"
+                              >
+                                <Content
+                                  icon={meta.icon}
+                                  title={meta.displayName}
+                                  sizePreset="main-ui"
+                                />
+                              </Card>
+                            );
+                          })}
+                        </Section>
 
                         <Button
                           href="/admin/indexing/status"

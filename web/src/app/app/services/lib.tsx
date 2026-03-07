@@ -1,12 +1,11 @@
-import { ReadonlyURLSearchParams } from "next/navigation";
-
-import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
 import {
-  WEB_SEARCH_TOOL_ID,
-  SEARCH_TOOL_ID,
-} from "@/app/app/components/tools/constants";
+  Filters,
+  DocumentInfoPacket,
+  StreamStopInfo,
+} from "@/lib/search/interfaces";
+import { handleSSEStream } from "@/lib/search/streamingUtils";
+import { FeedbackType } from "@/app/app/interfaces";
 import {
-  FeedbackType,
   BackendMessage,
   DocumentsResponse,
   FileDescriptor,
@@ -18,15 +17,12 @@ import {
   StreamingError,
   ToolCallMetadata,
   UserKnowledgeFilePacket,
-} from "@/app/app/interfaces";
-import {
-  Filters,
-  DocumentInfoPacket,
-  StreamStopInfo,
-} from "@/lib/search/interfaces";
-import { handleSSEStream } from "@/lib/search/streamingUtils";
-
+} from "../interfaces";
+import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
+import { ReadonlyURLSearchParams } from "next/navigation";
 import { SEARCH_PARAM_NAMES } from "./searchParams";
+import { WEB_SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
+import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { Packet } from "./streamingModels";
 
 export async function updateLlmOverrideForChatSession(
@@ -171,8 +167,8 @@ export async function* sendMessage({
         : null,
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     additional_context: additionalContext ?? null,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
   const body = JSON.stringify(payload);
@@ -308,8 +304,8 @@ export function processRawChatHistory(
   rawMessages: BackendMessage[],
   packets: Packet[][]
 ): Map<number, Message> {
-  const messages = new Map<number, Message>();
-  const parentMessageChildrenMap = new Map<number, number[]>();
+  const messages: Map<number, Message> = new Map();
+  const parentMessageChildrenMap: Map<number, number[]> = new Map();
 
   let agentMessageInd = 0;
 
@@ -370,12 +366,9 @@ export function processRawChatHistory(
       if (!parentMessageChildrenMap.has(messageInfo.parent_message)) {
         parentMessageChildrenMap.set(messageInfo.parent_message, []);
       }
-      const parentChildren = parentMessageChildrenMap.get(
-        messageInfo.parent_message
-      );
-      if (parentChildren) {
-        parentChildren.push(messageInfo.message_id);
-      }
+      parentMessageChildrenMap
+        .get(messageInfo.parent_message)!
+        .push(messageInfo.message_id);
     }
   });
 

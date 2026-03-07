@@ -248,7 +248,8 @@ def build_system_prompt(
             MEMORY_GUIDANCE,
             CRM_GUIDANCE,
         ]
-        system_prompt += TOOL_SECTION_HEADER + "\n".join(tool_sections)
+        system_prompt += TOOL_SECTION_HEADER + "
+".join(tool_sections)
         return system_prompt
 
     if tools:
