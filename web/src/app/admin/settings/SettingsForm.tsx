@@ -9,7 +9,7 @@ import LLMSelector from "@/components/llm/LLMSelector";
 import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
 import Title from "@/components/ui/title";
 import { toast } from "@/hooks/useToast";
-import { NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
+import { AuthType, NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { SettingsContext } from "@/providers/SettingsProvider";
 import Button from "@/refresh-components/buttons/Button";
@@ -21,6 +21,7 @@ import {
 } from "@/refresh-pages/crm/crmOptions";
 
 import { SvgAlertTriangle } from "@opal/icons";
+import { useUser } from "@/providers/UserProvider";
 
 import { AnonymousUserPath } from "./AnonymousUserPath";
 import { useVisionProviders } from "./hooks/useVisionProviders";
@@ -118,6 +119,7 @@ function parseMultiLineValues({
 
 export function SettingsForm() {
   const router = useRouter();
+  const { authTypeMetadata } = useUser();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [chatRetention, setChatRetention] = useState("");
@@ -172,6 +174,10 @@ export function SettingsForm() {
   if (!settings) {
     return null;
   }
+
+  const showInviteOnlyModeToggle =
+    authTypeMetadata.authType === AuthType.BASIC ||
+    authTypeMetadata.authType === AuthType.GOOGLE_OAUTH;
 
   async function updateSettingField(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -375,6 +381,16 @@ export function SettingsForm() {
           handleToggleSettingsField("anonymous_user_enabled", e.target.checked)
         }
       />
+      {showInviteOnlyModeToggle && (
+        <Checkbox
+          label="Whitelist / Invite-only"
+          sublabel="If set, only users on the invite list can join this workspace. If unset, users from your normal sign-up domain flow can still join even if invites exist."
+          checked={settings.invite_only_enabled}
+          onChange={(e) =>
+            handleToggleSettingsField("invite_only_enabled", e.target.checked)
+          }
+        />
+      )}
 
       <Checkbox
         label="Deep Research"

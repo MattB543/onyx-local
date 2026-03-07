@@ -1,5 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
-import { loginAs } from "@tests/e2e/utils/auth";
+import { loginAsWorkerUser } from "@tests/e2e/utils/auth";
 import { sendMessage } from "@tests/e2e/utils/chatActions";
 import { THEMES, setThemeBeforeNavigation } from "@tests/e2e/utils/theme";
 import { expectElementScreenshot } from "@tests/e2e/utils/visualRegression";
@@ -258,12 +258,24 @@ async function mockChatEndpointSequence(
   });
 }
 
+async function scrollChatTo(
+  page: Page,
+  position: "top" | "bottom"
+): Promise<void> {
+  const scrollContainer = page.getByTestId("chat-scroll-container");
+  await scrollContainer.evaluate(async (el, pos) => {
+    el.scrollTo({ top: pos === "top" ? 0 : el.scrollHeight });
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+  }, position);
+}
+
 async function screenshotChatContainer(
   page: Page,
   name: string
 ): Promise<void> {
   const container = page.locator("[data-main-container]");
   await expect(container).toBeVisible();
+  await scrollChatTo(page, "bottom");
   await expectElementScreenshot(container, { name });
 }
 
@@ -279,22 +291,21 @@ async function screenshotChatContainerTopAndBottom(
 ): Promise<void> {
   const container = page.locator("[data-main-container]");
   await expect(container).toBeVisible();
-  const scrollContainer = page.getByTestId("chat-scroll-container");
 
-  await scrollContainer.evaluate((el) => el.scrollTo({ top: 0 }));
+  await scrollChatTo(page, "top");
   await expectElementScreenshot(container, { name: `${name}-top` });
 
-  await scrollContainer.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await scrollChatTo(page, "bottom");
   await expectElementScreenshot(container, { name: `${name}-bottom` });
 }
 
 for (const theme of THEMES) {
   test.describe(`Chat Message Rendering (${theme} mode)`, () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
       turnCounter = 0;
       await page.context().clearCookies();
       await setThemeBeforeNavigation(page, theme);
-      await loginAs(page, "user");
+      await loginAsWorkerUser(page, testInfo.workerIndex);
     });
 
     test.describe("Short Messages", () => {
@@ -465,6 +476,54 @@ for (const theme of THEMES) {
     });
 
     test.describe("Web Search with Citations", () => {
+      const TOOLBAR_BUTTONS = [
+        "AgentMessage/copy-button",
+        "AgentMessage/like-button",
+        "AgentMessage/dislike-button",
+      ] as const;
+
+      async function screenshotToolbarButtonHoverStates(
+        page: Page,
+        namePrefix: string
+      ): Promise<void> {
+        const aiMessage = page.getByTestId("onyx-ai-message").first();
+        const toolbar = aiMessage.getByTestId("AgentMessage/toolbar");
+        await expect(toolbar).toBeVisible({ timeout: 10000 });
+
+        await toolbar.scrollIntoViewIfNeeded();
+        await page.evaluate(
+          () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+        );
+
+        for (const buttonTestId of TOOLBAR_BUTTONS) {
+          const button = aiMessage.getByTestId(buttonTestId);
+          await button.hover();
+          const buttonSlug = buttonTestId.split("/")[1];
+          await expectElementScreenshot(toolbar, {
+            name: `${namePrefix}-toolbar-${buttonSlug}-hover-${theme}`,
+          });
+        }
+
+        // Sources tag is located by role+name since SourceTag has no testid.
+        const sourcesButton = toolbar.getByRole("button", { name: "Sources" });
+        if (await sourcesButton.isVisible()) {
+          await sourcesButton.hover();
+          await expectElementScreenshot(toolbar, {
+            name: `${namePrefix}-toolbar-sources-hover-${theme}`,
+          });
+        }
+
+        // LLMPopover trigger is only rendered when the regenerate action is
+        // available (requires onRegenerate + parentMessage + llmManager props).
+        const llmTrigger = aiMessage.getByTestId("llm-popover-trigger");
+        if (await llmTrigger.isVisible()) {
+          await llmTrigger.hover();
+          await expectElementScreenshot(toolbar, {
+            name: `${namePrefix}-toolbar-llm-popover-hover-${theme}`,
+          });
+        }
+      }
+
       const WEB_SEARCH_DOCUMENTS: MockDocument[] = [
         {
           document_id: "web-doc-1",
@@ -542,6 +601,8 @@ Key advantages include:
           page,
           `chat-web-search-with-citations-${theme}`
         );
+
+        await screenshotToolbarButtonHoverStates(page, "chat-web-search");
       });
 
       test("internal document search response renders correctly", async ({
@@ -608,6 +669,8 @@ The platform architecture document provides additional context on how these impr
           page,
           `chat-internal-search-with-citations-${theme}`
         );
+
+        await screenshotToolbarButtonHoverStates(page, "chat-internal-search");
       });
     });
 
