@@ -30,24 +30,19 @@ export type StringWithDescription = {
 };
 
 export interface Option {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   label: string | ((currentCredential: Credential<any> | null) => string);
   name: string;
   description?:
     | string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     | ((currentCredential: Credential<any> | null) => string);
   query?: string;
   optional?: boolean;
   hidden?: boolean;
   visibleCondition?: (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     values: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentCredential: Credential<any> | null
   ) => boolean;
   wrapInCollapsible?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   disabled?: boolean | ((currentCredential: Credential<any> | null) => boolean);
 }
 
@@ -72,7 +67,6 @@ export interface ListOption extends Option {
 export interface TextOption extends Option {
   type: "text";
   default?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initial?: string | ((currentCredential: Credential<any> | null) => string);
   isTextArea?: boolean;
 }
@@ -143,9 +137,7 @@ export interface ConnectionConfiguration {
   )[];
   overrideDefaultFreq?: number;
   advancedValuesVisibleCondition?: (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     values: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentCredential: Credential<any> | null
   ) => boolean;
 }
@@ -529,69 +521,6 @@ export const connectorConfigs: Record<
       },
     ],
   },
-  google_calendar: {
-    description: "Configure Google Calendar connector",
-    values: [
-      {
-        type: "text",
-        label: "Calendar IDs",
-        name: "calendar_ids",
-        optional: true,
-        default: "",
-        isTextArea: true,
-        description:
-          "Optional comma-separated list of calendar IDs to index (e.g., primary, team@company.com). Leave empty to index all calendars accessible to the credential.",
-      },
-      {
-        type: "checkbox",
-        label: "Include declined events?",
-        name: "include_declined_events",
-        optional: true,
-        default: true,
-        description:
-          "If disabled, events where your own RSVP is declined are skipped.",
-      },
-      {
-        type: "checkbox",
-        label: "Include event descriptions?",
-        name: "include_event_descriptions",
-        optional: true,
-        default: true,
-        description:
-          "Include event description text in indexed content.",
-      },
-      {
-        type: "checkbox",
-        label: "Include attendees?",
-        name: "include_attendees",
-        optional: true,
-        default: true,
-        description:
-          "Include attendee names/emails and RSVP status in indexed content.",
-      },
-    ],
-    advanced_values: [
-      {
-        type: "number",
-        label: "Lookback Window (days)",
-        name: "lookback_days",
-        optional: true,
-        default: 30,
-        description:
-          "How many days into the past to keep in scope when indexing calendar events.",
-      },
-      {
-        type: "number",
-        label: "Lookahead Window (days)",
-        name: "lookahead_days",
-        optional: true,
-        default: 365,
-        description:
-          "How many days into the future to keep in scope when indexing calendar events.",
-      },
-    ],
-    overrideDefaultFreq: 60 * 60,
-  },
   gmail: {
     description: "Configure Gmail connector",
     values: [],
@@ -910,6 +839,42 @@ export const connectorConfigs: Record<
         description:
           "Index aspx-pages of all SharePoint sites defined above, even if a library or folder is specified.",
       },
+      {
+        type: "text",
+        query: "Microsoft Authority Host:",
+        label: "Authority Host",
+        name: "authority_host",
+        optional: true,
+        default: "https://login.microsoftonline.com",
+        description:
+          "The Microsoft identity authority host used for authentication. " +
+          "For most deployments, leave as default. " +
+          "For GCC High / DoD, use https://login.microsoftonline.us",
+      },
+      {
+        type: "text",
+        query: "Microsoft Graph API Host:",
+        label: "Graph API Host",
+        name: "graph_api_host",
+        optional: true,
+        default: "https://graph.microsoft.com",
+        description:
+          "The Microsoft Graph API host. " +
+          "For most deployments, leave as default. " +
+          "For GCC High / DoD, use https://graph.microsoft.us",
+      },
+      {
+        type: "text",
+        query: "SharePoint Domain Suffix:",
+        label: "SharePoint Domain Suffix",
+        name: "sharepoint_domain_suffix",
+        optional: true,
+        default: "sharepoint.com",
+        description:
+          "The domain suffix for SharePoint sites (e.g. sharepoint.com). " +
+          "For most deployments, leave as default. " +
+          "For GCC High, use sharepoint.us",
+      },
     ],
   },
   teams: {
@@ -924,7 +889,32 @@ export const connectorConfigs: Record<
         description: `Specify 0 or more Teams to index. For example, specifying the Team 'Support' for the 'onyxai' Org will cause us to only index messages sent in channels belonging to the 'Support' Team. If no Teams are specified, all Teams in your organization will be indexed.`,
       },
     ],
-    advanced_values: [],
+    advanced_values: [
+      {
+        type: "text",
+        query: "Microsoft Authority Host:",
+        label: "Authority Host",
+        name: "authority_host",
+        optional: true,
+        default: "https://login.microsoftonline.com",
+        description:
+          "The Microsoft identity authority host used for authentication. " +
+          "For most deployments, leave as default. " +
+          "For GCC High / DoD, use https://login.microsoftonline.us",
+      },
+      {
+        type: "text",
+        query: "Microsoft Graph API Host:",
+        label: "Graph API Host",
+        name: "graph_api_host",
+        optional: true,
+        default: "https://graph.microsoft.com",
+        description:
+          "The Microsoft Graph API host. " +
+          "For most deployments, leave as default. " +
+          "For GCC High / DoD, use https://graph.microsoft.us",
+      },
+    ],
   },
   discourse: {
     description: "Configure Discourse connector",
@@ -1770,7 +1760,6 @@ type ConnectorField = ConnectionConfiguration["values"][number];
 
 const buildInitialValuesForFields = (
   fields: ConnectorField[]
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> =>
   fields.reduce(
     (acc, field) => {
@@ -1787,13 +1776,11 @@ const buildInitialValuesForFields = (
       }
       return acc;
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     {} as Record<string, any>
   );
 
 export function createConnectorInitialValues(
   connector: ConfigurableSources
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> & AccessTypeGroupSelectorFormType {
   const configuration = connectorConfigs[connector];
 
@@ -1808,7 +1795,6 @@ export function createConnectorInitialValues(
 
 export function createConnectorValidationSchema(
   connector: ConfigurableSources
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Yup.ObjectSchema<Record<string, any>> {
   const configuration = connectorConfigs[connector];
 
@@ -1817,7 +1803,6 @@ export function createConnectorValidationSchema(
     name: Yup.string().required("Connector Name is required"),
     ...[...configuration.values, ...configuration.advanced_values].reduce(
       (acc, field) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let schema: any =
           field.type === "select"
             ? Yup.string()
@@ -1838,7 +1823,6 @@ export function createConnectorValidationSchema(
         acc[field.name] = schema;
         return acc;
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {} as Record<string, any>
     ),
     // These are advanced settings
@@ -1928,20 +1912,11 @@ export interface GoogleDriveConfig {
   shared_folder_urls?: string;
 }
 
-export interface GoogleCalendarConfig {
-  calendar_ids?: string;
-  lookback_days?: number;
-  lookahead_days?: number;
-  include_declined_events?: boolean;
-  include_event_descriptions?: boolean;
-  include_attendees?: boolean;
-}
+export interface GmailConfig {}
 
-export type GmailConfig = Record<string, never>;
+export interface BookstackConfig {}
 
-export type BookstackConfig = Record<string, never>;
-
-export type OutlineConfig = Record<string, never>;
+export interface OutlineConfig {}
 
 export interface ConfluenceConfig {
   wiki_base: string;
@@ -1967,10 +1942,15 @@ export interface SharepointConfig {
   sites?: string[];
   include_site_pages?: boolean;
   include_site_documents?: boolean;
+  authority_host?: string;
+  graph_api_host?: string;
+  sharepoint_domain_suffix?: string;
 }
 
 export interface TeamsConfig {
   teams?: string[];
+  authority_host?: string;
+  graph_api_host?: string;
 }
 
 export interface DiscourseConfig {
@@ -1989,7 +1969,7 @@ export interface DrupalWikiConfig {
   include_attachments?: boolean;
 }
 
-export type ProductboardConfig = Record<string, never>;
+export interface ProductboardConfig {}
 
 export interface SlackConfig {
   workspace: string;
@@ -2002,7 +1982,7 @@ export interface SlabConfig {
   base_url: string;
 }
 
-export type GuruConfig = Record<string, never>;
+export interface GuruConfig {}
 
 export interface GongConfig {
   workspaces?: string[];
@@ -2060,7 +2040,7 @@ export interface ZendeskConfig {
   calls_per_minute?: number;
 }
 
-export type DropboxConfig = Record<string, never>;
+export interface DropboxConfig {}
 
 export interface S3Config {
   bucket_type: "s3";
@@ -2101,15 +2081,15 @@ export interface AsanaConfig {
   asana_team_id?: string;
 }
 
-export type FreshdeskConfig = Record<string, never>;
+export interface FreshdeskConfig {}
 
-export type FirefliesConfig = Record<string, never>;
+export interface FirefliesConfig {}
 
 export interface MediaWikiConfig extends MediaWikiBaseConfig {
   hostname: string;
 }
 
-export type WikipediaConfig = MediaWikiBaseConfig;
+export interface WikipediaConfig extends MediaWikiBaseConfig {}
 
 export interface ImapConfig {
   host: string;

@@ -42,4 +42,9 @@ export interface InputComboBoxProps
   separatorLabel?: string;
   /** Callback to clear selection — renders a "Clear filter" row in the dropdown */
   onClear?: () => void;
+  /**
+   * When true, keep non-matching options visible under a separator while searching.
+   * Defaults to false so search results are strictly filtered.
+   */
+  showOtherOptions?: boolean;
 }

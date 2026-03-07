@@ -18,14 +18,9 @@ import {
   StreamingError,
   ToolCallMetadata,
   UserKnowledgeFilePacket,
-} from "@/app/app/interfaces";
-import {
-  Filters,
-  DocumentInfoPacket,
-  StreamStopInfo,
-} from "@/lib/search/interfaces";
-import { handleSSEStream } from "@/lib/search/streamingUtils";
-
+} from "../interfaces";
+import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
+import { ReadonlyURLSearchParams } from "next/navigation";
 import { SEARCH_PARAM_NAMES } from "./searchParams";
 import { Packet } from "./streamingModels";
 
@@ -130,6 +125,9 @@ export interface SendMessageParams {
   temperature?: number;
   // Origin of the message for telemetry tracking
   origin?: MessageOrigin;
+  // Additional context injected into the LLM call but not stored/shown in chat.
+  // Used e.g. by Chrome extension "Read this tab" feature.
+  additionalContext?: string;
 }
 
 export async function* sendMessage({
@@ -146,6 +144,7 @@ export async function* sendMessage({
   modelVersion,
   temperature,
   origin,
+  additionalContext,
 }: SendMessageParams): AsyncGenerator<PacketType, void, unknown> {
   // Build payload for new send-chat-message API
   const payload = {
@@ -168,6 +167,7 @@ export async function* sendMessage({
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    additional_context: additionalContext ?? null,
   };
 
   const body = JSON.stringify(payload);
@@ -306,12 +306,12 @@ export function processRawChatHistory(
   const messages = new Map<number, Message>();
   const parentMessageChildrenMap = new Map<number, number[]>();
 
-  let assistantMessageInd = 0;
+  let agentMessageInd = 0;
 
   rawMessages.forEach((messageInfo, _ind) => {
-    const packetsForMessage = packets[assistantMessageInd];
+    const packetsForMessage = packets[agentMessageInd];
     if (messageInfo.message_type === "assistant") {
-      assistantMessageInd++;
+      agentMessageInd++;
     }
 
     const hasContextDocs = (messageInfo?.context_docs || []).length > 0;
@@ -334,11 +334,11 @@ export function processRawChatHistory(
       message: messageInfo.message,
       type: messageInfo.message_type as "user" | "assistant",
       files: messageInfo.files,
-      alternateAssistantID:
+      alternateAgentID:
         messageInfo.alternate_assistant_id !== null
           ? Number(messageInfo.alternate_assistant_id)
           : null,
-      // only include these fields if this is an assistant message so that
+      // only include these fields if this is an agent message so that
       // this is identical to what is computed at streaming time
       ...(messageInfo.message_type === "assistant"
         ? {

@@ -1,22 +1,15 @@
 "use client";
 
-import React, {
-  createContext,
-  forwardRef,
-  useCallback,
-  useContext,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import type { IconProps } from "@opal/types";
-import Text from "@/refresh-components/texts/Text";
+import type { IconFunctionComponent } from "@opal/types";
 import { Button } from "@opal/components";
+import { Content } from "@opal/layouts";
 import { SvgX } from "@opal/icons";
 import { WithoutStyles } from "@/types";
 import { Section, SectionProps } from "@/layouts/general-layouts";
+import useContainerCenter from "@/hooks/useContainerCenter";
 
 /**
  * Modal Root Component
@@ -44,7 +37,7 @@ const ModalRoot = DialogPrimitive.Root;
  * <Modal.Overlay />
  * ```
  */
-const ModalOverlay = forwardRef<
+const ModalOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   WithoutStyles<React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>>
 >(({ ...props }, ref) => (
@@ -72,10 +65,10 @@ interface ModalContextValue {
   setHasDescription: (value: boolean) => void;
 }
 
-const ModalContext = createContext<ModalContextValue | null>(null);
+const ModalContext = React.createContext<ModalContextValue | null>(null);
 
 const useModalContext = () => {
-  const context = useContext(ModalContext);
+  const context = React.useContext(ModalContext);
   if (!context) {
     throw new Error("Modal compound components must be used within Modal");
   }
@@ -121,7 +114,7 @@ const heightClasses = {
  * </Modal.Content>
  * ```
  */
-interface ModalContentProps
+export interface ModalContentProps
   extends WithoutStyles<
     React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
   > {
@@ -134,7 +127,7 @@ interface ModalContentProps
    *  Stays inside DialogPrimitive.Content for proper focus management. */
   bottomSlot?: React.ReactNode;
 }
-const ModalContent = forwardRef<
+const ModalContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   ModalContentProps
 >(
@@ -151,19 +144,19 @@ const ModalContent = forwardRef<
     },
     ref
   ) => {
-    const closeButtonRef = useRef<HTMLDivElement>(null);
-    const [hasAttemptedClose, setHasAttemptedClose] = useState(false);
-    const [hasDescription, setHasDescription] = useState(false);
-    const hasUserTypedRef = useRef(false);
+    const closeButtonRef = React.useRef<HTMLDivElement>(null);
+    const [hasAttemptedClose, setHasAttemptedClose] = React.useState(false);
+    const [hasDescription, setHasDescription] = React.useState(false);
+    const hasUserTypedRef = React.useRef(false);
 
     // Reset state when modal closes or opens
-    const resetState = useCallback(() => {
+    const resetState = React.useCallback(() => {
       setHasAttemptedClose(false);
       hasUserTypedRef.current = false;
     }, []);
 
     // Handle input events to detect typing
-    const handleInput = useCallback((e: Event) => {
+    const handleInput = React.useCallback((e: Event) => {
       // Early exit if already detected typing (performance optimization)
       if (hasUserTypedRef.current) {
         return;
@@ -201,10 +194,10 @@ const ModalContent = forwardRef<
     }, []);
 
     // Keep track of the container node for cleanup
-    const containerNodeRef = useRef<HTMLDivElement | null>(null);
+    const containerNodeRef = React.useRef<HTMLDivElement | null>(null);
 
     // Callback ref to attach event listener when element mounts
-    const contentRef = useCallback(
+    const contentRef = React.useCallback(
       (node: HTMLDivElement | null) => {
         // Cleanup previous listener if exists
         if (containerNodeRef.current) {
@@ -227,12 +220,12 @@ const ModalContent = forwardRef<
     );
 
     // Check if user has typed anything
-    const hasModifiedInputs = useCallback(() => {
+    const hasModifiedInputs = React.useCallback(() => {
       return hasUserTypedRef.current;
     }, []);
 
     // Handle escape key and outside clicks
-    const handleInteractOutside = useCallback(
+    const handleInteractOutside = React.useCallback(
       (e: Event) => {
         // If preventAccidentalClose is disabled, always allow immediate close
         if (!preventAccidentalClose) {
@@ -272,11 +265,29 @@ const ModalContent = forwardRef<
       contentRef(node);
     };
 
+    const { centerX, centerY, hasContainerCenter } = useContainerCenter();
+
     const animationClasses = cn(
       "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
       "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
       "data-[state=open]:slide-in-from-top-1/2 data-[state=closed]:slide-out-to-top-1/2",
       "duration-200"
+    );
+
+    const containerStyle: React.CSSProperties | undefined = hasContainerCenter
+      ? ({
+          left: centerX,
+          top: centerY,
+          "--tw-enter-translate-x": "-50%",
+          "--tw-exit-translate-x": "-50%",
+          "--tw-enter-translate-y": "-50%",
+          "--tw-exit-translate-y": "-50%",
+        } as React.CSSProperties)
+      : undefined;
+
+    const positionClasses = cn(
+      "fixed -translate-x-1/2 -translate-y-1/2",
+      !hasContainerCenter && "left-1/2 top-1/2"
     );
 
     const dialogEventHandlers = {
@@ -323,8 +334,9 @@ const ModalContent = forwardRef<
               {...dialogEventHandlers}
             >
               <div
+                style={containerStyle}
                 className={cn(
-                  "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+                  positionClasses,
                   "z-modal",
                   "flex flex-col gap-4 items-center",
                   "max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem)]",
@@ -342,8 +354,10 @@ const ModalContent = forwardRef<
             // Without bottomSlot: original single-element rendering
             <DialogPrimitive.Content
               ref={handleRef}
+              style={containerStyle}
               className={cn(
-                "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden",
+                positionClasses,
+                "overflow-hidden",
                 "z-modal",
                 background === "gray"
                   ? "bg-background-tint-01"
@@ -374,9 +388,16 @@ ModalContent.displayName = DialogPrimitive.Content.displayName;
  * (icon, title, description, close button) are now controlled via this single
  * component using props, so no additional subcomponents are required.
  *
+ * When `icon` is omitted the header renders a minimal variant: just the
+ * title + description with the close button inline to the right of the title.
+ * This is JUST to be used for preview windows
+ *
  * @example
  * ```tsx
  * <Modal.Header icon={SvgWarning} title="Confirm Action" description="Are you sure?" />
+ *
+ * // Minimal variant (no icon)
+ * <Modal.Header title="Confirm Action" description="Are you sure?" />
  *
  * // With custom content
  * // Children render below the provided title/description stack.
@@ -386,69 +407,85 @@ ModalContent.displayName = DialogPrimitive.Content.displayName;
  * ```
  */
 interface ModalHeaderProps extends WithoutStyles<SectionProps> {
-  icon: React.FunctionComponent<IconProps>;
+  icon?: IconFunctionComponent;
+  moreIcon1?: IconFunctionComponent;
+  moreIcon2?: IconFunctionComponent;
   title: string;
   description?: string;
   onClose?: () => void;
 }
-const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(
-  ({ icon: Icon, title, description, onClose, children, ...props }, ref) => {
+const ModalHeader = React.forwardRef<HTMLDivElement, ModalHeaderProps>(
+  (
+    {
+      icon,
+      moreIcon1,
+      moreIcon2,
+      title,
+      description,
+      onClose,
+      children,
+      ...props
+    },
+    ref
+  ) => {
     const { closeButtonRef, setHasDescription } = useModalContext();
 
-    // useLayoutEffect ensures aria-describedby is set before paint,
-    // so screen readers announce the description when the dialog opens
-    useLayoutEffect(() => {
+    React.useLayoutEffect(() => {
       setHasDescription(!!description);
     }, [description, setHasDescription]);
 
+    const closeButton = onClose && (
+      <div
+        tabIndex={-1}
+        ref={closeButtonRef as React.RefObject<HTMLDivElement>}
+      >
+        <DialogPrimitive.Close asChild>
+          <Button
+            icon={SvgX}
+            prominence="tertiary"
+            size="sm"
+            onClick={onClose}
+          />
+        </DialogPrimitive.Close>
+      </div>
+    );
+
     return (
       <Section ref={ref} padding={1} alignItems="start" height="fit" {...props}>
-        <Section gap={0.5}>
-          <Section
-            gap={0}
-            padding={0}
-            flexDirection="row"
-            justifyContent="between"
-          >
-            {/*
-              The `h-[1.5rem]` and `w-[1.5rem]` were added as backups here.
-              However, prop-resolution technically resolves to choosing classNames over size props, so technically the `size={24}` is the backup.
-              We specify both to be safe.
-
-              # Note
-              1.5rem === 24px
-            */}
-            <Icon className="stroke-text-04 h-[1.5rem] w-[1.5rem]" size={24} />
-            {onClose && (
-              <div
-                tabIndex={-1}
-                ref={closeButtonRef as React.RefObject<HTMLDivElement>}
-              >
-                <DialogPrimitive.Close asChild>
-                  <Button
-                    icon={SvgX}
-                    prominence="tertiary"
-                    size="sm"
-                    onClick={onClose}
-                  />
-                </DialogPrimitive.Close>
-              </div>
-            )}
-          </Section>
-
-          <Section alignItems="start" gap={0}>
+        <Section
+          flexDirection="row"
+          justifyContent="between"
+          alignItems="start"
+          gap={0}
+          padding={0}
+        >
+          <div className="relative w-full">
+            {/* Close button is absolutely positioned because:
+               1. Figma mocks place it overlapping the top-right of the content area
+               2. Using ContentAction with rightChildren causes the description
+                  to wrap to the second line early due to the button reserving space */}
+            <div className="absolute top-0 right-0">{closeButton}</div>
             <DialogPrimitive.Title asChild>
-              <Text headingH3>{title}</Text>
+              <div>
+                <Content
+                  icon={icon}
+                  moreIcon1={moreIcon1}
+                  moreIcon2={moreIcon2}
+                  title={title}
+                  description={description}
+                  sizePreset="section"
+                  variant="heading"
+                />
+                {description && (
+                  <DialogPrimitive.Description className="hidden">
+                    {description}
+                  </DialogPrimitive.Description>
+                )}
+              </div>
             </DialogPrimitive.Title>
-            {description && (
-              <DialogPrimitive.Description asChild>
-                <Text secondaryBody text03>
-                  {description}
-                </Text>
-              </DialogPrimitive.Description>
-            )}
-          </Section>
+          </div>
         </Section>
+
         {children}
       </Section>
     );
@@ -471,17 +508,23 @@ ModalHeader.displayName = "ModalHeader";
 interface ModalBodyProps extends WithoutStyles<SectionProps> {
   twoTone?: boolean;
 }
-const ModalBody = forwardRef<HTMLDivElement, ModalBodyProps>(
+const ModalBody = React.forwardRef<HTMLDivElement, ModalBodyProps>(
   ({ twoTone = true, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(
           twoTone && "bg-background-tint-01",
-          "h-full min-h-0 overflow-y-auto w-full"
+          "flex-auto min-h-0 overflow-y-auto w-full"
         )}
       >
-        <Section padding={1} gap={1} alignItems="start" {...props}>
+        <Section
+          height="auto"
+          padding={1}
+          gap={1}
+          alignItems="start"
+          {...props}
+        >
           {children}
         </Section>
       </div>
@@ -504,7 +547,7 @@ ModalBody.displayName = "ModalBody";
  * </Modal.Footer>
  * ```
  */
-const ModalFooter = forwardRef<
+const ModalFooter = React.forwardRef<
   HTMLDivElement,
   WithoutStyles<SectionProps>
 >(({ ...props }, ref) => {

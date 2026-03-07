@@ -1,10 +1,3 @@
-import { redirect } from "next/navigation";
-
-import SignInButton from "@/app/auth/login/SignInButton";
-import AuthErrorDisplay from "@/components/auth/AuthErrorDisplay";
-import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
-import { HealthCheckBanner } from "@/components/health/healthcheck";
-import { AuthType } from "@/lib/constants";
 import { User } from "@/lib/types";
 import {
   getCurrentUserSS,
@@ -12,12 +5,15 @@ import {
   AuthTypeMetadata,
   getAuthUrlSS,
 } from "@/lib/userSS";
-
+import { redirect } from "next/navigation";
 import EmailPasswordForm from "../login/EmailPasswordForm";
-
+import SignInButton from "@/app/auth/login/SignInButton";
+import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
+import AuthErrorDisplay from "@/components/auth/AuthErrorDisplay";
+import { AuthType } from "@/lib/constants";
 
 const Page = async (props: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) => {
   const searchParams = await props.searchParams;
   const nextUrl = Array.isArray(searchParams?.next)
@@ -68,7 +64,6 @@ const Page = async (props: {
 
   return (
     <AuthFlowContainer authState="join">
-      <HealthCheckBanner />
       <AuthErrorDisplay searchParams={searchParams} />
 
       <>
