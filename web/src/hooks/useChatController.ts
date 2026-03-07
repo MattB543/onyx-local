@@ -572,6 +572,14 @@ export default function useChatController({
         ? messageToResend?.message || message
         : message;
 
+      // When editing a message that had files attached, preserve the original files.
+      // Skip for regeneration — the regeneration path reuses the existing user node
+      // (and its files), so merging here would send duplicates.
+      const effectiveFileDescriptors = [
+        ...projectFilesToFileDescriptors(currentMessageFiles),
+        ...(!regenerationRequest ? messageToResend?.files ?? [] : []),
+      ];
+
       updateChatStateAction(frozenSessionId, "loading");
 
       // find the parent
@@ -610,7 +618,7 @@ export default function useChatController({
         const result = buildImmediateMessages(
           parentNodeIdForMessage,
           currMessage,
-          projectFilesToFileDescriptors(currentMessageFiles),
+          effectiveFileDescriptors,
           messageToResend
         );
         initialUserNode = result.initialUserNode;
@@ -648,7 +656,7 @@ export default function useChatController({
 
       let finalMessage: BackendMessage | null = null;
       let toolCall: ToolCallMetadata | null = null;
-      let files = projectFilesToFileDescriptors(currentMessageFiles);
+      let files = effectiveFileDescriptors;
       let packets: Packet[] = [];
       let packetsVersion = 0;
 
@@ -686,7 +694,7 @@ export default function useChatController({
         updateCurrentMessageFIFO(stack, {
           signal: controller.signal,
           message: currMessage,
-          fileDescriptors: projectFilesToFileDescriptors(currentMessageFiles),
+          fileDescriptors: effectiveFileDescriptors,
           parentMessageId: (() => {
             const parentId =
               regenerationRequest?.parentMessage.messageId ||
@@ -759,7 +767,7 @@ export default function useChatController({
                 posthog.capture("extension_chat_query", {
                   extension_context: extensionContext,
                   assistant_id: liveAssistant?.id,
-                  has_files: currentMessageFiles.length > 0,
+                  has_files: effectiveFileDescriptors.length > 0,
                   deep_research: deepResearch,
                 });
               }
@@ -904,12 +912,7 @@ export default function useChatController({
               nodeId: initialUserNode.nodeId,
               message: currMessage,
               type: "user",
-              files: currentMessageFiles.map((file) => ({
-                id: file.file_id,
-                type: file.chat_file_type,
-                name: file.name,
-                user_file_id: file.id,
-              })),
+              files: effectiveFileDescriptors,
               toolCall: null,
               parentNodeId: parentMessage?.nodeId || SYSTEM_NODE_ID,
               packets: [],

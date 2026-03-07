@@ -30,7 +30,7 @@ import { getFormattedDateRangeString } from "@/lib/dateUtils";
 import { FilterManager, LlmManager, useFederatedConnectors } from "@/lib/hooks";
 import { useForcedTools } from "@/lib/hooks/useForcedTools";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
-import { truncateString, cn } from "@/lib/utils";
+import { truncateString, cn, isImageFile } from "@/lib/utils";
 import { useAppMode } from "@/providers/AppModeProvider";
 import { useProjectsContext } from "@/providers/ProjectsContext";
 import { useQueryController } from "@/providers/QueryControllerProvider";
@@ -386,6 +386,11 @@ const AppInputBar = memo(
     const shouldCompactImages = useMemo(() => {
       return currentMessageFiles.length > 1;
     }, [currentMessageFiles]);
+
+    const hasImageFiles = useMemo(
+      () => currentMessageFiles.some((f) => isImageFile(f.name)),
+      [currentMessageFiles]
+    );
 
     // Check if the assistant has search tools available (internal search or web search)
     // AND if deep research is globally enabled in admin settings
@@ -759,7 +764,7 @@ const AppInputBar = memo(
                 >
                   <LLMPopover
                     llmManager={llmManager}
-                    requiresImageGeneration={false}
+                    requiresImageInput={hasImageFiles}
                     disabled={disabled}
                   />
                 </div>
