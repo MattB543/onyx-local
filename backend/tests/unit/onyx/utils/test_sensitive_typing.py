@@ -8,8 +8,31 @@ These tests show what mypy will catch when SensitiveValue is misused.
 
 from typing import Any
 
+import pytest
+
+from onyx.utils.variable_functionality import fetch_versioned_implementation
+
 # This file demonstrates what mypy will catch.
 # The commented-out code below would produce type errors.
+
+_TEST_ENCRYPTION_KEY = "test-encrypt-key-for-unittests!"  # exactly 32 bytes / 256-bit AES
+
+
+@pytest.fixture(autouse=True)
+def _provide_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure ENCRYPTION_KEY_SECRET is set so the EE encryption path works."""
+    monkeypatch.setattr(
+        "onyx.configs.app_configs.ENCRYPTION_KEY_SECRET",
+        _TEST_ENCRYPTION_KEY,
+    )
+    try:
+        import ee.onyx.utils.encryption as ee_enc
+
+        monkeypatch.setattr(ee_enc, "ENCRYPTION_KEY_SECRET", _TEST_ENCRYPTION_KEY)
+        ee_enc._get_trimmed_key.cache_clear()
+    except (ModuleNotFoundError, AttributeError):
+        pass
+    fetch_versioned_implementation.cache_clear()
 
 
 def demonstrate_correct_usage() -> None:

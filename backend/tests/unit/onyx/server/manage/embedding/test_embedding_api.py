@@ -2,6 +2,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
 from onyx.db.models import SearchSettings
 from onyx.server.manage.embedding.api import list_embedding_models
 from onyx.server.manage.embedding.api import list_embedding_providers
@@ -9,7 +11,36 @@ from onyx.utils.encryption import decrypt_bytes_to_string
 from onyx.utils.encryption import encrypt_string_to_bytes
 from onyx.utils.encryption import mask_string
 from onyx.utils.sensitive import SensitiveValue
+from onyx.utils.variable_functionality import fetch_versioned_implementation
 from shared_configs.enums import EmbeddingProvider
+
+_TEST_ENCRYPTION_KEY = "test-encrypt-key-for-unittests!"  # exactly 32 bytes / 256-bit AES
+
+
+@pytest.fixture(autouse=True)
+def _provide_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure ENCRYPTION_KEY_SECRET is set so the EE encryption path works.
+
+    When EE mode is active, the EE ``_encrypt_string`` implementation
+    requires a non-empty ``ENCRYPTION_KEY_SECRET`` even when
+    ``SECRET_ENCRYPTION_MODE=disabled``.  Patching the value in both
+    the config module and the EE encryption module makes these tests
+    resilient regardless of the EE flag state.
+    """
+    monkeypatch.setattr(
+        "onyx.configs.app_configs.ENCRYPTION_KEY_SECRET",
+        _TEST_ENCRYPTION_KEY,
+    )
+    try:
+        import ee.onyx.utils.encryption as ee_enc
+
+        monkeypatch.setattr(ee_enc, "ENCRYPTION_KEY_SECRET", _TEST_ENCRYPTION_KEY)
+        ee_enc._get_trimmed_key.cache_clear()
+    except (ModuleNotFoundError, AttributeError):
+        pass
+    # Clear the versioned-implementation cache so a fresh lookup picks up
+    # the patched value if the EE path is selected.
+    fetch_versioned_implementation.cache_clear()
 
 
 def _build_sensitive_value(raw_value: str) -> SensitiveValue[str]:
