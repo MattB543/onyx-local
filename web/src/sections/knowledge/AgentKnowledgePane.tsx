@@ -2,6 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as GeneralLayouts from "@/layouts/general-layouts";
+import { Content } from "@opal/layouts";
 import * as TableLayouts from "@/layouts/table-layouts";
 import * as InputLayouts from "@/layouts/input-layouts";
 import { Card } from "@/refresh-components/cards";
@@ -91,7 +92,6 @@ function KnowledgeSidebar({
         <>
           <LineItem
             icon={SvgFolder}
-            description="(deprecated)"
             onClick={onNavigateToDocumentSets}
             selected={activeView === "document-sets"}
             emphasized={
@@ -312,10 +312,11 @@ function DocumentSetsTableContent({
       header: "Name",
       sortable: true,
       render: (ds) => (
-        <GeneralLayouts.LineItemLayout
+        <Content
           icon={SvgFolder}
           title={ds.name}
-          variant="secondary"
+          sizePreset="main-ui"
+          variant="section"
         />
       ),
     },
@@ -437,10 +438,11 @@ function RecentFilesTableContent({
       header: "Name",
       sortable: true,
       render: (file) => (
-        <GeneralLayouts.LineItemLayout
+        <Content
           icon={SvgFiles}
           title={file.name}
-          variant="secondary"
+          sizePreset="main-ui"
+          variant="section"
         />
       ),
     },
@@ -665,7 +667,6 @@ const KnowledgeAddView = memo(function KnowledgeAddView({
         {vectorDbEnabled && (
           <LineItem
             icon={SvgFolder}
-            description="(deprecated)"
             onClick={onNavigateToDocumentSets}
             emphasized={selectedDocumentSetIds.length > 0}
             aria-label="knowledge-add-document-sets"
@@ -1130,9 +1131,11 @@ export default function AgentKnowledgePane({
 
   return (
     <GeneralLayouts.Section gap={0.5} alignItems="stretch" height="auto">
-      <InputLayouts.Title
+      <Content
         title="Knowledge"
         description="Add specific connectors and documents for this agent to use to inform its responses."
+        sizePreset="main-content"
+        variant="section"
       />
 
       <Card>

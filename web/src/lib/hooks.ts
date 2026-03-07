@@ -23,23 +23,22 @@ import {
 } from "react";
 import { DateRangePickerValue } from "@/components/dateRangeSelectors/AdminDateRangeSelector";
 import { SourceMetadata } from "./search/interfaces";
-import { parseLlmDescriptor } from "./llm/utils";
+import { parseLlmDescriptor } from "./llmConfig/utils";
 import { ChatSession } from "@/app/app/interfaces";
-import { AllUsersResponse } from "./types";
 import { Credential } from "./connectors/credentials";
 import { SettingsContext } from "@/providers/SettingsProvider";
 import {
   MinimalPersonaSnapshot,
   PersonaLabel,
 } from "@/app/admin/assistants/interfaces";
-import { LLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+import { DefaultModel, LLMProviderDescriptor } from "@/interfaces/llm";
 import { isAnthropic } from "@/app/admin/configuration/llm/utils";
 import { getSourceMetadataForSources } from "./sources";
 import { AuthType, NEXT_PUBLIC_CLOUD_ENABLED } from "./constants";
 import { useUser } from "@/providers/UserProvider";
 import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { updateTemperatureOverrideForChatSession } from "@/app/app/services/lib";
-import { useLLMProviders } from "./hooks/useLLMProviders";
+import { useLLMProviders } from "@/hooks/useLLMProviders";
 
 const CREDENTIAL_URL = "/api/manage/admin/credential";
 
@@ -259,19 +258,27 @@ export const useLabels = () => {
     return mutate("/api/persona/labels");
   };
 
-  const createLabel = async (name: string) => {
+  const createLabel = async (name: string): Promise<PersonaLabel | null> => {
     const response = await fetch("/api/persona/labels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
 
-    if (response.ok) {
-      const newLabel = await response.json();
-      mutate("/api/persona/labels", [...(labels || []), newLabel], false);
+    if (!response.ok) {
+      return null;
     }
 
-    return response;
+    const newLabel: PersonaLabel = await response.json();
+    mutate(
+      "/api/persona/labels",
+      (currentLabels: PersonaLabel[] | undefined) => [
+        ...(currentLabels || []),
+        newLabel,
+      ],
+      false
+    );
+    return newLabel;
   };
 
   const updateLabel = async (id: number, name: string) => {
@@ -526,30 +533,106 @@ This approach ensures that user preferences are maintained for existing chats wh
 providing appropriate defaults for new conversations based on the available tools.
 */
 
-function getDefaultLlmDescriptor(
-  llmProviders: LLMProviderDescriptor[]
+export function getDefaultLlmDescriptor(
+  llmProviders: LLMProviderDescriptor[],
+  defaultText?: DefaultModel | null
 ): LlmDescriptor | null {
-  const defaultProvider = llmProviders.find(
-    (provider) => provider.is_default_provider
-  );
-  if (defaultProvider) {
-    return {
-      name: defaultProvider.name,
-      provider: defaultProvider.provider,
-      modelName: defaultProvider.default_model_name,
-    };
+  if (defaultText) {
+    const provider = llmProviders.find((p) => p.id === defaultText.provider_id);
+    if (provider) {
+      return {
+        name: provider.name,
+        provider: provider.provider,
+        modelName: defaultText.model_name,
+      };
+    }
   }
+  // Fallback: first provider with visible models
   const firstLlmProvider = llmProviders.find(
     (provider) => provider.model_configurations.length > 0
   );
   if (firstLlmProvider) {
+    const firstModel = firstLlmProvider.model_configurations.find(
+      (m) => m.is_visible
+    );
     return {
       name: firstLlmProvider.name,
       provider: firstLlmProvider.provider,
-      modelName: firstLlmProvider.default_model_name,
+      modelName: firstModel?.name ?? "",
     };
   }
   return null;
+}
+
+export function getValidLlmDescriptorForProviders(
+  modelName: string | null | undefined,
+  llmProviders: LLMProviderDescriptor[] | undefined | null
+): LlmDescriptor {
+  // Return early if providers haven't loaded yet (undefined/null)
+  // Empty arrays are valid (user has no provider access for this assistant)
+  if (llmProviders === undefined || llmProviders === null) {
+    return { name: "", provider: "", modelName: "" };
+  }
+
+  if (modelName) {
+    const model = parseLlmDescriptor(modelName);
+    // If we have no parsed modelName, try to find the provider by the raw modelName string
+    if (!(model.modelName && model.modelName.length > 0)) {
+      const provider = llmProviders.find((p) =>
+        p.model_configurations
+          .map((modelConfiguration) => modelConfiguration.name)
+          .includes(modelName)
+      );
+      if (provider) {
+        return {
+          modelName: modelName,
+          name: provider.name,
+          provider: provider.provider,
+        };
+      }
+    }
+
+    // If we have parsed provider info, try to find that specific provider.
+    // This ensures we don't incorrectly match a model to the wrong provider
+    // when the same model name exists across multiple providers (e.g., gpt-5 in Azure and OpenAI)
+    if (model.provider && model.provider.length > 0) {
+      const matchingProvider = llmProviders.find(
+        (p) =>
+          p.provider === model.provider &&
+          p.model_configurations
+            .map((modelConfiguration) => modelConfiguration.name)
+            .includes(model.modelName)
+      );
+      if (matchingProvider) {
+        return {
+          ...model,
+          name: matchingProvider.name,
+          provider: matchingProvider.provider,
+        };
+      }
+      // Provider info was present but not found - fall through to default
+    } else {
+      // Only search by model name when no provider info was parsed
+      const provider = llmProviders.find((p) =>
+        p.model_configurations
+          .map((modelConfiguration) => modelConfiguration.name)
+          .includes(model.modelName)
+      );
+
+      if (provider) {
+        return { ...model, provider: provider.provider, name: provider.name };
+      }
+    }
+  }
+
+  // Model not found in available providers - fall back to default model
+  return (
+    getDefaultLlmDescriptor(llmProviders) ?? {
+      name: "",
+      provider: "",
+      modelName: "",
+    }
+  );
 }
 
 export function useLlmManager(
@@ -560,19 +643,25 @@ export function useLlmManager(
 
   // Get all user-accessible providers via SWR (general providers - no persona filter)
   // This includes public + all restricted providers user can access via groups
-  const { llmProviders: allUserProviders, isLoading: isLoadingAllProviders } =
-    useLLMProviders();
+  const {
+    llmProviders: allUserProviders,
+    defaultText: allUserDefaultText,
+    isLoading: isLoadingAllProviders,
+  } = useLLMProviders();
   // Fetch persona-specific providers to enforce RBAC restrictions per assistant
   // Only fetch if we have an assistant selected
   const personaId =
     liveAssistant?.id !== undefined ? liveAssistant.id : undefined;
   const {
     llmProviders: personaProviders,
+    defaultText: personaDefaultText,
     isLoading: isLoadingPersonaProviders,
   } = useLLMProviders(personaId);
 
   const llmProviders =
     personaProviders !== undefined ? personaProviders : allUserProviders;
+  const defaultText =
+    personaProviders !== undefined ? personaDefaultText : allUserDefaultText;
 
   const [userHasManuallyOverriddenLLM, setUserHasManuallyOverriddenLLM] =
     useState(false);
@@ -631,7 +720,7 @@ export function useLlmManager(
       } else if (user?.preferences?.default_model) {
         setCurrentLlm(getValidLlmDescriptor(user.preferences.default_model));
       } else {
-        const defaultLlm = getDefaultLlmDescriptor(llmProviders);
+        const defaultLlm = getDefaultLlmDescriptor(llmProviders, defaultText);
         if (defaultLlm) {
           setCurrentLlm(defaultLlm);
         }
@@ -645,71 +734,7 @@ export function useLlmManager(
   function getValidLlmDescriptor(
     modelName: string | null | undefined
   ): LlmDescriptor {
-    // Return early if providers haven't loaded yet (undefined/null)
-    // Empty arrays are valid (user has no provider access for this assistant)
-    if (llmProviders === undefined || llmProviders === null) {
-      return { name: "", provider: "", modelName: "" };
-    }
-
-    if (modelName) {
-      const model = parseLlmDescriptor(modelName);
-      // If we have no parsed modelName, try to find the provider by the raw modelName string
-      if (!(model.modelName && model.modelName.length > 0)) {
-        const provider = llmProviders.find((p) =>
-          p.model_configurations
-            .map((modelConfiguration) => modelConfiguration.name)
-            .includes(modelName)
-        );
-        if (provider) {
-          return {
-            modelName: modelName,
-            name: provider.name,
-            provider: provider.provider,
-          };
-        }
-      }
-
-      // If we have parsed provider info, try to find that specific provider.
-      // This ensures we don't incorrectly match a model to the wrong provider
-      // when the same model name exists across multiple providers (e.g., gpt-5 in Azure and OpenAI)
-      if (model.provider && model.provider.length > 0) {
-        const matchingProvider = llmProviders.find(
-          (p) =>
-            p.provider === model.provider &&
-            p.model_configurations
-              .map((modelConfiguration) => modelConfiguration.name)
-              .includes(model.modelName)
-        );
-        if (matchingProvider) {
-          return {
-            ...model,
-            name: matchingProvider.name,
-            provider: matchingProvider.provider,
-          };
-        }
-        // Provider info was present but not found - fall through to default
-      } else {
-        // Only search by model name when no provider info was parsed
-        const provider = llmProviders.find((p) =>
-          p.model_configurations
-            .map((modelConfiguration) => modelConfiguration.name)
-            .includes(model.modelName)
-        );
-
-        if (provider) {
-          return { ...model, provider: provider.provider, name: provider.name };
-        }
-      }
-    }
-
-    // Model not found in available providers - fall back to default model
-    return (
-      getDefaultLlmDescriptor(llmProviders) ?? {
-        name: "",
-        provider: "",
-        modelName: "",
-      }
-    );
+    return getValidLlmDescriptorForProviders(modelName, llmProviders);
   }
 
   const [imageFilesPresent, setImageFilesPresent] = useState(false);

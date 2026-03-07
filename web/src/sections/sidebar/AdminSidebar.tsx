@@ -22,7 +22,7 @@ import {
   SlackIconSkeleton,
   BrainIcon,
 } from "@/components/icons/icons";
-import { CombinedSettings } from "@/app/admin/settings/interfaces";
+import { CombinedSettings } from "@/interfaces/settings";
 import SidebarTab from "@/refresh-components/buttons/SidebarTab";
 import SidebarBody from "@/sections/sidebar/SidebarBody";
 import {
@@ -30,6 +30,7 @@ import {
   SvgActivity,
   SvgArrowUpCircle,
   SvgBarChart,
+  SvgBubbleText,
   SvgCpu,
   SvgFileText,
   SvgFolder,
@@ -37,11 +38,9 @@ import {
   SvgArrowExchange,
   SvgImage,
   SvgKey,
-  SvgOnyxLogo,
   SvgOnyxOctagon,
   SvgSearch,
   SvgServer,
-  SvgSettings,
   SvgShield,
   SvgThumbsUp,
   SvgUploadCloud,
@@ -51,6 +50,7 @@ import {
   SvgPaintBrush,
   SvgDiscordMono,
   SvgWallet,
+  SvgTerminal,
 } from "@opal/icons";
 import SvgMcp from "@opal/icons/mcp";
 import UserAvatarPopover from "@/sections/sidebar/UserAvatarPopover";
@@ -92,7 +92,7 @@ const custom_assistants_items = (
 ) => {
   const items = [
     {
-      name: "Assistants",
+      name: "Agents",
       icon: SvgOnyxOctagon,
       link: "/admin/assistants",
     },
@@ -166,7 +166,7 @@ const collections = (
         ]
       : []),
     {
-      name: "Custom Assistants",
+      name: "Custom Agents",
       items: custom_assistants_items(isCurator, enableEnterprise),
     },
     ...(isCurator && enableEnterprise
@@ -189,12 +189,12 @@ const collections = (
             name: "Configuration",
             items: [
               {
-                name: "Default Assistant",
-                icon: SvgOnyxLogo,
-                link: "/admin/configuration/default-assistant",
+                name: "Chat Preferences",
+                icon: SvgBubbleText,
+                link: "/admin/configuration/chat-preferences",
               },
               {
-                name: "LLM",
+                name: "LLM Models",
                 icon: SvgCpu,
                 link: "/admin/configuration/llm",
               },
@@ -207,6 +207,11 @@ const collections = (
                 name: "Image Generation",
                 icon: SvgImage,
                 link: "/admin/configuration/image-generation",
+              },
+              {
+                name: "Code Interpreter",
+                icon: SvgTerminal,
+                link: "/admin/configuration/code-interpreter",
               },
               ...(!enableCloud && vectorDbEnabled
                 ? [
@@ -298,11 +303,6 @@ const collections = (
           {
             name: "Settings",
             items: [
-              {
-                name: "Workspace Settings",
-                icon: SvgSettings,
-                link: "/admin/settings",
-              },
               ...(enableEnterprise
                 ? [
                     {

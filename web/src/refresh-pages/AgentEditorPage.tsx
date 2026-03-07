@@ -13,12 +13,13 @@ import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInElementField from "@/refresh-components/form/InputTypeInElementField";
 import InputDatePickerField from "@/refresh-components/form/InputDatePickerField";
+import Message from "@/refresh-components/messages/Message";
 import Separator from "@/refresh-components/Separator";
 import * as InputLayouts from "@/layouts/input-layouts";
 import { useFormikContext } from "formik";
 import LLMSelector from "@/components/llm/LLMSelector";
-import { parseLlmDescriptor, structureValue } from "@/lib/llm/utils";
-import { useLLMProviders } from "@/lib/hooks/useLLMProviders";
+import { parseLlmDescriptor, structureValue } from "@/lib/llmConfig/utils";
+import { useLLMProviders } from "@/hooks/useLLMProviders";
 import {
   STARTER_MESSAGES_EXAMPLES,
   MAX_CHARACTERS_STARTER_MESSAGE,
@@ -31,7 +32,6 @@ import {
   PYTHON_TOOL_ID,
   SEARCH_TOOL_ID,
   OPEN_URL_TOOL_ID,
-  FILE_READER_TOOL_ID,
 } from "@/app/app/components/tools/constants";
 import Text from "@/refresh-components/texts/Text";
 import { Card } from "@/refresh-components/cards";
@@ -57,6 +57,7 @@ import {
   SvgLock,
   SvgOnyxOctagon,
   SvgSliders,
+  SvgUsers,
   SvgTrash,
 } from "@opal/icons";
 import CustomAgentAvatar, {
@@ -87,6 +88,8 @@ import ShareAgentModal from "@/sections/modals/ShareAgentModal";
 import AgentKnowledgePane from "@/sections/knowledge/AgentKnowledgePane";
 import { ValidSources } from "@/lib/types";
 import { useSettingsContext } from "@/providers/SettingsProvider";
+import { useUser } from "@/providers/UserProvider";
+import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
 
 interface AgentIconEditorProps {
   existingAgent?: FullPersona | null;
@@ -312,7 +315,11 @@ function MCPServerCard({
         description={server.description}
         icon={getActionIcon(server.server_url, server.name)}
         rightChildren={
-          <GeneralLayouts.Section flexDirection="row" gap={0.5}>
+          <GeneralLayouts.Section
+            flexDirection="row"
+            gap={0.5}
+            alignItems="start"
+          >
             <EnabledCount
               enabledCount={enabledCount}
               totalCount={enabledTools.length}
@@ -351,18 +358,9 @@ function MCPServerCard({
       </ActionsLayouts.Header>
       {isLoading ? (
         <ActionsLayouts.Content>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index} padding={0.75}>
-              <GeneralLayouts.LineItemLayout
-                // We provide dummy values here.
-                // The `loading` prop will always render a pulsing box instead, so the dummy-values will actually NOT be rendered at all.
-                title="..."
-                description="..."
-                rightChildren={<></>}
-                loading
-              />
-            </Card>
-          ))}
+          <GeneralLayouts.Section padding={1}>
+            <SimpleLoader />
+          </GeneralLayouts.Section>
         </ActionsLayouts.Content>
       ) : (
         enabledTools.length > 0 &&
@@ -452,6 +450,8 @@ export default function AgentEditorPage({
   const shareAgentModal = useCreateModal();
   const deleteAgentModal = useCreateModal();
   const settings = useSettingsContext();
+  const { isAdmin, isCurator } = useUser();
+  const canUpdateFeaturedStatus = isAdmin || isCurator;
   const vectorDbEnabled = settings?.settings.vector_db_enabled !== false;
 
   // LLM Model Selection
@@ -528,9 +528,6 @@ export default function AgentEditorPage({
   );
   const codeInterpreterTool = availableTools?.find(
     (t) => t.in_code_tool_id === PYTHON_TOOL_ID
-  );
-  const fileReaderTool = availableTools?.find(
-    (t) => t.in_code_tool_id === FILE_READER_TOOL_ID
   );
   const isImageGenerationAvailable = !!imageGenTool;
   const imageGenerationDisabledTooltip = isImageGenerationAvailable
@@ -619,14 +616,6 @@ export default function AgentEditorPage({
         (tool) => tool.in_code_tool_id === PYTHON_TOOL_ID
       ) ??
         false),
-    file_reader:
-      !!fileReaderTool &&
-      (existingAgent?.tools?.some(
-        (tool) => tool.in_code_tool_id === FILE_READER_TOOL_ID
-      ) ??
-        // Default to enabled for new assistants when the tool is available
-        !!fileReaderTool),
-
     // MCP servers - dynamically add fields for each server with nested tool fields
     ...Object.fromEntries(
       mcpServersWithTools.map(({ server, tools }) => {
@@ -667,6 +656,8 @@ export default function AgentEditorPage({
     shared_user_ids: existingAgent?.users?.map((user) => user.id) ?? [],
     shared_group_ids: existingAgent?.groups ?? [],
     is_public: existingAgent?.is_public ?? true,
+    label_ids: existingAgent?.labels?.map((l) => l.id) ?? [],
+    is_default_persona: existingAgent?.is_default_persona ?? false,
   };
 
   const validationSchema = Yup.object().shape({
@@ -761,9 +752,6 @@ export default function AgentEditorPage({
           toolIds.push(searchTool.id);
         }
       }
-      if (values.file_reader && fileReaderTool) {
-        toolIds.push(fileReaderTool.id);
-      }
       if (values.image_generation && imageGenTool) {
         toolIds.push(imageGenTool.id);
       }
@@ -833,8 +821,8 @@ export default function AgentEditorPage({
         uploaded_image_id: values.uploaded_image_id,
         icon_name: values.icon_name,
         search_start_date: values.knowledge_cutoff_date || null,
-        label_ids: null,
-        is_default_persona: false,
+        label_ids: values.label_ids,
+        is_default_persona: values.is_default_persona,
         // display_priority: ...,
 
         user_file_ids: values.enable_knowledge ? values.user_file_ids : [],
@@ -1016,6 +1004,10 @@ export default function AgentEditorPage({
               (fileId: string) =>
                 fileStatusMap.get(fileId) === UserFileStatus.PROCESSING
             );
+            const isShared =
+              values.is_public ||
+              values.shared_user_ids.length > 0 ||
+              values.shared_group_ids.length > 0;
 
             return (
               <>
@@ -1075,10 +1067,20 @@ export default function AgentEditorPage({
                     userIds={values.shared_user_ids}
                     groupIds={values.shared_group_ids}
                     isPublic={values.is_public}
-                    onShare={(userIds, groupIds, isPublic) => {
+                    isFeatured={values.is_default_persona}
+                    labelIds={values.label_ids}
+                    onShare={(
+                      userIds,
+                      groupIds,
+                      isPublic,
+                      isFeatured,
+                      labelIds
+                    ) => {
                       setFieldValue("shared_user_ids", userIds);
                       setFieldValue("shared_group_ids", groupIds);
                       setFieldValue("is_public", isPublic);
+                      setFieldValue("is_default_persona", isFeatured);
+                      setFieldValue("label_ids", labelIds);
                       shareAgentModal.toggle(false);
                     }}
                   />
@@ -1168,7 +1170,6 @@ export default function AgentEditorPage({
                           <InputLayouts.Vertical
                             name="agent_avatar"
                             title="Agent Avatar"
-                            center
                           >
                             <AgentIconEditor existingAgent={existingAgent} />
                           </InputLayouts.Vertical>
@@ -1329,24 +1330,6 @@ export default function AgentEditorPage({
                               </InputLayouts.Horizontal>
                             </Card>
 
-                            <Card
-                              variant={
-                                !!fileReaderTool ? undefined : "disabled"
-                              }
-                            >
-                              <InputLayouts.Horizontal
-                                name="file_reader"
-                                title="File Reader"
-                                description="Read sections of uploaded files. Required for files that exceed the context window."
-                                disabled={!fileReaderTool}
-                              >
-                                <SwitchField
-                                  name="file_reader"
-                                  disabled={!fileReaderTool}
-                                />
-                              </InputLayouts.Horizontal>
-                            </Card>
-
                             {/* Tools */}
                             <>
                               {/* render the separator if there is at least one mcp-server or open-api-tool */}
@@ -1399,17 +1382,36 @@ export default function AgentEditorPage({
                             <Card>
                               <InputLayouts.Horizontal
                                 title="Share This Agent"
-                                description="Share this agent with other users, groups, or everyone in your organization."
+                                description="with other users, groups, or everyone in your organization."
                                 center
                               >
                                 <Button
                                   secondary
-                                  leftIcon={SvgLock}
+                                  leftIcon={isShared ? SvgUsers : SvgLock}
                                   onClick={() => shareAgentModal.toggle(true)}
                                 >
                                   Share
                                 </Button>
                               </InputLayouts.Horizontal>
+                              {canUpdateFeaturedStatus && (
+                                <>
+                                  <InputLayouts.Horizontal
+                                    name="is_default_persona"
+                                    title="Feature This Agent"
+                                    description="Show this agent at the top of the explore agents list and automatically pin it to the sidebar for new users with access."
+                                  >
+                                    <SwitchField name="is_default_persona" />
+                                  </InputLayouts.Horizontal>
+                                  {values.is_default_persona && !isShared && (
+                                    <Message
+                                      static
+                                      close={false}
+                                      className="w-full"
+                                      text="This agent is private to you and will only be featured for yourself."
+                                    />
+                                  )}
+                                </>
+                              )}
                             </Card>
 
                             <Card>

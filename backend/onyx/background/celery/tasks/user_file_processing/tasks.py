@@ -5,14 +5,18 @@ from uuid import UUID
 
 import httpx
 import sqlalchemy as sa
+from celery import Celery
 from celery import shared_task
 from celery import Task
+from redis import Redis
 from redis.lock import Lock as RedisLock
 from retry import retry
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
 from onyx.background.celery.apps.app_base import task_logger
+from onyx.background.celery.celery_redis import celery_get_queue_length
 from onyx.background.celery.celery_utils import httpx_init_vespa_pool
 from onyx.background.celery.tasks.shared.RetryDocumentIndex import RetryDocumentIndex
 from onyx.configs.app_configs import DISABLE_VECTOR_DB
@@ -21,12 +25,16 @@ from onyx.configs.app_configs import VESPA_CLOUD_CERT_PATH
 from onyx.configs.app_configs import VESPA_CLOUD_KEY_PATH
 from onyx.configs.constants import CELERY_GENERIC_BEAT_LOCK_TIMEOUT
 from onyx.configs.constants import CELERY_USER_FILE_PROCESSING_LOCK_TIMEOUT
+from onyx.configs.constants import CELERY_USER_FILE_PROCESSING_TASK_EXPIRES
 from onyx.configs.constants import CELERY_USER_FILE_PROJECT_SYNC_LOCK_TIMEOUT
+from onyx.configs.constants import CELERY_USER_FILE_PROJECT_SYNC_TASK_EXPIRES
 from onyx.configs.constants import DocumentSource
 from onyx.configs.constants import OnyxCeleryPriority
 from onyx.configs.constants import OnyxCeleryQueues
 from onyx.configs.constants import OnyxCeleryTask
 from onyx.configs.constants import OnyxRedisLocks
+from onyx.configs.constants import USER_FILE_PROCESSING_MAX_QUEUE_DEPTH
+from onyx.configs.constants import USER_FILE_PROJECT_SYNC_MAX_QUEUE_DEPTH
 from onyx.connectors.file.connector import LocalFileConnector
 from onyx.connectors.models import Document
 from onyx.connectors.models import HierarchyNode
@@ -57,12 +65,71 @@ def _user_file_lock_key(user_file_id: str | UUID) -> str:
     return f"{OnyxRedisLocks.USER_FILE_PROCESSING_LOCK_PREFIX}:{user_file_id}"
 
 
-def _user_file_project_sync_lock_key(user_file_id: str | UUID) -> str:
+def _user_file_queued_key(user_file_id: str | UUID) -> str:
+    """Key that exists while a process_single_user_file task is sitting in the queue.
+
+    The beat generator sets this with a TTL equal to CELERY_USER_FILE_PROCESSING_TASK_EXPIRES
+    before enqueuing and the worker deletes it as its first action.  This prevents
+    the beat from adding duplicate tasks for files that already have a live task
+    in flight.
+    """
+    return f"{OnyxRedisLocks.USER_FILE_QUEUED_PREFIX}:{user_file_id}"
+
+
+def user_file_project_sync_lock_key(user_file_id: str | UUID) -> str:
     return f"{OnyxRedisLocks.USER_FILE_PROJECT_SYNC_LOCK_PREFIX}:{user_file_id}"
+
+
+def _user_file_project_sync_queued_key(user_file_id: str | UUID) -> str:
+    return f"{OnyxRedisLocks.USER_FILE_PROJECT_SYNC_QUEUED_PREFIX}:{user_file_id}"
 
 
 def _user_file_delete_lock_key(user_file_id: str | UUID) -> str:
     return f"{OnyxRedisLocks.USER_FILE_DELETE_LOCK_PREFIX}:{user_file_id}"
+
+
+def get_user_file_project_sync_queue_depth(celery_app: Celery) -> int:
+    redis_celery: Redis = celery_app.broker_connection().channel().client  # type: ignore
+    return celery_get_queue_length(
+        OnyxCeleryQueues.USER_FILE_PROJECT_SYNC, redis_celery
+    )
+
+
+def enqueue_user_file_project_sync_task(
+    *,
+    celery_app: Celery,
+    redis_client: Redis,
+    user_file_id: str | UUID,
+    tenant_id: str,
+    priority: OnyxCeleryPriority = OnyxCeleryPriority.HIGH,
+) -> bool:
+    """Enqueue a project-sync task if no matching queued task already exists."""
+    queued_key = _user_file_project_sync_queued_key(user_file_id)
+
+    # NX+EX gives us atomic dedupe and a self-healing TTL.
+    queued_guard_set = redis_client.set(
+        queued_key,
+        1,
+        nx=True,
+        ex=CELERY_USER_FILE_PROJECT_SYNC_TASK_EXPIRES,
+    )
+    if not queued_guard_set:
+        return False
+
+    try:
+        celery_app.send_task(
+            OnyxCeleryTask.PROCESS_SINGLE_USER_FILE_PROJECT_SYNC,
+            kwargs={"user_file_id": str(user_file_id), "tenant_id": tenant_id},
+            queue=OnyxCeleryQueues.USER_FILE_PROJECT_SYNC,
+            priority=priority,
+            expires=CELERY_USER_FILE_PROJECT_SYNC_TASK_EXPIRES,
+        )
+    except Exception:
+        # Roll back the queued guard if task publish fails.
+        redis_client.delete(queued_key)
+        raise
+
+    return True
 
 
 @retry(tries=3, delay=1, backoff=2, jitter=(0.0, 1.0))
@@ -120,7 +187,24 @@ def _get_document_chunk_count(
 def check_user_file_processing(self: Task, *, tenant_id: str) -> None:
     """Scan for user files with PROCESSING status and enqueue per-file tasks.
 
-    Uses direct Redis locks to avoid overlapping runs.
+    Three mechanisms prevent queue runaway:
+
+    1. **Queue depth backpressure** – if the broker queue already has more than
+       USER_FILE_PROCESSING_MAX_QUEUE_DEPTH items we skip this beat cycle
+       entirely.  Workers are clearly behind; adding more tasks would only make
+       the backlog worse.
+
+    2. **Per-file queued guard** – before enqueuing a task we set a short-lived
+       Redis key (TTL = CELERY_USER_FILE_PROCESSING_TASK_EXPIRES).  If that key
+       already exists the file already has a live task in the queue, so we skip
+       it.  The worker deletes the key the moment it picks up the task so the
+       next beat cycle can re-enqueue if the file is still PROCESSING.
+
+    3. **Task expiry** – every enqueued task carries an `expires` value equal to
+       CELERY_USER_FILE_PROCESSING_TASK_EXPIRES.  If a task is still sitting in
+       the queue after that deadline, Celery discards it without touching the DB.
+       This is a belt-and-suspenders defence: even if the guard key is lost (e.g.
+       Redis restart), stale tasks evict themselves rather than piling up forever.
     """
     task_logger.info("check_user_file_processing - Starting")
 
@@ -135,7 +219,21 @@ def check_user_file_processing(self: Task, *, tenant_id: str) -> None:
         return None
 
     enqueued = 0
+    skipped_guard = 0
     try:
+        # --- Protection 1: queue depth backpressure ---
+        r_celery = self.app.broker_connection().channel().client  # type: ignore
+        queue_len = celery_get_queue_length(
+            OnyxCeleryQueues.USER_FILE_PROCESSING, r_celery
+        )
+        if queue_len > USER_FILE_PROCESSING_MAX_QUEUE_DEPTH:
+            task_logger.warning(
+                f"check_user_file_processing - Queue depth {queue_len} exceeds "
+                f"{USER_FILE_PROCESSING_MAX_QUEUE_DEPTH}, skipping enqueue for "
+                f"tenant={tenant_id}"
+            )
+            return None
+
         with get_session_with_current_tenant() as db_session:
             user_file_ids = (
                 db_session.execute(
@@ -148,12 +246,35 @@ def check_user_file_processing(self: Task, *, tenant_id: str) -> None:
             )
 
             for user_file_id in user_file_ids:
-                self.app.send_task(
-                    OnyxCeleryTask.PROCESS_SINGLE_USER_FILE,
-                    kwargs={"user_file_id": str(user_file_id), "tenant_id": tenant_id},
-                    queue=OnyxCeleryQueues.USER_FILE_PROCESSING,
-                    priority=OnyxCeleryPriority.HIGH,
+                # --- Protection 2: per-file queued guard ---
+                queued_key = _user_file_queued_key(user_file_id)
+                guard_set = redis_client.set(
+                    queued_key,
+                    1,
+                    ex=CELERY_USER_FILE_PROCESSING_TASK_EXPIRES,
+                    nx=True,
                 )
+                if not guard_set:
+                    skipped_guard += 1
+                    continue
+
+                # --- Protection 3: task expiry ---
+                # If task submission fails, clear the guard immediately so the
+                # next beat cycle can retry enqueuing this file.
+                try:
+                    self.app.send_task(
+                        OnyxCeleryTask.PROCESS_SINGLE_USER_FILE,
+                        kwargs={
+                            "user_file_id": str(user_file_id),
+                            "tenant_id": tenant_id,
+                        },
+                        queue=OnyxCeleryQueues.USER_FILE_PROCESSING,
+                        priority=OnyxCeleryPriority.HIGH,
+                        expires=CELERY_USER_FILE_PROCESSING_TASK_EXPIRES,
+                    )
+                except Exception:
+                    redis_client.delete(queued_key)
+                    raise
                 enqueued += 1
 
     finally:
@@ -161,7 +282,8 @@ def check_user_file_processing(self: Task, *, tenant_id: str) -> None:
             lock.release()
 
     task_logger.info(
-        f"check_user_file_processing - Enqueued {enqueued} tasks for tenant={tenant_id}"
+        f"check_user_file_processing - Enqueued {enqueued} skipped_guard={skipped_guard} "
+        f"tasks for tenant={tenant_id}"
     )
     return None
 
@@ -304,6 +426,12 @@ def process_single_user_file(
     start = time.monotonic()
 
     redis_client = get_redis_client(tenant_id=tenant_id)
+
+    # Clear the "queued" guard set by the beat generator so that the next beat
+    # cycle can re-enqueue this file if it is still in PROCESSING state after
+    # this task completes or fails.
+    redis_client.delete(_user_file_queued_key(user_file_id))
+
     file_lock: RedisLock = redis_client.lock(
         _user_file_lock_key(user_file_id),
         timeout=CELERY_USER_FILE_PROCESSING_LOCK_TIMEOUT,
@@ -557,8 +685,8 @@ def process_single_user_file_delete(
     ignore_result=True,
 )
 def check_for_user_file_project_sync(self: Task, *, tenant_id: str) -> None:
-    """Scan for user files with PROJECT_SYNC status and enqueue per-file tasks."""
-    task_logger.info("check_for_user_file_project_sync - Starting")
+    """Scan for user files needing project sync and enqueue per-file tasks."""
+    task_logger.info("Starting")
 
     redis_client = get_redis_client(tenant_id=tenant_id)
     lock: RedisLock = redis_client.lock(
@@ -570,13 +698,25 @@ def check_for_user_file_project_sync(self: Task, *, tenant_id: str) -> None:
         return None
 
     enqueued = 0
+    skipped_guard = 0
     try:
+        queue_depth = get_user_file_project_sync_queue_depth(self.app)
+        if queue_depth > USER_FILE_PROJECT_SYNC_MAX_QUEUE_DEPTH:
+            task_logger.warning(
+                f"Queue depth {queue_depth} exceeds "
+                f"{USER_FILE_PROJECT_SYNC_MAX_QUEUE_DEPTH}, skipping enqueue for tenant={tenant_id}"
+            )
+            return None
+
         with get_session_with_current_tenant() as db_session:
             user_file_ids = (
                 db_session.execute(
                     select(UserFile.id).where(
                         sa.and_(
-                            UserFile.needs_project_sync.is_(True),
+                            sa.or_(
+                                UserFile.needs_project_sync.is_(True),
+                                UserFile.needs_persona_sync.is_(True),
+                            ),
                             UserFile.status == UserFileStatus.COMPLETED,
                         )
                     )
@@ -586,19 +726,23 @@ def check_for_user_file_project_sync(self: Task, *, tenant_id: str) -> None:
             )
 
             for user_file_id in user_file_ids:
-                self.app.send_task(
-                    OnyxCeleryTask.PROCESS_SINGLE_USER_FILE_PROJECT_SYNC,
-                    kwargs={"user_file_id": str(user_file_id), "tenant_id": tenant_id},
-                    queue=OnyxCeleryQueues.USER_FILE_PROJECT_SYNC,
+                if not enqueue_user_file_project_sync_task(
+                    celery_app=self.app,
+                    redis_client=redis_client,
+                    user_file_id=user_file_id,
+                    tenant_id=tenant_id,
                     priority=OnyxCeleryPriority.HIGH,
-                )
+                ):
+                    skipped_guard += 1
+                    continue
                 enqueued += 1
     finally:
         if lock.owned():
             lock.release()
 
     task_logger.info(
-        f"check_for_user_file_project_sync - Enqueued {enqueued} tasks for tenant={tenant_id}"
+        f"Enqueued {enqueued} "
+        f"Skipped guard {skipped_guard} tasks for tenant={tenant_id}"
     )
     return None
 
@@ -617,8 +761,10 @@ def process_single_user_file_project_sync(
     )
 
     redis_client = get_redis_client(tenant_id=tenant_id)
+    redis_client.delete(_user_file_project_sync_queued_key(user_file_id))
+
     file_lock: RedisLock = redis_client.lock(
-        _user_file_project_sync_lock_key(user_file_id),
+        user_file_project_sync_lock_key(user_file_id),
         timeout=CELERY_USER_FILE_PROJECT_SYNC_LOCK_TIMEOUT,
     )
 
@@ -630,7 +776,11 @@ def process_single_user_file_project_sync(
 
     try:
         with get_session_with_current_tenant() as db_session:
-            user_file = db_session.get(UserFile, _as_uuid(user_file_id))
+            user_file = db_session.execute(
+                select(UserFile)
+                .where(UserFile.id == _as_uuid(user_file_id))
+                .options(selectinload(UserFile.assistants))
+            ).scalar_one_or_none()
             if not user_file:
                 task_logger.info(
                     f"process_single_user_file_project_sync - User file not found id={user_file_id}"
@@ -658,13 +808,17 @@ def process_single_user_file_project_sync(
                 ]
 
                 project_ids = [project.id for project in user_file.projects]
+                persona_ids = [p.id for p in user_file.assistants if not p.deleted]
                 for retry_document_index in retry_document_indices:
                     retry_document_index.update_single(
                         doc_id=str(user_file.id),
                         tenant_id=tenant_id,
                         chunk_count=user_file.chunk_count,
                         fields=None,
-                        user_fields=VespaDocumentUserFields(user_projects=project_ids),
+                        user_fields=VespaDocumentUserFields(
+                            user_projects=project_ids,
+                            personas=persona_ids,
+                        ),
                     )
 
             task_logger.info(
@@ -672,6 +826,7 @@ def process_single_user_file_project_sync(
             )
 
             user_file.needs_project_sync = False
+            user_file.needs_persona_sync = False
             user_file.last_project_sync_at = datetime.datetime.now(
                 datetime.timezone.utc
             )

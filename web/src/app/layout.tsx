@@ -1,39 +1,35 @@
 import "./globals.css";
 
-import { Metadata } from "next";
-import { Hanken_Grotesk, Inter } from "next/font/google";
-import Script from "next/script";
-import { ThemeProvider } from "next-themes";
-import { Suspense } from "react";
-
-import StatsOverlayLoader from "@/components/dev/StatsOverlayLoader";
-import CloudError from "@/components/errorPages/CloudErrorPage";
-import Error from "@/components/errorPages/ErrorPage";
-import GatedContentWrapper from "@/components/GatedContentWrapper";
 import {
   fetchEnterpriseSettingsSS,
   fetchSettingsSS,
 } from "@/components/settings/lib";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { fetchAppSidebarMetadata } from "@/lib/appSidebarSS";
 import {
   CUSTOM_ANALYTICS_ENABLED,
   GTM_ENABLED,
-  MODAL_ROOT_ID,
-  NEXT_PUBLIC_CLOUD_ENABLED,
   SERVER_SIDE_ONLY__PAID_ENTERPRISE_FEATURES_ENABLED,
+  NEXT_PUBLIC_CLOUD_ENABLED,
+  MODAL_ROOT_ID,
 } from "@/lib/constants";
-import { getAuthTypeMetadataSS, getCurrentUserSS } from "@/lib/userSS";
+import { Metadata } from "next";
 import { buildClientUrl } from "@/lib/utilsSS";
+import { Inter } from "next/font/google";
+import { EnterpriseSettings, ApplicationStatus } from "@/interfaces/settings";
 import AppProvider from "@/providers/AppProvider";
-
-import {
-  ApplicationStatus,
-  EnterpriseSettings,
-} from "./admin/settings/interfaces";
-import PostHogPageView from "./PostHogPageView";
 import { PHProvider } from "./providers";
+import { getAuthTypeMetadataSS, getCurrentUserSS } from "@/lib/userSS";
+import { Suspense } from "react";
+import PostHogPageView from "./PostHogPageView";
+import Script from "next/script";
+import { Hanken_Grotesk } from "next/font/google";
 import { WebVitals } from "./web-vitals";
+import { ThemeProvider } from "next-themes";
+import CloudError from "@/components/errorPages/CloudErrorPage";
+import Error from "@/components/errorPages/ErrorPage";
+import GatedContentWrapper from "@/components/GatedContentWrapper";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { fetchAppSidebarMetadata } from "@/lib/appSidebarSS";
+import StatsOverlayLoader from "@/components/dev/StatsOverlayLoader";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,18 +47,11 @@ export async function generateMetadata(): Promise<Metadata> {
   let logoLocation = buildClientUrl("/onyx.ico");
   let enterpriseSettings: EnterpriseSettings | null = null;
   if (SERVER_SIDE_ONLY__PAID_ENTERPRISE_FEATURES_ENABLED) {
-    try {
-      const enterpriseResponse = await fetchEnterpriseSettingsSS();
-      if (enterpriseResponse.ok) {
-        enterpriseSettings = await enterpriseResponse.json();
-      }
-    } catch (error) {
-      console.warn("generateMetadata: enterprise settings fetch failed", error);
-    }
-
-    logoLocation = enterpriseSettings?.use_custom_logo
-      ? "/api/enterprise-settings/logo"
-      : buildClientUrl("/onyx.ico");
+    enterpriseSettings = await (await fetchEnterpriseSettingsSS()).json();
+    logoLocation =
+      enterpriseSettings && enterpriseSettings.use_custom_logo
+        ? "/api/enterprise-settings/logo"
+        : buildClientUrl("/onyx.ico");
   }
 
   return {
@@ -161,7 +150,8 @@ export default async function RootLayout({
   // middleware returns 402 for all non-allowlisted API calls, preventing data
   // leakage. The user sees a brief loading state before being redirected.
   const content =
-    productGating === ApplicationStatus.GATED_ACCESS ? (
+    productGating === ApplicationStatus.GATED_ACCESS ||
+    productGating === ApplicationStatus.SEAT_LIMIT_EXCEEDED ? (
       <GatedContentWrapper>{children}</GatedContentWrapper>
     ) : (
       children

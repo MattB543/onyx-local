@@ -28,6 +28,7 @@ from onyx.db.document_access import get_accessible_documents_by_ids
 from onyx.db.models import ConnectorCredentialPair
 from onyx.db.models import Document
 from onyx.db.models import DocumentSet
+from onyx.db.models import FederatedConnector__DocumentSet
 from onyx.db.models import HierarchyNode
 from onyx.db.models import Persona
 from onyx.db.models import Persona__User
@@ -255,9 +256,6 @@ def create_update_persona(
     try:
         # Default persona validation
         if create_persona_request.is_default_persona:
-            if not create_persona_request.is_public:
-                raise ValueError("Cannot make a default persona non public")
-
             # Curators can edit default personas, but not make them
             if user.role == UserRole.CURATOR or user.role == UserRole.GLOBAL_CURATOR:
                 pass
@@ -334,6 +332,7 @@ def update_persona_shared(
     db_session: Session,
     group_ids: list[int] | None = None,
     is_public: bool | None = None,
+    label_ids: list[int] | None = None,
 ) -> None:
     """Simplified version of `create_update_persona` which only touches the
     accessibility rather than any of the logic (e.g. prompt, connected data sources,
@@ -343,9 +342,7 @@ def update_persona_shared(
     )
 
     if user and user.role != UserRole.ADMIN and persona.user_id != user.id:
-        raise HTTPException(
-            status_code=403, detail="You don't have permission to modify this persona"
-        )
+        raise PermissionError("You don't have permission to modify this persona")
 
     versioned_update_persona_access = fetch_versioned_implementation(
         "onyx.db.persona", "update_persona_access"
@@ -358,6 +355,15 @@ def update_persona_shared(
         user_ids=user_ids,
         group_ids=group_ids,
     )
+
+    if label_ids is not None:
+        labels = (
+            db_session.query(PersonaLabel).filter(PersonaLabel.id.in_(label_ids)).all()
+        )
+        if len(labels) != len(label_ids):
+            raise ValueError("Some label IDs were not found in the database")
+        persona.labels.clear()
+        persona.labels = labels
 
     db_session.commit()
 
@@ -420,9 +426,16 @@ def get_minimal_persona_snapshots_for_user(
     stmt = stmt.options(
         selectinload(Persona.tools),
         selectinload(Persona.labels),
-        selectinload(Persona.document_sets)
-        .selectinload(DocumentSet.connector_credential_pairs)
-        .selectinload(ConnectorCredentialPair.connector),
+        selectinload(Persona.document_sets).options(
+            selectinload(DocumentSet.connector_credential_pairs).selectinload(
+                ConnectorCredentialPair.connector
+            ),
+            selectinload(DocumentSet.users),
+            selectinload(DocumentSet.groups),
+            selectinload(DocumentSet.federated_connectors).selectinload(
+                FederatedConnector__DocumentSet.federated_connector
+            ),
+        ),
         selectinload(Persona.hierarchy_nodes),
         selectinload(Persona.attached_documents).selectinload(
             Document.parent_hierarchy_node
@@ -453,7 +466,16 @@ def get_persona_snapshots_for_user(
             Document.parent_hierarchy_node
         ),
         selectinload(Persona.labels),
-        selectinload(Persona.document_sets),
+        selectinload(Persona.document_sets).options(
+            selectinload(DocumentSet.connector_credential_pairs).selectinload(
+                ConnectorCredentialPair.connector
+            ),
+            selectinload(DocumentSet.users),
+            selectinload(DocumentSet.groups),
+            selectinload(DocumentSet.federated_connectors).selectinload(
+                FederatedConnector__DocumentSet.federated_connector
+            ),
+        ),
         selectinload(Persona.user),
         selectinload(Persona.user_files),
         selectinload(Persona.users),
@@ -550,9 +572,16 @@ def get_minimal_persona_snapshots_paginated(
             Document.parent_hierarchy_node
         ),
         selectinload(Persona.labels),
-        selectinload(Persona.document_sets)
-        .selectinload(DocumentSet.connector_credential_pairs)
-        .selectinload(ConnectorCredentialPair.connector),
+        selectinload(Persona.document_sets).options(
+            selectinload(DocumentSet.connector_credential_pairs).selectinload(
+                ConnectorCredentialPair.connector
+            ),
+            selectinload(DocumentSet.users),
+            selectinload(DocumentSet.groups),
+            selectinload(DocumentSet.federated_connectors).selectinload(
+                FederatedConnector__DocumentSet.federated_connector
+            ),
+        ),
         selectinload(Persona.user),
     )
 
@@ -611,7 +640,16 @@ def get_persona_snapshots_paginated(
             Document.parent_hierarchy_node
         ),
         selectinload(Persona.labels),
-        selectinload(Persona.document_sets),
+        selectinload(Persona.document_sets).options(
+            selectinload(DocumentSet.connector_credential_pairs).selectinload(
+                ConnectorCredentialPair.connector
+            ),
+            selectinload(DocumentSet.users),
+            selectinload(DocumentSet.groups),
+            selectinload(DocumentSet.federated_connectors).selectinload(
+                FederatedConnector__DocumentSet.federated_connector
+            ),
+        ),
         selectinload(Persona.user),
         selectinload(Persona.user_files),
         selectinload(Persona.users),
@@ -732,6 +770,9 @@ def mark_persona_as_deleted(
 ) -> None:
     persona = get_persona_by_id(persona_id=persona_id, user=user, db_session=db_session)
     persona.deleted = True
+    affected_file_ids = [uf.id for uf in persona.user_files]
+    if affected_file_ids:
+        _mark_files_need_persona_sync(db_session, affected_file_ids)
     db_session.commit()
 
 
@@ -743,11 +784,13 @@ def mark_persona_as_not_deleted(
     persona = get_persona_by_id(
         persona_id=persona_id, user=user, db_session=db_session, include_deleted=True
     )
-    if persona.deleted:
-        persona.deleted = False
-        db_session.commit()
-    else:
+    if not persona.deleted:
         raise ValueError(f"Persona with ID {persona_id} is not deleted.")
+    persona.deleted = False
+    affected_file_ids = [uf.id for uf in persona.user_files]
+    if affected_file_ids:
+        _mark_files_need_persona_sync(db_session, affected_file_ids)
+    db_session.commit()
 
 
 def mark_delete_persona_by_name(
@@ -811,6 +854,20 @@ def update_personas_display_priority(
 
     if commit_db_txn:
         db_session.commit()
+
+
+def _mark_files_need_persona_sync(
+    db_session: Session,
+    user_file_ids: list[UUID],
+) -> None:
+    """Flag the given UserFile rows so the background sync task picks them up
+    and updates their persona metadata in the vector DB."""
+    if not user_file_ids:
+        return
+    db_session.query(UserFile).filter(UserFile.id.in_(user_file_ids)).update(
+        {UserFile.needs_persona_sync: True},
+        synchronize_session=False,
+    )
 
 
 def upsert_persona(
@@ -913,6 +970,8 @@ def upsert_persona(
         labels = (
             db_session.query(PersonaLabel).filter(PersonaLabel.id.in_(label_ids)).all()
         )
+        if len(labels) != len(label_ids):
+            raise ValueError("Some label IDs were not found in the database")
 
     # Fetch and attach hierarchy_nodes by IDs
     hierarchy_nodes = None
@@ -1001,8 +1060,13 @@ def upsert_persona(
             existing_persona.tools = tools or []
 
         if user_file_ids is not None:
+            old_file_ids = {uf.id for uf in existing_persona.user_files}
+            new_file_ids = {uf.id for uf in (user_files or [])}
+            affected_file_ids = old_file_ids | new_file_ids
             existing_persona.user_files.clear()
             existing_persona.user_files = user_files or []
+            if affected_file_ids:
+                _mark_files_need_persona_sync(db_session, list(affected_file_ids))
 
         if hierarchy_node_ids is not None:
             existing_persona.hierarchy_nodes.clear()
@@ -1056,6 +1120,8 @@ def upsert_persona(
             attached_documents=attached_documents or [],
         )
         db_session.add(new_persona)
+        if user_files:
+            _mark_files_need_persona_sync(db_session, [uf.id for uf in user_files])
         persona = new_persona
     if commit:
         db_session.commit()
@@ -1101,9 +1167,6 @@ def update_persona_is_default(
     persona = fetch_persona_by_id_for_user(
         db_session=db_session, persona_id=persona_id, user=user, get_editable=True
     )
-
-    if not persona.is_public:
-        persona.is_public = True
 
     persona.is_default_persona = is_default
     db_session.commit()

@@ -12,7 +12,7 @@ import { Button } from "@opal/components";
 import Tabs from "@/refresh-components/Tabs";
 import { cn, noProp } from "@/lib/utils";
 import { SvgRefreshCw } from "@opal/icons";
-import { WellKnownLLMProviderDescriptor } from "@/app/admin/configuration/llm/interfaces";
+import { WellKnownLLMProviderDescriptor } from "@/interfaces/llm";
 import {
   OnboardingFormWrapper,
   OnboardingFormChildProps,
@@ -172,7 +172,7 @@ function OllamaFormFields({
             )}
           />
 
-          <Separator className="my-0" />
+          <Separator className="py-0" />
 
           <FormikField<string>
             name={FIELD_DEFAULT_MODEL_NAME}
@@ -294,7 +294,7 @@ function OllamaFormFields({
             )}
           />
 
-          <Separator className="my-0" />
+          <Separator className="py-0" />
 
           <FormikField<string>
             name={FIELD_DEFAULT_MODEL_NAME}

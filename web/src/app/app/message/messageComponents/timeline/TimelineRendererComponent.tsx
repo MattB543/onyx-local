@@ -34,8 +34,6 @@ export interface TimelineRendererComponentProps {
   packets: Packet[];
   /** Chat state for rendering */
   chatState: FullChatState;
-  /** Completion callback */
-  onComplete: () => void;
   /** Whether to animate streaming */
   animate: boolean;
   /** Whether stop packet has been seen */
@@ -77,7 +75,6 @@ export const TimelineRendererComponent = memo(
   function TimelineRendererComponent({
     packets,
     chatState,
-    onComplete,
     animate,
     stopPacketSeen,
     stopReason,
@@ -127,7 +124,7 @@ export const TimelineRendererComponent = memo(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         packets={packets as any}
         state={chatState}
-        onComplete={onComplete}
+        onComplete={() => {}}
         animate={animate}
         renderType={renderType}
         stopPacketSeen={stopPacketSeen}

@@ -227,14 +227,14 @@ export function SlackChannelConfigFormFields({
             <RadioGroupItemField
               value="assistant"
               id="assistant"
-              label="Search Assistant"
+              label="Search Agent"
               sublabel="Control both the documents and the prompt to use for answering questions"
             />
             <RadioGroupItemField
               value="non_search_assistant"
               id="non_search_assistant"
-              label="Non-Search Assistant"
-              sublabel="Chat with an assistant that does not use documents"
+              label="Non-Search Agent"
+              sublabel="Chat with an agent that does not use documents"
             />
           </RadioGroup>
         </div>
@@ -330,15 +330,15 @@ export function SlackChannelConfigFormFields({
           <div className="mt-4">
             <SubLabel>
               <>
-                Select the search-enabled assistant OnyxBot will use while
-                answering questions in Slack.
+                Select the search-enabled agent OnyxBot will use while answering
+                questions in Slack.
                 {syncEnabledAssistants.length > 0 && (
                   <>
                     <br />
                     <span className="text-sm text-text-dark/80">
-                      Note: Some of your assistants have auto-synced connectors
-                      in their document sets. You cannot select these assistants
-                      as they will not be able to answer questions in Slack.{" "}
+                      Note: Some of your agents have auto-synced connectors in
+                      their document sets. You cannot select these agents as
+                      they will not be able to answer questions in Slack.{" "}
                       <button
                         type="button"
                         onClick={() =>
@@ -352,7 +352,7 @@ export function SlackChannelConfigFormFields({
                         {viewSyncEnabledAssistants
                           ? "Hide un-selectable "
                           : "View all "}
-                        assistants
+                        agents
                       </button>
                     </span>
                   </>
@@ -370,7 +370,7 @@ export function SlackChannelConfigFormFields({
             {viewSyncEnabledAssistants && syncEnabledAssistants.length > 0 && (
               <div className="mt-4">
                 <p className="text-sm text-text-dark/80">
-                  Un-selectable assistants:
+                  Un-selectable agents:
                 </p>
                 <div className="mb-3 mt-2 flex gap-2 flex-wrap text-sm">
                   {syncEnabledAssistants.map(
@@ -397,15 +397,15 @@ export function SlackChannelConfigFormFields({
           <div className="mt-4">
             <SubLabel>
               <>
-                Select the non-search assistant OnyxBot will use while answering
+                Select the non-search agent OnyxBot will use while answering
                 questions in Slack.
                 {syncEnabledAssistants.length > 0 && (
                   <>
                     <br />
                     <span className="text-sm text-text-dark/80">
-                      Note: Some of your assistants have auto-synced connectors
-                      in their document sets. You cannot select these assistants
-                      as they will not be able to answer questions in Slack.{" "}
+                      Note: Some of your agents have auto-synced connectors in
+                      their document sets. You cannot select these agents as
+                      they will not be able to answer questions in Slack.{" "}
                       <button
                         type="button"
                         onClick={() =>
@@ -419,7 +419,7 @@ export function SlackChannelConfigFormFields({
                         {viewSyncEnabledAssistants
                           ? "Hide un-selectable "
                           : "View all "}
-                        assistants
+                        agents
                       </button>
                     </span>
                   </>
@@ -527,7 +527,7 @@ export function SlackChannelConfigFormFields({
                 name="is_ephemeral"
                 label="Respond to user in a private (ephemeral) message"
                 tooltip="If set, OnyxBot will respond only to the user in a private (ephemeral) message. If you also
-                chose 'Search' Assistant above, selecting this option will make documents that are private to the user
+                chose 'Search' Agent above, selecting this option will make documents that are private to the user
                 available for their queries."
               />
 

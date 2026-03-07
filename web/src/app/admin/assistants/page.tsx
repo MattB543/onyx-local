@@ -47,8 +47,8 @@ function MainContent({
   return (
     <div>
       <Text className="mb-2">
-        Assistants are a way to build custom search/question-answering
-        experiences for different use cases.
+        Agents are a way to build custom search/question-answering experiences
+        for different use cases.
       </Text>
       <Text className="mt-2">They allow you to customize:</Text>
       <div className="text-sm">
@@ -63,21 +63,21 @@ function MainContent({
       <div>
         <Separator />
 
-        <Title>Create an Assistant</Title>
+        <Title>Create an Agent</Title>
         <CreateButton href="/app/agents/create?admin=true">
-          New Assistant
+          New Agent
         </CreateButton>
 
         <Separator />
 
-        <Title>Existing Assistants</Title>
+        <Title>Existing Agents</Title>
         {totalItems > 0 ? (
           <>
             <SubLabel>
-              Assistants will be displayed as options on the Chat / Search
-              interfaces in the order they are displayed below. Assistants
-              marked as hidden will not be displayed. Editable assistants are
-              shown at the top.
+              Agents will be displayed as options on the Chat / Search
+              interfaces in the order they are displayed below. Agents marked as
+              hidden will not be displayed. Editable agents are shown at the
+              top.
             </SubLabel>
             <PersonasTable
               personas={customPersonas}
@@ -96,34 +96,22 @@ function MainContent({
         ) : (
           <div className="mt-6 p-8 border border-border rounded-lg bg-background-weak text-center">
             <Text className="text-lg font-medium mb-2">
-              No custom assistants yet
+              No custom agents yet
             </Text>
             <Text className="text-subtle mb-3">
-              Create your first assistant to:
+              Create your first agent to:
             </Text>
             <ul className="text-subtle text-sm list-disc text-left inline-block mb-3">
               <li>Build department-specific knowledge bases</li>
-              <li>Create specialized research assistants</li>
+              <li>Create specialized research agents</li>
               <li>Set up compliance and policy advisors</li>
             </ul>
             <Text className="text-subtle text-sm mb-4">
               ...and so much more!
             </Text>
             <CreateButton href="/app/agents/create?admin=true">
-              Create Your First Assistant
+              Create Your First Agent
             </CreateButton>
-            <div className="mt-6 pt-6 border-t border-border">
-              <Text className="text-subtle text-sm">
-                OR go{" "}
-                <a
-                  href="/admin/configuration/default-assistant"
-                  className="text-link underline"
-                >
-                  here
-                </a>{" "}
-                to adjust the Default Assistant
-              </Text>
-            </div>
           </div>
         )}
       </div>
@@ -140,13 +128,13 @@ export default function Page() {
 
   return (
     <>
-      <AdminPageTitle icon={SvgOnyxOctagon} title="Assistants" />
+      <AdminPageTitle icon={SvgOnyxOctagon} title="Agents" />
 
       {isLoading && <ThreeDotsLoader />}
 
       {error && (
         <ErrorCallout
-          errorTitle="Failed to load assistants"
+          errorTitle="Failed to load agents"
           errorMsg={
             error?.info?.message ||
             error?.info?.detail ||

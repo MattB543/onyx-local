@@ -1,36 +1,35 @@
-import React, { JSX, memo, useMemo } from "react";
-
+import React, { JSX, memo } from "react";
 import {
   ChatPacket,
+  ImageGenerationToolPacket,
   Packet,
   PacketType,
   ReasoningPacket,
   StopReason,
-  SearchToolStart,
 } from "../../services/streamingModels";
-
 import {
   FullChatState,
   MessageRenderer,
   RenderType,
+  RendererResult,
   RendererOutput,
 } from "./interfaces";
-import { CustomToolRenderer } from "./renderers/CustomToolRenderer";
-import { ImageToolRenderer } from "./renderers/ImageToolRenderer";
 import { MessageTextRenderer } from "./renderers/MessageTextRenderer";
+import { ImageToolRenderer } from "./renderers/ImageToolRenderer";
 import { PythonToolRenderer } from "./timeline/renderers/code/PythonToolRenderer";
-import { CrmToolRenderer } from "./timeline/renderers/crm/CrmToolRenderer";
+import { ReasoningRenderer } from "./timeline/renderers/reasoning/ReasoningRenderer";
+import CustomToolRenderer from "./renderers/CustomToolRenderer";
+import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
+import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
+import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
 import { DeepResearchPlanRenderer } from "./timeline/renderers/deepresearch/DeepResearchPlanRenderer";
 import { ResearchAgentRenderer } from "./timeline/renderers/deepresearch/ResearchAgentRenderer";
-import { FetchToolRenderer } from "./timeline/renderers/fetch/FetchToolRenderer";
-import { FileReaderToolRenderer } from "./timeline/renderers/filereader/FileReaderToolRenderer";
-import { MemoryToolRenderer } from "./timeline/renderers/memory/MemoryToolRenderer";
-import { ReasoningRenderer } from "./timeline/renderers/reasoning/ReasoningRenderer";
-import { InternalSearchToolRenderer } from "./timeline/renderers/search/InternalSearchToolRenderer";
 import { WebSearchToolRenderer } from "./timeline/renderers/search/WebSearchToolRenderer";
+import { InternalSearchToolRenderer } from "./timeline/renderers/search/InternalSearchToolRenderer";
+import { SearchToolStart } from "../../services/streamingModels";
 
 // Different types of chat packets using discriminated unions
-export interface GroupedPackets {
+interface GroupedPackets {
   packets: Packet[];
 }
 
@@ -62,16 +61,6 @@ function isPythonToolPacket(packet: Packet) {
 
 function isCustomToolPacket(packet: Packet) {
   return packet.obj.type === PacketType.CUSTOM_TOOL_START;
-}
-
-function isCrmToolPacket(packet: Packet) {
-  return (
-    packet.obj.type === PacketType.CRM_SEARCH_TOOL_START ||
-    packet.obj.type === PacketType.CRM_CREATE_TOOL_START ||
-    packet.obj.type === PacketType.CRM_UPDATE_TOOL_START ||
-    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_START ||
-    packet.obj.type === PacketType.CALENDAR_SEARCH_TOOL_START
-  );
 }
 
 function isFileReaderToolPacket(packet: Packet) {
@@ -117,7 +106,6 @@ function isResearchAgentPacket(packet: Packet) {
 
 export function findRenderer(
   groupedPackets: GroupedPackets
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): MessageRenderer<any, any> | null {
   // Check for chat messages first
   if (groupedPackets.packets.some((packet) => isChatPacket(packet))) {
@@ -151,9 +139,6 @@ export function findRenderer(
   if (groupedPackets.packets.some((packet) => isFileReaderToolPacket(packet))) {
     return FileReaderToolRenderer;
   }
-  if (groupedPackets.packets.some((packet) => isCrmToolPacket(packet))) {
-    return CrmToolRenderer;
-  }
   if (groupedPackets.packets.some((packet) => isCustomToolPacket(packet))) {
     return CustomToolRenderer;
   }
@@ -169,6 +154,53 @@ export function findRenderer(
   return null;
 }
 
+// Handles display groups containing both chat text and image generation packets
+function MixedContentHandler({
+  chatPackets,
+  imagePackets,
+  chatState,
+  onComplete,
+  animate,
+  stopPacketSeen,
+  stopReason,
+  children,
+}: {
+  chatPackets: Packet[];
+  imagePackets: Packet[];
+  chatState: FullChatState;
+  onComplete: () => void;
+  animate: boolean;
+  stopPacketSeen: boolean;
+  stopReason?: StopReason;
+  children: (result: RendererOutput) => JSX.Element;
+}) {
+  return (
+    <MessageTextRenderer
+      packets={chatPackets as ChatPacket[]}
+      state={chatState}
+      onComplete={() => {}}
+      animate={animate}
+      renderType={RenderType.FULL}
+      stopPacketSeen={stopPacketSeen}
+      stopReason={stopReason}
+    >
+      {(textResults) => (
+        <ImageToolRenderer
+          packets={imagePackets as ImageGenerationToolPacket[]}
+          state={chatState}
+          onComplete={onComplete}
+          animate={animate}
+          renderType={RenderType.FULL}
+          stopPacketSeen={stopPacketSeen}
+          stopReason={stopReason}
+        >
+          {(imageResults) => children([...textResults, ...imageResults])}
+        </ImageToolRenderer>
+      )}
+    </MessageTextRenderer>
+  );
+}
+
 // Props interface for RendererComponent
 interface RendererComponentProps {
   packets: Packet[];
@@ -177,7 +209,6 @@ interface RendererComponentProps {
   animate: boolean;
   stopPacketSeen: boolean;
   stopReason?: StopReason;
-  useShortRenderer?: boolean;
   children: (result: RendererOutput) => JSX.Element;
 }
 
@@ -191,7 +222,6 @@ function areRendererPropsEqual(
     prev.stopPacketSeen === next.stopPacketSeen &&
     prev.stopReason === next.stopReason &&
     prev.animate === next.animate &&
-    prev.useShortRenderer === next.useShortRenderer &&
     prev.chatState.assistant?.id === next.chatState.assistant?.id
     // Skip: onComplete, children (function refs), chatState (memoized upstream)
   );
@@ -205,12 +235,47 @@ export const RendererComponent = memo(function RendererComponent({
   animate,
   stopPacketSeen,
   stopReason,
-  useShortRenderer = false,
   children,
 }: RendererComponentProps) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- packets identity changes every render; renderer is derived from packet type
-  const RendererFn = useMemo(() => findRenderer({ packets }), [packets.length]);
-  const renderType = useShortRenderer ? RenderType.HIGHLIGHT : RenderType.FULL;
+  // Detect mixed display groups (both chat text and image generation)
+  const hasChatPackets = packets.some((p) => isChatPacket(p));
+  const hasImagePackets = packets.some((p) => isImageToolPacket(p));
+
+  if (hasChatPackets && hasImagePackets) {
+    const sharedTypes = new Set<string>([
+      PacketType.SECTION_END,
+      PacketType.ERROR,
+    ]);
+
+    const chatPackets = packets.filter(
+      (p) =>
+        isChatPacket(p) ||
+        p.obj.type === PacketType.CITATION_INFO ||
+        sharedTypes.has(p.obj.type as string)
+    );
+    const imagePackets = packets.filter(
+      (p) =>
+        isImageToolPacket(p) ||
+        p.obj.type === PacketType.IMAGE_GENERATION_TOOL_DELTA ||
+        sharedTypes.has(p.obj.type as string)
+    );
+
+    return (
+      <MixedContentHandler
+        chatPackets={chatPackets}
+        imagePackets={imagePackets}
+        chatState={chatState}
+        onComplete={onComplete}
+        animate={animate}
+        stopPacketSeen={stopPacketSeen}
+        stopReason={stopReason}
+      >
+        {children}
+      </MixedContentHandler>
+    );
+  }
+
+  const RendererFn = findRenderer({ packets });
 
   if (!RendererFn) {
     return children([{ icon: null, status: null, content: <></> }]);
@@ -218,12 +283,11 @@ export const RendererComponent = memo(function RendererComponent({
 
   return (
     <RendererFn
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       packets={packets as any}
       state={chatState}
       onComplete={onComplete}
       animate={animate}
-      renderType={renderType}
+      renderType={RenderType.FULL}
       stopPacketSeen={stopPacketSeen}
       stopReason={stopReason}
     >

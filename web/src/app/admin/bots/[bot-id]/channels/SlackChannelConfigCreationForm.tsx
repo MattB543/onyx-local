@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 import { toast } from "@/hooks/useToast";
@@ -156,7 +156,7 @@ export const SlackChannelConfigCreationForm = ({
               is: "assistant",
               then: (schema) =>
                 schema.required(
-                  "A persona is required when using the'Assistant' knowledge source"
+                  "An agent is required when using the 'Agent' knowledge source"
                 ),
             }),
           standard_answer_categories: Yup.array(),
