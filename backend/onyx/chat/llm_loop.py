@@ -48,6 +48,7 @@ from onyx.server.query_and_chat.streaming_models import TopLevelBranching
 from onyx.tools.built_in_tools import CITEABLE_TOOLS_NAMES
 from onyx.tools.built_in_tools import STOPPING_TOOLS_NAMES
 from onyx.tools.interface import Tool
+from onyx.tools.models import ChatFile
 from onyx.tools.models import MemoryToolResponseSnapshot
 from onyx.tools.models import ToolCallInfo
 from onyx.tools.models import ToolCallKickoff
@@ -65,6 +66,18 @@ from onyx.utils.logger import setup_logger
 from shared_configs.contextvars import get_current_tenant_id
 
 logger = setup_logger()
+
+
+def _looks_like_xml_tool_call_payload(text: str | None) -> bool:
+    """Detect XML-style marshaled tool calls emitted as plain text."""
+    if not text:
+        return False
+    lowered = text.lower()
+    return (
+        "<function_calls" in lowered
+        and "<invoke" in lowered
+        and "<parameter" in lowered
+    )
 
 
 def _should_keep_bedrock_tool_definitions(
@@ -121,18 +134,36 @@ def _try_fallback_tool_extraction(
     reasoning_but_no_answer_or_tools = (
         llm_step_result.reasoning and not llm_step_result.answer and no_tool_calls
     )
+    xml_tool_call_text_detected = no_tool_calls and (
+        _looks_like_xml_tool_call_payload(llm_step_result.answer)
+        or _looks_like_xml_tool_call_payload(llm_step_result.raw_answer)
+        or _looks_like_xml_tool_call_payload(llm_step_result.reasoning)
+    )
     should_try_fallback = (
-        tool_choice == ToolChoiceOptions.REQUIRED and no_tool_calls
-    ) or reasoning_but_no_answer_or_tools
+        (tool_choice == ToolChoiceOptions.REQUIRED and no_tool_calls)
+        or reasoning_but_no_answer_or_tools
+        or xml_tool_call_text_detected
+    )
 
     if not should_try_fallback:
         return llm_step_result, False
 
     # Try to extract from answer first, then fall back to reasoning
     extracted_tool_calls: list[ToolCallKickoff] = []
+
     if llm_step_result.answer:
         extracted_tool_calls = extract_tool_calls_from_response_text(
             response_text=llm_step_result.answer,
+            tool_definitions=tool_defs,
+            placement=Placement(turn_index=turn_index),
+        )
+    if (
+        not extracted_tool_calls
+        and llm_step_result.raw_answer
+        and llm_step_result.raw_answer != llm_step_result.answer
+    ):
+        extracted_tool_calls = extract_tool_calls_from_response_text(
+            response_text=llm_step_result.raw_answer,
             tool_definitions=tool_defs,
             placement=Placement(turn_index=turn_index),
         )
@@ -142,17 +173,17 @@ def _try_fallback_tool_extraction(
             tool_definitions=tool_defs,
             placement=Placement(turn_index=turn_index),
         )
-
     if extracted_tool_calls:
         logger.info(
             f"Extracted {len(extracted_tool_calls)} tool call(s) from response text "
-            f"as fallback (tool_choice was REQUIRED but no tool calls returned)"
+            "as fallback"
         )
         return (
             LlmStepResult(
                 reasoning=llm_step_result.reasoning,
                 answer=llm_step_result.answer,
                 tool_calls=extracted_tool_calls,
+                raw_answer=llm_step_result.raw_answer,
             ),
             True,
         )
@@ -525,6 +556,7 @@ def run_llm_loop(
     forced_tool_id: int | None = None,
     user_identity: LLMUserIdentity | None = None,
     chat_session_id: str | None = None,
+    chat_files: list[ChatFile] | None = None,
     include_citations: bool = True,
     all_injected_file_metadata: dict[str, FileToolMetadata] | None = None,
     inject_memories_in_prompt: bool = True,
@@ -808,6 +840,7 @@ def run_llm_loop(
                 next_citation_num=citation_processor.get_next_citation_number(),
                 max_concurrent_tools=None,
                 skip_search_query_expansion=has_called_search_tool,
+                chat_files=chat_files,
                 url_snippet_map=extract_url_snippet_map(gathered_documents or []),
                 inject_memories_in_prompt=inject_memories_in_prompt,
             )
