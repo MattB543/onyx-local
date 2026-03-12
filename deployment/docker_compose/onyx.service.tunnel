@@ -14,7 +14,8 @@ SupplementaryGroups=docker
 Environment=HOME=/home/ec2-user
 WorkingDirectory=/home/ec2-user/onyx/deployment/docker_compose
 ExecStartPre=/home/ec2-user/onyx/deployment/docker_compose/bootstrap-env.sh
-ExecStart=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack up -d --remove-orphans
+ExecStartPre=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack pull api_server background web_server inference_model_server indexing_model_server
+ExecStart=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack up -d --remove-orphans --no-build
 ExecStop=/usr/bin/docker compose -f docker-compose.prod-tunnel.yml -p onyx-stack down
 TimeoutStartSec=600
 TimeoutStopSec=120

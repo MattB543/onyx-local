@@ -1,0 +1,114 @@
+name: Build and Push Docker Images to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      force_no_cache:
+        description: "Force build without cache"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_PREFIX: ghcr.io/mattb543
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: onyx-backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            extra_build_args: ""
+
+          - image: onyx-web-server
+            context: ./web
+            dockerfile: ./web/Dockerfile
+            extra_build_args: "NODE_OPTIONS=--max-old-space-size=8192"
+
+          - image: onyx-model-server
+            context: ./backend
+            dockerfile: ./backend/Dockerfile.model_server
+            extra_build_args: ""
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+
+    concurrency:
+      group: build-push-${{ matrix.image }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate manual dispatch ref
+        if: github.event_name == 'workflow_dispatch' && github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          echo "Manual dispatch must target the default branch (${{ github.event.repository.default_branch }}) because this workflow only publishes latest/sha tags from the default branch."
+          exit 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # ratchet:docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="sha-${GITHUB_SHA::7}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # ratchet:docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=sha-{{sha}},enable={{is_default_branch}}
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          flavor: |
+            latest=false
+
+      - name: Build and push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # ratchet:docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            ONYX_VERSION=${{ steps.version.outputs.version }}
+            ${{ matrix.extra_build_args }}
+          cache-from: |
+            type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:cache-arm64
+          cache-to: |
+            type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:cache-arm64,mode=max
+          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.force_no_cache }}
+          provenance: false

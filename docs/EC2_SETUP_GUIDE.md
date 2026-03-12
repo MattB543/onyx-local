@@ -118,7 +118,7 @@ Replace `ACCOUNT_ID` and `KMS_KEY_ID`:
     {
       "Sid": "KmsEnvelopeEncryption",
       "Effect": "Allow",
-      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+      "Action": ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
       "Resource": "arn:aws:kms:us-east-2:ACCOUNT_ID:key/KMS_KEY_ID"
     },
     {
@@ -138,6 +138,22 @@ Replace `ACCOUNT_ID` and `KMS_KEY_ID`:
 ```
 
 Attach that role to the EC2 instance.
+
+**Alternative: KMS key policy.** If you cannot create custom IAM policies (e.g. restricted SSO permission sets), you can grant the EC2 role crypto operations directly in the KMS key policy instead. Add a second statement to the key policy:
+
+```json
+{
+  "Sid": "Allow EC2 role to use the key for crypto operations",
+  "Effect": "Allow",
+  "Principal": {
+    "AWS": "arn:aws:iam::ACCOUNT_ID:role/YOUR_EC2_ROLE_NAME"
+  },
+  "Action": ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"],
+  "Resource": "*"
+}
+```
+
+This bypasses IAM entirely — the permission is granted at the KMS resource level. Use `kms:PutKeyPolicy` to apply it via CLI or edit the key policy in the KMS console.
 
 ### 4c. Set IMDS hop limit to 2
 
@@ -160,9 +176,9 @@ REGION=us-east-2
 SSM_KMS_KEY=alias/onyx-secrets-key
 PREFIX=/onyx/prod/secrets
 
-POSTGRES_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
-DB_READONLY_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
-MINIO_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
+POSTGRES_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+DB_READONLY_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+MINIO_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
 
 aws ssm put-parameter \
   --name "$PREFIX/POSTGRES_PASSWORD" \
@@ -254,7 +270,13 @@ The last command should print `/onyx/prod/encrypted_dek/v1`.
 
 ## 5. EC2 Host Setup
 
-### 5a. Install packages
+### 5a. Connect and install packages
+
+If connecting via SSM Session Manager, the session starts as `ssm-user`. Switch to `ec2-user` first:
+
+```bash
+sudo su - ec2-user
+```
 
 Amazon Linux 2023 includes AWS CLI v2 by default. Verify it, then install the remaining packages the bootstrap script needs:
 
@@ -563,13 +585,18 @@ docker exec onyx-stack-relational_db-1 pg_dump -U postgres -d postgres > backup-
 |---------|--------------|-----|
 | `AccessDeniedException` on SSM or KMS | IMDS hop limit still `1` | set hop limit to `2` |
 | `AccessDeniedException` on SSM or KMS | role policy or key policy points at the wrong region or key ARN | confirm everything is in `us-east-2` and the policy references the correct key |
+| `AccessDeniedException` on `kms:Encrypt` during `ssm put-parameter` | EC2 role missing `kms:Encrypt` | SSM needs `kms:Encrypt` to write SecureStrings with a custom KMS key — add it to the IAM policy or KMS key policy |
+| `AWSKeyManagementServicePowerUser` doesn't grant crypto ops | this managed policy only covers key management (Create, Describe, List), not Encrypt/Decrypt/GenerateDataKey | use a custom IAM policy or grant crypto ops via the KMS key policy instead |
 | bootstrap logs show `0 secret(s)` | wrong SSM prefix | verify `/onyx/prod/secrets` exists in `us-east-2` |
 | `Failed to fetch encrypted DEK from AWS SSM Parameter Store` | wrong `AWS_ENCRYPTED_DEK_PARAM` or missing IAM permission | verify `/onyx/prod/encrypted_dek/v1` exists and the instance role can read it |
 | `Failed to decrypt DEK with AWS KMS` | wrong `AWS_KMS_KEY_ID`, key policy, or region | verify the CMK and instance role permissions |
 | `Cannot decrypt legacy AES-CBC data: ENCRYPTION_KEY_SECRET is not set` | migration needs the old key | store `ENCRYPTION_KEY_SECRET` in SSM before re-encrypting |
 | bootstrap fails with a duplicate SSM key error | two parameter paths end with the same env key name | rename one of the SSM parameters so every final path segment is unique |
 | Cloudflare Tunnel cannot connect to origin | wrong origin port or Onyx not running | verify `curl http://127.0.0.1:8080/api/health` on the instance |
-| `502 Bad Gateway` from nginx | api/web container not healthy yet | check `docker compose ... logs api_server web_server` |
+| `502 Bad Gateway` from nginx | api/web container not healthy yet | check `docker compose ... logs api_server web_server`; restart nginx after rebuilding services |
+| `ValueError: The length of the provided data is not a multiple of the block length` | EE encryption module not delegating to KMS path | ensure `SECRET_ENCRYPTION_MODE=aws_kms_envelope` is set in `.env` and the EE `_decrypt_bytes` checks the mode |
+
+**Windows / Git Bash users:** Git Bash on Windows converts paths starting with `/` to Windows paths (e.g. `/onyx/prod/secrets` becomes `C:/Program Files/Git/onyx/prod/secrets`). Set `export MSYS_NO_PATHCONV=1` before running AWS CLI commands with SSM parameter paths.
 
 Useful manual checks:
 
@@ -623,3 +650,12 @@ Boot sequence:
 5. `api_server` and `background` fetch `/onyx/prod/encrypted_dek/v{version}` from SSM
 6. KMS decrypts the DEK
 7. Onyx uses that DEK for database credential encryption at runtime
+
+### Encryption delegation
+
+Onyx uses `fetch_versioned_implementation` to select between OSS and EE versions of encryption functions at runtime. When EE is enabled, the EE `_decrypt_bytes` and `_encrypt_string` check `SECRET_ENCRYPTION_MODE`:
+
+- **`aws_kms_envelope`:** Delegates to the OSS KMS envelope encryption path, which handles KMS payloads and falls back to legacy AES-CBC decryption (using `ENCRYPTION_KEY_SECRET`) for data encrypted before migration.
+- **`disabled`:** Uses the legacy AES-CBC path with `ENCRYPTION_KEY_SECRET` directly.
+
+During migration, keep both `ENCRYPTION_KEY_SECRET` (for legacy fallback) and the KMS env vars set until all data has been re-encrypted.

@@ -2,7 +2,7 @@ name: onyx
 
 services:
   api_server:
-    image: onyxdotapp/onyx-backend:${IMAGE_TAG:-latest}
+    image: ${ONYX_BACKEND_IMAGE:-onyxdotapp/onyx-backend:${IMAGE_TAG:-latest}}
     build:
       context: ../../backend
       dockerfile: Dockerfile
@@ -50,7 +50,7 @@ services:
       - file-system:/app/file-system
 
   background:
-    image: onyxdotapp/onyx-backend:${IMAGE_TAG:-latest}
+    image: ${ONYX_BACKEND_IMAGE:-onyxdotapp/onyx-backend:${IMAGE_TAG:-latest}}
     build:
       context: ../../backend
       dockerfile: Dockerfile
@@ -105,7 +105,7 @@ services:
         max-file: "6"
 
   web_server:
-    image: onyxdotapp/onyx-web-server:${IMAGE_TAG:-latest}
+    image: ${ONYX_WEB_SERVER_IMAGE:-onyxdotapp/onyx-web-server:${IMAGE_TAG:-latest}}
     build:
       context: ../../web
       dockerfile: Dockerfile
@@ -129,7 +129,7 @@ services:
         max-file: "6"
 
   inference_model_server:
-    image: onyxdotapp/onyx-model-server:${IMAGE_TAG:-latest}
+    image: ${ONYX_MODEL_SERVER_IMAGE:-onyxdotapp/onyx-model-server:${IMAGE_TAG:-latest}}
     build:
       context: ../../backend
       dockerfile: Dockerfile.model_server
@@ -154,7 +154,7 @@ services:
         max-file: "6"
 
   indexing_model_server:
-    image: onyxdotapp/onyx-model-server:${IMAGE_TAG:-latest}
+    image: ${ONYX_MODEL_SERVER_IMAGE:-onyxdotapp/onyx-model-server:${IMAGE_TAG:-latest}}
     build:
       context: ../../backend
       dockerfile: Dockerfile.model_server
