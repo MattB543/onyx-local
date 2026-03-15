@@ -10,6 +10,7 @@ import type { Route } from "next";
 import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 import LoginPage from "./LoginPage";
 import { AuthType } from "@/lib/constants";
+import { getServerAuthBranding } from "@/lib/serverBranding";
 
 export interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -17,6 +18,7 @@ export interface PageProps {
 
 export default async function Page(props: PageProps) {
   const searchParams = await props.searchParams;
+  const { brandName, isWhitelabeled } = getServerAuthBranding();
   const autoRedirectDisabled = searchParams?.disableAutoRedirect === "true";
   const autoRedirectToSignupDisabled =
     searchParams?.autoRedirectToSignup === "false";
@@ -108,6 +110,8 @@ export default async function Page(props: PageProps) {
           authUrl={authUrl}
           authTypeMetadata={authTypeMetadata}
           nextUrl={nextUrl}
+          brandName={brandName}
+          isWhitelabeled={isWhitelabeled}
           hidePageRedirect={true}
           verified={verified}
           isFirstUser={isFirstUser}

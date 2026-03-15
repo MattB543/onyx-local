@@ -1,12 +1,13 @@
-"use client";
-
 import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 import { REGISTRATION_URL } from "@/lib/constants";
 import { Button } from "@opal/components";
 import Link from "next/link";
 import { SvgImport } from "@opal/icons";
+import { getServerAuthBranding } from "@/lib/serverBranding";
 
 export default function Page() {
+  const { brandName } = getServerAuthBranding();
+
   return (
     <AuthFlowContainer>
       <div className="flex flex-col space-y-6">
@@ -14,12 +15,12 @@ export default function Page() {
           Account Not Found
         </h2>
         <p className="text-text-700 max-w-md text-center">
-          We couldn&apos;t find your account in our records. To access Onyx, you
-          need to either:
+          We couldn&apos;t find your account in our records. To access{" "}
+          {brandName}, you need to either:
         </p>
         <ul className="list-disc text-left text-text-600 w-full pl-6 mx-auto">
-          <li>Be invited to an existing Onyx team</li>
-          <li>Create a new Onyx team</li>
+          <li>Be invited to an existing {brandName} team</li>
+          <li>Create a new {brandName} team</li>
         </ul>
         <div className="flex justify-center">
           <Button

@@ -4,7 +4,6 @@ import { Button } from "@opal/components";
 import Logo from "@/refresh-components/Logo";
 import { SvgSidebar } from "@opal/icons";
 import { useSettingsContext } from "@/providers/SettingsProvider";
-import { NEXT_PUBLIC_WHITELABEL_NAME } from "@/lib/constants";
 
 interface LogoSectionProps {
   folded?: boolean;
@@ -14,6 +13,7 @@ interface LogoSectionProps {
 function LogoSection({ folded, onFoldClick }: LogoSectionProps) {
   const settings = useSettingsContext();
   const applicationName = settings.enterpriseSettings?.application_name;
+  const whitelabelName = settings.settings?.whitelabel_name;
   const logoDisplayStyle = settings.enterpriseSettings?.logo_display_style;
 
   const logo = useCallback(
@@ -38,7 +38,7 @@ function LogoSection({ folded, onFoldClick }: LogoSectionProps) {
         /* px-2.5 => 2 for the standard sidebar padding + 0.5 for internal padding specific to this component. */
         "flex px-2.5 py-2",
         folded ? "justify-center" : "justify-between",
-        applicationName || NEXT_PUBLIC_WHITELABEL_NAME
+        applicationName || whitelabelName
           ? "h-[3.75rem] min-h-[3.75rem]"
           : "h-[3.25rem] min-h-[3.25rem]"
       )}

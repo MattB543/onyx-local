@@ -12,6 +12,7 @@ export enum QueryHistoryType {
 }
 
 export interface Settings {
+  whitelabel_name?: string | null;
   anonymous_user_enabled: boolean;
   invite_only_enabled: boolean;
   anonymous_user_path?: string;

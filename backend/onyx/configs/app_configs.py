@@ -51,6 +51,9 @@ GENERATIVE_MODEL_ACCESS_CHECK_FREQ = int(
 # Controls whether users can use User Knowledge (personal documents) in assistants
 DISABLE_USER_KNOWLEDGE = os.environ.get("DISABLE_USER_KNOWLEDGE", "").lower() == "true"
 
+# Whitelabel: if set, replaces "Onyx" branding with this name in the UI
+WHITELABEL_NAME = os.environ.get("WHITELABEL_NAME") or None
+
 # Disables vector DB (Vespa/OpenSearch) entirely. When True, connectors and RAG search
 # are disabled but core chat, tools, user file uploads, and Projects still work.
 DISABLE_VECTOR_DB = os.environ.get("DISABLE_VECTOR_DB", "").lower() == "true"

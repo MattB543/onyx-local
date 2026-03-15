@@ -49,6 +49,9 @@ class Notification(BaseModel):
 class Settings(BaseModel):
     """General settings"""
 
+    # Whitelabel: if set, replaces "Onyx" branding with this name
+    whitelabel_name: str | None = None
+
     # is float to allow for fractional days for easier automated testing
     maximum_chat_retention_days: float | None = None
     company_name: str | None = None

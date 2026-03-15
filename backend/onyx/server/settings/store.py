@@ -3,6 +3,7 @@ from onyx.configs.app_configs import DISABLE_USER_KNOWLEDGE
 from onyx.configs.app_configs import ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
 from onyx.configs.app_configs import ONYX_QUERY_HISTORY_TYPE
 from onyx.configs.app_configs import SHOW_EXTRA_CONNECTORS
+from onyx.configs.app_configs import WHITELABEL_NAME
 from onyx.configs.constants import KV_SETTINGS_KEY
 from onyx.configs.constants import OnyxRedisLocks
 from onyx.key_value_store.factory import get_kv_store
@@ -52,6 +53,7 @@ def load_settings() -> Settings:
 
     settings.show_extra_connectors = SHOW_EXTRA_CONNECTORS
     settings.opensearch_indexing_enabled = ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
+    settings.whitelabel_name = WHITELABEL_NAME
     return settings
 
 
