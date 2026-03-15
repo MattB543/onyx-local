@@ -14,8 +14,6 @@ interface LoginPageProps {
   authUrl: string | null;
   authTypeMetadata: AuthTypeMetadata | null;
   nextUrl: string | null;
-  brandName: string;
-  isWhitelabeled: boolean;
   hidePageRedirect?: boolean;
   verified?: boolean;
   isFirstUser?: boolean;
@@ -25,8 +23,6 @@ export default function LoginPage({
   authUrl,
   authTypeMetadata,
   nextUrl,
-  brandName,
-  isWhitelabeled,
   hidePageRedirect,
   verified,
   isFirstUser,
@@ -53,10 +49,7 @@ export default function LoginPage({
         // basic auth is handled below w/ the EmailPasswordForm
         authTypeMetadata.authType !== AuthType.BASIC && (
           <div className="flex flex-col w-full gap-4">
-            <LoginText
-              brandName={brandName}
-              isWhitelabeled={isWhitelabeled}
-            />
+            <LoginText />
             <SignInButton
               authorizeUrl={authUrl}
               authType={authTypeMetadata?.authType}
@@ -66,7 +59,7 @@ export default function LoginPage({
 
       {authTypeMetadata?.authType === AuthType.CLOUD && (
         <div className="w-full justify-center flex flex-col gap-6">
-          <LoginText brandName={brandName} isWhitelabeled={isWhitelabeled} />
+          <LoginText />
           {authUrl && authTypeMetadata && (
             <>
               <SignInButton
@@ -91,7 +84,7 @@ export default function LoginPage({
 
       {authTypeMetadata?.authType === AuthType.BASIC && (
         <div className="flex flex-col w-full gap-6">
-          <LoginText brandName={brandName} isWhitelabeled={isWhitelabeled} />
+          <LoginText />
 
           {authTypeMetadata?.oauthEnabled && authUrl && (
             <>

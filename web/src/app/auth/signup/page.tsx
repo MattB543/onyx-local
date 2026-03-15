@@ -14,13 +14,11 @@ import AuthErrorDisplay from "@/components/auth/AuthErrorDisplay";
 import Text from "@/refresh-components/texts/Text";
 import { cn } from "@/lib/utils";
 import { AuthType } from "@/lib/constants";
-import { getServerAuthBranding } from "@/lib/serverBranding";
 
 const Page = async (props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) => {
   const searchParams = await props.searchParams;
-  const { brandName } = getServerAuthBranding();
   const nextUrl = Array.isArray(searchParams?.next)
     ? searchParams?.next[0]
     : searchParams?.next || null;
@@ -79,7 +77,7 @@ const Page = async (props: {
               {cloud ? "Complete your sign up" : "Create account"}
             </Text>
             <Text as="p" text03>
-              Get started with {brandName}
+              Get started with Onyx
             </Text>
           </div>
           {cloud && authUrl && (
