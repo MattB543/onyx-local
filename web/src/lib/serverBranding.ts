@@ -1,5 +1,3 @@
-import "server-only";
-
 export function getServerAuthBranding() {
   const whitelabelName = process.env.WHITELABEL_NAME?.trim();
 

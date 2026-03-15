@@ -1,3 +1,5 @@
+"use client";
+
 import AuthFlowContainer from "@/components/auth/AuthFlowContainer";
 import { REGISTRATION_URL } from "@/lib/constants";
 import { Button } from "@opal/components";
