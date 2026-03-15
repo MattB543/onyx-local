@@ -7,6 +7,7 @@ import {
   LOGO_FOLDED_SIZE_PX,
   LOGO_UNFOLDED_SIZE_PX,
   NEXT_PUBLIC_DO_NOT_USE_TOGGLE_OFF_DANSWER_POWERED,
+  NEXT_PUBLIC_WHITELABEL_NAME,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import Text from "@/refresh-components/texts/Text";
@@ -25,6 +26,28 @@ export default function Logo({ folded, size, className }: LogoProps) {
   const settings = useSettingsContext();
   const logoDisplayStyle = settings.enterpriseSettings?.logo_display_style;
   const applicationName = settings.enterpriseSettings?.application_name;
+
+  // Whitelabel override: show just the name text, no Onyx icon
+  if (NEXT_PUBLIC_WHITELABEL_NAME) {
+    if (folded) {
+      return (
+        <div
+          className={cn(
+            "flex items-center justify-center font-bold text-lg flex-shrink-0",
+            className
+          )}
+          style={{ width: foldedSize, height: foldedSize }}
+        >
+          {NEXT_PUBLIC_WHITELABEL_NAME.charAt(0)}
+        </div>
+      );
+    }
+    return (
+      <div className={cn("flex items-center", className)}>
+        <Truncated headingH3>{NEXT_PUBLIC_WHITELABEL_NAME}</Truncated>
+      </div>
+    );
+  }
 
   const logo = useMemo(
     () =>

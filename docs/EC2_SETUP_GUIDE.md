@@ -303,9 +303,11 @@ Log out and back in after adding `ec2-user` to the `docker` group.
 
 ```bash
 cd /home/ec2-user
-git clone --depth 1 https://github.com/onyx-dot-app/onyx.git
+git clone --depth 1 https://github.com/MattB543/onyx-local.git onyx
 cd /home/ec2-user/onyx/deployment/docker_compose
 ```
+
+The directory must be named `onyx` (matching the systemd unit's `WorkingDirectory`). The `onyx` argument to `git clone` ensures this regardless of the repo name.
 
 ### 5c. Create `env.config` from the repo template
 
@@ -317,11 +319,14 @@ Edit `env.config`. Use the template variables as follows:
 
 | Variable | Set / keep | Notes |
 |----------|------------|-------|
-| `IMAGE_TAG` | set if you want a pinned release | leave `latest` only if you are comfortable pulling the newest image on update |
+| `ONYX_BACKEND_IMAGE` | set | full image reference including tag, e.g. `ghcr.io/mattb543/onyx-backend:latest` |
+| `ONYX_WEB_SERVER_IMAGE` | set | full image reference including tag, e.g. `ghcr.io/mattb543/onyx-web-server:latest` |
+| `ONYX_MODEL_SERVER_IMAGE` | set | full image reference including tag, e.g. `ghcr.io/mattb543/onyx-model-server:latest` |
+| `IMAGE_TAG` | usually leave unset | only used as a fallback tag when `ONYX_*_IMAGE` vars are not set (i.e. pulling upstream images) |
 | `WEB_DOMAIN` | set | public Cloudflare hostname, e.g. `https://onyx.company.com` |
 | `AUTH_TYPE` | keep `basic` | this guide does not use OAuth or OIDC |
 | `VALID_EMAIL_DOMAINS` | set | restrict Onyx self-signup to your real email domain list |
-| `SESSION_EXPIRE_TIME_SECONDS` | keep or tune | default `604800` is a 7-day session lifetime |
+| `SESSION_EXPIRE_TIME_SECONDS` | set to `157680000` | 5-year session lifetime — Cloudflare Access + Okta handles real authentication, so users should only need to create their Onyx account once |
 | `LICENSE_ENFORCEMENT_ENABLED` | keep `false` | prevents EE/license-gated codepaths from loading for this MIT-only deployment |
 | `POSTGRES_USER` | keep unless you have a reason to change it | database superuser name used by the compose stack |
 | `DB_READONLY_USER` | keep unless you have a reason to change it | readonly DB username created by the stack |
@@ -345,10 +350,11 @@ Edit `env.config`. Use the template variables as follows:
 
 For a normal fresh deployment, the only values you usually need to change are:
 
+- `ONYX_BACKEND_IMAGE`, `ONYX_WEB_SERVER_IMAGE`, `ONYX_MODEL_SERVER_IMAGE` (point at the fork's GHCR images)
 - `WEB_DOMAIN`
 - `VALID_EMAIL_DOMAINS`
+- `SESSION_EXPIRE_TIME_SECONDS` (set to `157680000` so users don't re-auth in Onyx after Cloudflare Access lets them through)
 - `AWS_KMS_KEY_ID`
-- optionally `IMAGE_TAG`
 - optionally `S3_FILE_STORE_BUCKET_NAME`
 - optionally `TUNNEL_ORIGIN_PORT`
 
@@ -571,6 +577,15 @@ cd deployment/docker_compose
 sudo systemctl restart onyx.service
 ```
 
+The systemd unit automatically pulls the latest images (via `ExecStartPre` → `docker compose pull`) and regenerates `.env` from `env.config` + SSM before starting.
+
+If disk space is tight after pulling new images, clean up old ones:
+
+```bash
+docker system prune -a
+docker builder prune -a
+```
+
 Database backup:
 
 ```bash
@@ -594,6 +609,7 @@ docker exec onyx-stack-relational_db-1 pg_dump -U postgres -d postgres > backup-
 | bootstrap fails with a duplicate SSM key error | two parameter paths end with the same env key name | rename one of the SSM parameters so every final path segment is unique |
 | Cloudflare Tunnel cannot connect to origin | wrong origin port or Onyx not running | verify `curl http://127.0.0.1:8080/api/health` on the instance |
 | `502 Bad Gateway` from nginx | api/web container not healthy yet | check `docker compose ... logs api_server web_server`; restart nginx after rebuilding services |
+| `no space left on device` during image pull | old images / build cache filling disk | run `docker system prune -a && docker builder prune -a`, then retry |
 | `ValueError: The length of the provided data is not a multiple of the block length` | EE encryption module not delegating to KMS path | ensure `SECRET_ENCRYPTION_MODE=aws_kms_envelope` is set in `.env` and the EE `_decrypt_bytes` checks the mode |
 
 **Windows / Git Bash users:** Git Bash on Windows converts paths starting with `/` to Windows paths (e.g. `/onyx/prod/secrets` becomes `C:/Program Files/Git/onyx/prod/secrets`). Set `export MSYS_NO_PATHCONV=1` before running AWS CLI commands with SSM parameter paths.
@@ -646,7 +662,8 @@ Boot sequence:
 1. EC2 starts
 2. systemd starts `onyx.service`
 3. `bootstrap-env.sh` fetches SSM secrets into `.env`
-4. `docker-compose.prod-tunnel.yml` starts the Onyx stack
+4. `docker compose pull` fetches the latest images from GHCR
+5. `docker-compose.prod-tunnel.yml` starts the Onyx stack
 5. `api_server` and `background` fetch `/onyx/prod/encrypted_dek/v{version}` from SSM
 6. KMS decrypts the DEK
 7. Onyx uses that DEK for database credential encryption at runtime
