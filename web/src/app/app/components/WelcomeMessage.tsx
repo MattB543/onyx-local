@@ -37,10 +37,12 @@ export default function WelcomeMessage({
 
   let content: React.ReactNode = null;
 
+  const whitelabelName = settings?.settings?.whitelabel_name;
+
   if (isDefaultAgent) {
     content = (
       <div data-testid="onyx-logo" className="flex flex-row items-center gap-4">
-        <Logo folded size={32} />
+        {!whitelabelName && <Logo folded size={32} />}
         <Text as="p" headingH2>
           {greeting}
         </Text>
