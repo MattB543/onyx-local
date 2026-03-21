@@ -12,7 +12,7 @@ import Card from "@/refresh-components/cards/Card";
 import EmptyMessage from "@/refresh-components/EmptyMessage";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import Pagination from "@/refresh-components/Pagination";
+import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import CreateOrganizationModal from "@/refresh-pages/crm/components/CreateOrganizationModal";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
@@ -202,7 +202,7 @@ export default function CrmOrganizationsPage() {
           )}
 
           {!isLoading && organizations.length > 0 && totalPages > 1 && (
-            <Pagination
+            <PageSelector
               currentPage={pageNum + 1}
               totalPages={totalPages}
               onPageChange={(nextPage) => setPageNum(nextPage - 1)}

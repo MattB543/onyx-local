@@ -17,7 +17,7 @@ import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import Pagination from "@/refresh-components/Pagination";
+import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
 import CreateContactModal from "@/refresh-pages/crm/components/CreateContactModal";
@@ -297,7 +297,7 @@ export default function CrmContactsPage() {
           )}
 
           {!isLoading && contacts.length > 0 && totalPages > 1 && (
-            <Pagination
+            <PageSelector
               currentPage={pageNum + 1}
               totalPages={totalPages}
               onPageChange={(nextPage) => setPageNum(nextPage - 1)}

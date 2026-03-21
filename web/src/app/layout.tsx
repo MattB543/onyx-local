@@ -58,9 +58,8 @@ export async function generateMetadata(): Promise<Metadata> {
     }
   }
 
-  const settingsRes = await fetchSettingsSS();
-  const settings = settingsRes.ok ? (await settingsRes.json()) : null;
-  const whitelabelName = settings?.whitelabel_name;
+  const combinedSettings = await fetchSettingsSS();
+  const whitelabelName = combinedSettings?.settings?.whitelabel_name;
 
   return {
     title: enterpriseSettings?.application_name || whitelabelName || "Onyx",
