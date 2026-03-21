@@ -248,7 +248,7 @@ export default function AddConnector({
       toast.success("Credential deleted successfully!");
     } else {
       const errorData = await response.json();
-      toast.error(errorData.message);
+      toast.error(errorData.detail || errorData.message);
     }
   };
 
@@ -467,7 +467,7 @@ export default function AddConnector({
 
                 if (!timeoutErrorHappenedRef.current) {
                   // Only show error if timeout didn't happen
-                  toast.error(errorData.message || errorData.detail);
+                  toast.error(errorData.detail || errorData.message);
                 }
               }
             } else if (isSuccess) {

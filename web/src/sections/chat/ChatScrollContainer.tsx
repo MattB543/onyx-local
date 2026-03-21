@@ -368,7 +368,7 @@ const ChatScrollContainer = memo(
           >
             <div
               ref={contentWrapperRef}
-              className="w-full flex-1 flex flex-col items-center"
+              className="w-full flex-1 flex flex-col items-center px-4"
               data-scroll-ready={isScrollReady}
               style={{
                 visibility: isScrollReady ? "visible" : "hidden",

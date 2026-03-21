@@ -3,6 +3,7 @@ from onyx.configs.app_configs import DISABLE_USER_KNOWLEDGE
 from onyx.configs.app_configs import ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
 from onyx.configs.app_configs import ONYX_QUERY_HISTORY_TYPE
 from onyx.configs.app_configs import SHOW_EXTRA_CONNECTORS
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_MB
 from onyx.configs.app_configs import WHITELABEL_NAME
 from onyx.configs.constants import KV_SETTINGS_KEY
 from onyx.configs.constants import OnyxRedisLocks
@@ -51,6 +52,7 @@ def load_settings() -> Settings:
     if DISABLE_USER_KNOWLEDGE:
         settings.user_knowledge_enabled = False
 
+    settings.user_file_max_upload_size_mb = USER_FILE_MAX_UPLOAD_SIZE_MB
     settings.show_extra_connectors = SHOW_EXTRA_CONNECTORS
     settings.opensearch_indexing_enabled = ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
     settings.whitelabel_name = WHITELABEL_NAME

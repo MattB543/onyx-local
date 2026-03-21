@@ -7,6 +7,8 @@ interface CodeBlockProps {
   className?: string;
   children?: ReactNode;
   codeText: string;
+  showHeader?: boolean;
+  noPadding?: boolean;
 }
 
 const MemoizedCodeLine = memo(({ content }: { content: ReactNode }) => (
@@ -17,6 +19,8 @@ export const CodeBlock = memo(function CodeBlock({
   className = "",
   children,
   codeText,
+  showHeader = true,
+  noPadding = false,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -36,7 +40,7 @@ export const CodeBlock = memo(function CodeBlock({
     });
   }, [codeText]);
 
-  const copyButton = (
+  const CopyButton = () => (
     <div
       className="ml-auto cursor-pointer select-none"
       onMouseDown={handleCopy}
@@ -82,45 +86,61 @@ export const CodeBlock = memo(function CodeBlock({
     );
   }
 
-  const codeContent = !language ? (
-    <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
-      <code className={`text-sm hljs ${className}`}>
-        {Array.isArray(children)
-          ? children.map((child, index) => (
-              <MemoizedCodeLine key={index} content={child} />
-            ))
-          : children}
-      </code>
-    </pre>
-  ) : (
-    <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
-      <code className="text-xs">
-        {Array.isArray(children)
-          ? children.map((child, index) => (
-              <MemoizedCodeLine key={index} content={child} />
-            ))
-          : children}
-      </code>
-    </pre>
-  );
+  const CodeContent = () => {
+    if (!language) {
+      return (
+        <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
+          <code className={`text-sm hljs ${className}`}>
+            {Array.isArray(children)
+              ? children.map((child, index) => (
+                  <MemoizedCodeLine key={index} content={child} />
+                ))
+              : children}
+          </code>
+        </pre>
+      );
+    }
+
+    return (
+      <pre className="!p-2 m-0 overflow-x-auto w-0 min-w-full hljs">
+        <code className="text-xs">
+          {Array.isArray(children)
+            ? children.map((child, index) => (
+                <MemoizedCodeLine key={index} content={child} />
+              ))
+            : children}
+        </code>
+      </pre>
+    );
+  };
 
   return (
-    <div className="bg-background-tint-00 px-1 pb-1 rounded-12 max-w-full min-w-0">
-      {language && (
-        <div className="flex items-center px-2 py-1 text-sm text-text-04 gap-x-2">
-          <SvgCode
-            height={12}
-            width={12}
-            stroke="currentColor"
-            className="my-auto"
-          />
-          <Text secondaryMono>{language}</Text>
-          {codeText && copyButton}
+    <>
+      {showHeader ? (
+        <div
+          className={cn(
+            "bg-background-tint-00 rounded-12 max-w-full min-w-0",
+            !noPadding && "px-1 pb-1"
+          )}
+        >
+          {language && (
+            <div className="flex items-center px-2 py-1 text-sm text-text-04 gap-x-2">
+              <SvgCode
+                height={12}
+                width={12}
+                stroke="currentColor"
+                className="my-auto"
+              />
+              <Text secondaryMono>{language}</Text>
+              {codeText && <CopyButton />}
+            </div>
+          )}
+          <CodeContent />
         </div>
+      ) : (
+        <CodeContent />
       )}
-
-      {codeContent}
-    </div>
+    </>
   );
 });
 

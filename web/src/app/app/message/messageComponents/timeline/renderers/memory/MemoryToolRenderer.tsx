@@ -50,6 +50,7 @@ export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string
         content: <div />,
         supportsCollapsible: false,
         timelineLayout: "timeline",
+        noPaddingRight: true,
       },
     ]);
   }
@@ -87,6 +88,7 @@ export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string
         status: "Memory",
         supportsCollapsible: false,
         timelineLayout: "timeline",
+        noPaddingRight: true,
         content,
       },
     ]);
@@ -156,6 +158,7 @@ export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string
       status: statusLabel,
       supportsCollapsible: false,
       timelineLayout: "timeline",
+      noPaddingRight: true,
       content: memoryContent,
     },
   ]);

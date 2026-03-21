@@ -1,5 +1,3 @@
-import type { Route } from "next";
-import { useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
 // ---------------------------------------------------------------------------
@@ -162,25 +160,33 @@ export function useToast() {
 // Query-param toast hook
 // ---------------------------------------------------------------------------
 
-type ToastFromQueryMessages = Record<string, {
+interface ToastFromQueryMessages {
+  [key: string]: {
     message: string;
     type?: ToastLevel | null;
-  }>;
+  };
+}
 
 /**
  * Reads a `?message=<key>` query param on mount, fires the matching toast,
  * and strips the param from the URL.
  */
 export function useToastFromQuery(messages: ToastFromQueryMessages) {
-  const router = useRouter();
-
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const messageValue = searchParams?.get("message");
 
     if (messageValue && messageValue in messages) {
+      searchParams.delete("message");
+      const newSearch = searchParams.toString()
+        ? "?" + searchParams.toString()
+        : "";
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + newSearch
+      );
       const spec = messages[messageValue];
-      router.replace(window.location.pathname as Route);
       if (spec !== undefined) {
         toast({
           message: spec.message,

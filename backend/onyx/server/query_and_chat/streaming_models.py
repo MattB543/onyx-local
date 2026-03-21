@@ -33,6 +33,7 @@ class StreamingType(Enum):
     PYTHON_TOOL_START = "python_tool_start"
     PYTHON_TOOL_DELTA = "python_tool_delta"
     CUSTOM_TOOL_START = "custom_tool_start"
+    CUSTOM_TOOL_ARGS = "custom_tool_args"
     CUSTOM_TOOL_DELTA = "custom_tool_delta"
     CRM_SEARCH_TOOL_START = "crm_search_tool_start"
     CRM_SEARCH_TOOL_DELTA = "crm_search_tool_delta"
@@ -55,6 +56,7 @@ class StreamingType(Enum):
     REASONING_DONE = "reasoning_done"
     CITATION_INFO = "citation_info"
     TOOL_CALL_DEBUG = "tool_call_debug"
+    TOOL_CALL_ARGUMENT_DELTA = "tool_call_argument_delta"
 
     MEMORY_TOOL_START = "memory_tool_start"
     MEMORY_TOOL_DELTA = "memory_tool_delta"
@@ -259,6 +261,20 @@ class CustomToolStart(BaseObj):
     type: Literal["custom_tool_start"] = StreamingType.CUSTOM_TOOL_START.value
 
     tool_name: str
+    tool_id: int | None = None
+
+
+class CustomToolArgs(BaseObj):
+    type: Literal["custom_tool_args"] = StreamingType.CUSTOM_TOOL_ARGS.value
+
+    tool_name: str
+    tool_args: dict[str, Any]
+
+
+class CustomToolErrorInfo(BaseModel):
+    is_auth_error: bool = False
+    status_code: int
+    message: str
 
 
 # The allowed streamed packets for a custom tool
@@ -266,11 +282,22 @@ class CustomToolDelta(BaseObj):
     type: Literal["custom_tool_delta"] = StreamingType.CUSTOM_TOOL_DELTA.value
 
     tool_name: str
+    tool_id: int | None = None
     response_type: str
     # For non-file responses
     data: dict | list | str | int | float | bool | None = None
     # For file-based responses like image/csv
     file_ids: list[str] | None = None
+    error: CustomToolErrorInfo | None = None
+
+
+class ToolCallArgumentDelta(BaseObj):
+    type: Literal["tool_call_argument_delta"] = (
+        StreamingType.TOOL_CALL_ARGUMENT_DELTA.value
+    )
+
+    tool_type: str
+    argument_deltas: dict[str, Any]
 
 
 class CrmSearchToolStart(BaseObj):
@@ -458,6 +485,7 @@ PacketObj = Union[
     PythonToolStart,
     PythonToolDelta,
     CustomToolStart,
+    CustomToolArgs,
     CustomToolDelta,
     CrmSearchToolStart,
     CrmSearchToolDelta,
@@ -485,6 +513,7 @@ PacketObj = Union[
     # Citation Packets
     CitationInfo,
     ToolCallDebug,
+    ToolCallArgumentDelta,
     # Deep Research Packets
     DeepResearchPlanStart,
     DeepResearchPlanDelta,

@@ -227,7 +227,7 @@ def is_versioned_encrypted_payload(payload: bytes) -> bool:
 
 
 # IMPORTANT DO NOT DELETE, THIS IS USED BY fetch_versioned_implementation
-def _encrypt_string(input_str: str) -> bytes:
+def _encrypt_string(input_str: str, key: str | None = None) -> bytes:
     _validate_encryption_mode()
     if SECRET_ENCRYPTION_MODE == _SECRET_ENCRYPTION_MODE_DISABLED:
         if SECRET_ENCRYPTION_REQUIRED:
@@ -279,7 +279,7 @@ def _decrypt_legacy_aes_cbc(input_bytes: bytes) -> str:
 
 
 # IMPORTANT DO NOT DELETE, THIS IS USED BY fetch_versioned_implementation
-def _decrypt_bytes(input_bytes: bytes) -> str:
+def _decrypt_bytes(input_bytes: bytes, key: str | None = None) -> str:
     _validate_encryption_mode()
     if SECRET_ENCRYPTION_MODE == _SECRET_ENCRYPTION_MODE_DISABLED:
         if SECRET_ENCRYPTION_REQUIRED:
@@ -386,15 +386,15 @@ def ensure_secret_encryption_ready() -> None:
     versioned_check_fn()
 
 
-def encrypt_string_to_bytes(input_str: str) -> bytes:
+def encrypt_string_to_bytes(input_str: str, key: str | None = None) -> bytes:
     versioned_encryption_fn = fetch_versioned_implementation(
         "onyx.utils.encryption", "_encrypt_string"
     )
-    return versioned_encryption_fn(input_str)
+    return versioned_encryption_fn(input_str, key=key)
 
 
-def decrypt_bytes_to_string(input_bytes: bytes) -> str:
+def decrypt_bytes_to_string(input_bytes: bytes, key: str | None = None) -> str:
     versioned_decryption_fn = fetch_versioned_implementation(
         "onyx.utils.encryption", "_decrypt_bytes"
     )
-    return versioned_decryption_fn(input_bytes)
+    return versioned_decryption_fn(input_bytes, key=key)
