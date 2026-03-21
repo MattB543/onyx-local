@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import DataTable from "@/refresh-components/table/DataTable";
-import { createTableColumns } from "@/refresh-components/table/columns";
+import { Table, createTableColumns } from "@opal/components";
 import { Content } from "@opal/layouts";
 import { Button } from "@opal/components";
 import { SvgDownload } from "@opal/icons";
@@ -27,7 +26,7 @@ import type {
   StatusFilter,
   StatusCountMap,
 } from "./interfaces";
-import { getInitials } from "./utils";
+import { getUserInitials } from "@/lib/user";
 
 // ---------------------------------------------------------------------------
 // Column renderers
@@ -77,7 +76,8 @@ function buildColumns(onMutate: () => void) {
   return [
     tc.qualifier({
       content: "avatar-user",
-      getInitials: (row) => getInitials(row.personal_name, row.email),
+      getInitials: (row) =>
+        getUserInitials(row.personal_name, row.email) ?? "?",
       selectable: false,
     }),
     tc.column("email", {
@@ -216,10 +216,11 @@ export default function UsersTable({
         roleCounts={roleCounts}
         statusCounts={statusCounts}
       />
-      <DataTable
+      <Table
         data={filteredUsers}
         columns={columns}
         getRowId={(row) => row.id ?? row.email}
+        qualifier="avatar"
         pageSize={PAGE_SIZE}
         searchTerm={searchTerm}
         emptyState={
@@ -230,7 +231,6 @@ export default function UsersTable({
           />
         }
         footer={{
-          mode: "summary",
           leftExtra: (
             <Button
               icon={SvgDownload}
