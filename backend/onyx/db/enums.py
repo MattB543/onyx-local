@@ -382,3 +382,13 @@ class CustomJobTriggerEventStatus(str, PyEnum):
     CONSUMED = "consumed"
     DROPPED = "dropped"
     FAILED = "failed"
+
+
+class HookPoint(str, PyEnum):
+    DOCUMENT_INGESTION = "document_ingestion"
+    QUERY_PROCESSING = "query_processing"
+
+
+class HookFailStrategy(str, PyEnum):
+    HARD = "hard"  # exception propagates, pipeline aborts
+    SOFT = "soft"  # log error, return original input, pipeline continues

@@ -93,7 +93,7 @@ def create_message_packets(
     final_search_docs: list[SearchDoc] | None = None
     if final_documents:
         sorted_final_documents = sorted(
-            final_documents, key=lambda x: (x.score or 0.0), reverse=True
+            final_documents, key=lambda x: x.score or 0.0, reverse=True
         )
         final_search_docs = [
             SearchDoc(**doc.model_dump()) for doc in sorted_final_documents
@@ -562,7 +562,7 @@ def create_search_packets(
     # Emit documents if present
     if search_docs:
         sorted_search_docs = sorted(
-            search_docs, key=lambda x: (x.score or 0.0), reverse=True
+            search_docs, key=lambda x: x.score or 0.0, reverse=True
         )
         packets.append(
             Packet(

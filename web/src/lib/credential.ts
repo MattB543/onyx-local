@@ -89,7 +89,7 @@ export async function forceDeleteCredential<T>(credentialId: number) {
 export function linkCredential(
   connectorId: number,
   credentialId: number,
-  name?: string,
+  name: string,
   accessType?: AccessType,
   groups?: number[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,7 +104,7 @@ export function linkCredential(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: name || null,
+        name,
         access_type: accessType !== undefined ? accessType : "public",
         groups: groups || null,
         auto_sync_options: autoSyncOptions || null,

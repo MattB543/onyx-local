@@ -1439,7 +1439,7 @@ def get_connector_indexing_status(
     # Track admin page visit for analytics
     mt_cloud_telemetry(
         tenant_id=tenant_id,
-        distinct_id=user.email,
+        distinct_id=str(user.id),
         event=MilestoneRecordType.VISITED_ADMIN_PAGE,
     )
 
@@ -1620,8 +1620,7 @@ def _validate_connector_allowed(source: DocumentSource) -> None:
             return
 
     raise ValueError(
-        "This connector type has been disabled by your system admin. "
-        "Please contact them to get it enabled if you wish to use it."
+        "This connector type has been disabled by your system admin. Please contact them to get it enabled if you wish to use it."
     )
 
 
@@ -1654,7 +1653,7 @@ def create_connector_from_model(
 
         mt_cloud_telemetry(
             tenant_id=tenant_id,
-            distinct_id=user.email,
+            distinct_id=str(user.id),
             event=MilestoneRecordType.CREATED_CONNECTOR,
         )
 
@@ -1727,13 +1726,12 @@ def create_connector_with_mock_credential(
         )
 
         logger.info(
-            f"create_connector_with_mock_credential - running check_for_indexing: "
-            f"cc_pair={response.data}"
+            f"create_connector_with_mock_credential - running check_for_indexing: cc_pair={response.data}"
         )
 
         mt_cloud_telemetry(
             tenant_id=tenant_id,
-            distinct_id=user.email,
+            distinct_id=str(user.id),
             event=MilestoneRecordType.CREATED_CONNECTOR,
         )
         return response
@@ -2087,9 +2085,7 @@ def submit_connector_request(
     if not connector_name:
         raise HTTPException(status_code=400, detail="Connector name cannot be empty")
 
-    # Get user identifier for telemetry
     user_email = user.email
-    distinct_id = user_email or tenant_id
 
     # Track connector request via PostHog telemetry (Cloud only)
     from shared_configs.configs import MULTI_TENANT
@@ -2097,11 +2093,11 @@ def submit_connector_request(
     if MULTI_TENANT:
         mt_cloud_telemetry(
             tenant_id=tenant_id,
-            distinct_id=distinct_id,
+            distinct_id=str(user.id),
             event=MilestoneRecordType.REQUESTED_CONNECTOR,
             properties={
                 "connector_name": connector_name,
-                "user_email": user_email,
+                "user_email": user.email,
             },
         )
 
@@ -2112,7 +2108,7 @@ def submit_connector_request(
             email_body_text = f"""A new connector request has been submitted:
 
 Connector Name: {connector_name}
-User Email: {user_email or 'Not provided (anonymous user)'}
+User Email: {user_email or "Not provided (anonymous user)"}
 Tenant ID: {tenant_id}
 """
             email_body_html = f"""<html>
@@ -2120,7 +2116,7 @@ Tenant ID: {tenant_id}
 <p>A new connector request has been submitted:</p>
 <ul>
 <li><strong>Connector Name:</strong> {connector_name}</li>
-<li><strong>User Email:</strong> {user_email or 'Not provided (anonymous user)'}</li>
+<li><strong>User Email:</strong> {user_email or "Not provided (anonymous user)"}</li>
 <li><strong>Tenant ID:</strong> {tenant_id}</li>
 </ul>
 </body>
@@ -2142,8 +2138,7 @@ Tenant ID: {tenant_id}
             )
 
     logger.info(
-        f"Connector request submitted: {connector_name} by user {user_email or 'anonymous'} "
-        f"(tenant: {tenant_id})"
+        f"Connector request submitted: {connector_name} by user {user_email or 'anonymous'} (tenant: {tenant_id})"
     )
 
     return StatusResponse(

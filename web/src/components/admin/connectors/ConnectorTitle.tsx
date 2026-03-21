@@ -15,7 +15,7 @@ interface ConnectorTitleProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connector: Connector<any>;
   ccPairId: number;
-  ccPairName: string | null | undefined;
+  ccPairName: string;
   isPublic?: boolean;
   owner?: string;
   isLink?: boolean;

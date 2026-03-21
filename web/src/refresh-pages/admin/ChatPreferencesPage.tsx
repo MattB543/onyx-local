@@ -24,7 +24,7 @@ import {
   SvgFold,
   SvgExternalLink,
 } from "@opal/icons";
-import { ADMIN_ROUTE_CONFIG, ADMIN_PATHS } from "@/lib/admin-routes";
+import { ADMIN_ROUTES } from "@/lib/admin-routes";
 import { Content } from "@opal/layouts";
 import {
   useSettingsContext,
@@ -64,7 +64,7 @@ import {
   DEFAULT_CRM_STAGE_OPTIONS,
 } from "@/refresh-pages/crm/crmOptions";
 
-const route = ADMIN_ROUTE_CONFIG[ADMIN_PATHS.CHAT_PREFERENCES]!;
+const route = ADMIN_ROUTES.CHAT_PREFERENCES;
 
 interface DefaultAgentConfiguration {
   tool_ids: number[];
