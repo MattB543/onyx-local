@@ -58,8 +58,12 @@ export async function generateMetadata(): Promise<Metadata> {
     }
   }
 
+  const settingsRes = await fetchSettingsSS();
+  const settings = settingsRes.ok ? (await settingsRes.json()) : null;
+  const whitelabelName = settings?.whitelabel_name;
+
   return {
-    title: enterpriseSettings?.application_name || "Onyx",
+    title: enterpriseSettings?.application_name || whitelabelName || "Onyx",
     description: "Question answering for your documents",
     icons: {
       icon: logoLocation,

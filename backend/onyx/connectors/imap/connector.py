@@ -27,9 +27,24 @@ from onyx.connectors.models import ConnectorCheckpoint
 from onyx.connectors.models import Document
 from onyx.connectors.models import TextSection
 from onyx.utils.logger import setup_logger
+from onyx.utils.retry_wrapper import retry_builder
 
 logger = setup_logger()
 
+# Retry decorator for IMAP operations that may fail due to transient
+# network issues (connection resets, timeouts, etc.).  Uses the same
+# retry_builder utility as the Gmail connector with conservative defaults
+# appropriate for IMAP's stateful connections.
+_add_imap_retries = retry_builder(
+    tries=5,
+    delay=1,
+    max_delay=10,
+    backoff=2,
+    exceptions=(
+        OSError,  # covers ConnectionError, TimeoutError, socket errors
+        imaplib.IMAP4.error,  # covers IMAP4.abort and IMAP4.readonly too
+    ),
+)
 
 _DEFAULT_IMAP_PORT_NUMBER = int(os.environ.get("IMAP_PORT", 993))
 _IMAP_OKAY_STATUS = "OK"
@@ -118,13 +133,15 @@ class ImapConnector(
         username = get_or_raise(_USERNAME_KEY)
         password = get_or_raise(_PASSWORD_KEY)
 
-        mail_client = imaplib.IMAP4_SSL(host=self._host, port=self._port)
-        status, _data = mail_client.login(user=username, password=password)
+        @_add_imap_retries
+        def _connect_and_login() -> imaplib.IMAP4_SSL:
+            client = imaplib.IMAP4_SSL(host=self._host, port=self._port)
+            status, _data = client.login(user=username, password=password)
+            if status != _IMAP_OKAY_STATUS:
+                raise RuntimeError(f"Failed to log into imap server; {status=}")
+            return client
 
-        if status != _IMAP_OKAY_STATUS:
-            raise RuntimeError(f"Failed to log into imap server; {status=}")
-
-        return mail_client
+        return _connect_and_login()
 
     def _load_from_checkpoint(
         self,
@@ -138,68 +155,71 @@ class ImapConnector(
 
         mail_client = self._get_mail_client()
 
-        if checkpoint.todo_mailboxes is None:
-            # This is the dummy checkpoint.
-            # Fill it with mailboxes first.
-            if self._mailboxes:
-                checkpoint.todo_mailboxes = [m for m in self._mailboxes if m]
-            else:
-                fetched_mailboxes = _fetch_all_mailboxes_for_email_account(
-                    mail_client=mail_client
-                )
-                if not fetched_mailboxes:
-                    raise RuntimeError(
-                        "Failed to find any mailboxes for this email account"
+        try:
+            if checkpoint.todo_mailboxes is None:
+                # This is the dummy checkpoint.
+                # Fill it with mailboxes first.
+                if self._mailboxes:
+                    checkpoint.todo_mailboxes = [m for m in self._mailboxes if m]
+                else:
+                    fetched_mailboxes = _fetch_all_mailboxes_for_email_account(
+                        mail_client=mail_client
                     )
-                checkpoint.todo_mailboxes = [m for m in fetched_mailboxes if m]
+                    if not fetched_mailboxes:
+                        raise RuntimeError(
+                            "Failed to find any mailboxes for this email account"
+                        )
+                    checkpoint.todo_mailboxes = [m for m in fetched_mailboxes if m]
 
-            return checkpoint
-
-        if (
-            not checkpoint.current_mailbox
-            or not checkpoint.current_mailbox.todo_email_ids
-        ):
-            if not checkpoint.todo_mailboxes:
-                checkpoint.has_more = False
                 return checkpoint
 
-            mailbox = checkpoint.todo_mailboxes.pop()
-            email_ids = _fetch_email_ids_in_mailbox(
-                mail_client=mail_client,
-                mailbox=mailbox,
-                start=start,
-                end=end,
+            if (
+                not checkpoint.current_mailbox
+                or not checkpoint.current_mailbox.todo_email_ids
+            ):
+                if not checkpoint.todo_mailboxes:
+                    checkpoint.has_more = False
+                    return checkpoint
+
+                mailbox = checkpoint.todo_mailboxes.pop()
+                email_ids = _fetch_email_ids_in_mailbox(
+                    mail_client=mail_client,
+                    mailbox=mailbox,
+                    start=start,
+                    end=end,
+                )
+                checkpoint.current_mailbox = CurrentMailbox(
+                    mailbox=mailbox,
+                    todo_email_ids=email_ids,
+                )
+
+            _select_mailbox(
+                mail_client=mail_client, mailbox=checkpoint.current_mailbox.mailbox
             )
-            checkpoint.current_mailbox = CurrentMailbox(
-                mailbox=mailbox,
-                todo_email_ids=email_ids,
+            current_todos = cast(
+                list, copy.deepcopy(checkpoint.current_mailbox.todo_email_ids[:_PAGE_SIZE])
             )
-
-        _select_mailbox(
-            mail_client=mail_client, mailbox=checkpoint.current_mailbox.mailbox
-        )
-        current_todos = cast(
-            list, copy.deepcopy(checkpoint.current_mailbox.todo_email_ids[:_PAGE_SIZE])
-        )
-        checkpoint.current_mailbox.todo_email_ids = (
-            checkpoint.current_mailbox.todo_email_ids[_PAGE_SIZE:]
-        )
-
-        for email_id in current_todos:
-            email_msg = _fetch_email(mail_client=mail_client, email_id=email_id)
-            if not email_msg:
-                logger.warn(f"Failed to fetch message {email_id=}; skipping")
-                continue
-
-            email_headers = EmailHeaders.from_email_msg(email_msg=email_msg)
-
-            yield _convert_email_headers_and_body_into_document(
-                email_msg=email_msg,
-                email_headers=email_headers,
-                include_perm_sync=include_perm_sync,
+            checkpoint.current_mailbox.todo_email_ids = (
+                checkpoint.current_mailbox.todo_email_ids[_PAGE_SIZE:]
             )
 
-        return checkpoint
+            for email_id in current_todos:
+                email_msg = _fetch_email(mail_client=mail_client, email_id=email_id)
+                if not email_msg:
+                    logger.warn(f"Failed to fetch message {email_id=}; skipping")
+                    continue
+
+                email_headers = EmailHeaders.from_email_msg(email_msg=email_msg)
+
+                yield _convert_email_headers_and_body_into_document(
+                    email_msg=email_msg,
+                    email_headers=email_headers,
+                    include_perm_sync=include_perm_sync,
+                )
+
+            return checkpoint
+        finally:
+            mail_client.logout()
 
     # impls for BaseConnector
 
@@ -247,8 +267,9 @@ class ImapConnector(
         )
 
 
+@_add_imap_retries
 def _fetch_all_mailboxes_for_email_account(mail_client: imaplib.IMAP4_SSL) -> list[str]:
-    status, mailboxes_data = mail_client.list(directory='""', pattern="*")
+    status, mailboxes_data = mail_client.list(directory="", pattern="*")
     if status != _IMAP_OKAY_STATUS:
         raise RuntimeError(f"Failed to fetch mailboxes; {status=}")
 
@@ -307,6 +328,7 @@ def _select_mailbox(mail_client: imaplib.IMAP4_SSL, mailbox: str) -> None:
         raise RuntimeError(f"Failed to select {mailbox=}")
 
 
+@_add_imap_retries
 def _fetch_email_ids_in_mailbox(
     mail_client: imaplib.IMAP4_SSL,
     mailbox: str,
@@ -333,6 +355,7 @@ def _fetch_email_ids_in_mailbox(
     return [email_id.decode() for email_id in email_ids.split()]
 
 
+@_add_imap_retries
 def _fetch_email(mail_client: imaplib.IMAP4_SSL, email_id: str) -> Message | None:
     status, msg_data = mail_client.fetch(message_set=email_id, message_parts="(RFC822)")
     if status != _IMAP_OKAY_STATUS or not msg_data:
@@ -409,11 +432,16 @@ def _parse_email_body(
     email_msg: Message,
     email_headers: EmailHeaders,
 ) -> str:
-    body = None
+    plain_body = None
+    html_body = None
     for part in email_msg.walk():
         if part.is_multipart():
             # Multipart parts are *containers* for other parts, not the actual content itself.
             # Therefore, we skip until we find the individual parts instead.
+            continue
+
+        content_type = part.get_content_type()
+        if content_type not in ("text/plain", "text/html"):
             continue
 
         charset = part.get_content_charset() or "utf-8"
@@ -426,11 +454,16 @@ def _parse_email_body(
                     f"{type(raw_payload)=}, {raw_payload=}"
                 )
                 continue
-            body = raw_payload.decode(charset)
-            break
+            decoded = raw_payload.decode(charset)
+            if content_type == "text/plain" and plain_body is None:
+                plain_body = decoded
+            elif content_type == "text/html" and html_body is None:
+                html_body = decoded
         except (UnicodeDecodeError, LookupError) as e:
-            print(f"Warning: Could not decode part with charset {charset}. Error: {e}")
+            logger.warning(f"Could not decode part with charset {charset}. Error: {e}")
             continue
+
+    body = plain_body or html_body
 
     if not body:
         logger.warn(

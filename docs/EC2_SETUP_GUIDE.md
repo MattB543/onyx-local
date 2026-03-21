@@ -326,7 +326,7 @@ Edit `env.config`. Use the template variables as follows:
 | `WEB_DOMAIN` | set | public Cloudflare hostname, e.g. `https://onyx.company.com` |
 | `AUTH_TYPE` | keep `basic` | this guide does not use OAuth or OIDC |
 | `VALID_EMAIL_DOMAINS` | set | restrict Onyx self-signup to your real email domain list |
-| `SESSION_EXPIRE_TIME_SECONDS` | set to `157680000` | 5-year session lifetime — Cloudflare Access + Okta handles real authentication, so users should only need to create their Onyx account once |
+| `SESSION_EXPIRE_TIME_SECONDS` | set to `34560000` | 400-day session lifetime — Cloudflare Access + Okta handles real authentication, so users should only need to create their Onyx account once |
 | `LICENSE_ENFORCEMENT_ENABLED` | keep `false` | prevents EE/license-gated codepaths from loading for this MIT-only deployment |
 | `POSTGRES_USER` | keep unless you have a reason to change it | database superuser name used by the compose stack |
 | `DB_READONLY_USER` | keep unless you have a reason to change it | readonly DB username created by the stack |
@@ -353,7 +353,7 @@ For a normal fresh deployment, the only values you usually need to change are:
 - `ONYX_BACKEND_IMAGE`, `ONYX_WEB_SERVER_IMAGE`, `ONYX_MODEL_SERVER_IMAGE` (point at the fork's GHCR images)
 - `WEB_DOMAIN`
 - `VALID_EMAIL_DOMAINS`
-- `SESSION_EXPIRE_TIME_SECONDS` (set to `157680000` so users don't re-auth in Onyx after Cloudflare Access lets them through)
+- `SESSION_EXPIRE_TIME_SECONDS` (set to `34560000` so users don't re-auth in Onyx after Cloudflare Access lets them through)
 - `AWS_KMS_KEY_ID`
 - optionally `S3_FILE_STORE_BUCKET_NAME`
 - optionally `TUNNEL_ORIGIN_PORT`

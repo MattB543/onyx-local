@@ -5,7 +5,6 @@ from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import HTTPException
 from fastapi import Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -40,6 +39,8 @@ from onyx.db.crm import update_crm_settings
 from onyx.db.crm import update_organization
 from onyx.db.crm import validate_stage_string
 from onyx.db.engine.sql_engine import get_session
+from onyx.error_handling.error_codes import OnyxErrorCode
+from onyx.error_handling.exceptions import OnyxError
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import User
@@ -70,21 +71,21 @@ router = APIRouter(prefix="/user/crm")
 def _load_contact_or_404(contact_id: UUID, db_session: Session):
     contact = get_contact_by_id(contact_id, db_session)
     if contact is None:
-        raise HTTPException(status_code=404, detail="CRM contact not found.")
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "CRM contact not found.")
     return contact
 
 
 def _load_organization_or_404(organization_id: UUID, db_session: Session):
     organization = get_organization_by_id(organization_id, db_session)
     if organization is None:
-        raise HTTPException(status_code=404, detail="CRM organization not found.")
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "CRM organization not found.")
     return organization
 
 
 def _load_tag_or_404(tag_id: UUID, db_session: Session):
     tag = get_tag_by_id(tag_id, db_session)
     if tag is None:
-        raise HTTPException(status_code=404, detail="CRM tag not found.")
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "CRM tag not found.")
     return tag
 
 
@@ -154,7 +155,7 @@ def _serialize_interaction(interaction, db_session: Session) -> CrmInteractionSn
 def _ensure_user_exists(user_id: UUID, db_session: Session) -> None:
     if db_session.get(User, user_id) is not None:
         return
-    raise HTTPException(status_code=404, detail=f"CRM user not found: {user_id}")
+    raise OnyxError(OnyxErrorCode.NOT_FOUND, f"CRM user not found: {user_id}")
 
 
 @router.get("/settings")
@@ -250,7 +251,7 @@ def get_contacts(
                 allowed_stages=allowed_stages,
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
 
     normalized_category: str | None = None
     if category is not None:
@@ -307,7 +308,7 @@ def post_contact(
             or allowed_stages[0]
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
 
     contact, created = create_contact(
         db_session=db_session,
@@ -327,9 +328,9 @@ def post_contact(
         created_by=user.id,
     )
     if not created:
-        raise HTTPException(
-            status_code=409,
-            detail="A CRM contact with this email already exists.",
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE,
+            "A CRM contact with this email already exists.",
         )
     return _serialize_contact(contact, db_session)
 
@@ -359,7 +360,7 @@ def patch_contact(
 
     if "status" in patches:
         if patches["status"] is None:
-            raise HTTPException(status_code=400, detail="'status' cannot be null.")
+            raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, "'status' cannot be null.")
         allowed_stages = get_allowed_contact_stages(db_session)
         try:
             patches["status"] = validate_stage_string(
@@ -367,7 +368,7 @@ def patch_contact(
                 allowed_stages=allowed_stages,
             )
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
 
     if "owner_ids" in patches:
         owner_ids_patch = patches["owner_ids"]
@@ -384,15 +385,15 @@ def patch_contact(
             patches=patches,
         )
     except IntegrityError:
-        raise HTTPException(
-            status_code=409,
-            detail="A CRM contact with this email already exists.",
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE,
+            "A CRM contact with this email already exists.",
         )
     except ValueError as e:
         message = str(e)
-        raise HTTPException(
-            status_code=409 if "already exists" in message else 400,
-            detail=message,
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE if "already exists" in message else OnyxErrorCode.VALIDATION_ERROR,
+            message,
         )
 
     return _serialize_contact(updated_contact, db_session)
@@ -451,9 +452,9 @@ def post_organization(
         created_by=user.id,
     )
     if not created:
-        raise HTTPException(
-            status_code=409,
-            detail="A CRM organization with this name already exists.",
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE,
+            "A CRM organization with this name already exists.",
         )
     return _serialize_organization(organization, db_session)
 
@@ -485,15 +486,15 @@ def patch_organization(
             patches=patches,
         )
     except IntegrityError:
-        raise HTTPException(
-            status_code=409,
-            detail="A CRM organization with this name already exists.",
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE,
+            "A CRM organization with this name already exists.",
         )
     except ValueError as e:
         message = str(e)
-        raise HTTPException(
-            status_code=409 if "already exists" in message else 400,
-            detail=message,
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE if "already exists" in message else OnyxErrorCode.VALIDATION_ERROR,
+            message,
         )
 
     return _serialize_organization(updated_organization, db_session)
@@ -556,17 +557,17 @@ def post_interaction(
         if attendee.user_id:
             attendee_user = db_session.get(User, attendee.user_id)
             if attendee_user is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"CRM attendee user not found: {attendee.user_id}",
+                raise OnyxError(
+                    OnyxErrorCode.NOT_FOUND,
+                    f"CRM attendee user not found: {attendee.user_id}",
                 )
 
         if attendee.contact_id:
             attendee_contact = get_contact_by_id(attendee.contact_id, db_session)
             if attendee_contact is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"CRM attendee contact not found: {attendee.contact_id}",
+                raise OnyxError(
+                    OnyxErrorCode.NOT_FOUND,
+                    f"CRM attendee contact not found: {attendee.contact_id}",
                 )
 
         key = (attendee.user_id, attendee.contact_id)
@@ -591,7 +592,7 @@ def post_interaction(
             occurred_at=interaction_create_request.occurred_at,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
 
     user_ids_by_role: dict[CrmAttendeeRole, list[UUID]] = defaultdict(list)
     contact_ids_by_role: dict[CrmAttendeeRole, list[UUID]] = defaultdict(list)
@@ -647,9 +648,9 @@ def post_tag(
         color=tag_create_request.color,
     )
     if not created:
-        raise HTTPException(
-            status_code=409,
-            detail="A CRM tag with this name already exists.",
+        raise OnyxError(
+            OnyxErrorCode.DUPLICATE_RESOURCE,
+            "A CRM tag with this name already exists.",
         )
     return CrmTagSnapshot.from_model(tag)
 

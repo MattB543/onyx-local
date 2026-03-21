@@ -49,6 +49,7 @@ From: {from_field}
 To: {to_field}
 Subject: {subject}
 Date: {date}
+Sender email (for CRM lookup): {sender_email}
 
 Body:
 {body}
