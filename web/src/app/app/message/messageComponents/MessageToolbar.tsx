@@ -29,6 +29,9 @@ import FeedbackModal, {
   FeedbackModalProps,
 } from "@/sections/modals/FeedbackModal";
 import { Button, SelectButton } from "@opal/components";
+import TTSButton from "./TTSButton";
+import { useVoiceMode } from "@/providers/VoiceModeProvider";
+import { useVoiceStatus } from "@/hooks/useVoiceStatus";
 
 // Wrapper component for SourceTag in toolbar to handle memoization
 const SourcesTagWrapper = memo(function SourcesTagWrapper({
@@ -144,6 +147,14 @@ export default function MessageToolbar({
     (state) => state.updateCurrentSelectedNodeForDocDisplay
   );
 
+  // Voice mode - hide toolbar during TTS playback for this message
+  const { isTTSPlaying, activeMessageNodeId, isAwaitingAutoPlaybackStart } =
+    useVoiceMode();
+  const { ttsEnabled } = useVoiceStatus();
+  const isTTSActiveForThisMessage =
+    (isTTSPlaying || isAwaitingAutoPlaybackStart) &&
+    activeMessageNodeId === nodeId;
+
   // Feedback modal state and handlers
   const { handleFeedbackChange } = useFeedbackController();
   const modal = useCreateModal();
@@ -204,6 +215,11 @@ export default function MessageToolbar({
     [messageId, currentFeedback, handleFeedbackChange, modal]
   );
 
+  // Hide toolbar while TTS is playing for this message
+  if (isTTSActiveForThisMessage) {
+    return null;
+  }
+
   return (
     <>
       <modal.Provider>
@@ -249,6 +265,7 @@ export default function MessageToolbar({
             <SelectButton
               icon={SvgThumbsUp}
               onClick={() => handleFeedbackClick("like")}
+              variant="select-light"
               state={isFeedbackTransient("like") ? "selected" : "empty"}
               tooltip={
                 currentFeedback === "like" ? "Remove Like" : "Good Response"
@@ -258,6 +275,7 @@ export default function MessageToolbar({
             <SelectButton
               icon={SvgThumbsDown}
               onClick={() => handleFeedbackClick("dislike")}
+              variant="select-light"
               state={isFeedbackTransient("dislike") ? "selected" : "empty"}
               tooltip={
                 currentFeedback === "dislike"
@@ -266,6 +284,13 @@ export default function MessageToolbar({
               }
               data-testid="AgentMessage/dislike-button"
             />
+            {ttsEnabled && (
+              <TTSButton
+                text={
+                  removeThinkingTokens(getTextContent(rawPackets)) as string
+                }
+              />
+            )}
 
             {onRegenerate &&
               messageId !== undefined &&
@@ -283,7 +308,7 @@ export default function MessageToolbar({
                       });
                       regenerator(llmDescriptor);
                     }}
-                    folded
+                    foldable
                   />
                 </div>
               )}

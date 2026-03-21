@@ -29,6 +29,8 @@ interface ComboBoxDropdownProps {
   showCreateOption: boolean;
   /** Callback to clear selection */
   onClear?: () => void;
+  /** Show "Add" prefix in create option */
+  showAddPrefix: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export const ComboBoxDropdown = forwardRef<
       allowCreate,
       showCreateOption,
       onClear,
+      showAddPrefix,
     },
     ref
   ) => {
@@ -136,6 +139,7 @@ export const ComboBoxDropdown = forwardRef<
           allowCreate={allowCreate}
           showCreateOption={showCreateOption}
           onClear={onClear}
+          showAddPrefix={showAddPrefix}
         />
       </div>,
       document.body
