@@ -19,6 +19,7 @@ $env:DEV_LOGGING_ENABLED = "true"
 $env:REQUIRE_EMAIL_VERIFICATION = "False"
 $env:ENABLE_CUSTOM_JOBS = "true"
 $env:EMAIL_CRM_CUSTOM_JOB_ID = "3ac43005-1312-4d55-8ed1-f7303ddb36e2"
+$env:ENABLE_OPENSEARCH_INDEXING_FOR_ONYX = "false"
 
 & (Join-Path $root ".venv\Scripts\uvicorn.exe") onyx.main:app --reload --port 8080 2>&1 |
     Tee-Object -FilePath $logPath

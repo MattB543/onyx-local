@@ -113,7 +113,16 @@ def _encrypt_string(input_str: str, key: str | None = None) -> bytes:
     if SECRET_ENCRYPTION_MODE != "disabled":
         from onyx.utils.encryption import _encrypt_string as _kms_encrypt
 
+        if key is not None:
+            logger.warning(
+                "Explicit key= ignored in KMS mode — KMS manages its own keys."
+            )
         return _kms_encrypt(input_str)
+
+    # Disabled mode: if no key at all, pass through as plaintext.
+    effective_key = key if key is not None else ENCRYPTION_KEY_SECRET
+    if not effective_key:
+        return input_str.encode()
 
     return _encrypt_string_aes_cbc(input_str, key=key)
 
@@ -124,7 +133,16 @@ def _decrypt_bytes(input_bytes: bytes, key: str | None = None) -> str:
     if SECRET_ENCRYPTION_MODE != "disabled":
         from onyx.utils.encryption import _decrypt_bytes as _kms_decrypt
 
+        if key is not None:
+            logger.warning(
+                "Explicit key= ignored in KMS mode — KMS manages its own keys."
+            )
         return _kms_decrypt(input_bytes)
+
+    # Disabled mode: if no key at all, pass through as plaintext.
+    effective_key = key if key is not None else ENCRYPTION_KEY_SECRET
+    if not effective_key:
+        return input_bytes.decode()
 
     return _decrypt_bytes_aes_cbc(input_bytes, key=key)
 
@@ -138,9 +156,11 @@ def _ensure_secret_encryption_ready() -> None:
         return _kms_ready()
 
     if not ENCRYPTION_KEY_SECRET:
-        raise RuntimeError(
-            "ENCRYPTION_KEY_SECRET is not set. Cannot validate secret encryption readiness."
+        logger.info(
+            "SECRET_ENCRYPTION_MODE=disabled and no ENCRYPTION_KEY_SECRET set. "
+            "Credentials will be stored as plaintext."
         )
+        return
 
     test_payload = "onyx-secret-readiness-check"
     encrypted = _encrypt_string_aes_cbc(test_payload)

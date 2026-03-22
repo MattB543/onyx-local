@@ -19,6 +19,7 @@ $env:DEV_LOGGING_ENABLED = "true"
 $env:REQUIRE_EMAIL_VERIFICATION = "False"
 $env:ENABLE_CUSTOM_JOBS = "true"
 $env:EMAIL_CRM_CUSTOM_JOB_ID = "3ac43005-1312-4d55-8ed1-f7303ddb36e2"
+$env:ENABLE_OPENSEARCH_INDEXING_FOR_ONYX = "false"
 $env:PATH = (Join-Path $root ".venv\Scripts") + ";" + $env:PATH
 
 & (Join-Path $root ".venv\Scripts\python.exe") scripts/dev_run_background_jobs.py 2>&1 |

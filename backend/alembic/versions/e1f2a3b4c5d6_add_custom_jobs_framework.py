@@ -19,6 +19,17 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Idempotency: skip if tables already exist (e.g. created outside alembic)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "custom_job" in inspector.get_table_names():
+        # Ensure the chat_message index is still created
+        if "ix_chat_message_time_sent" not in [
+            idx["name"] for idx in inspector.get_indexes("chat_message")
+        ]:
+            op.create_index("ix_chat_message_time_sent", "chat_message", ["time_sent"])
+        return
+
     op.create_table(
         "custom_job",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
