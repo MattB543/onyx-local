@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
-import { CrmOrganizationType, exportCrmOrganizations } from "@/app/app/crm/crmService";
+import {
+  CrmOrganizationType,
+  exportCrmOrganizations,
+} from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
@@ -26,7 +29,13 @@ import {
   ORGANIZATION_TYPE_OPTIONS,
 } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgDownload, SvgMoreHorizontal, SvgOrganization, SvgPlusCircle, SvgUploadCloud } from "@opal/icons";
+import {
+  SvgDownload,
+  SvgMoreHorizontal,
+  SvgOrganization,
+  SvgPlusCircle,
+  SvgUploadCloud,
+} from "@opal/icons";
 import { Section } from "@/layouts/general-layouts";
 import Popover from "@/refresh-components/Popover";
 
@@ -227,10 +236,16 @@ export default function CrmOrganizationsPage() {
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                const href = organization.website!.startsWith("http")
+                                const href = organization.website!.startsWith(
+                                  "http"
+                                )
                                   ? organization.website!
                                   : `https://${organization.website!}`;
-                                window.open(href, "_blank", "noopener,noreferrer");
+                                window.open(
+                                  href,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                );
                               }}
                               className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
                             >

@@ -4,10 +4,7 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { useSWRConfig } from "swr";
 
-import {
-  CrmImportResult,
-  importCrmCsv,
-} from "@/app/app/crm/crmService";
+import { CrmImportResult, importCrmCsv } from "@/app/app/crm/crmService";
 import Button from "@/refresh-components/buttons/Button";
 import Modal from "@/refresh-components/Modal";
 import Text from "@/refresh-components/texts/Text";
@@ -189,7 +186,12 @@ export default function ImportCsvModal({
               <input {...getInputProps()} />
               {file ? (
                 <div className="flex flex-col items-center gap-1">
-                  <Text as="p" secondaryBody text05 className="text-sm font-medium">
+                  <Text
+                    as="p"
+                    secondaryBody
+                    text05
+                    className="text-sm font-medium"
+                  >
                     {file.name}
                   </Text>
                   <Text as="p" secondaryBody text03 className="text-xs">

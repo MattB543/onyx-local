@@ -503,7 +503,9 @@ export async function exportCrmOrganizations(): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `crm_organizations_${new Date().toISOString().split("T")[0]}.csv`;
+  a.download = `crm_organizations_${
+    new Date().toISOString().split("T")[0]
+  }.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -541,11 +543,13 @@ export async function exportCrmInteractions(): Promise<void> {
 export async function importCrmCsv(
   entityType: "organizations" | "contacts" | "interactions",
   file: File,
-  dryRun = false,
+  dryRun = false
 ): Promise<CrmImportResult> {
   const form = new FormData();
   form.append("file", file);
-  const url = `/api/user/crm/import/${entityType}${dryRun ? "?dry_run=true" : ""}`;
+  const url = `/api/user/crm/import/${entityType}${
+    dryRun ? "?dry_run=true" : ""
+  }`;
   const res = await fetch(url, { method: "POST", body: form });
   if (!res.ok) {
     const text = await res.text();

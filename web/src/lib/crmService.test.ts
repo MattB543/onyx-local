@@ -46,7 +46,9 @@ describe("CRM profile picture service", () => {
 
     await expect(
       uploadContactProfilePicture("contact-123", file)
-    ).rejects.toThrow("Upload CRM contact profile picture failed (Status: 413)");
+    ).rejects.toThrow(
+      "Upload CRM contact profile picture failed (Status: 413)"
+    );
   });
 
   test("deleteContactProfilePicture sends a delete request to the profile-picture endpoint", async () => {

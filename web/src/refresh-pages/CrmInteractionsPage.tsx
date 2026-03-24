@@ -4,7 +4,10 @@ import { Route } from "next";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
-import { CrmInteractionType, exportCrmInteractions } from "@/app/app/crm/crmService";
+import {
+  CrmInteractionType,
+  exportCrmInteractions,
+} from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -21,7 +24,12 @@ import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils"
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 import { formatCrmLabel } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgActivity, SvgDownload, SvgMoreHorizontal, SvgUploadCloud } from "@opal/icons";
+import {
+  SvgActivity,
+  SvgDownload,
+  SvgMoreHorizontal,
+  SvgUploadCloud,
+} from "@opal/icons";
 import { Section } from "@/layouts/general-layouts";
 import Popover from "@/refresh-components/Popover";
 
@@ -56,12 +64,11 @@ export default function CrmInteractionsPage() {
     }
   }, []);
 
-  const { interactions, totalItems, isLoading, error } =
-    useCrmInteractions({
-      pageNum,
-      pageSize: PAGE_SIZE,
-      interactionType: typeFilter === "all" ? undefined : typeFilter,
-    });
+  const { interactions, totalItems, isLoading, error } = useCrmInteractions({
+    pageNum,
+    pageSize: PAGE_SIZE,
+    interactionType: typeFilter === "all" ? undefined : typeFilter,
+  });
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
@@ -200,18 +207,18 @@ export default function CrmInteractionsPage() {
                           className="stroke-text-04"
                         />
                       </div>
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <span className="truncate text-base font-semibold text-text-05">
-                            {[
-                              interaction.type.charAt(0).toUpperCase() +
-                                interaction.type.slice(1),
-                              interaction.contact_name,
-                              interaction.organization_name
-                                ? `at ${interaction.organization_name}`
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" \u00B7 ")}
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="truncate text-base font-semibold text-text-05">
+                          {[
+                            interaction.type.charAt(0).toUpperCase() +
+                              interaction.type.slice(1),
+                            interaction.contact_name,
+                            interaction.organization_name
+                              ? `at ${interaction.organization_name}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" \u00B7 ")}
                         </span>
                         <span className="truncate text-sm text-text-04">
                           {interaction.title}

@@ -49,20 +49,17 @@ export default function CrmHomePage() {
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const handleExport = useCallback(
-    async (exportFn: () => Promise<void>) => {
-      setExporting(true);
-      setExportPopoverOpen(false);
-      try {
-        await exportFn();
-      } catch (err) {
-        console.error("Failed to export:", err);
-      } finally {
-        setExporting(false);
-      }
-    },
-    []
-  );
+  const handleExport = useCallback(async (exportFn: () => Promise<void>) => {
+    setExporting(true);
+    setExportPopoverOpen(false);
+    try {
+      await exportFn();
+    } catch (err) {
+      console.error("Failed to export:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
 
   const {
     contacts,
@@ -121,9 +118,7 @@ export default function CrmHomePage() {
                         tertiary
                         size="md"
                         className="!w-full justify-start"
-                        onClick={() =>
-                          handleExport(exportCrmContacts)
-                        }
+                        onClick={() => handleExport(exportCrmContacts)}
                       >
                         Export Contacts
                       </Button>
@@ -131,9 +126,7 @@ export default function CrmHomePage() {
                         tertiary
                         size="md"
                         className="!w-full justify-start"
-                        onClick={() =>
-                          handleExport(exportCrmOrganizations)
-                        }
+                        onClick={() => handleExport(exportCrmOrganizations)}
                       >
                         Export Organizations
                       </Button>
@@ -141,9 +134,7 @@ export default function CrmHomePage() {
                         tertiary
                         size="md"
                         className="!w-full justify-start"
-                        onClick={() =>
-                          handleExport(exportCrmInteractions)
-                        }
+                        onClick={() => handleExport(exportCrmInteractions)}
                       >
                         Export Interactions
                       </Button>
@@ -302,7 +293,9 @@ export default function CrmHomePage() {
                                 <CopyEmailButton email={contact.email!} />
                               </div>
                             ) : (
-                              <span className="text-sm text-text-03">No email</span>
+                              <span className="text-sm text-text-03">
+                                No email
+                              </span>
                             )}
                             <span className="truncate text-sm text-text-03">
                               {contact.title
@@ -318,12 +311,10 @@ export default function CrmHomePage() {
                             <StatusBadge status={contact.status} />
                             <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
                               <span>
-                                Created{" "}
-                                {formatRelativeDate(contact.created_at)}
+                                Created {formatRelativeDate(contact.created_at)}
                               </span>
                               <span>
-                                Updated{" "}
-                                {formatRelativeDate(contact.updated_at)}
+                                Updated {formatRelativeDate(contact.updated_at)}
                               </span>
                             </div>
                           </div>
@@ -343,10 +334,7 @@ export default function CrmHomePage() {
               </Text>
               <div className="flex items-center gap-2">
                 <div className="w-[160px]">
-                  <InputSelect
-                    value={orgsSortBy}
-                    onValueChange={setOrgsSortBy}
-                  >
+                  <InputSelect value={orgsSortBy} onValueChange={setOrgsSortBy}>
                     <InputSelect.Trigger placeholder="Sort by" />
                     <InputSelect.Content>
                       <InputSelect.Item value="updated_at">
@@ -413,10 +401,16 @@ export default function CrmHomePage() {
                                 onClick={(event) => {
                                   event.preventDefault();
                                   event.stopPropagation();
-                                  const href = organization.website!.startsWith("http")
+                                  const href = organization.website!.startsWith(
+                                    "http"
+                                  )
                                     ? organization.website!
                                     : `https://${organization.website!}`;
-                                  window.open(href, "_blank", "noopener,noreferrer");
+                                  window.open(
+                                    href,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  );
                                 }}
                                 className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
                               >
@@ -464,7 +458,8 @@ export default function CrmHomePage() {
             ) : recentInteractions.length === 0 ? (
               <Card variant="tertiary">
                 <Text as="p" secondaryBody text03 className="text-sm">
-                  No interactions yet. Log your first interaction to get started.
+                  No interactions yet. Log your first interaction to get
+                  started.
                 </Text>
               </Card>
             ) : (
@@ -515,7 +510,8 @@ export default function CrmHomePage() {
                           <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
                             <span>
                               {formatRelativeDate(
-                                interaction.occurred_at || interaction.created_at
+                                interaction.occurred_at ||
+                                  interaction.created_at
                               )}
                             </span>
                           </div>

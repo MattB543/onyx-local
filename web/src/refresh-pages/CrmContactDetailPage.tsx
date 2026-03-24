@@ -148,10 +148,7 @@ export default function CrmContactDetailPage({
   const attendeeUserNameById = useMemo(
     () =>
       new Map(
-        (usersData || []).map((candidate) => [
-          candidate.id,
-          candidate.email,
-        ])
+        (usersData || []).map((candidate) => [candidate.id, candidate.email])
       ),
     [usersData]
   );
@@ -396,7 +393,9 @@ export default function CrmContactDetailPage({
                             <div className="flex flex-col items-center gap-2">
                               <InputImage
                                 src={activeProfilePictureUrl || undefined}
-                                alt={`${contact.full_name || contact.first_name} profile picture`}
+                                alt={`${
+                                  contact.full_name || contact.first_name
+                                } profile picture`}
                                 size={104}
                                 onDrop={(file) => {
                                   setPendingProfilePictureFile(file);

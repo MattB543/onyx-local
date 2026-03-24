@@ -32,7 +32,13 @@ import {
   formatCrmLabel,
 } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgDownload, SvgMoreHorizontal, SvgPlusCircle, SvgUploadCloud, SvgUser } from "@opal/icons";
+import {
+  SvgDownload,
+  SvgMoreHorizontal,
+  SvgPlusCircle,
+  SvgUploadCloud,
+  SvgUser,
+} from "@opal/icons";
 import CopyEmailButton from "@/refresh-pages/crm/components/CopyEmailButton";
 import { Section } from "@/layouts/general-layouts";
 import Popover from "@/refresh-components/Popover";
@@ -237,9 +243,7 @@ export default function CrmContactsPage() {
             >
               <InputSelect.Trigger placeholder="Filter by category" />
               <InputSelect.Content>
-                <InputSelect.Item value="all">
-                  All categories
-                </InputSelect.Item>
+                <InputSelect.Item value="all">All categories</InputSelect.Item>
                 {categoryOptions.map((category) => (
                   <InputSelect.Item key={category} value={category}>
                     {formatCrmLabel(category)}
@@ -340,7 +344,9 @@ export default function CrmContactsPage() {
                               <CopyEmailButton email={contact.email!} />
                             </div>
                           ) : (
-                            <span className="text-sm text-text-03">No email</span>
+                            <span className="text-sm text-text-03">
+                              No email
+                            </span>
                           )}
                           <span className="truncate text-sm text-text-03">
                             {contact.title
@@ -356,12 +362,10 @@ export default function CrmContactsPage() {
                           <StatusBadge status={contact.status} />
                           <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
                             <span>
-                              Created{" "}
-                              {formatRelativeDate(contact.created_at)}
+                              Created {formatRelativeDate(contact.created_at)}
                             </span>
                             <span>
-                              Updated{" "}
-                              {formatRelativeDate(contact.updated_at)}
+                              Updated {formatRelativeDate(contact.updated_at)}
                             </span>
                           </div>
                         </div>
