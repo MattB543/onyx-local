@@ -45,6 +45,7 @@ export interface CrmContact {
   phone: string | null;
   title: string | null;
   organization_id: string | null;
+  organization_name: string | null;
   owner_ids: string[];
   source: CrmContactSource | null;
   status: CrmContactStage;
@@ -52,10 +53,44 @@ export interface CrmContact {
   notes: string | null;
   linkedin_url: string | null;
   location: string | null;
+  profile_picture_file_id: string | null;
+  profile_picture_url: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   tags: CrmTag[];
+}
+
+export interface CrmContactCreateBody {
+  first_name: string;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  title?: string | null;
+  organization_id?: string | null;
+  owner_ids?: string[] | null;
+  source?: CrmContactSource | null;
+  status?: CrmContactStage;
+  category?: string | null;
+  notes?: string | null;
+  linkedin_url?: string | null;
+  location?: string | null;
+}
+
+export interface CrmContactPatchBody {
+  first_name?: string;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  title?: string | null;
+  organization_id?: string | null;
+  owner_ids?: string[] | null;
+  source?: CrmContactSource | null;
+  status?: CrmContactStage;
+  category?: string | null;
+  notes?: string | null;
+  linkedin_url?: string | null;
+  location?: string | null;
 }
 
 export interface CrmOrganization {
@@ -85,7 +120,9 @@ export interface CrmInteractionAttendee {
 export interface CrmInteraction {
   id: string;
   contact_id: string | null;
+  contact_name: string | null;
   organization_id: string | null;
+  organization_name: string | null;
   logged_by: string | null;
   type: CrmInteractionType;
   title: string;
@@ -178,6 +215,13 @@ async function deleteJson<T>(path: string, action: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function deleteNoContent(path: string, action: string): Promise<void> {
+  const response = await fetch(path, { method: "DELETE" });
+  if (!response.ok) {
+    handleRequestError(action, response);
+  }
+}
+
 export async function getCrmSettings(): Promise<CrmSettings> {
   return getJson<CrmSettings>("/api/user/crm/settings", "Fetch CRM settings");
 }
@@ -246,20 +290,49 @@ export async function getCrmContact(contactId: string): Promise<CrmContact> {
 }
 
 export async function createCrmContact(
-  body: Partial<CrmContact> & Pick<CrmContact, "first_name">
+  body: CrmContactCreateBody
 ): Promise<CrmContact> {
   return postJson("/api/user/crm/contacts", body, "Create CRM contact");
 }
 
 export async function patchCrmContact(
   contactId: string,
-  patch: Partial<CrmContact>
+  patch: CrmContactPatchBody
 ): Promise<CrmContact> {
   return postJson(
     `/api/user/crm/contacts/${contactId}`,
     patch,
     "Patch CRM contact",
     "PATCH"
+  );
+}
+
+export async function uploadContactProfilePicture(
+  contactId: string,
+  file: File
+): Promise<{ file_id: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(
+    `/api/user/crm/contacts/${contactId}/upload-profile-picture`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+  if (!response.ok) {
+    handleRequestError("Upload CRM contact profile picture", response);
+  }
+  return (await response.json()) as { file_id: string };
+}
+
+export async function deleteContactProfilePicture(
+  contactId: string
+): Promise<void> {
+  await deleteNoContent(
+    `/api/user/crm/contacts/${contactId}/profile-picture`,
+    "Delete CRM contact profile picture"
   );
 }
 
@@ -316,12 +389,14 @@ export async function patchCrmOrganization(
 export async function listCrmInteractions(args?: {
   contact_id?: string;
   organization_id?: string;
+  interaction_type?: CrmInteractionType;
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmInteraction>> {
   const path = withQueryParams("/api/user/crm/interactions", {
     contact_id: args?.contact_id,
     organization_id: args?.organization_id,
+    interaction_type: args?.interaction_type,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -403,4 +478,78 @@ export async function removeTagFromOrganization(
     `/api/user/crm/organizations/${organizationId}/tags/${tagId}`,
     "Unassign CRM tag from organization"
   );
+}
+
+// ---------------------------------------------------------------------------
+// CSV Export / Import
+// ---------------------------------------------------------------------------
+
+export interface CrmImportError {
+  row: number;
+  error: string;
+}
+
+export interface CrmImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: CrmImportError[];
+}
+
+export async function exportCrmOrganizations(): Promise<void> {
+  const res = await fetch("/api/user/crm/export/organizations");
+  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crm_organizations_${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function exportCrmContacts(): Promise<void> {
+  const res = await fetch("/api/user/crm/export/contacts");
+  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crm_contacts_${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function exportCrmInteractions(): Promise<void> {
+  const res = await fetch("/api/user/crm/export/interactions");
+  if (!res.ok) throw new Error(`Export failed: ${res.statusText}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `crm_interactions_${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function importCrmCsv(
+  entityType: "organizations" | "contacts" | "interactions",
+  file: File,
+  dryRun = false,
+): Promise<CrmImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const url = `/api/user/crm/import/${entityType}${dryRun ? "?dry_run=true" : ""}`;
+  const res = await fetch(url, { method: "POST", body: form });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Import failed: ${res.statusText}`);
+  }
+  return await res.json();
 }

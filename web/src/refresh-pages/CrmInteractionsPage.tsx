@@ -1,66 +1,66 @@
 "use client";
 
+import { Route } from "next";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
-import { CrmOrganizationType, exportCrmOrganizations } from "@/app/app/crm/crmService";
+import { CrmInteractionType, exportCrmInteractions } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
-import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
+import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import EmptyMessage from "@/refresh-components/EmptyMessage";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
-import CreateOrganizationModal from "@/refresh-pages/crm/components/CreateOrganizationModal";
+import InteractionTypeIcon from "@/refresh-pages/crm/components/InteractionTypeIcon";
 import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
-import OrgAvatar from "@/refresh-pages/crm/components/OrgAvatar";
-import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
-import {
-  formatCrmLabel,
-  ORGANIZATION_TYPE_OPTIONS,
-} from "@/refresh-pages/crm/crmOptions";
+import { formatCrmLabel } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgDownload, SvgMoreHorizontal, SvgOrganization, SvgPlusCircle, SvgUploadCloud } from "@opal/icons";
+import { SvgActivity, SvgDownload, SvgMoreHorizontal, SvgUploadCloud } from "@opal/icons";
 import { Section } from "@/layouts/general-layouts";
 import Popover from "@/refresh-components/Popover";
 
 const PAGE_SIZE = 25;
 
-export default function CrmOrganizationsPage() {
+const INTERACTION_TYPE_OPTIONS: CrmInteractionType[] = [
+  "note",
+  "call",
+  "email",
+  "meeting",
+  "event",
+];
+
+export default function CrmInteractionsPage() {
   const { isAdmin } = useUser();
-  const [searchText, setSearchText] = useState("");
-  const [typeFilter, setTypeFilter] = useState<CrmOrganizationType | "all">(
+  const [typeFilter, setTypeFilter] = useState<CrmInteractionType | "all">(
     "all"
   );
   const [pageNum, setPageNum] = useState(0);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [importModalOpen, setImportModalOpen] = useState(false);
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      await exportCrmOrganizations();
+      await exportCrmInteractions();
     } catch (err) {
-      console.error("Failed to export organizations:", err);
+      console.error("Failed to export interactions:", err);
     } finally {
       setExporting(false);
     }
   }, []);
 
-  const { organizations, totalItems, isLoading, error, refreshOrganizations } =
-    useCrmOrganizations({
-      q: searchText || undefined,
-      type: typeFilter === "all" ? undefined : typeFilter,
+  const { interactions, totalItems, isLoading, error } =
+    useCrmInteractions({
       pageNum,
       pageSize: PAGE_SIZE,
+      interactionType: typeFilter === "all" ? undefined : typeFilter,
     });
 
   const totalPages = useMemo(
@@ -69,15 +69,15 @@ export default function CrmOrganizationsPage() {
   );
 
   const emptyDescription =
-    searchText || typeFilter !== "all"
-      ? "Try adjusting filters or search terms."
-      : "Create your first organization to get started.";
+    typeFilter !== "all"
+      ? "Try adjusting the type filter."
+      : "Log your first interaction to get started.";
 
   return (
     <AppLayouts.Root>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
-          icon={SvgOrganization}
+          icon={SvgActivity}
           title="CRM"
           description="Manage contacts and organizations."
         >
@@ -106,7 +106,7 @@ export default function CrmOrganizationsPage() {
                         }}
                         disabled={exporting}
                       >
-                        {exporting ? "Exporting..." : "Export Organizations"}
+                        {exporting ? "Exporting..." : "Export Interactions"}
                       </Button>
                       {isAdmin && (
                         <Button
@@ -125,14 +125,6 @@ export default function CrmOrganizationsPage() {
                     </Section>
                   </Popover.Content>
                 </Popover>
-                <Button
-                  action
-                  primary
-                  leftIcon={SvgPlusCircle}
-                  onClick={() => setCreateModalOpen(true)}
-                >
-                  New Organization
-                </Button>
               </div>
             }
           />
@@ -140,27 +132,19 @@ export default function CrmOrganizationsPage() {
 
         <SettingsLayouts.Body>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
-            <InputTypeIn
-              value={searchText}
-              onChange={(event) => {
-                setSearchText(event.target.value);
-                setPageNum(0);
-              }}
-              placeholder="Search organizations"
-              leftSearchIcon
-            />
+            <div />
 
             <InputSelect
               value={typeFilter}
               onValueChange={(value) => {
-                setTypeFilter(value as CrmOrganizationType | "all");
+                setTypeFilter(value as CrmInteractionType | "all");
                 setPageNum(0);
               }}
             >
               <InputSelect.Trigger placeholder="Filter by type" />
               <InputSelect.Content>
                 <InputSelect.Item value="all">All types</InputSelect.Item>
-                {ORGANIZATION_TYPE_OPTIONS.map((type) => (
+                {INTERACTION_TYPE_OPTIONS.map((type) => (
                   <InputSelect.Item key={type} value={type}>
                     {formatCrmLabel(type)}
                   </InputSelect.Item>
@@ -180,90 +164,93 @@ export default function CrmOrganizationsPage() {
 
           {error && (
             <Text as="p" secondaryBody className="text-sm text-status-error-03">
-              Failed to load organizations.
+              Failed to load interactions.
             </Text>
           )}
 
           {isLoading ? (
             <Text as="p" secondaryBody text03 className="text-sm">
-              Loading organizations...
+              Loading interactions...
             </Text>
-          ) : organizations.length === 0 ? (
+          ) : interactions.length === 0 ? (
             <EmptyMessage
-              icon={SvgOrganization}
-              title="No organizations found"
+              icon={SvgActivity}
+              title="No interactions found"
               description={emptyDescription}
             />
           ) : (
             <div className="flex flex-col gap-2">
-              {organizations.map((organization) => {
-                const websiteDisplay = organization.website
-                  ? organization.website.replace(/^https?:\/\//i, "")
-                  : null;
+              {interactions.map((interaction) => {
+                const linkHref = interaction.contact_id
+                  ? `/app/crm/contacts/${interaction.contact_id}`
+                  : interaction.organization_id
+                    ? `/app/crm/organizations/${interaction.organization_id}`
+                    : null;
 
-                return (
-                  <Link
-                    key={organization.id}
-                    href={`/app/crm/organizations/${organization.id}`}
-                    className="block"
+                const card = (
+                  <Card
+                    variant="secondary"
+                    className="[&>div]:items-stretch transition-colors hover:bg-background-tint-02"
                   >
-                    <Card
-                      variant="secondary"
-                      className="[&>div]:items-stretch transition-colors hover:bg-background-tint-02"
-                    >
-                      <div className="flex w-full items-center gap-3">
-                        <OrgAvatar
-                          name={organization.name}
-                          type={organization.type}
-                          size="lg"
+                    <div className="flex w-full items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background-tint-02">
+                        <InteractionTypeIcon
+                          type={interaction.type}
+                          size={20}
+                          className="stroke-text-04"
                         />
+                      </div>
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <span className="text-base font-semibold text-text-05">
-                            {organization.name}
+                          <span className="truncate text-base font-semibold text-text-05">
+                            {[
+                              interaction.type.charAt(0).toUpperCase() +
+                                interaction.type.slice(1),
+                              interaction.contact_name,
+                              interaction.organization_name
+                                ? `at ${interaction.organization_name}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" \u00B7 ")}
+                        </span>
+                        <span className="truncate text-sm text-text-04">
+                          {interaction.title}
+                        </span>
+                        {interaction.summary && (
+                          <span className="line-clamp-2 text-sm text-text-03">
+                            {interaction.summary}
                           </span>
-                          {websiteDisplay ? (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const href = organization.website!.startsWith("http")
-                                  ? organization.website!
-                                  : `https://${organization.website!}`;
-                                window.open(href, "_blank", "noopener,noreferrer");
-                              }}
-                              className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
-                            >
-                              {websiteDisplay}
-                            </button>
-                          ) : (
-                            <span className="text-sm text-text-03">
-                              No website
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <TypeBadge type={organization.type} />
-                          <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
-                            <span>
-                              Created{" "}
-                              {formatRelativeDate(organization.created_at)}
-                            </span>
-                            <span>
-                              Updated{" "}
-                              {formatRelativeDate(organization.updated_at)}
-                            </span>
-                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                          <span>
+                            {formatRelativeDate(
+                              interaction.occurred_at || interaction.created_at
+                            )}
+                          </span>
                         </div>
                       </div>
-                    </Card>
+                    </div>
+                  </Card>
+                );
+
+                return linkHref ? (
+                  <Link
+                    key={interaction.id}
+                    href={linkHref as Route}
+                    className="block"
+                  >
+                    {card}
                   </Link>
+                ) : (
+                  <div key={interaction.id}>{card}</div>
                 );
               })}
             </div>
           )}
 
-          {!isLoading && organizations.length > 0 && totalPages > 1 && (
+          {!isLoading && interactions.length > 0 && totalPages > 1 && (
             <PageSelector
               currentPage={pageNum + 1}
               totalPages={totalPages}
@@ -273,22 +260,12 @@ export default function CrmOrganizationsPage() {
         </SettingsLayouts.Body>
       </SettingsLayouts.Root>
 
-      <CreateOrganizationModal
-        open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        onSuccess={() => {
-          setPageNum(0);
-          void refreshOrganizations();
-        }}
-      />
-
       <ImportCsvModal
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
-        defaultEntityType="organizations"
+        defaultEntityType="interactions"
         onSuccess={() => {
           setPageNum(0);
-          void refreshOrganizations();
         }}
       />
     </AppLayouts.Root>

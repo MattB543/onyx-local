@@ -1,0 +1,66 @@
+import {
+  deleteContactProfilePicture,
+  uploadContactProfilePicture,
+} from "@/app/app/crm/crmService";
+
+describe("CRM profile picture service", () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, "fetch");
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  test("uploadContactProfilePicture posts form data to the upload endpoint", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ file_id: "file-123" }),
+    } as Response);
+
+    const file = new File(["avatar"], "avatar.png", { type: "image/png" });
+    const result = await uploadContactProfilePicture("contact-123", file);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/user/crm/contacts/contact-123/upload-profile-picture",
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
+
+    const request = fetchSpy.mock.calls[0][1];
+    expect(request?.body).toBeInstanceOf(FormData);
+    expect((request?.body as FormData).get("file")).toBe(file);
+    expect(result).toEqual({ file_id: "file-123" });
+  });
+
+  test("uploadContactProfilePicture throws when the upload fails", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 413,
+    } as Response);
+
+    const file = new File(["avatar"], "avatar.png", { type: "image/png" });
+
+    await expect(
+      uploadContactProfilePicture("contact-123", file)
+    ).rejects.toThrow("Upload CRM contact profile picture failed (Status: 413)");
+  });
+
+  test("deleteContactProfilePicture sends a delete request to the profile-picture endpoint", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+    } as Response);
+
+    await expect(
+      deleteContactProfilePicture("contact-123")
+    ).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/user/crm/contacts/contact-123/profile-picture",
+      { method: "DELETE" }
+    );
+  });
+});

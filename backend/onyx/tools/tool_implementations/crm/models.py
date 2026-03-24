@@ -13,6 +13,7 @@ from onyx.db.models import CrmInteraction
 from onyx.db.models import CrmInteractionAttendee
 from onyx.db.models import CrmOrganization
 from onyx.db.models import CrmTag
+from onyx.file_store.utils import build_frontend_file_url
 from onyx.tools.models import ToolCallException
 from onyx.tools.tool_implementations.payload_utils import as_llm_json
 from onyx.tools.tool_implementations.payload_utils import compact_tool_payload_for_model
@@ -180,6 +181,12 @@ def serialize_contact(
         "notes": contact.notes,
         "linkedin_url": contact.linkedin_url,
         "location": contact.location,
+        "profile_picture_file_id": contact.profile_picture_file_id,
+        "profile_picture_url": (
+            build_frontend_file_url(contact.profile_picture_file_id)
+            if contact.profile_picture_file_id
+            else None
+        ),
         "created_by": str(contact.created_by) if contact.created_by else None,
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
         "updated_at": contact.updated_at.isoformat() if contact.updated_at else None,

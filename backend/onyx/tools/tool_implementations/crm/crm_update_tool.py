@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
+from onyx.configs.constants import FileOrigin
 from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
 from onyx.db.crm import get_contact_owner_ids
@@ -21,6 +22,7 @@ from onyx.db.crm import update_organization
 from onyx.db.enums import CrmContactSource
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import User
+from onyx.file_store.utils import save_file_from_url
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
@@ -36,9 +38,11 @@ from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_organization
+from onyx.utils.logger import setup_logger
 
 
 CRM_UPDATE_ENTITY_TYPES = {"contact", "organization"}
+logger = setup_logger()
 
 
 class CrmUpdateTool(Tool[None]):
@@ -107,7 +111,8 @@ class CrmUpdateTool(Tool[None]):
                                 "Fields to update. Only include fields you want to change. "
                                 "For contacts: first_name, last_name, email, phone, title (job title), "
                                 "organization_id, owner_ids, source (manual|import|referral|inbound|other), "
-                                "status (workspace-defined contact stages), category, notes, linkedin_url, location. "
+                                "status (workspace-defined contact stages), category, notes, linkedin_url, location, "
+                                "profile_picture_url (remote image URL or null to clear). "
                                 "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
                                 "sector, location, size, notes."
                             ),
@@ -123,6 +128,32 @@ class CrmUpdateTool(Tool[None]):
 
     def _normalize_contact_updates(self, updates: dict[str, Any]) -> dict[str, Any]:
         normalized_updates = dict(updates)
+        if "profile_picture_url" in normalized_updates:
+            profile_picture_url = normalized_updates.pop("profile_picture_url")
+            if profile_picture_url is None:
+                normalized_updates["profile_picture_file_id"] = None
+            elif isinstance(profile_picture_url, str):
+                normalized_url = profile_picture_url.strip()
+                if not normalized_url:
+                    normalized_updates["profile_picture_file_id"] = None
+                else:
+                    try:
+                        normalized_updates["profile_picture_file_id"] = save_file_from_url(
+                            normalized_url,
+                            display_name="crm_profile_picture",
+                            file_origin=FileOrigin.CRM_UPLOAD,
+                            require_image=True,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to download CRM contact profile picture during update: %s",
+                            e,
+                        )
+            else:
+                raise ToolCallException(
+                    message=f"Invalid profile_picture_url payload type: {type(profile_picture_url)}",
+                    llm_facing_message="'updates.profile_picture_url' must be a string URL or null.",
+                )
 
         if "source" in normalized_updates:
             normalized_updates["source"] = parse_enum_maybe(
@@ -234,7 +265,7 @@ class CrmUpdateTool(Tool[None]):
                                 llm_facing_message="Could not find one of the provided updates.owner_ids users.",
                             )
 
-                    updated_contact = update_contact(
+                    updated_contact, _ = update_contact(
                         db_session=db_session,
                         contact=contact,
                         patches=updates,
@@ -259,7 +290,7 @@ class CrmUpdateTool(Tool[None]):
                         )
 
                     updates = self._normalize_organization_updates(updates_raw)
-                    updated_organization = update_organization(
+                    updated_organization, _ = update_organization(
                         db_session=db_session,
                         organization=organization,
                         patches=updates,

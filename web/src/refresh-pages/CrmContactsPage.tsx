@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { CrmContactStage } from "@/app/app/crm/crmService";
+import { CrmContactStage, exportCrmContacts } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import EmptyMessage from "@/refresh-components/EmptyMessage";
@@ -21,6 +22,7 @@ import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
 import CreateContactModal from "@/refresh-pages/crm/components/CreateContactModal";
+import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
@@ -30,13 +32,17 @@ import {
   formatCrmLabel,
 } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgPlusCircle, SvgUser } from "@opal/icons";
+import { SvgDownload, SvgMoreHorizontal, SvgPlusCircle, SvgUploadCloud, SvgUser } from "@opal/icons";
+import CopyEmailButton from "@/refresh-pages/crm/components/CopyEmailButton";
+import { Section } from "@/layouts/general-layouts";
+import Popover from "@/refresh-components/Popover";
 
 const PAGE_SIZE = 25;
 
 export default function CrmContactsPage() {
   const searchParams = useSearchParams();
   const organizationIdFilter = searchParams.get("organization_id") ?? undefined;
+  const { isAdmin } = useUser();
   const { crmSettings } = useCrmSettings();
   const stageOptions = useMemo(
     () =>
@@ -62,6 +68,20 @@ export default function CrmContactsPage() {
   const [orgFilterId, setOrgFilterId] = useState<string | undefined>(undefined);
   const [pageNum, setPageNum] = useState(0);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [morePopoverOpen, setMorePopoverOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      await exportCrmContacts();
+    } catch (err) {
+      console.error("Failed to export contacts:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
 
   const { organizations: orgLookup } = useCrmOrganizations({
     pageNum: 0,
@@ -110,14 +130,57 @@ export default function CrmContactsPage() {
         >
           <CrmNav
             rightContent={
-              <Button
-                action
-                primary
-                leftIcon={SvgPlusCircle}
-                onClick={() => setCreateModalOpen(true)}
-              >
-                New Contact
-              </Button>
+              <div className="flex items-center gap-2">
+                <Popover
+                  open={morePopoverOpen}
+                  onOpenChange={setMorePopoverOpen}
+                >
+                  <Popover.Trigger asChild>
+                    <Button secondary className="!p-2">
+                      <SvgMoreHorizontal className="h-4 w-4 rotate-90 stroke-text-03" />
+                    </Button>
+                  </Popover.Trigger>
+                  <Popover.Content align="end">
+                    <Section gap={0.5} alignItems="stretch">
+                      <Button
+                        tertiary
+                        size="md"
+                        leftIcon={SvgDownload}
+                        className="gap-2"
+                        onClick={() => {
+                          setMorePopoverOpen(false);
+                          handleExport();
+                        }}
+                        disabled={exporting}
+                      >
+                        {exporting ? "Exporting..." : "Export Contacts"}
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          tertiary
+                          size="md"
+                          leftIcon={SvgUploadCloud}
+                          className="gap-2"
+                          onClick={() => {
+                            setMorePopoverOpen(false);
+                            setImportModalOpen(true);
+                          }}
+                        >
+                          Import CSV
+                        </Button>
+                      )}
+                    </Section>
+                  </Popover.Content>
+                </Popover>
+                <Button
+                  action
+                  primary
+                  leftIcon={SvgPlusCircle}
+                  onClick={() => setCreateModalOpen(true)}
+                >
+                  New Contact
+                </Button>
+              </div>
             }
           />
         </SettingsLayouts.Header>
@@ -262,17 +325,31 @@ export default function CrmContactsPage() {
                             firstName={contact.first_name}
                             lastName={contact.last_name}
                             size="lg"
+                            profilePictureUrl={contact.profile_picture_url}
                           />
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
                           <span className="text-base font-semibold text-text-05">
                             {contact.full_name || contact.first_name}
                           </span>
-                          <span className="text-sm text-text-03">
-                            {contact.title || "No title"}
-                          </span>
+                          {contact.email ? (
+                            <div className="flex items-center gap-1">
+                              <span className="truncate text-sm text-text-04">
+                                {contact.email}
+                              </span>
+                              <CopyEmailButton email={contact.email!} />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-text-03">No email</span>
+                          )}
                           <span className="truncate text-sm text-text-03">
-                            {orgName || "No organization"}
+                            {contact.title
+                              ? orgName
+                                ? `${contact.title} at ${orgName}`
+                                : contact.title
+                              : orgName
+                                ? `at ${orgName}`
+                                : "No title"}
                           </span>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -310,6 +387,16 @@ export default function CrmContactsPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         organizationId={organizationIdFilter}
+        onSuccess={() => {
+          setPageNum(0);
+          void refreshContacts();
+        }}
+      />
+
+      <ImportCsvModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        defaultEntityType="contacts"
         onSuccess={() => {
           setPageNum(0);
           void refreshContacts();

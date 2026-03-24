@@ -1,14 +1,16 @@
 "use client";
 
 import { Form, Formik } from "formik";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   createCrmContact,
   CrmContactSource,
   CrmContactStage,
+  uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
+import { toast } from "@/hooks/useToast";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
@@ -16,6 +18,7 @@ import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import InputImage from "@/refresh-components/inputs/InputImage";
 import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
@@ -64,6 +67,30 @@ export default function CreateContactModal({
   const { user } = useUser();
   const { crmSettings } = useCrmSettings();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
+  const [pendingProfilePictureFile, setPendingProfilePictureFile] =
+    useState<File | null>(null);
+  const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!pendingProfilePictureFile) {
+      setProfilePicturePreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(pendingProfilePictureFile);
+    setProfilePicturePreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [pendingProfilePictureFile]);
+
+  useEffect(() => {
+    if (!open) {
+      setPendingProfilePictureFile(null);
+    }
+  }, [open]);
 
   const stageOptions = useMemo(
     () =>
@@ -120,7 +147,7 @@ export default function CreateContactModal({
           validationSchema={contactValidationSchema}
           onSubmit={async (values, { setStatus }) => {
             try {
-              await createCrmContact({
+              const createdContact = await createCrmContact({
                 first_name: values.first_name.trim(),
                 last_name: optionalText(values.last_name),
                 email: optionalText(values.email),
@@ -135,6 +162,22 @@ export default function CreateContactModal({
                 location: optionalText(values.location),
                 organization_id: organizationId,
               });
+              if (pendingProfilePictureFile) {
+                try {
+                  await uploadContactProfilePicture(
+                    createdContact.id,
+                    pendingProfilePictureFile
+                  );
+                } catch (error) {
+                  console.error(
+                    "Failed to upload CRM contact profile picture:",
+                    error
+                  );
+                  toast.warning(
+                    "Contact created, but the profile picture could not be uploaded."
+                  );
+                }
+              }
               onSuccess();
               onOpenChange(false);
             } catch {
@@ -146,6 +189,29 @@ export default function CreateContactModal({
             <Form>
               <Modal.Body>
                 <div className="flex w-full flex-col gap-3">
+                  <div className="flex flex-col items-center gap-2">
+                    <InputImage
+                      src={profilePicturePreviewUrl || undefined}
+                      alt="Contact profile picture"
+                      size={96}
+                      onDrop={(file) => {
+                        setPendingProfilePictureFile(file);
+                      }}
+                      onDropRejected={(reason) => {
+                        toast.error(reason);
+                      }}
+                      onRemove={
+                        pendingProfilePictureFile
+                          ? () => {
+                              setPendingProfilePictureFile(null);
+                            }
+                          : undefined
+                      }
+                    />
+                    <Text as="p" secondaryBody text03 className="text-sm">
+                      Profile Picture
+                    </Text>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <InputTypeInField
                       name="first_name"

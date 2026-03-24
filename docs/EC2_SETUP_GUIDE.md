@@ -345,6 +345,7 @@ Edit `env.config`. Use the template variables as follows:
 | `SECRET_OLD_KEY_VERSIONS` | leave empty for new installs | populate only during DEK rotation or migration |
 | `ENCRYPTION_KEY_SECRET` | leave commented out unless migrating old AES-CBC secrets | if needed, store it in SSM instead of writing it directly in `env.config` |
 | `LOG_LEVEL` | keep or tune | default `info` is appropriate for normal production use |
+| `OPENSEARCH_FOR_ONYX_ENABLED` | set to `false` | disables OpenSearch indexing — upstream enabled it by default, but we don't run an OpenSearch container. Without this, the backend will crash on startup trying to connect to OpenSearch at `localhost:9200`. Can be re-enabled later if you add an OpenSearch service to the stack. |
 | `SHOW_EXTRA_CONNECTORS` | keep `false` unless you intentionally want them visible | UI-only feature exposure flag |
 | `TUNNEL_ORIGIN_PORT` | keep `8080` unless that host port conflicts | `cloudflared` should point to `http://localhost:8080` |
 
@@ -355,6 +356,7 @@ For a normal fresh deployment, the only values you usually need to change are:
 - `VALID_EMAIL_DOMAINS`
 - `SESSION_EXPIRE_TIME_SECONDS` (set to `34560000` so users don't re-auth in Onyx after Cloudflare Access lets them through)
 - `AWS_KMS_KEY_ID`
+- `OPENSEARCH_FOR_ONYX_ENABLED=false` (required — upstream defaults to `true` but we don't run OpenSearch)
 - optionally `S3_FILE_STORE_BUCKET_NAME`
 - optionally `TUNNEL_ORIGIN_PORT`
 

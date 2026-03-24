@@ -1,6 +1,7 @@
 """Tests for CRM tool streaming packet emissions and session replay helpers."""
 
 from queue import Queue
+from unittest.mock import MagicMock
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from onyx.chat.emitter import Emitter
+from onyx.configs.constants import FileOrigin
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.session_loading import create_crm_create_packets
 from onyx.server.query_and_chat.session_loading import (
@@ -33,8 +35,10 @@ from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
+from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
+from onyx.tools.models import ToolCallException
 
 
 @pytest.fixture
@@ -185,6 +189,178 @@ class TestCrmToolRun:
         assert packet.obj.payload["status"] == "created"
         assert '"entity_type": "contact"' in result.llm_facing_response
 
+    def test_crm_create_tool_definition_exposes_profile_picture_url(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+
+        definition = tool.tool_definition()
+        contact_properties = definition["function"]["parameters"]["properties"][
+            "contact"
+        ]["properties"]
+
+        assert "profile_picture_url" in contact_properties
+
+    def test_crm_create_contact_profile_picture_download_failure_is_non_fatal(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+        contact = CrmContact(first_name="Alice", status="lead")
+        contact.id = uuid4()
+        mocked_db_session = MagicMock()
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
+                return_value=(contact, True),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url",
+                side_effect=Exception("boom"),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact"
+            ) as mock_update_contact,
+        ):
+            payload = tool._create_contact(
+                db_session=mocked_db_session,
+                contact_data={
+                    "first_name": "Alice",
+                    "owner_ids": [],
+                    "profile_picture_url": "https://example.com/avatar.png",
+                },
+            )
+
+        assert payload["status"] == "created"
+        assert payload["contact"]["profile_picture_file_id"] is None
+        mock_update_contact.assert_not_called()
+
+    def test_crm_create_contact_downloads_profile_picture_when_created(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+        db_session_mock = MagicMock()
+        contact = CrmContact(first_name="Alice", status="lead")
+        contact.id = uuid4()
+        updated_contact = CrmContact(
+            first_name="Alice",
+            status="lead",
+            profile_picture_file_id="file-123",
+        )
+        updated_contact.id = contact.id
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
+                return_value=(contact, True),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url",
+                return_value="file-123",
+            ) as mock_save_file,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact",
+                return_value=(updated_contact, True),
+            ) as mock_update_contact,
+        ):
+            payload = tool._create_contact(
+                db_session=db_session_mock,
+                contact_data={
+                    "first_name": "Alice",
+                    "owner_ids": [],
+                    "profile_picture_url": "https://example.com/avatar.png",
+                },
+            )
+
+        mock_save_file.assert_called_once_with(
+            "https://example.com/avatar.png",
+            display_name=f"crm_profile_{contact.id}",
+            file_origin=FileOrigin.CRM_UPLOAD,
+            require_image=True,
+        )
+        mock_update_contact.assert_called_once_with(
+            db_session=db_session_mock,
+            contact=contact,
+            patches={"profile_picture_file_id": "file-123"},
+        )
+        assert payload["contact"]["profile_picture_file_id"] == "file-123"
+
+    def test_crm_create_contact_existing_contact_does_not_download_profile_picture(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+        contact = CrmContact(first_name="Alice", status="lead")
+        contact.id = uuid4()
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
+                return_value=(contact, False),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url"
+            ) as mock_save_file,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact"
+            ) as mock_update_contact,
+        ):
+            payload = tool._create_contact(
+                db_session=MagicMock(),
+                contact_data={
+                    "first_name": "Alice",
+                    "owner_ids": [],
+                    "profile_picture_url": "https://example.com/avatar.png",
+                },
+            )
+
+        assert payload["status"] == "already_exists"
+        mock_save_file.assert_not_called()
+        mock_update_contact.assert_not_called()
+
     def test_crm_update_run_emits_delta(
         self, emitter: Emitter, db_session, placement: Placement
     ) -> None:
@@ -216,7 +392,7 @@ class TestCrmToolRun:
             ) as mock_get_tags,
         ):
             mock_get_contact.return_value = contact
-            mock_update_contact.return_value = updated_contact
+            mock_update_contact.return_value = (updated_contact, True)
             mock_get_contact_owner_ids.return_value = []
             mock_get_tags.return_value = []
 
@@ -231,6 +407,101 @@ class TestCrmToolRun:
         assert isinstance(packet.obj, CrmUpdateToolDelta)
         assert packet.obj.payload["status"] == "updated"
         assert '"status": "updated"' in result.llm_facing_response
+
+    def test_crm_update_normalize_contact_updates_downloads_profile_picture(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with patch(
+            "onyx.tools.tool_implementations.crm.crm_update_tool.save_file_from_url",
+            return_value="file-123",
+        ) as mock_save_file:
+            updates = tool._normalize_contact_updates(
+                {"profile_picture_url": "https://example.com/avatar.png"}
+            )
+
+        mock_save_file.assert_called_once_with(
+            "https://example.com/avatar.png",
+            display_name="crm_profile_picture",
+            file_origin=FileOrigin.CRM_UPLOAD,
+            require_image=True,
+        )
+        assert updates["profile_picture_file_id"] == "file-123"
+        assert "profile_picture_url" not in updates
+
+    def test_crm_update_normalize_contact_updates_clears_profile_picture(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        updates = tool._normalize_contact_updates({"profile_picture_url": None})
+
+        assert updates["profile_picture_file_id"] is None
+
+    def test_crm_update_normalize_contact_updates_empty_string_clears_profile_picture(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        updates = tool._normalize_contact_updates({"profile_picture_url": ""})
+
+        assert updates["profile_picture_file_id"] is None
+        assert "profile_picture_url" not in updates
+
+    def test_crm_update_normalize_contact_updates_rejects_invalid_profile_picture_type(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with pytest.raises(ToolCallException) as exc:
+            tool._normalize_contact_updates({"profile_picture_url": 123})
+
+        assert "string URL or null" in exc.value.llm_facing_message
+
+    def test_crm_update_normalize_contact_updates_profile_picture_download_failure_is_non_fatal(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with patch(
+            "onyx.tools.tool_implementations.crm.crm_update_tool.save_file_from_url",
+            side_effect=Exception("boom"),
+        ):
+            updates = tool._normalize_contact_updates(
+                {
+                    "first_name": "Alice",
+                    "profile_picture_url": "https://example.com/avatar.png",
+                }
+            )
+
+        assert updates["first_name"] == "Alice"
+        assert "profile_picture_file_id" not in updates
+
+    def test_serialize_contact_profile_picture_none(self) -> None:
+        contact = CrmContact(
+            first_name="Bob",
+            status="lead",
+        )
+        contact.id = uuid4()
+
+        payload = serialize_contact(contact, owner_ids=[], tags=[])
+
+        assert payload["profile_picture_file_id"] is None
+        assert payload["profile_picture_url"] is None
+
+    def test_serialize_contact_includes_profile_picture_fields(self) -> None:
+        contact = CrmContact(
+            first_name="Alice",
+            status="lead",
+            profile_picture_file_id="file-123",
+        )
+        contact.id = uuid4()
+
+        payload = serialize_contact(contact, owner_ids=[], tags=[])
+
+        assert payload["profile_picture_file_id"] == "file-123"
+        assert payload["profile_picture_url"] == "/api/chat/file/file-123"
 
     def test_crm_log_interaction_run_emits_delta(
         self, emitter: Emitter, db_session, placement: Placement

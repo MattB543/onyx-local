@@ -4575,6 +4575,9 @@ class CrmContact(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
+    profile_picture_file_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
     created_by: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("user.id", ondelete="SET NULL"),

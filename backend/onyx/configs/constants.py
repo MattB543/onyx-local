@@ -366,6 +366,7 @@ class FileOrigin(str, Enum):
     CHAT_IMAGE_GEN = "chat_image_gen"
     CONNECTOR = "connector"
     CONNECTOR_METADATA = "connector_metadata"
+    CRM_UPLOAD = "crm_upload"
     GENERATED_REPORT = "generated_report"
     INDEXING_CHECKPOINT = "indexing_checkpoint"
     PLAINTEXT_CACHE = "plaintext_cache"

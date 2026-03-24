@@ -1,32 +1,68 @@
 "use client";
 
+import { Route } from "next";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
+import {
+  exportCrmContacts,
+  exportCrmInteractions,
+  exportCrmOrganizations,
+} from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
+import { useUser } from "@/providers/UserProvider";
+import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
+import Popover from "@/refresh-components/Popover";
 import Text from "@/refresh-components/texts/Text";
+import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
+import InteractionTypeIcon from "@/refresh-pages/crm/components/InteractionTypeIcon";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
 import OrgAvatar from "@/refresh-pages/crm/components/OrgAvatar";
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 
-import { SvgActivity, SvgOrganization, SvgUser } from "@opal/icons";
+import {
+  SvgActivity,
+  SvgDownload,
+  SvgOrganization,
+  SvgUploadCloud,
+  SvgUser,
+} from "@opal/icons";
+import CopyEmailButton from "@/refresh-pages/crm/components/CopyEmailButton";
+import { Section } from "@/layouts/general-layouts";
 
 const RECENT_LIST_LIMIT = 5;
-const INTERACTION_LOOKUP_LIMIT = 150;
-const ORGANIZATION_LOOKUP_LIMIT = 150;
 
 export default function CrmHomePage() {
+  const { isAdmin } = useUser();
   const [contactsSortBy, setContactsSortBy] = useState("updated_at");
   const [orgsSortBy, setOrgsSortBy] = useState("updated_at");
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(
+    async (exportFn: () => Promise<void>) => {
+      setExporting(true);
+      setExportPopoverOpen(false);
+      try {
+        await exportFn();
+      } catch (err) {
+        console.error("Failed to export:", err);
+      } finally {
+        setExporting(false);
+      }
+    },
+    []
+  );
 
   const {
     contacts,
@@ -46,23 +82,14 @@ export default function CrmHomePage() {
     pageSize: RECENT_LIST_LIMIT,
     sortBy: orgsSortBy,
   });
-  const { organizations: organizationLookup } = useCrmOrganizations({
+  const {
+    interactions: recentInteractions,
+    totalItems: totalInteractions,
+    isLoading: loadingInteractions,
+  } = useCrmInteractions({
     pageNum: 0,
-    pageSize: ORGANIZATION_LOOKUP_LIMIT,
+    pageSize: RECENT_LIST_LIMIT,
   });
-  const { interactions } = useCrmInteractions({
-    pageNum: 0,
-    pageSize: INTERACTION_LOOKUP_LIMIT,
-  });
-
-  const orgNameById = useMemo(() => {
-    return new Map(
-      organizationLookup.map((organization) => [
-        organization.id,
-        organization.name,
-      ])
-    );
-  }, [organizationLookup]);
 
   return (
     <AppLayouts.Root>
@@ -72,7 +99,69 @@ export default function CrmHomePage() {
           title="CRM"
           description="Manage your contacts, organizations, and interactions."
         >
-          <CrmNav />
+          <CrmNav
+            rightContent={
+              <div className="flex items-center gap-2">
+                <Popover
+                  open={exportPopoverOpen}
+                  onOpenChange={setExportPopoverOpen}
+                >
+                  <Popover.Trigger asChild>
+                    <Button
+                      secondary
+                      leftIcon={SvgDownload}
+                      disabled={exporting}
+                    >
+                      {exporting ? "Exporting..." : "Export"}
+                    </Button>
+                  </Popover.Trigger>
+                  <Popover.Content align="end">
+                    <Section gap={0.5} alignItems="stretch">
+                      <Button
+                        tertiary
+                        size="md"
+                        className="!w-full justify-start"
+                        onClick={() =>
+                          handleExport(exportCrmContacts)
+                        }
+                      >
+                        Export Contacts
+                      </Button>
+                      <Button
+                        tertiary
+                        size="md"
+                        className="!w-full justify-start"
+                        onClick={() =>
+                          handleExport(exportCrmOrganizations)
+                        }
+                      >
+                        Export Organizations
+                      </Button>
+                      <Button
+                        tertiary
+                        size="md"
+                        className="!w-full justify-start"
+                        onClick={() =>
+                          handleExport(exportCrmInteractions)
+                        }
+                      >
+                        Export Interactions
+                      </Button>
+                    </Section>
+                  </Popover.Content>
+                </Popover>
+                {isAdmin && (
+                  <Button
+                    secondary
+                    leftIcon={SvgUploadCloud}
+                    onClick={() => setImportModalOpen(true)}
+                  >
+                    Import
+                  </Button>
+                )}
+              </div>
+            }
+          />
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
@@ -126,10 +215,10 @@ export default function CrmHomePage() {
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <Text as="p" headingH3>
-                    {interactions.length}
+                    {loadingInteractions ? "--" : totalInteractions}
                   </Text>
                   <Text as="p" secondaryBody text03 className="text-sm">
-                    Recent Interactions
+                    Interactions
                   </Text>
                 </div>
               </div>
@@ -183,11 +272,6 @@ export default function CrmHomePage() {
             ) : (
               <div className="flex flex-col gap-2">
                 {contacts.map((contact) => {
-                  const orgName = contact.organization_id
-                    ? orgNameById.get(contact.organization_id) ||
-                      "Linked organization"
-                    : null;
-
                   return (
                     <Link
                       key={contact.id}
@@ -203,17 +287,31 @@ export default function CrmHomePage() {
                               firstName={contact.first_name}
                               lastName={contact.last_name}
                               size="lg"
+                              profilePictureUrl={contact.profile_picture_url}
                             />
                           </div>
                           <div className="flex min-w-0 flex-1 flex-col gap-1">
                             <span className="text-base font-semibold text-text-05">
                               {contact.full_name || contact.first_name}
                             </span>
-                            <span className="text-sm text-text-03">
-                              {contact.title || "No title"}
-                            </span>
+                            {contact.email ? (
+                              <div className="flex items-center gap-1">
+                                <span className="truncate text-sm text-text-04">
+                                  {contact.email}
+                                </span>
+                                <CopyEmailButton email={contact.email!} />
+                              </div>
+                            ) : (
+                              <span className="text-sm text-text-03">No email</span>
+                            )}
                             <span className="truncate text-sm text-text-03">
-                              {orgName || "No organization"}
+                              {contact.title
+                                ? contact.organization_name
+                                  ? `${contact.title} at ${contact.organization_name}`
+                                  : contact.title
+                                : contact.organization_name
+                                  ? `at ${contact.organization_name}`
+                                  : "No title"}
                             </span>
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -320,7 +418,7 @@ export default function CrmHomePage() {
                                     : `https://${organization.website!}`;
                                   window.open(href, "_blank", "noopener,noreferrer");
                                 }}
-                                className="truncate text-left text-sm text-text-04 hover:underline"
+                                className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
                               >
                                 {websiteDisplay}
                               </button>
@@ -351,8 +449,102 @@ export default function CrmHomePage() {
               </div>
             )}
           </div>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <Text as="p" mainUiAction text02>
+                Recent Interactions
+              </Text>
+            </div>
+
+            {loadingInteractions ? (
+              <Text as="p" secondaryBody text03 className="text-sm">
+                Loading...
+              </Text>
+            ) : recentInteractions.length === 0 ? (
+              <Card variant="tertiary">
+                <Text as="p" secondaryBody text03 className="text-sm">
+                  No interactions yet. Log your first interaction to get started.
+                </Text>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {recentInteractions.map((interaction) => {
+                  const linkHref = interaction.contact_id
+                    ? `/app/crm/contacts/${interaction.contact_id}`
+                    : interaction.organization_id
+                      ? `/app/crm/organizations/${interaction.organization_id}`
+                      : null;
+
+                  const card = (
+                    <Card
+                      variant="secondary"
+                      className="[&>div]:items-stretch transition-colors hover:bg-background-tint-02"
+                    >
+                      <div className="flex w-full items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background-tint-02">
+                          <InteractionTypeIcon
+                            type={interaction.type}
+                            size={20}
+                            className="stroke-text-04"
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <span className="truncate text-base font-semibold text-text-05">
+                            {[
+                              interaction.type.charAt(0).toUpperCase() +
+                                interaction.type.slice(1),
+                              interaction.contact_name,
+                              interaction.organization_name
+                                ? `at ${interaction.organization_name}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" \u00B7 ")}
+                          </span>
+                          <span className="truncate text-sm text-text-04">
+                            {interaction.title}
+                          </span>
+                          {interaction.summary && (
+                            <span className="line-clamp-1 text-sm text-text-03">
+                              {interaction.summary}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
+                            <span>
+                              {formatRelativeDate(
+                                interaction.occurred_at || interaction.created_at
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+
+                  return linkHref ? (
+                    <Link key={interaction.id} href={linkHref as Route}>
+                      {card}
+                    </Link>
+                  ) : (
+                    <div key={interaction.id}>{card}</div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </SettingsLayouts.Body>
       </SettingsLayouts.Root>
+
+      <ImportCsvModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        onSuccess={() => {
+          // SWR cache is invalidated inside the modal
+        }}
+      />
     </AppLayouts.Root>
   );
 }

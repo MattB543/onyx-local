@@ -3,14 +3,17 @@
 import { Form, Formik } from "formik";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   CrmContactSource,
   CrmContactStage,
+  deleteContactProfilePicture,
   patchCrmContact,
+  uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
+import { toast } from "@/hooks/useToast";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
@@ -23,6 +26,7 @@ import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import InputImage from "@/refresh-components/inputs/InputImage";
 import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
@@ -79,6 +83,12 @@ export default function CrmContactDetailPage({
   const [interactionPageSize, setInteractionPageSize] = useState(
     INTERACTION_PAGE_SIZE
   );
+  const [pendingProfilePictureFile, setPendingProfilePictureFile] =
+    useState<File | null>(null);
+  const [profilePicturePreviewUrl, setProfilePicturePreviewUrl] = useState<
+    string | null
+  >(null);
+  const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
 
   const { contact, isLoading, error, refreshContact } =
     useCrmContact(contactId);
@@ -168,6 +178,30 @@ export default function CrmContactDetailPage({
     ],
     [contact?.first_name, contact?.full_name]
   );
+  const activeProfilePictureUrl =
+    profilePicturePreviewUrl ||
+    (removeProfilePicture ? null : contact?.profile_picture_url) ||
+    null;
+
+  useEffect(() => {
+    if (!pendingProfilePictureFile) {
+      setProfilePicturePreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(pendingProfilePictureFile);
+    setProfilePicturePreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [pendingProfilePictureFile]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setPendingProfilePictureFile(null);
+      setRemoveProfilePicture(false);
+    }
+  }, [contact?.id, isEditing]);
 
   return (
     <AppLayouts.Root>
@@ -234,6 +268,7 @@ export default function CrmContactDetailPage({
                     firstName={contact.first_name}
                     lastName={contact.last_name}
                     size="lg"
+                    profilePictureUrl={contact.profile_picture_url}
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="text-base font-semibold text-text-05">
@@ -306,6 +341,8 @@ export default function CrmContactDetailPage({
                         }}
                         validationSchema={contactValidationSchema}
                         onSubmit={async (values, { setStatus }) => {
+                          let profilePictureWarning: string | null = null;
+
                           try {
                             await patchCrmContact(contact.id, {
                               first_name: values.first_name.trim(),
@@ -321,15 +358,77 @@ export default function CrmContactDetailPage({
                               source: values.source || undefined,
                               notes: optionalText(values.notes),
                             });
-                            await refreshContact();
-                            setIsEditing(false);
                           } catch {
                             setStatus("Failed to save contact.");
+                            return;
+                          }
+
+                          try {
+                            if (pendingProfilePictureFile) {
+                              await uploadContactProfilePicture(
+                                contact.id,
+                                pendingProfilePictureFile
+                              );
+                            } else if (
+                              removeProfilePicture &&
+                              contact.profile_picture_file_id
+                            ) {
+                              await deleteContactProfilePicture(contact.id);
+                            }
+                          } catch (error) {
+                            console.error(
+                              "Failed to update CRM contact profile picture:",
+                              error
+                            );
+                            profilePictureWarning =
+                              "Contact details saved, but the profile picture could not be updated.";
+                          }
+
+                          await refreshContact();
+                          setIsEditing(false);
+                          if (profilePictureWarning) {
+                            toast.warning(profilePictureWarning);
                           }
                         }}
                       >
                         {({ isSubmitting, status, values, setFieldValue }) => (
                           <Form className="flex h-full flex-col gap-3">
+                            <div className="flex flex-col items-center gap-2">
+                              <InputImage
+                                src={activeProfilePictureUrl || undefined}
+                                alt={`${contact.full_name || contact.first_name} profile picture`}
+                                size={104}
+                                onDrop={(file) => {
+                                  setPendingProfilePictureFile(file);
+                                  setRemoveProfilePicture(false);
+                                }}
+                                onDropRejected={(reason) => {
+                                  toast.error(reason);
+                                }}
+                                onRemove={
+                                  activeProfilePictureUrl
+                                    ? () => {
+                                        if (pendingProfilePictureFile) {
+                                          setPendingProfilePictureFile(null);
+                                          setRemoveProfilePicture(false);
+                                        } else if (
+                                          contact.profile_picture_file_id
+                                        ) {
+                                          setRemoveProfilePicture(true);
+                                        }
+                                      }
+                                    : undefined
+                                }
+                              />
+                              <Text
+                                as="p"
+                                secondaryBody
+                                text03
+                                className="text-sm"
+                              >
+                                Profile Picture
+                              </Text>
+                            </div>
                             <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:[&>*]:min-w-0">
                               <div className="flex flex-col gap-1">
                                 <Text

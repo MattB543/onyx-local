@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 const AVATAR_COLORS: [
@@ -15,22 +19,30 @@ const AVATAR_COLORS: [
 ];
 
 const sizeClasses = {
-  sm: "w-8 h-8 text-sm",
-  md: "w-10 h-10 text-sm",
-  lg: "w-12 h-12 text-base",
+  sm: "w-10 h-10 text-sm",
+  md: "w-12 h-12 text-base",
+  lg: "w-14 h-14 text-lg",
 };
 
 interface ContactAvatarProps {
   firstName: string;
   lastName: string | null;
   size?: "sm" | "md" | "lg";
+  profilePictureUrl?: string | null;
 }
 
 export default function ContactAvatar({
   firstName,
   lastName,
   size = "md",
+  profilePictureUrl,
 }: ContactAvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [profilePictureUrl]);
+
   const initials = (
     (firstName?.[0] || "") + (lastName?.[0] || "")
   ).toUpperCase();
@@ -39,17 +51,27 @@ export default function ContactAvatar({
     AVATAR_COLORS.length;
   const fallbackColor = AVATAR_COLORS[0];
   const color = AVATAR_COLORS[colorIndex] || fallbackColor;
+  const showProfilePicture = Boolean(profilePictureUrl) && !imageFailed;
 
   return (
     <div
       className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-full font-medium",
+        "relative flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-medium",
         sizeClasses[size],
-        color.bg,
-        color.text
+        showProfilePicture ? "bg-background-neutral-00" : color.bg,
+        showProfilePicture ? undefined : color.text
       )}
     >
-      {initials || "?"}
+      {showProfilePicture ? (
+        <img
+          src={profilePictureUrl || undefined}
+          alt={`${firstName} ${lastName || ""}`.trim() || "Contact avatar"}
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        initials || "?"
+      )}
     </div>
   );
 }

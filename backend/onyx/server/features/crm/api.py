@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Query
+from fastapi import UploadFile
+from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -14,10 +17,17 @@ from onyx.auth.users import current_user
 from onyx.db.crm import add_interaction_attendees
 from onyx.db.crm import add_tag_to_contact
 from onyx.db.crm import add_tag_to_organization
+from onyx.db.crm import build_contact_email_lookup
+from onyx.db.crm import build_org_name_lookup
+from onyx.db.crm import build_user_email_lookup
 from onyx.db.crm import create_contact
 from onyx.db.crm import create_interaction
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
+from onyx.db.crm import ensure_tags_exist
+from onyx.db.crm import export_all_contacts
+from onyx.db.crm import export_all_interactions
+from onyx.db.crm import export_all_organizations
 from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
 from onyx.db.crm import get_contact_owner_ids
@@ -25,6 +35,7 @@ from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_interaction_attendees
 from onyx.db.crm import get_or_create_crm_settings
 from onyx.db.crm import get_organization_by_id
+from onyx.db.crm import get_organization_by_name
 from onyx.db.crm import get_organization_tags
 from onyx.db.crm import get_tag_by_id
 from onyx.db.crm import list_contacts
@@ -39,16 +50,39 @@ from onyx.db.crm import update_crm_settings
 from onyx.db.crm import update_organization
 from onyx.db.crm import validate_stage_string
 from onyx.db.engine.sql_engine import get_session
+from onyx.db.enums import CrmAttendeeRole
+from onyx.db.enums import CrmContactSource
+from onyx.db.enums import CrmInteractionType
+from onyx.db.enums import CrmOrganizationType
+from onyx.db.models import CrmContact
+from onyx.db.models import CrmOrganization
+from onyx.db.models import User
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmOrganizationType
-from onyx.db.models import User
+from onyx.file_store.file_store import get_default_file_store
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_MB
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
+from onyx.configs.constants import FileOrigin
 from onyx.server.documents.models import PaginatedReturn
+from onyx.server.features.crm.csv_utils import build_csv_bytes
+from onyx.server.features.crm.csv_utils import CONTACT_CSV_HEADERS
+from onyx.server.features.crm.csv_utils import CONTACT_IMPORT_HEADERS
+from onyx.server.features.crm.csv_utils import INTERACTION_CSV_HEADERS
+from onyx.server.features.crm.csv_utils import INTERACTION_IMPORT_HEADERS
+from onyx.server.features.crm.csv_utils import MAX_IMPORT_FILE_SIZE
+from onyx.server.features.crm.csv_utils import MAX_IMPORT_ROWS
+from onyx.server.features.crm.csv_utils import ORGANIZATION_CSV_HEADERS
+from onyx.server.features.crm.csv_utils import ORGANIZATION_IMPORT_HEADERS
+from onyx.server.features.crm.csv_utils import parse_csv_upload
+from onyx.server.features.crm.csv_utils import parse_datetime_or_none
+from onyx.server.features.crm.csv_utils import parse_enum_or_none
+from onyx.server.features.crm.csv_utils import parse_pipe_delimited
 from onyx.server.features.crm.models import CrmContactCreateRequest
 from onyx.server.features.crm.models import CrmContactPatchRequest
 from onyx.server.features.crm.models import CrmContactSnapshot
 from onyx.server.features.crm.models import CrmEntityType
+from onyx.server.features.crm.models import CrmImportError
+from onyx.server.features.crm.models import CrmImportResult
 from onyx.server.features.crm.models import CrmInteractionAttendeeSnapshot
 from onyx.server.features.crm.models import CrmInteractionCreateRequest
 from onyx.server.features.crm.models import CrmInteractionSnapshot
@@ -60,6 +94,7 @@ from onyx.server.features.crm.models import CrmSettingsPatchRequest
 from onyx.server.features.crm.models import CrmSettingsSnapshot
 from onyx.server.features.crm.models import CrmTagCreateRequest
 from onyx.server.features.crm.models import CrmTagSnapshot
+from onyx.server.features.projects.projects_file_utils import is_upload_too_large
 from onyx.utils.logger import setup_logger
 
 
@@ -92,9 +127,15 @@ def _load_tag_or_404(tag_id: UUID, db_session: Session):
 def _serialize_contact(contact, db_session: Session) -> CrmContactSnapshot:
     owner_ids = get_contact_owner_ids(contact.id, db_session)
     tags = get_contact_tags(contact.id, db_session)
+    organization_name: str | None = None
+    if contact.organization_id is not None:
+        organization = get_organization_by_id(contact.organization_id, db_session)
+        if organization is not None:
+            organization_name = organization.name
     return CrmContactSnapshot.from_model(
         contact=contact,
         owner_ids=owner_ids,
+        organization_name=organization_name,
         tags=tags,
     )
 
@@ -109,6 +150,25 @@ def _serialize_interaction(interaction, db_session: Session) -> CrmInteractionSn
     user_name_by_id: dict[UUID, str | None] = {}
     contact_name_by_id: dict[UUID, str | None] = {}
     attendee_snapshots: list[CrmInteractionAttendeeSnapshot] = []
+    interaction_contact_name: str | None = None
+    interaction_organization_name: str | None = None
+
+    if interaction.contact_id is not None:
+        interaction_contact = get_contact_by_id(interaction.contact_id, db_session)
+        if interaction_contact is not None:
+            name_parts = [
+                interaction_contact.first_name,
+                interaction_contact.last_name or "",
+            ]
+            full_name = " ".join(part for part in name_parts if part).strip()
+            interaction_contact_name = full_name or interaction_contact.email
+
+    if interaction.organization_id is not None:
+        interaction_organization = get_organization_by_id(
+            interaction.organization_id, db_session
+        )
+        if interaction_organization is not None:
+            interaction_organization_name = interaction_organization.name
 
     for attendee in attendees:
         display_name: str | None = None
@@ -148,6 +208,8 @@ def _serialize_interaction(interaction, db_session: Session) -> CrmInteractionSn
 
     return CrmInteractionSnapshot.from_model(
         interaction=interaction,
+        contact_name=interaction_contact_name,
+        organization_name=interaction_organization_name,
         attendee_snapshots=attendee_snapshots,
     )
 
@@ -379,7 +441,7 @@ def patch_contact(
                 _ensure_user_exists(owner_uuid, db_session)
 
     try:
-        updated_contact = update_contact(
+        updated_contact, _ = update_contact(
             db_session=db_session,
             contact=contact,
             patches=patches,
@@ -397,6 +459,58 @@ def patch_contact(
         )
 
     return _serialize_contact(updated_contact, db_session)
+
+
+@router.post("/contacts/{contact_id}/upload-profile-picture")
+def upload_contact_profile_picture(
+    contact_id: UUID,
+    file: UploadFile,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_user),
+) -> dict[str, str]:
+    contact = _load_contact_or_404(contact_id, db_session)
+
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if not content_type or not content_type.startswith("image/"):
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "Only image uploads are supported for CRM profile pictures.",
+        )
+
+    if is_upload_too_large(file, USER_FILE_MAX_UPLOAD_SIZE_BYTES):
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            f"Profile picture exceeds the maximum allowed size of {USER_FILE_MAX_UPLOAD_SIZE_MB} MB.",
+        )
+
+    file_store = get_default_file_store()
+    file_id = file_store.save_file(
+        content=file.file,
+        display_name=file.filename or f"crm_profile_{contact_id}",
+        file_origin=FileOrigin.CRM_UPLOAD,
+        file_type=content_type,
+    )
+    update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"profile_picture_file_id": file_id},
+    )
+    return {"file_id": file_id}
+
+
+@router.delete("/contacts/{contact_id}/profile-picture")
+def delete_contact_profile_picture(
+    contact_id: UUID,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_user),
+) -> Response:
+    contact = _load_contact_or_404(contact_id, db_session)
+    update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"profile_picture_file_id": None},
+    )
+    return Response(status_code=204)
 
 
 @router.get("/organizations")
@@ -480,7 +594,7 @@ def patch_organization(
 
     patches = organization_patch_request.model_dump(exclude_unset=True)
     try:
-        updated_organization = update_organization(
+        updated_organization, _ = update_organization(
             db_session=db_session,
             organization=organization,
             patches=patches,
@@ -504,6 +618,7 @@ def patch_organization(
 def get_interactions(
     contact_id: UUID | None = Query(None),
     organization_id: UUID | None = Query(None),
+    interaction_type: CrmInteractionType | None = Query(None),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
@@ -515,6 +630,7 @@ def get_interactions(
         page_size=page_size,
         contact_id=contact_id,
         organization_id=organization_id,
+        interaction_type=interaction_type,
     )
 
     return PaginatedReturn(
@@ -723,3 +839,623 @@ def delete_organization_tag(
         CrmTagSnapshot.from_model(tag)
         for tag in get_organization_tags(organization.id, db_session)
     ]
+
+
+# ---------------------------------------------------------------------------
+# CSV Export endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/export/organizations")
+def export_organizations_csv(
+    _: User | None = Depends(current_user),
+    db_session: Session = Depends(get_session),
+) -> Response:
+    rows = export_all_organizations(db_session)
+    csv_bytes = build_csv_bytes(ORGANIZATION_CSV_HEADERS, rows)
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="crm_organizations_{date.today().isoformat()}.csv"'
+        },
+    )
+
+
+@router.get("/export/contacts")
+def export_contacts_csv(
+    _: User | None = Depends(current_user),
+    db_session: Session = Depends(get_session),
+) -> Response:
+    rows = export_all_contacts(db_session)
+    csv_bytes = build_csv_bytes(CONTACT_CSV_HEADERS, rows)
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="crm_contacts_{date.today().isoformat()}.csv"'
+        },
+    )
+
+
+@router.get("/export/interactions")
+def export_interactions_csv(
+    _: User | None = Depends(current_user),
+    db_session: Session = Depends(get_session),
+) -> Response:
+    rows = export_all_interactions(db_session)
+    csv_bytes = build_csv_bytes(INTERACTION_CSV_HEADERS, rows)
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="crm_interactions_{date.today().isoformat()}.csv"'
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# CSV Import endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/import/organizations")
+async def import_organizations_csv(
+    file: UploadFile,
+    dry_run: bool = False,
+    user: User | None = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> CrmImportResult:
+    contents = await file.read()
+    if len(contents) > MAX_IMPORT_FILE_SIZE:
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "Import file exceeds maximum allowed size.",
+        )
+
+    try:
+        rows = parse_csv_upload(
+            contents,
+            ORGANIZATION_IMPORT_HEADERS,
+            optional_headers=["id", "created_by", "created_at", "updated_at"],
+            max_rows=MAX_IMPORT_ROWS,
+        )
+    except ValueError as e:
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
+
+    result = CrmImportResult()
+
+    for row_num, row in enumerate(rows, start=2):
+        try:
+            with db_session.begin_nested():
+                name = row.get("name", "").strip()
+                if not name:
+                    raise ValueError("Organization name is required")
+
+                org_type = parse_enum_or_none(row.get("type", ""), CrmOrganizationType)
+                tag_names = parse_pipe_delimited(row.get("tags", ""))
+
+                patches: dict = {
+                    "name": name,
+                    "website": row.get("website", "").strip() or None,
+                    "type": org_type,
+                    "sector": row.get("sector", "").strip() or None,
+                    "location": row.get("location", "").strip() or None,
+                    "size": row.get("size", "").strip() or None,
+                    "notes": row.get("notes", "").strip() or None,
+                }
+
+                row_id = row.get("id", "").strip()
+                resolved_org_id: UUID | None = None
+                is_update = False
+                anything_changed = False
+
+                if row_id:
+                    org = db_session.get(CrmOrganization, UUID(row_id))
+                    if not org:
+                        raise ValueError(
+                            f"Organization with id '{row_id}' not found"
+                        )
+                    _, org_changed = update_organization(
+                        db_session, organization=org, patches=patches, commit=False
+                    )
+                    resolved_org_id = org.id
+                    is_update = True
+                    anything_changed = org_changed
+                else:
+                    existing = get_organization_by_name(name, db_session)
+                    if existing:
+                        _, org_changed = update_organization(
+                            db_session,
+                            organization=existing,
+                            patches=patches,
+                            commit=False,
+                        )
+                        resolved_org_id = existing.id
+                        is_update = True
+                        anything_changed = org_changed
+                    else:
+                        new_org, _ = create_organization(
+                            db_session,
+                            name=name,
+                            website=patches["website"],
+                            type=org_type,
+                            sector=patches["sector"],
+                            location=patches["location"],
+                            size=patches["size"],
+                            notes=patches["notes"],
+                            created_by=user.id if user else None,
+                            commit=False,
+                        )
+                        resolved_org_id = new_org.id
+                        result.created += 1
+
+                if resolved_org_id:
+                    # Sync tags: replace existing with CSV-declared state
+                    desired_tag_map = (
+                        ensure_tags_exist(db_session, tag_names, commit=False)
+                        if tag_names
+                        else {}
+                    )
+                    desired_tag_ids = set(desired_tag_map.values())
+
+                    # Get current tags on this org
+                    db_session.flush()
+                    current_tags = get_organization_tags(resolved_org_id, db_session)
+                    current_tag_ids = {t.id for t in current_tags}
+
+                    tags_to_remove = current_tag_ids - desired_tag_ids
+                    tags_to_add = desired_tag_ids - current_tag_ids
+
+                    for old_tag_id in tags_to_remove:
+                        remove_tag_from_organization(
+                            db_session,
+                            organization_id=resolved_org_id,
+                            tag_id=old_tag_id,
+                            commit=False,
+                        )
+
+                    for new_tag_id in tags_to_add:
+                        add_tag_to_organization(
+                            db_session,
+                            organization_id=resolved_org_id,
+                            tag_id=new_tag_id,
+                            commit=False,
+                        )
+
+                    if tags_to_remove or tags_to_add:
+                        anything_changed = True
+
+                if is_update and anything_changed:
+                    result.updated += 1
+                elif is_update:
+                    result.skipped += 1
+
+                db_session.flush()
+        except Exception as e:
+            result.errors.append(CrmImportError(row=row_num, error=str(e)))
+
+    if dry_run:
+        db_session.rollback()
+    else:
+        db_session.commit()
+
+    return result
+
+
+@router.post("/import/contacts")
+async def import_contacts_csv(
+    file: UploadFile,
+    dry_run: bool = False,
+    user: User | None = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> CrmImportResult:
+    contents = await file.read()
+    if len(contents) > MAX_IMPORT_FILE_SIZE:
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "Import file exceeds maximum allowed size.",
+        )
+
+    try:
+        rows = parse_csv_upload(
+            contents,
+            CONTACT_IMPORT_HEADERS,
+            optional_headers=["id", "created_by", "created_at", "updated_at"],
+            max_rows=MAX_IMPORT_ROWS,
+        )
+    except ValueError as e:
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
+
+    org_name_lookup = build_org_name_lookup(db_session)
+    contact_email_lookup = build_contact_email_lookup(db_session)
+    user_email_lookup = build_user_email_lookup(db_session)
+    allowed_stages = get_allowed_contact_stages(db_session)
+    default_stage = allowed_stages[0] if allowed_stages else "new"
+
+    result = CrmImportResult()
+
+    for row_num, row in enumerate(rows, start=2):
+        try:
+            with db_session.begin_nested():
+                first_name = row.get("first_name", "").strip()
+                if not first_name:
+                    raise ValueError("Contact first_name is required")
+
+                last_name = row.get("last_name", "").strip() or None
+                email = row.get("email", "").strip() or None
+                phone = row.get("phone", "").strip() or None
+                title = row.get("title", "").strip() or None
+                notes = row.get("notes", "").strip() or None
+                linkedin_url = row.get("linkedin_url", "").strip() or None
+                location = row.get("location", "").strip() or None
+                category = row.get("category", "").strip() or None
+
+                # Resolve organization
+                org_name = row.get("organization_name", "").strip()
+                organization_id: UUID | None = None
+                if org_name:
+                    organization_id = org_name_lookup.get(org_name.lower())
+                    if organization_id is None:
+                        raise ValueError(
+                            f"Organization '{org_name}' not found"
+                        )
+
+                # Resolve owner emails
+                owner_email_strs = parse_pipe_delimited(row.get("owner_emails", ""))
+                owner_ids: list[UUID] = []
+                for owner_email in owner_email_strs:
+                    uid = user_email_lookup.get(owner_email.lower())
+                    if uid is None:
+                        result.errors.append(
+                            CrmImportError(
+                                row=row_num,
+                                error=f"Owner email '{owner_email}' not found (skipped owner)",
+                            )
+                        )
+                    else:
+                        owner_ids.append(uid)
+
+                # Validate source
+                source = parse_enum_or_none(
+                    row.get("source", ""), CrmContactSource
+                )
+
+                # Validate status
+                status_str = row.get("status", "").strip()
+                if status_str:
+                    try:
+                        status = validate_stage_string(
+                            status_str, allowed_stages=allowed_stages
+                        )
+                    except ValueError:
+                        raise ValueError(
+                            f"Invalid status '{status_str}'. "
+                            f"Allowed: {', '.join(allowed_stages)}"
+                        )
+                else:
+                    status = default_stage
+
+                tag_names = parse_pipe_delimited(row.get("tags", ""))
+
+                patches: dict = {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "phone": phone,
+                    "title": title,
+                    "organization_id": organization_id,
+                    "owner_ids": owner_ids,
+                    "source": source,
+                    "status": status,
+                    "category": category,
+                    "notes": notes,
+                    "linkedin_url": linkedin_url,
+                    "location": location,
+                }
+
+                row_id = row.get("id", "").strip()
+                contact_id: UUID | None = None
+                is_update = False
+                anything_changed = False
+
+                if row_id:
+                    contact = db_session.get(CrmContact, UUID(row_id))
+                    if not contact:
+                        raise ValueError(
+                            f"Contact with id '{row_id}' not found"
+                        )
+                    _, contact_changed = update_contact(
+                        db_session,
+                        contact=contact,
+                        patches=patches,
+                        commit=False,
+                    )
+                    contact_id = contact.id
+                    is_update = True
+                    anything_changed = contact_changed
+                else:
+                    # Dedup by email
+                    existing_contact_id = contact_email_lookup.get(email.lower()) if email else None
+                    existing = db_session.get(CrmContact, existing_contact_id) if existing_contact_id else None
+                    if existing:
+                        _, contact_changed = update_contact(
+                            db_session,
+                            contact=existing,
+                            patches=patches,
+                            commit=False,
+                        )
+                        contact_id = existing.id
+                        is_update = True
+                        anything_changed = contact_changed
+                    else:
+                        new_contact, _ = create_contact(
+                            db_session,
+                            first_name=first_name,
+                            last_name=last_name,
+                            email=email,
+                            phone=phone,
+                            title=title,
+                            organization_id=organization_id,
+                            owner_ids=owner_ids,
+                            source=source,
+                            status=status,
+                            category=category,
+                            notes=notes,
+                            linkedin_url=linkedin_url,
+                            location=location,
+                            created_by=user.id if user else None,
+                            commit=False,
+                        )
+                        contact_id = new_contact.id
+                        if email:
+                            contact_email_lookup[email.lower()] = new_contact.id
+                        result.created += 1
+
+                if contact_id:
+                    desired_tag_map = (
+                        ensure_tags_exist(db_session, tag_names, commit=False)
+                        if tag_names
+                        else {}
+                    )
+                    desired_tag_ids = set(desired_tag_map.values())
+
+                    current_tags = get_contact_tags(contact_id, db_session)
+                    current_tag_ids = {t.id for t in current_tags}
+
+                    tags_to_remove = current_tag_ids - desired_tag_ids
+                    tags_to_add = desired_tag_ids - current_tag_ids
+
+                    for old_tag_id in tags_to_remove:
+                        remove_tag_from_contact(
+                            db_session,
+                            contact_id=contact_id,
+                            tag_id=old_tag_id,
+                            commit=False,
+                        )
+
+                    for new_tag_id in tags_to_add:
+                        add_tag_to_contact(
+                            db_session,
+                            contact_id=contact_id,
+                            tag_id=new_tag_id,
+                            commit=False,
+                        )
+
+                    if tags_to_remove or tags_to_add:
+                        anything_changed = True
+
+                if is_update and anything_changed:
+                    result.updated += 1
+                elif is_update:
+                    result.skipped += 1
+
+                db_session.flush()
+        except Exception as e:
+            result.errors.append(CrmImportError(row=row_num, error=str(e)))
+
+    if dry_run:
+        db_session.rollback()
+    else:
+        db_session.commit()
+
+    return result
+
+
+@router.post("/import/interactions")
+async def import_interactions_csv(
+    file: UploadFile,
+    dry_run: bool = False,
+    user: User | None = Depends(current_admin_user),
+    db_session: Session = Depends(get_session),
+) -> CrmImportResult:
+    contents = await file.read()
+    if len(contents) > MAX_IMPORT_FILE_SIZE:
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "Import file exceeds maximum allowed size.",
+        )
+
+    try:
+        rows = parse_csv_upload(
+            contents,
+            INTERACTION_IMPORT_HEADERS,
+            optional_headers=["id", "logged_by", "created_at", "updated_at"],
+            max_rows=MAX_IMPORT_ROWS,
+        )
+    except ValueError as e:
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
+
+    org_name_lookup = build_org_name_lookup(db_session)
+    contact_email_lookup = build_contact_email_lookup(db_session)
+    user_email_lookup = build_user_email_lookup(db_session)
+
+    result = CrmImportResult()
+
+    for row_num, row in enumerate(rows, start=2):
+        try:
+            with db_session.begin_nested():
+                # Validate required fields
+                title = row.get("title", "").strip()
+                if not title:
+                    raise ValueError("Interaction title is required")
+
+                interaction_type = parse_enum_or_none(
+                    row.get("type", ""), CrmInteractionType
+                )
+                if interaction_type is None:
+                    raise ValueError("Interaction type is required")
+
+                summary = row.get("summary", "").strip() or None
+
+                # Resolve contact_email -> contact_id
+                contact_email = row.get("contact_email", "").strip()
+                contact_id: UUID | None = None
+                if contact_email:
+                    contact_id = contact_email_lookup.get(contact_email.lower())
+                    if contact_id is None:
+                        raise ValueError(
+                            f"Contact with email '{contact_email}' not found"
+                        )
+
+                # Resolve organization_name -> organization_id
+                org_name = row.get("organization_name", "").strip()
+                organization_id: UUID | None = None
+                if org_name:
+                    organization_id = org_name_lookup.get(org_name.lower())
+                    if organization_id is None:
+                        raise ValueError(
+                            f"Organization '{org_name}' not found"
+                        )
+
+                # Parse occurred_at
+                occurred_at = parse_datetime_or_none(row.get("occurred_at", ""))
+
+                # Check for update vs create
+                row_id = row.get("id", "").strip()
+                if row_id:
+                    result.skipped += 1
+                    result.errors.append(
+                        CrmImportError(
+                            row=row_num,
+                            error="Interaction updates not supported, skipping row with id",
+                        )
+                    )
+                    continue
+
+                interaction = create_interaction(
+                    db_session,
+                    contact_id=contact_id,
+                    organization_id=organization_id,
+                    logged_by=user.id if user else None,
+                    interaction_type=interaction_type,
+                    title=title,
+                    summary=summary,
+                    occurred_at=occurred_at,
+                    commit=False,
+                )
+                db_session.flush()
+
+                # Parse and add attendees
+                organizer_user_emails = parse_pipe_delimited(
+                    row.get("organizer_users", "")
+                )
+                organizer_contact_emails = parse_pipe_delimited(
+                    row.get("organizer_contacts", "")
+                )
+                attendee_user_emails = parse_pipe_delimited(
+                    row.get("attendee_users", "")
+                )
+                attendee_contact_emails = parse_pipe_delimited(
+                    row.get("attendee_contacts", "")
+                )
+
+                # Organizer users
+                org_user_ids: list[UUID] = []
+                for email in organizer_user_emails:
+                    uid = user_email_lookup.get(email.lower())
+                    if uid is None:
+                        result.errors.append(
+                            CrmImportError(
+                                row=row_num,
+                                error=f"Organizer user email '{email}' not found (skipped attendee)",
+                            )
+                        )
+                    else:
+                        org_user_ids.append(uid)
+
+                # Organizer contacts
+                org_contact_ids: list[UUID] = []
+                for email in organizer_contact_emails:
+                    cid = contact_email_lookup.get(email.lower())
+                    if cid is None:
+                        result.errors.append(
+                            CrmImportError(
+                                row=row_num,
+                                error=f"Organizer contact email '{email}' not found (skipped attendee)",
+                            )
+                        )
+                    else:
+                        org_contact_ids.append(cid)
+
+                # Attendee users
+                att_user_ids: list[UUID] = []
+                for email in attendee_user_emails:
+                    uid = user_email_lookup.get(email.lower())
+                    if uid is None:
+                        result.errors.append(
+                            CrmImportError(
+                                row=row_num,
+                                error=f"Attendee user email '{email}' not found (skipped attendee)",
+                            )
+                        )
+                    else:
+                        att_user_ids.append(uid)
+
+                # Attendee contacts
+                att_contact_ids: list[UUID] = []
+                for email in attendee_contact_emails:
+                    cid = contact_email_lookup.get(email.lower())
+                    if cid is None:
+                        result.errors.append(
+                            CrmImportError(
+                                row=row_num,
+                                error=f"Attendee contact email '{email}' not found (skipped attendee)",
+                            )
+                        )
+                    else:
+                        att_contact_ids.append(cid)
+
+                # Add organizer attendees
+                if org_user_ids or org_contact_ids:
+                    add_interaction_attendees(
+                        db_session=db_session,
+                        interaction_id=interaction.id,
+                        user_ids=org_user_ids or None,
+                        contact_ids=org_contact_ids or None,
+                        role=CrmAttendeeRole.ORGANIZER,
+                        commit=False,
+                    )
+
+                # Add attendee attendees
+                if att_user_ids or att_contact_ids:
+                    add_interaction_attendees(
+                        db_session=db_session,
+                        interaction_id=interaction.id,
+                        user_ids=att_user_ids or None,
+                        contact_ids=att_contact_ids or None,
+                        role=CrmAttendeeRole.ATTENDEE,
+                        commit=False,
+                    )
+
+                result.created += 1
+                db_session.flush()
+        except Exception as e:
+            result.errors.append(CrmImportError(row=row_num, error=str(e)))
+
+    if dry_run:
+        db_session.rollback()
+    else:
+        db_session.commit()
+
+    return result

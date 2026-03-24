@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
+from onyx.configs.constants import FileOrigin
 from onyx.db.crm import add_tag_to_contact
 from onyx.db.crm import add_tag_to_organization
 from onyx.db.crm import create_contact
@@ -21,9 +22,11 @@ from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_tags
 from onyx.db.crm import get_tag_by_id
+from onyx.db.crm import update_contact
 from onyx.db.enums import CrmContactSource
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import User
+from onyx.file_store.utils import save_file_from_url
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmCreateToolStart
@@ -40,9 +43,11 @@ from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.tools.tool_implementations.crm.models import serialize_tag
+from onyx.utils.logger import setup_logger
 
 
 CRM_CREATE_ENTITY_TYPES = {"contact", "organization", "tag"}
+logger = setup_logger()
 
 
 class CrmCreateTool(Tool[None]):
@@ -165,6 +170,10 @@ class CrmCreateTool(Tool[None]):
                                 "location": {
                                     "type": "string",
                                     "description": "Location (e.g. 'San Francisco, CA').",
+                                },
+                                "profile_picture_url": {
+                                    "type": "string",
+                                    "description": "Remote image URL to download and attach as the contact's profile picture.",
                                 },
                                 "tag_ids": {
                                     "type": "array",
@@ -317,7 +326,36 @@ class CrmCreateTool(Tool[None]):
             if not tag_id:
                 continue
             if get_tag_by_id(tag_id, db_session):
-                add_tag_to_contact(db_session=db_session, contact_id=contact.id, tag_id=tag_id)
+                add_tag_to_contact(
+                    db_session=db_session,
+                    contact_id=contact.id,
+                    tag_id=tag_id,
+                )
+
+        profile_picture_url = contact_data.get("profile_picture_url")
+        if profile_picture_url is not None and not isinstance(profile_picture_url, str):
+            raise ToolCallException(
+                message=f"Invalid profile_picture_url payload type: {type(profile_picture_url)}",
+                llm_facing_message="'contact.profile_picture_url' must be a string URL.",
+            )
+        if created and isinstance(profile_picture_url, str) and profile_picture_url.strip():
+            try:
+                profile_picture_file_id = save_file_from_url(
+                    profile_picture_url.strip(),
+                    display_name=f"crm_profile_{contact.id}",
+                    file_origin=FileOrigin.CRM_UPLOAD,
+                    require_image=True,
+                )
+                contact, _ = update_contact(
+                    db_session=db_session,
+                    contact=contact,
+                    patches={"profile_picture_file_id": profile_picture_file_id},
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to download CRM contact profile picture during create: %s",
+                    e,
+                )
 
         tags = get_contact_tags(contact.id, db_session)
         resolved_owner_ids = get_contact_owner_ids(contact.id, db_session)

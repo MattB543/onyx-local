@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import {
   CrmInteraction,
+  CrmInteractionType,
   PaginatedReturn,
   listCrmInteractions,
 } from "@/app/app/crm/crmService";
@@ -10,6 +11,7 @@ import {
 interface UseCrmInteractionsParams {
   contactId?: string;
   organizationId?: string;
+  interactionType?: CrmInteractionType;
   pageNum: number;
   pageSize: number;
 }
@@ -17,6 +19,7 @@ interface UseCrmInteractionsParams {
 export function useCrmInteractions({
   contactId,
   organizationId,
+  interactionType,
   pageNum,
   pageSize,
 }: UseCrmInteractionsParams) {
@@ -27,6 +30,7 @@ export function useCrmInteractions({
       "crm-interactions",
       contactId ?? "",
       organizationId ?? "",
+      interactionType ?? "",
       pageNum,
       pageSize,
     ],
@@ -34,6 +38,7 @@ export function useCrmInteractions({
       listCrmInteractions({
         contact_id: contactId,
         organization_id: organizationId,
+        interaction_type: interactionType,
         page_num: pageNum,
         page_size: pageSize,
       }),

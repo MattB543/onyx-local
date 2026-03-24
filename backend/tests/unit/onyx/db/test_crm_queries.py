@@ -10,8 +10,11 @@ from onyx.db.crm import create_contact
 from onyx.db.crm import create_interaction
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
+from onyx.db.crm import build_contact_email_lookup
+from onyx.db.crm import build_org_name_lookup
 from onyx.db.crm import find_contacts_for_attendee_resolution
 from onyx.db.crm import find_users_for_attendee_resolution
+from onyx.db.crm import export_all_contacts
 from onyx.db.crm import get_contact_by_email
 from onyx.db.crm import get_organization_by_name
 from onyx.db.crm import list_contacts
@@ -132,7 +135,7 @@ def test_update_contact_happy_path_ignores_protected_fields() -> None:
     contact.id = uuid4()
     original_created_at = contact.created_at
 
-    updated = update_contact(
+    updated, changed = update_contact(
         db_session=db_session,
         contact=contact,
         patches={
@@ -145,6 +148,7 @@ def test_update_contact_happy_path_ignores_protected_fields() -> None:
     )
 
     assert updated is contact
+    assert changed is True
     assert contact.first_name == "Alicia"
     assert contact.email == "alicia@example.com"
     assert contact.notes == "updated"
@@ -169,6 +173,153 @@ def test_update_contact_rejects_duplicate_email() -> None:
         )
 
     db_session.commit.assert_not_called()
+
+
+def test_update_contact_semantically_identical_values_do_not_mark_changed() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(
+        first_name=" Alice ",
+        last_name="Smith ",
+        email="Alice@Example.com",
+        phone="",
+        title=" VP ",
+        status="Lead",
+        category="",
+        notes=" Important lead ",
+        linkedin_url="",
+        location=" NY ",
+    )
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "email": "Alice@Example.com",
+            "phone": None,
+            "title": "VP",
+            "status": "Lead",
+            "category": None,
+            "notes": "Important lead",
+            "linkedin_url": None,
+            "location": "NY",
+        },
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is False
+    db_session.flush.assert_not_called()
+    db_session.commit.assert_not_called()
+    db_session.refresh.assert_not_called()
+
+
+def test_update_contact_sets_profile_picture_file_id() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(first_name="Alice", status="lead")
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"profile_picture_file_id": "file-123"},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.profile_picture_file_id == "file-123"
+    db_session.flush.assert_called_once()
+    db_session.refresh.assert_called_once_with(contact)
+
+
+def test_update_contact_clears_profile_picture_file_id() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        profile_picture_file_id="file-123",
+    )
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"profile_picture_file_id": None},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.profile_picture_file_id is None
+    db_session.flush.assert_called_once()
+    db_session.refresh.assert_called_once_with(contact)
+
+
+def test_update_contact_profile_picture_noop_does_not_mark_changed() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        profile_picture_file_id="file-123",
+    )
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"profile_picture_file_id": "file-123"},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is False
+    db_session.flush.assert_not_called()
+    db_session.refresh.assert_not_called()
+
+
+def test_export_all_contacts_empty_profile_picture_url() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Bob",
+        status="lead",
+    )
+    contact.id = uuid4()
+    db_session.scalars.return_value = [contact]
+
+    owner_rows = MagicMock()
+    owner_rows.all.return_value = []
+    tag_rows = MagicMock()
+    tag_rows.all.return_value = []
+    db_session.execute.side_effect = [owner_rows, tag_rows]
+
+    rows = export_all_contacts(db_session)
+
+    assert rows[0]["profile_picture_url"] == ""
+
+
+def test_export_all_contacts_includes_profile_picture_url() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        profile_picture_file_id="file-123",
+    )
+    contact.id = uuid4()
+    db_session.scalars.return_value = [contact]
+
+    owner_rows = MagicMock()
+    owner_rows.all.return_value = []
+    tag_rows = MagicMock()
+    tag_rows.all.return_value = []
+    db_session.execute.side_effect = [owner_rows, tag_rows]
+
+    rows = export_all_contacts(db_session)
+
+    assert rows[0]["profile_picture_url"] == "/api/chat/file/file-123"
 
 
 def test_create_organization_rejects_empty_name() -> None:
@@ -233,13 +384,14 @@ def test_update_organization_happy_path_normalizes_name() -> None:
     organization = CrmOrganization(name="Old Name")
     organization.id = uuid4()
 
-    updated = update_organization(
+    updated, changed = update_organization(
         db_session=db_session,
         organization=organization,
         patches={"name": "  New Name  ", "notes": "  Updated notes  "},
     )
 
     assert updated is organization
+    assert changed is True
     assert organization.name == "New Name"
     assert organization.notes == "Updated notes"
     db_session.commit.assert_called_once()
@@ -262,6 +414,40 @@ def test_update_organization_rejects_duplicate_name() -> None:
         )
 
     db_session.commit.assert_not_called()
+
+
+def test_update_organization_semantically_identical_values_do_not_mark_changed() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    organization = CrmOrganization(
+        name=" Acme ",
+        website=" ACME.COM ",
+        sector="",
+        location=" Remote ",
+        size="",
+        notes=" Strategic ",
+    )
+    organization.id = uuid4()
+
+    updated, changed = update_organization(
+        db_session=db_session,
+        organization=organization,
+        patches={
+            "name": "Acme",
+            "website": "ACME.COM",
+            "sector": None,
+            "location": "Remote",
+            "size": None,
+            "notes": "Strategic",
+        },
+        commit=False,
+    )
+
+    assert updated is organization
+    assert changed is False
+    db_session.flush.assert_not_called()
+    db_session.commit.assert_not_called()
+    db_session.refresh.assert_not_called()
 
 
 def test_create_interaction_does_not_auto_add_primary_contact_attendee() -> None:
@@ -350,6 +536,31 @@ def test_list_organizations_escapes_like_metacharacters() -> None:
     stmt = db_session.scalars.call_args.args[0]
     compiled = stmt.compile()
     assert expected_like in compiled.params.values()
+
+
+def test_build_contact_email_lookup_normalizes_keys() -> None:
+    db_session = MagicMock()
+    db_session.execute.return_value.all.return_value = [
+        (uuid4(), " Alice@Example.com "),
+        (uuid4(), ""),
+    ]
+
+    lookup = build_contact_email_lookup(db_session)
+
+    assert list(lookup.keys()) == ["alice@example.com"]
+
+
+def test_build_org_name_lookup_normalizes_keys() -> None:
+    db_session = MagicMock()
+    org_id = uuid4()
+    db_session.execute.return_value.all.return_value = [
+        (org_id, " Acme Corp "),
+        (uuid4(), ""),
+    ]
+
+    lookup = build_org_name_lookup(db_session)
+
+    assert lookup == {"acme corp": org_id}
 
 
 def test_list_tags_escapes_like_metacharacters() -> None:

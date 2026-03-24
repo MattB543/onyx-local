@@ -4,9 +4,9 @@ from io import BytesIO
 from typing import cast
 from uuid import UUID
 
-import requests
 from sqlalchemy.orm import Session
 
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
 from onyx.configs.app_configs import WEB_DOMAIN
 from onyx.configs.constants import FileOrigin
 from onyx.db.models import UserFile
@@ -17,6 +17,7 @@ from onyx.file_store.models import InMemoryChatFile
 from onyx.server.query_and_chat.chat_utils import mime_type_to_chat_file_type
 from onyx.utils.b64 import get_image_type
 from onyx.utils.logger import setup_logger
+from onyx.utils.url import ssrf_safe_get
 from onyx.utils.threadpool_concurrency import run_functions_tuples_in_parallel
 from onyx.utils.timing import log_function_time
 
@@ -228,17 +229,56 @@ def validate_user_files_ownership(
     return current_user_files
 
 
-def save_file_from_url(url: str) -> str:
-    response = requests.get(url)
-    response.raise_for_status()
+def save_file_from_url(
+    url: str,
+    *,
+    display_name: str = "GeneratedImage",
+    file_origin: FileOrigin = FileOrigin.CHAT_IMAGE_GEN,
+    file_type: str | None = None,
+    timeout: tuple[float, float] = (5, 20),
+    max_bytes: int = USER_FILE_MAX_UPLOAD_SIZE_BYTES,
+    require_image: bool = False,
+) -> str:
+    response = ssrf_safe_get(url, timeout=timeout, stream=True)
+    try:
+        response.raise_for_status()
 
-    file_io = BytesIO(response.content)
+        content_type_header = response.headers.get("Content-Type")
+        resolved_content_type = None
+        if content_type_header:
+            resolved_content_type = content_type_header.split(";")[0].strip().lower()
+
+        if require_image:
+            if not resolved_content_type:
+                raise ValueError("Remote image URL did not include a Content-Type header.")
+            if not resolved_content_type.startswith("image/"):
+                raise ValueError(
+                    f"Remote URL did not return an image Content-Type: {resolved_content_type}"
+                )
+
+        resolved_file_type = file_type or resolved_content_type or "image/png"
+
+        file_io = BytesIO()
+        total_bytes = 0
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            total_bytes += len(chunk)
+            if total_bytes > max_bytes:
+                raise ValueError(
+                    f"Remote file exceeds maximum allowed size of {max_bytes} bytes."
+                )
+            file_io.write(chunk)
+        file_io.seek(0)
+    finally:
+        response.close()
+
     file_store = get_default_file_store()
     file_id = file_store.save_file(
         content=file_io,
-        display_name="GeneratedImage",
-        file_origin=FileOrigin.CHAT_IMAGE_GEN,
-        file_type="image/png;base64",
+        display_name=display_name,
+        file_origin=file_origin,
+        file_type=resolved_file_type,
     )
     return file_id
 

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import field_validator
 from pydantic import model_validator
 
 from onyx.db.enums import CrmAttendeeRole
@@ -18,6 +19,7 @@ from onyx.db.models import CrmInteractionAttendee
 from onyx.db.models import CrmOrganization
 from onyx.db.models import CrmSettings
 from onyx.db.models import CrmTag
+from onyx.file_store.utils import build_frontend_file_url
 
 
 class CrmEntityType(str, Enum):
@@ -80,6 +82,14 @@ class CrmTagCreateRequest(BaseModel):
     name: str
     color: str | None = None
 
+    @field_validator("name")
+    @classmethod
+    def name_must_not_contain_pipe(cls, v: str) -> str:
+        v = v.strip()
+        if "|" in v:
+            raise ValueError("Tag names cannot contain the '|' character.")
+        return v
+
 
 class CrmContactCreateRequest(BaseModel):
     first_name: str
@@ -122,6 +132,7 @@ class CrmContactSnapshot(BaseModel):
     phone: str | None
     title: str | None
     organization_id: UUID | None
+    organization_name: str | None
     owner_ids: list[UUID]
     source: CrmContactSource | None
     status: str
@@ -129,6 +140,8 @@ class CrmContactSnapshot(BaseModel):
     notes: str | None
     linkedin_url: str | None
     location: str | None
+    profile_picture_file_id: str | None
+    profile_picture_url: str | None
     created_by: UUID | None
     created_at: datetime
     updated_at: datetime
@@ -139,6 +152,7 @@ class CrmContactSnapshot(BaseModel):
         cls,
         contact: CrmContact,
         owner_ids: list[UUID],
+        organization_name: str | None = None,
         tags: list[CrmTag] | None = None,
     ) -> "CrmContactSnapshot":
         name_parts = [contact.first_name, contact.last_name or ""]
@@ -152,6 +166,7 @@ class CrmContactSnapshot(BaseModel):
             phone=contact.phone,
             title=contact.title,
             organization_id=contact.organization_id,
+            organization_name=organization_name,
             owner_ids=owner_ids,
             source=contact.source,
             status=contact.status,
@@ -159,6 +174,12 @@ class CrmContactSnapshot(BaseModel):
             notes=contact.notes,
             linkedin_url=contact.linkedin_url,
             location=contact.location,
+            profile_picture_file_id=contact.profile_picture_file_id,
+            profile_picture_url=(
+                build_frontend_file_url(contact.profile_picture_file_id)
+                if contact.profile_picture_file_id
+                else None
+            ),
             created_by=contact.created_by,
             created_at=contact.created_at,
             updated_at=contact.updated_at,
@@ -271,7 +292,9 @@ class CrmInteractionCreateRequest(BaseModel):
 class CrmInteractionSnapshot(BaseModel):
     id: UUID
     contact_id: UUID | None
+    contact_name: str | None
     organization_id: UUID | None
+    organization_name: str | None
     logged_by: UUID | None
     type: CrmInteractionType
     title: str
@@ -285,6 +308,8 @@ class CrmInteractionSnapshot(BaseModel):
     def from_model(
         cls,
         interaction: CrmInteraction,
+        contact_name: str | None = None,
+        organization_name: str | None = None,
         attendees: list[CrmInteractionAttendee] | None = None,
         attendee_snapshots: list[CrmInteractionAttendeeSnapshot] | None = None,
     ) -> "CrmInteractionSnapshot":
@@ -298,7 +323,9 @@ class CrmInteractionSnapshot(BaseModel):
         return CrmInteractionSnapshot(
             id=interaction.id,
             contact_id=interaction.contact_id,
+            contact_name=contact_name,
             organization_id=interaction.organization_id,
+            organization_name=organization_name,
             logged_by=interaction.logged_by,
             type=interaction.type,
             title=interaction.title,
@@ -308,6 +335,18 @@ class CrmInteractionSnapshot(BaseModel):
             updated_at=interaction.updated_at,
             attendees=resolved_attendees,
         )
+
+
+class CrmImportError(BaseModel):
+    row: int
+    error: str
+
+
+class CrmImportResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: list[CrmImportError] = []
 
 
 class CrmSearchResultItem(BaseModel):
