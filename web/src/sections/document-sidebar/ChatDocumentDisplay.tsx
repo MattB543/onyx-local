@@ -104,6 +104,17 @@ export default function ChatDocumentDisplay({
       <Text as="p" className="line-clamp-2 text-left" secondaryBody text03>
         {buildDocumentSummaryDisplay(document.match_highlights, document.blurb)}
       </Text>
+
+      {document.is_internet && document.image && (
+        <img
+          src={document.image}
+          alt=""
+          className="w-full h-24 object-cover rounded-md mt-1"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      )}
     </div>
   );
 }

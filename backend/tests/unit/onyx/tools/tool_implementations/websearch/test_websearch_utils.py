@@ -1,8 +1,13 @@
 from pathlib import Path
 
+from onyx.context.search.utils import convert_inference_sections_to_search_docs
 from onyx.tools.tool_implementations.open_url.models import WebContent
+from onyx.tools.tool_implementations.web_search.models import WebSearchResult
 from onyx.tools.tool_implementations.web_search.utils import (
     inference_section_from_internet_page_scrape,
+)
+from onyx.tools.tool_implementations.web_search.utils import (
+    inference_section_from_internet_search_result,
 )
 
 CONTENT_FILE = Path(__file__).parent / "data" / "tartan.txt"
@@ -14,7 +19,7 @@ TRUNCATED_CONTENT_PREFIX = "[...truncated] "
 
 
 def get_text_from_file(file_path: Path) -> str:
-    with open(file_path, "r") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
 
@@ -39,21 +44,14 @@ def test_no_snippet_provided() -> None:
     section = inference_section_from_internet_page_scrape(web_content, "")
 
     # Section will be of length min(MAX_NUM_CHARS_WEB_CONTENT, len(tartan_text))
-    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(
-        TRUNCATED_CONTENT_SUFFIX
-    )
+    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(TRUNCATED_CONTENT_SUFFIX)
 
     # Get the combined_content without the truncated suffix
-    combined_content_without_suffix = section.combined_content[
-        :MAX_NUM_CHARS_WEB_CONTENT
-    ]
+    combined_content_without_suffix = section.combined_content[:MAX_NUM_CHARS_WEB_CONTENT]
 
     # Check that we have the first 15000 characters of the tartan text
     assert combined_content_without_suffix == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT]
-    assert (
-        section.combined_content
-        == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT] + TRUNCATED_CONTENT_SUFFIX
-    )
+    assert section.combined_content == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT] + TRUNCATED_CONTENT_SUFFIX
 
 
 def test_snippet_lower_bound_() -> None:
@@ -67,9 +65,7 @@ def test_snippet_lower_bound_() -> None:
 
     section = inference_section_from_internet_page_scrape(web_content, snippet)
 
-    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(
-        TRUNCATED_CONTENT_SUFFIX
-    )
+    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(TRUNCATED_CONTENT_SUFFIX)
 
     no_suffix = section.combined_content[:MAX_NUM_CHARS_WEB_CONTENT]
 
@@ -88,10 +84,7 @@ def test_snippet_provided_after_limit() -> None:
 
     section = inference_section_from_internet_page_scrape(web_content, snippet)
 
-    assert (
-        len(section.combined_content)
-        == len(TRUNCATED_CONTENT_PREFIX) + MAX_NUM_CHARS_WEB_CONTENT
-    )
+    assert len(section.combined_content) == len(TRUNCATED_CONTENT_PREFIX) + MAX_NUM_CHARS_WEB_CONTENT
 
     no_prefix = section.combined_content[len(TRUNCATED_CONTENT_PREFIX) :]
     # We should get the last 15000 characters of the tartan text
@@ -111,9 +104,9 @@ def test_snippet_provided_in_middle() -> None:
 
     section = inference_section_from_internet_page_scrape(web_content, snippet)
 
-    assert len(section.combined_content) == len(
-        TRUNCATED_CONTENT_PREFIX
-    ) + MAX_NUM_CHARS_WEB_CONTENT + len(TRUNCATED_CONTENT_SUFFIX)
+    assert len(section.combined_content) == len(TRUNCATED_CONTENT_PREFIX) + MAX_NUM_CHARS_WEB_CONTENT + len(
+        TRUNCATED_CONTENT_SUFFIX
+    )
 
     no_prefix = section.combined_content[len(TRUNCATED_CONTENT_PREFIX) :]
     no_affix = no_prefix[:MAX_NUM_CHARS_WEB_CONTENT]
@@ -125,18 +118,11 @@ def test_snippet_provided_in_middle() -> None:
     top_padding = (MAX_NUM_CHARS_WEB_CONTENT - len(snippet)) // 2
     bottom_padding = MAX_NUM_CHARS_WEB_CONTENT - len(snippet) - top_padding
 
-    assert (
-        no_affix
-        == tartan_text[
-            expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1
-        ]
-    )
+    assert no_affix == tartan_text[expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1]
 
     assert section.combined_content == (
         TRUNCATED_CONTENT_PREFIX
-        + tartan_text[
-            expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1
-        ]
+        + tartan_text[expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1]
         + TRUNCATED_CONTENT_SUFFIX
     )
 
@@ -150,21 +136,14 @@ def test_bad_snippet() -> None:
     section = inference_section_from_internet_page_scrape(web_content, snippet)
 
     # Section will be of length min(MAX_NUM_CHARS_WEB_CONTENT, len(tartan_text))
-    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(
-        TRUNCATED_CONTENT_SUFFIX
-    )
+    assert len(section.combined_content) == MAX_NUM_CHARS_WEB_CONTENT + len(TRUNCATED_CONTENT_SUFFIX)
 
     # Get the combined_content without the truncated suffix
-    combined_content_without_suffix = section.combined_content[
-        :MAX_NUM_CHARS_WEB_CONTENT
-    ]
+    combined_content_without_suffix = section.combined_content[:MAX_NUM_CHARS_WEB_CONTENT]
 
     # Check that we have the first 15000 characters of the tartan text
     assert combined_content_without_suffix == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT]
-    assert (
-        section.combined_content
-        == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT] + TRUNCATED_CONTENT_SUFFIX
-    )
+    assert section.combined_content == tartan_text[:MAX_NUM_CHARS_WEB_CONTENT] + TRUNCATED_CONTENT_SUFFIX
 
 
 def test_similar_snippet_in_middle_fuzzy_match() -> None:
@@ -179,9 +158,9 @@ def test_similar_snippet_in_middle_fuzzy_match() -> None:
 
     section = inference_section_from_internet_page_scrape(web_content, snippet)
 
-    assert len(section.combined_content) == len(
-        TRUNCATED_CONTENT_PREFIX
-    ) + MAX_NUM_CHARS_WEB_CONTENT + len(TRUNCATED_CONTENT_SUFFIX)
+    assert len(section.combined_content) == len(TRUNCATED_CONTENT_PREFIX) + MAX_NUM_CHARS_WEB_CONTENT + len(
+        TRUNCATED_CONTENT_SUFFIX
+    )
 
     no_prefix = section.combined_content[len(TRUNCATED_CONTENT_PREFIX) :]
     no_affix = no_prefix[:MAX_NUM_CHARS_WEB_CONTENT]
@@ -193,17 +172,27 @@ def test_similar_snippet_in_middle_fuzzy_match() -> None:
     top_padding = (MAX_NUM_CHARS_WEB_CONTENT - len(snippet)) // 2
     bottom_padding = MAX_NUM_CHARS_WEB_CONTENT - len(snippet) - top_padding
 
-    assert (
-        no_affix
-        == tartan_text[
-            expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1
-        ]
-    )
+    assert no_affix == tartan_text[expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1]
 
     assert section.combined_content == (
         TRUNCATED_CONTENT_PREFIX
-        + tartan_text[
-            expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1
-        ]
+        + tartan_text[expected_start_idx - top_padding : expected_end_idx + bottom_padding + 1]
         + TRUNCATED_CONTENT_SUFFIX
     )
+
+
+def test_internet_search_result_propagates_image_to_search_doc() -> None:
+    result = WebSearchResult(
+        title="Onyx",
+        link="https://example.com/article",
+        snippet="Example snippet",
+        image="https://example.com/image.png",
+    )
+
+    section = inference_section_from_internet_search_result(result)
+    docs = convert_inference_sections_to_search_docs([section], is_internet=True)
+
+    assert section.center_chunk.metadata == {"image": "https://example.com/image.png"}
+    assert len(docs) == 1
+    assert docs[0].image == "https://example.com/image.png"
+    assert docs[0].is_internet is True

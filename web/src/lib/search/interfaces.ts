@@ -71,6 +71,7 @@ export interface OnyxDocument extends MinimalOnyxDocument {
   updated_at: string | null;
   db_doc_id?: number;
   is_internet: boolean;
+  image: string | null;
   validationState?: null | "good" | "bad";
 }
 
@@ -268,6 +269,7 @@ export interface SearchDocWithContent {
   primary_owners?: string[] | null;
   secondary_owners?: string[] | null;
   is_internet: boolean;
+  image?: string | null;
   content?: string | null;
 }
 

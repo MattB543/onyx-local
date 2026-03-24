@@ -2892,6 +2892,7 @@ class SearchDoc(Base):
         postgresql.ARRAY(String), nullable=True
     )
     is_internet: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    image: Mapped[str | None] = mapped_column(String, nullable=True)
 
     is_relevant: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     relevance_explanation: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -69,6 +69,7 @@ class SerperClient(WebSearchProvider, WebContentProvider):
                     snippet=snippet,
                     author=None,
                     published_date=None,
+                    image=(result.get("imageUrl") or "").strip() or None,
                 )
             )
 

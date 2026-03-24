@@ -113,9 +113,7 @@ class ExaClient(WebSearchProvider, WebContentProvider):
     def supports_site_filter(self) -> bool:
         return False
 
-    def _search_exa(
-        self, query: str, include_domains: list[str] | None = None
-    ) -> list[WebSearchResult]:
+    def _search_exa(self, query: str, include_domains: list[str] | None = None) -> list[WebSearchResult]:
         response = self.exa.search_and_contents(
             query,
             type="auto",
@@ -132,17 +130,15 @@ class ExaClient(WebSearchProvider, WebContentProvider):
             title = (result.title or "").strip()
             # library type stub issue
             snippet = (result.highlights[0] if result.highlights else "").strip()
+            raw_image = getattr(result, "image", None)
             results.append(
                 WebSearchResult(
                     title=title,
                     link=result.url,
                     snippet=snippet,
                     author=result.author,
-                    published_date=(
-                        time_str_to_utc(result.published_date)
-                        if result.published_date
-                        else None
-                    ),
+                    published_date=(time_str_to_utc(result.published_date) if result.published_date else None),
+                    image=raw_image.strip() or None if isinstance(raw_image, str) else None,
                 )
             )
 
@@ -175,11 +171,7 @@ class ExaClient(WebSearchProvider, WebContentProvider):
             raise
         except Exception as e:
             error_msg = str(e)
-            if (
-                "api" in error_msg.lower()
-                or "key" in error_msg.lower()
-                or "auth" in error_msg.lower()
-            ):
+            if "api" in error_msg.lower() or "key" in error_msg.lower() or "auth" in error_msg.lower():
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid Exa API key: {error_msg}",
@@ -211,11 +203,7 @@ class ExaClient(WebSearchProvider, WebContentProvider):
                     title=title,
                     link=result.url,
                     full_content=full_content,
-                    published_date=(
-                        time_str_to_utc(result.published_date)
-                        if result.published_date
-                        else None
-                    ),
+                    published_date=(time_str_to_utc(result.published_date) if result.published_date else None),
                     scrape_successful=bool(full_content),
                 )
             )

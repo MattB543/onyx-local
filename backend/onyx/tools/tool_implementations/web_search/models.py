@@ -29,6 +29,7 @@ class WebSearchResult(BaseModel):
     snippet: str
     author: str | None = None
     published_date: datetime | None = None
+    image: str | None = None
 
     @field_validator("link")
     @classmethod

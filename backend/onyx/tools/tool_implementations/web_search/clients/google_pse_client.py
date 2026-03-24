@@ -41,9 +41,7 @@ class GooglePSEClient(WebSearchProvider):
             "num": str(self._num_results),
         }
 
-        response = requests.get(
-            GOOGLE_CUSTOM_SEARCH_URL, params=params, timeout=self._timeout_seconds
-        )
+        response = requests.get(GOOGLE_CUSTOM_SEARCH_URL, params=params, timeout=self._timeout_seconds)
 
         # Check for HTTP errors first
         try:
@@ -57,13 +55,9 @@ class GooglePSEClient(WebSearchProvider):
                     error_info = error_data["error"]
                     error_detail = error_info.get("message", str(error_info))
             except Exception:
-                error_detail = (
-                    response.text[:200] if response.text else "No error details"
-                )
+                error_detail = response.text[:200] if response.text else "No error details"
 
-            raise ValueError(
-                f"Google PSE search failed (status {status}): {error_detail}"
-            ) from exc
+            raise ValueError(f"Google PSE search failed (status {status}): {error_detail}") from exc
 
         data = response.json()
 
@@ -87,27 +81,31 @@ class GooglePSEClient(WebSearchProvider):
             # Attempt to extract metadata if available
             pagemap = item.get("pagemap") or {}
             metatags = pagemap.get("metatags", [])
+            meta = metatags[0] if metatags and isinstance(metatags[0], dict) else {}
             published_date: datetime | None = None
             author: str | None = None
 
-            if metatags:
-                meta = metatags[0]
+            if meta:
                 author = meta.get("og:site_name") or meta.get("author")
-                published_str = (
-                    meta.get("article:published_time")
-                    or meta.get("og:updated_time")
-                    or meta.get("date")
-                )
+                published_str = meta.get("article:published_time") or meta.get("og:updated_time") or meta.get("date")
                 if published_str:
                     try:
-                        published_date = datetime.fromisoformat(
-                            published_str.replace("Z", "+00:00")
-                        )
+                        published_date = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                     except ValueError:
-                        logger.debug(
-                            f"Failed to parse published_date '{published_str}' for link {link}"
-                        )
+                        logger.debug(f"Failed to parse published_date '{published_str}' for link {link}")
                         published_date = None
+
+            # Extract image URL from pagemap
+            image: str | None = None
+            cse_images = pagemap.get("cse_image", [])
+            if cse_images and isinstance(cse_images, list):
+                image = cse_images[0].get("src") if isinstance(cse_images[0], dict) else None
+            if not image:
+                image = meta.get("og:image")
+            if isinstance(image, str):
+                image = image.strip() or None
+            else:
+                image = None
 
             results.append(
                 WebSearchResult(
@@ -116,6 +114,7 @@ class GooglePSEClient(WebSearchProvider):
                     snippet=snippet,
                     author=author,
                     published_date=published_date,
+                    image=image,
                 )
             )
 
@@ -139,11 +138,7 @@ class GooglePSEClient(WebSearchProvider):
             raise
         except Exception as e:
             error_msg = str(e)
-            if (
-                "api" in error_msg.lower()
-                or "key" in error_msg.lower()
-                or "auth" in error_msg.lower()
-            ):
+            if "api" in error_msg.lower() or "key" in error_msg.lower() or "auth" in error_msg.lower():
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid Google PSE API key: {error_msg}",

@@ -50,6 +50,7 @@ def test_search_maps_brave_response(monkeypatch: pytest.MonkeyPatch) -> None:
                             "title": "Result 1",
                             "url": "https://example.com/one",
                             "description": "Snippet 1",
+                            "thumbnail": {"src": " https://example.com/image.jpg "},
                         },
                         {
                             "title": "Result without URL",
@@ -68,6 +69,7 @@ def test_search_maps_brave_response(monkeypatch: pytest.MonkeyPatch) -> None:
     assert results[0].title == "Result 1"
     assert results[0].link == "https://example.com/one"
     assert results[0].snippet == "Snippet 1"
+    assert results[0].image == "https://example.com/image.jpg"
 
 
 def test_search_caps_count_to_brave_max(monkeypatch: pytest.MonkeyPatch) -> None:

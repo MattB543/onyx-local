@@ -29,9 +29,7 @@ class SearXNGClient(WebSearchProvider):
             "q": query,
             "format": "json",
         }
-        logger.debug(
-            f"Searching with payload: {payload} to {self._searxng_base_url}/search"
-        )
+        logger.debug(f"Searching with payload: {payload} to {self._searxng_base_url}/search")
         response = requests.post(
             f"{self._searxng_base_url}/search",
             data=payload,
@@ -48,6 +46,7 @@ class SearXNGClient(WebSearchProvider):
                 title=result["title"],
                 link=result["url"],
                 snippet=result["content"],
+                image=raw_image.strip() or None if isinstance((raw_image := result.get("img_src")), str) else None,
             )
             for result in limited_results
         ]
@@ -87,10 +86,7 @@ class SearXNGClient(WebSearchProvider):
         # "https://github.com/searxng/searxng". I don't think that would happen by coincidence, so I
         # think this is a good enough check for now. I'm open for suggestions on improvements.
         config = response.json()
-        if (
-            config.get("brand", {}).get("GIT_URL")
-            != "https://github.com/searxng/searxng"
-        ):
+        if config.get("brand", {}).get("GIT_URL") != "https://github.com/searxng/searxng":
             raise HTTPException(
                 status_code=400,
                 detail="This does not appear to be a SearXNG instance. Please check the URL and try again.",

@@ -48,9 +48,7 @@ class BraveClient(WebSearchProvider):
         self._num_results = max(1, min(num_results, BRAVE_MAX_RESULTS_PER_REQUEST))
         self._timeout_seconds = timeout_seconds
         self._country = _normalize_country(country)
-        self._search_lang = _normalize_language_code(
-            search_lang, field_name="search_lang"
-        )
+        self._search_lang = _normalize_language_code(search_lang, field_name="search_lang")
         self._ui_lang = _normalize_language_code(ui_lang, field_name="ui_lang")
         self._safesearch = _normalize_option(
             safesearch,
@@ -97,9 +95,7 @@ class BraveClient(WebSearchProvider):
                 timeout=self._timeout_seconds,
             )
         except requests.RequestException as exc:
-            raise RetryableBraveSearchError(
-                f"Brave search request failed: {exc}"
-            ) from exc
+            raise RetryableBraveSearchError(f"Brave search request failed: {exc}") from exc
 
         try:
             response.raise_for_status()
@@ -124,6 +120,10 @@ class BraveClient(WebSearchProvider):
             title = _clean_string(result.get("title"))
             description = _clean_string(result.get("description"))
 
+            # Extract thumbnail image URL if available
+            thumbnail = result.get("thumbnail") or {}
+            image = _clean_string(thumbnail.get("src")) or None
+
             results.append(
                 WebSearchResult(
                     title=title,
@@ -131,6 +131,7 @@ class BraveClient(WebSearchProvider):
                     snippet=description,
                     author=None,
                     published_date=None,
+                    image=image,
                 )
             )
 
@@ -155,12 +156,7 @@ class BraveClient(WebSearchProvider):
         except (ValueError, requests.RequestException) as e:
             error_msg = str(e)
             lower = error_msg.lower()
-            if (
-                "status 401" in lower
-                or "status 403" in lower
-                or "api key" in lower
-                or "auth" in lower
-            ):
+            if "status 401" in lower or "status 403" in lower or "api key" in lower or "auth" in lower:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid Brave API key: {error_msg}",
@@ -221,9 +217,7 @@ def _normalize_country(country: str | None) -> str | None:
     if not normalized:
         return None
     if len(normalized) != 2 or not normalized.isalpha():
-        raise ValueError(
-            "Brave provider config 'country' must be a 2-letter ISO country code."
-        )
+        raise ValueError("Brave provider config 'country' must be a 2-letter ISO country code.")
     return normalized
 
 
@@ -251,7 +245,5 @@ def _normalize_option(
         return None
     if normalized not in allowed_values:
         allowed = ", ".join(sorted(allowed_values))
-        raise ValueError(
-            f"Brave provider config '{field_name}' must be one of: {allowed}."
-        )
+        raise ValueError(f"Brave provider config '{field_name}' must be one of: {allowed}.")
     return normalized

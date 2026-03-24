@@ -168,6 +168,10 @@ def inference_section_from_internet_search_result(
     # Calculate score using reciprocal rank to preserve ordering
     score = 1.0 / (rank + 1)
 
+    metadata: dict[str, str | list[str]] = {}
+    if result.image:
+        metadata["image"] = result.image
+
     chunk = InferenceChunk(
         chunk_id=0,
         blurb=result.snippet,
@@ -181,7 +185,7 @@ def inference_section_from_internet_search_result(
         boost=1,
         score=score,
         hidden=False,
-        metadata={},
+        metadata=metadata,
         match_highlights=[result.snippet],
         doc_summary="",
         chunk_context="",
