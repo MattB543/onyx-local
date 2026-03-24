@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from onyx.context.search.models import BaseFilters
+from onyx.context.search.models import extract_image_url_from_metadata
 from onyx.context.search.models import InferenceSection
 from onyx.context.search.models import SearchDoc
 from onyx.server.manage.models import StandardAnswer
@@ -82,6 +83,7 @@ class SearchDocWithContent(SearchDoc):
                 primary_owners=chunk.primary_owners,
                 secondary_owners=chunk.secondary_owners,
                 is_internet=is_internet,
+                image=extract_image_url_from_metadata(chunk.metadata),
                 content=section.combined_content if include_content else None,
             )
             for section in sections
