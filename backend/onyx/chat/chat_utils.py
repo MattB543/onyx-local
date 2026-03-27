@@ -7,6 +7,8 @@ from uuid import UUID
 from fastapi.datastructures import Headers
 from sqlalchemy.orm import Session
 
+from onyx.chat.chat_file_utils import estimate_token_count_for_text
+from onyx.chat.chat_file_utils import get_chat_upload_token_count
 from onyx.chat.models import ChatHistoryResult
 from onyx.chat.models import ChatLoadedFile
 from onyx.chat.models import ChatMessageSimple
@@ -335,6 +337,7 @@ def load_chat_file(
         file_id = file_descriptor["id"]
 
         def _extract() -> str:
+            file_io.seek(0)
             return extract_file_text(
                 file=file_io,
                 file_name=file_descriptor.get("name") or "",
@@ -369,6 +372,23 @@ def load_chat_file(
             logger.warning(
                 f"Failed to get token count for file {file_descriptor['id']}: {e}"
             )
+    else:
+        raw_file_token_count = get_chat_upload_token_count(
+            file_id=file_descriptor["id"],
+            db_session=db_session,
+        )
+        if raw_file_token_count is not None:
+            token_count = raw_file_token_count
+        elif content_text:
+            try:
+                token_count = estimate_token_count_for_text(
+                    text=content_text,
+                    db_session=db_session,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to estimate token count for raw file {file_descriptor['id']}: {e}"
+                )
 
     return ChatLoadedFile(
         file_id=file_descriptor["id"],

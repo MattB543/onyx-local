@@ -32,9 +32,11 @@ from onyx.db.models import ChatSessionSharedStatus
 from onyx.db.models import SearchDoc as DBSearchDoc
 from onyx.db.models import ToolCall
 from onyx.db.models import User
+from onyx.db.models import UserFile
 from onyx.db.persona import get_best_persona_id_for_user
 from onyx.file_store.file_store import get_default_file_store
 from onyx.file_store.models import FileDescriptor
+from onyx.file_store.utils import plaintext_file_name_for_id
 from onyx.llm.override_models import LLMOverride
 from onyx.llm.override_models import PromptOverride
 from onyx.server.query_and_chat.models import ChatMessageDetail
@@ -199,10 +201,35 @@ def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_sessio
         )
     ).fetchall()
 
+    raw_file_ids_to_consider: set[str] = set()
     for _, files in messages_with_files:
-        file_store = get_default_file_store()
         for file_info in files or []:
-            file_store.delete_file(file_id=file_info.get("id"))
+            if file_info.get("user_file_id"):
+                continue
+            file_id = file_info.get("id")
+            if file_id:
+                raw_file_ids_to_consider.add(file_id)
+
+    protected_raw_file_ids = set(
+        db_session.scalars(
+            select(UserFile.file_id).where(UserFile.file_id.in_(raw_file_ids_to_consider))
+        ).all()
+    )
+
+    file_store = get_default_file_store()
+    for file_id in raw_file_ids_to_consider - protected_raw_file_ids:
+        try:
+            file_store.delete_file(file_id=file_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete raw chat file {file_id}: {e}")
+
+        plaintext_file_id = plaintext_file_name_for_id(file_id)
+        try:
+            file_store.delete_file(file_id=plaintext_file_id)
+        except Exception:
+            logger.debug(
+                f"Plaintext cache {plaintext_file_id} did not exist during chat deletion"
+            )
 
     # Delete ChatMessage records - CASCADE constraints will automatically handle:
     # - ChatMessage__StandardAnswer relationship records

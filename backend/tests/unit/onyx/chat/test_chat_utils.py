@@ -1,10 +1,14 @@
 """Tests for chat_utils.py, specifically get_custom_agent_prompt."""
 
+from io import BytesIO
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from onyx.chat.chat_utils import _build_tool_call_response_history_message
 from onyx.chat.chat_utils import get_custom_agent_prompt
+from onyx.chat.chat_utils import load_chat_file
 from onyx.configs.constants import DEFAULT_PERSONA_ID
+from onyx.file_store.models import ChatFileType
 from onyx.prompts.chat_prompts import TOOL_CALL_RESPONSE_CROSS_MESSAGE
 
 
@@ -170,3 +174,68 @@ class TestBuildToolCallResponseHistoryMessage:
             tool_call_response='{"raw":"value"}',
         )
         assert message == TOOL_CALL_RESPONSE_CROSS_MESSAGE
+
+
+def test_load_chat_file_uses_raw_chat_upload_token_count() -> None:
+    db_session = MagicMock()
+    file_store = MagicMock()
+    file_store.read_file.return_value = BytesIO(b"image-bytes")
+
+    with (
+        patch("onyx.chat.chat_utils.get_default_file_store", return_value=file_store),
+        patch("onyx.chat.chat_utils.get_chat_upload_token_count", return_value=17)
+        as mock_get_chat_upload_token_count,
+    ):
+        loaded_file = load_chat_file(
+            {
+                "id": "raw-file-1",
+                "type": ChatFileType.IMAGE,
+                "name": "image.png",
+            },
+            db_session,
+        )
+
+    assert loaded_file.file_id == "raw-file-1"
+    assert loaded_file.content == b"image-bytes"
+    assert loaded_file.token_count == 17
+    mock_get_chat_upload_token_count.assert_called_once_with(
+        file_id="raw-file-1",
+        db_session=db_session,
+    )
+
+
+def test_load_chat_file_rewinds_stream_before_extracting_text() -> None:
+    db_session = MagicMock()
+    file_store = MagicMock()
+
+    def _read_file_side_effect(file_id: str, mode: str = "b") -> BytesIO:
+        if file_id == "raw-file-1":
+            return BytesIO(b"hello world")
+        raise FileNotFoundError(file_id)
+
+    file_store.read_file.side_effect = _read_file_side_effect
+
+    with (
+        patch("onyx.chat.chat_utils.get_default_file_store", return_value=file_store),
+        patch("onyx.chat.chat_utils.get_chat_upload_token_count", return_value=None),
+        patch(
+            "onyx.chat.chat_utils.extract_file_text",
+            side_effect=lambda file, file_name, break_on_unprocessable: file.read().decode(
+                "utf-8"
+            ),
+        ),
+        patch("onyx.chat.chat_utils.store_plaintext"),
+        patch("onyx.chat.chat_utils.estimate_token_count_for_text", return_value=3),
+    ):
+        loaded_file = load_chat_file(
+            {
+                "id": "raw-file-1",
+                "type": ChatFileType.PLAIN_TEXT,
+                "name": "note.txt",
+            },
+            db_session,
+        )
+
+    assert loaded_file.content == b"hello world"
+    assert loaded_file.content_text == "hello world"
+    assert loaded_file.token_count == 3

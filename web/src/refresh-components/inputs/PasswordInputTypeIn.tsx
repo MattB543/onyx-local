@@ -144,6 +144,14 @@ export interface PasswordInputTypeInProps
    * The input remains editable so users can type a new value.
    */
   isNonRevealable?: boolean;
+  /**
+   * When true, uses native `type="password"` instead of custom mask characters.
+   * This enables password manager autofill (1Password, etc.) since they rely
+   * on `type="password"` to detect password fields.
+   * Use this for login/signup forms. Leave false (default) for API key fields
+   * where custom masking is preferred.
+   */
+  useNativeType?: boolean;
 }
 
 /**
@@ -162,6 +170,7 @@ export interface PasswordInputTypeInProps
 export default function PasswordInputTypeIn({
   ref,
   isNonRevealable = false,
+  useNativeType = false,
   value,
   onChange,
   onFocus,
@@ -294,15 +303,25 @@ export default function PasswordInputTypeIn({
     >
       <InputTypeIn
         ref={ref}
-        value={getDisplayValue()}
-        onChange={handleChange}
+        {...(useNativeType
+          ? {
+              type: isHidden ? "password" : "text",
+              value: realValue,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                onChange?.(e);
+              },
+            }
+          : {
+              value: getDisplayValue(),
+              onChange: handleChange,
+              onSelect: captureSelection,
+              onKeyDown: captureSelection,
+            })}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        onSelect={captureSelection}
-        onKeyDown={captureSelection}
         variant={disabled ? "disabled" : error ? "error" : undefined}
         showClearButton={showClearButton}
-        autoComplete="off"
+        {...(!useNativeType && { autoComplete: "off" })}
         data-ph-no-capture
         rightSection={
           showToggleButton ? (

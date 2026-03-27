@@ -34,6 +34,8 @@ export interface ProjectFile {
   token_count: number | null;
   chunk_count: number | null;
   temp_id?: string | null;
+  attachment_source?: "upload" | "recent";
+  index_for_later?: boolean;
 }
 
 export interface RejectedFile {
@@ -105,6 +107,31 @@ export async function uploadFiles(
 
   if (!response.ok) {
     handleRequestError("Upload files", response);
+  }
+
+  return response.json();
+}
+
+export async function uploadChatFiles(
+  files: File[],
+  tempIdMap?: Map<string, string>
+): Promise<CategorizedFiles> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  if (tempIdMap !== undefined && tempIdMap !== null) {
+    formData.append(
+      "temp_id_map",
+      JSON.stringify(Object.fromEntries(tempIdMap))
+    );
+  }
+
+  const response = await fetch("/api/chat/files/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    handleRequestError("Upload chat files", response);
   }
 
   return response.json();

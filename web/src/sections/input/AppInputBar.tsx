@@ -324,6 +324,22 @@ const AppInputBar = React.memo(
       [setCurrentMessageFiles]
     );
 
+    const handleToggleIndexForLater = useCallback(
+      (fileId: string, checked: boolean) => {
+        setCurrentMessageFiles((prev) =>
+          prev.map((file) =>
+            file.id === fileId
+              ? {
+                  ...file,
+                  index_for_later: checked,
+                }
+              : file
+          )
+        );
+      },
+      [setCurrentMessageFiles]
+    );
+
     const { activePromptShortcuts } = usePromptShortcuts();
     const vectorDbEnabled = useVectorDbEnabled();
     const { ccPairs, isLoading: ccPairsLoading } = useCCPairs(vectorDbEnabled);
@@ -508,7 +524,14 @@ const AppInputBar = React.memo(
                   (existingFile) => existingFile.file_id === file.file_id
                 )
               ) {
-                setCurrentMessageFiles((prev) => [...prev, file]);
+                setCurrentMessageFiles((prev) => [
+                  ...prev,
+                  {
+                    ...file,
+                    attachment_source: "recent",
+                    index_for_later: false,
+                  },
+                ]);
               }
             }}
             onUnpickRecent={(file: ProjectFile) => {
@@ -755,6 +778,7 @@ const AppInputBar = React.memo(
                   hideProcessingState={hideProcessingState}
                   onFileClick={handleFileClick}
                   compactImages={shouldCompactImages}
+                  onToggleIndexForLater={handleToggleIndexForLater}
                 />
               ))}
             </div>

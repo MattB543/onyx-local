@@ -93,6 +93,7 @@ class SendMessageRequest(BaseModel):
     forced_tool_id: int | None = None
 
     file_descriptors: list[FileDescriptor] = []
+    index_for_later_file_ids: list[str] = []
 
     internal_search_filters: BaseFilters | None = None
 

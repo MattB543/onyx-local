@@ -112,6 +112,7 @@ export type MessageOrigin =
 export interface SendMessageParams {
   message: string;
   fileDescriptors?: FileDescriptor[];
+  indexForLaterFileIds?: string[];
   parentMessageId: number | null;
   chatSessionId: string;
   filters: Filters | null;
@@ -134,6 +135,7 @@ export interface SendMessageParams {
 export async function* sendMessage({
   message,
   fileDescriptors,
+  indexForLaterFileIds,
   parentMessageId,
   chatSessionId,
   filters,
@@ -153,6 +155,7 @@ export async function* sendMessage({
     chat_session_id: chatSessionId,
     parent_message_id: parentMessageId,
     file_descriptors: fileDescriptors,
+    index_for_later_file_ids: indexForLaterFileIds ?? [],
     internal_search_filters: filters,
     deep_research: deepResearch ?? false,
     allowed_tool_ids: enabledToolIds,

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from onyx.chat.chat_file_utils import get_chat_upload_file_record
 from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
 from onyx.configs.app_configs import WEB_DOMAIN
 from onyx.configs.constants import FileOrigin
@@ -358,61 +359,72 @@ def verify_user_files(
     from onyx.db.models import Project__UserFile
     from onyx.db.projects import check_project_ownership
 
-    # Extract user_file_ids and project file_ids from the file descriptors
-    user_file_ids = []
-    project_file_ids = []
+    project_file_ids_to_verify: list[str] = []
 
     for file_descriptor in user_files:
-        # Check if this file descriptor has a user_file_id
-        if file_descriptor.get("user_file_id"):
+        file_id = file_descriptor.get("id")
+        if not file_id:
+            raise ValueError("File descriptor is missing an id")
+
+        user_file_id = file_descriptor.get("user_file_id")
+        if user_file_id:
+            parsed_user_file_id: UUID | None = None
             try:
-                user_file_ids.append(UUID(file_descriptor["user_file_id"]))
+                parsed_user_file_id = UUID(user_file_id)
             except (ValueError, TypeError):
-                logger.warning(
-                    f"Invalid user_file_id in file descriptor: {file_descriptor['user_file_id']}"
+                parsed_user_file_id = None
+
+            if parsed_user_file_id is not None:
+                user_file = (
+                    db_session.query(UserFile)
+                    .filter(UserFile.id == parsed_user_file_id)
+                    .first()
                 )
-                continue
-        else:
-            # This is a project file - use the 'id' field which is the file_id
-            if file_descriptor.get("id"):
-                project_file_ids.append(file_descriptor["id"])
+                if user_file is not None:
+                    if user_file.user_id != user_id:
+                        raise ValueError(
+                            f"User {user_id} does not have access to file {user_file.id}"
+                        )
+                    continue
 
-    # Verify user files (existing logic)
-    if user_file_ids:
-        validate_user_files_ownership(user_file_ids, user_id, db_session)
+        raw_chat_upload = get_chat_upload_file_record(
+            file_id=file_id,
+            user_id=user_id,
+            db_session=db_session,
+        )
+        if raw_chat_upload is not None:
+            continue
 
-    # Verify project files
-    if project_file_ids:
-        if project_id is None:
-            raise ValueError(
-                "Project files provided but no project_id specified for verification"
-            )
+        project_file_ids_to_verify.append(file_id)
 
-        # Verify user owns the project
-        if not check_project_ownership(project_id, user_id, db_session):
-            raise ValueError(
-                f"User {user_id} does not have access to project {project_id}"
-            )
+    if not project_file_ids_to_verify:
+        return
 
-        # Verify all project files belong to the specified project
-        user_files_in_project = (
-            db_session.query(UserFile)
-            .join(Project__UserFile)
-            .filter(
-                Project__UserFile.project_id == project_id,
-                UserFile.file_id.in_(project_file_ids),
-            )
-            .all()
+    if project_id is None:
+        raise ValueError(
+            "Project files provided but no project_id specified for verification"
         )
 
-        # Check if all files were found in the project
-        found_file_ids = {uf.file_id for uf in user_files_in_project}
-        missing_files = set(project_file_ids) - found_file_ids
+    if not check_project_ownership(project_id, user_id, db_session):
+        raise ValueError(f"User {user_id} does not have access to project {project_id}")
 
-        if missing_files:
-            raise ValueError(
-                f"Files {missing_files} are not associated with project {project_id}"
-            )
+    user_files_in_project = (
+        db_session.query(UserFile)
+        .join(Project__UserFile)
+        .filter(
+            Project__UserFile.project_id == project_id,
+            UserFile.file_id.in_(project_file_ids_to_verify),
+        )
+        .all()
+    )
+
+    found_file_ids = {uf.file_id for uf in user_files_in_project}
+    missing_files = set(project_file_ids_to_verify) - found_file_ids
+
+    if missing_files:
+        raise ValueError(
+            f"Files {missing_files} are not associated with project {project_id}"
+        )
 
 
 def build_frontend_file_url(file_id: str) -> str:

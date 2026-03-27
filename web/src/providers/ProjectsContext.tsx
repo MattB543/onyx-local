@@ -22,6 +22,7 @@ import {
   fetchProjects as svcFetchProjects,
   createProject as svcCreateProject,
   uploadFiles as svcUploadFiles,
+  uploadChatFiles as svcUploadChatFiles,
   getRecentFiles as svcGetRecentFiles,
   getFilesInProject as svcGetFilesInProject,
   getProject as svcGetProject,
@@ -60,7 +61,8 @@ const generateTempId = () => {
 // Create optimistic file from File object
 const createOptimisticFile = (
   file: File,
-  projectId: number | null = null
+  projectId: number | null = null,
+  overrides: Partial<ProjectFile> = {}
 ): ProjectFile => {
   const tempId = generateTempId();
   return {
@@ -77,6 +79,7 @@ const createOptimisticFile = (
     token_count: null,
     chunk_count: null,
     temp_id: tempId, // Store temp_id for mapping later
+    ...overrides,
   };
 };
 
@@ -97,6 +100,10 @@ interface ProjectsContextType {
     files: File[],
     projectId?: number | null,
     onSuccess?: (uploaded: CategorizedFiles) => void,
+    onFailure?: (failedTempIds: string[]) => void
+  ) => Promise<ProjectFile[]>;
+  beginChatUpload: (
+    files: File[],
     onFailure?: (failedTempIds: string[]) => void
   ) => Promise<ProjectFile[]>;
   allRecentFiles: ProjectFile[];
@@ -292,16 +299,29 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
     setRecentFiles(files);
   }, [getRecentFiles]);
 
-  const getTempIdMap = (files: File[], optimisticFiles: ProjectFile[]) => {
-    const tempIdMap = new Map<string, string>();
-    for (const f of files) {
-      const tempId = optimisticFiles.find((o) => o.name === f.name)?.temp_id;
-      if (tempId) {
-        tempIdMap.set(buildFileKey(f), tempId);
+  const mergeUploadedFile = useCallback(
+    (existingFile: ProjectFile, uploadedFile: ProjectFile): ProjectFile => ({
+      ...existingFile,
+      ...uploadedFile,
+      attachment_source: existingFile.attachment_source,
+      index_for_later: existingFile.index_for_later,
+    }),
+    []
+  );
+
+  const getTempIdMap = useCallback(
+    (files: File[], optimisticFiles: ProjectFile[]) => {
+      const tempIdMap = new Map<string, string>();
+      for (const f of files) {
+        const tempId = optimisticFiles.find((o) => o.name === f.name)?.temp_id;
+        if (tempId) {
+          tempIdMap.set(buildFileKey(f), tempId);
+        }
       }
-    }
-    return tempIdMap;
-  };
+      return tempIdMap;
+    },
+    []
+  );
 
   const removeOptimisticFilesByTempIds = useCallback(
     (optimisticTempIds: Set<string>, projectId?: number | null) => {
@@ -384,7 +404,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
             prev.map((f) => {
               if (f.temp_id) {
                 const u = tempIdToUploadedFileMap.get(f.temp_id);
-                return u ? { ...f, ...u } : f;
+                return u ? mergeUploadedFile(f, u) : f;
               }
               return f;
             })
@@ -393,7 +413,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
             prev.map((f) => {
               if (f.temp_id) {
                 const u = tempIdToUploadedFileMap.get(f.temp_id);
-                return u ? { ...f, ...u } : f;
+                return u ? mergeUploadedFile(f, u) : f;
               }
               return f;
             })
@@ -403,7 +423,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
               prev.map((f) => {
                 if (f.temp_id) {
                   const u = tempIdToUploadedFileMap.get(f.temp_id);
-                  return u ? { ...f, ...u } : f;
+                  return u ? mergeUploadedFile(f, u) : f;
                 }
                 return f;
               })
@@ -472,8 +492,115 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       currentProjectId,
       refreshCurrentProjectDetails,
       refreshRecentFiles,
+      getTempIdMap,
       removeOptimisticFilesByTempIds,
       settingsContext,
+      mergeUploadedFile,
+    ]
+  );
+
+  const beginChatUpload = useCallback(
+    async (
+      files: File[],
+      onFailure?: (failedTempIds: string[]) => void
+    ): Promise<ProjectFile[]> => {
+      const rawMax = settingsContext?.settings?.user_file_max_upload_size_mb;
+      const maxUploadSizeMb =
+        rawMax && rawMax > 0 ? rawMax : DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB;
+      const maxUploadSizeBytes = maxUploadSizeMb * 1024 * 1024;
+
+      const oversizedFiles = files.filter(
+        (file) => file.size > maxUploadSizeBytes
+      );
+      const validFiles = files.filter(
+        (file) => file.size <= maxUploadSizeBytes
+      );
+
+      if (oversizedFiles.length > 0) {
+        const skippedNames = oversizedFiles.map((file) => file.name).join(", ");
+        toast.warning(
+          `Skipped ${oversizedFiles.length} oversized file(s) (>${maxUploadSizeMb} MB): ${skippedNames}`
+        );
+      }
+
+      if (validFiles.length === 0) {
+        onFailure?.([]);
+        return [];
+      }
+
+      const optimisticFiles = validFiles.map((file) =>
+        createOptimisticFile(file, null, {
+          attachment_source: "upload",
+          index_for_later: false,
+        })
+      );
+      const tempIdMap = getTempIdMap(validFiles, optimisticFiles);
+      setCurrentMessageFiles((prev) => [...prev, ...optimisticFiles]);
+
+      svcUploadChatFiles(validFiles, tempIdMap)
+        .then((uploaded) => {
+          const uploadedFiles = (uploaded.user_files || []).map((file) => ({
+            ...file,
+            attachment_source: "upload" as const,
+          }));
+          const tempIdToUploadedFileMap = new Map(
+            uploadedFiles.map((file) => [file.temp_id, file])
+          );
+
+          setCurrentMessageFiles((prev) =>
+            prev.map((file) => {
+              if (!file.temp_id) {
+                return file;
+              }
+              const uploadedFile = tempIdToUploadedFileMap.get(file.temp_id);
+              return uploadedFile ? mergeUploadedFile(file, uploadedFile) : file;
+            })
+          );
+
+          const rejectedFiles = uploaded.rejected_files || [];
+          if (rejectedFiles.length > 0) {
+            const uniqueReasons = new Set(
+              rejectedFiles.map((rejectedFile) => rejectedFile.reason)
+            );
+            toast.warning(
+              `Some files were not uploaded. ${Array.from(uniqueReasons).join(" | ")}`
+            );
+
+            const failedNameSet = new Set<string>(
+              rejectedFiles.map((file) => file.file_name)
+            );
+            const failedTempIds = Array.from(
+              new Set(
+                optimisticFiles
+                  .filter((file) => file.temp_id && failedNameSet.has(file.name))
+                  .map((file) => file.temp_id as string)
+              )
+            );
+            removeOptimisticFilesByTempIds(new Set(failedTempIds));
+            if (failedTempIds.length > 0) {
+              onFailure?.(failedTempIds);
+            }
+          }
+        })
+        .catch(() => {
+          const optimisticTempIds = new Set(
+            optimisticFiles
+              .map((file) => file.temp_id)
+              .filter((tempId): tempId is string => Boolean(tempId))
+          );
+
+          removeOptimisticFilesByTempIds(optimisticTempIds);
+          toast.error("Failed to upload files");
+          onFailure?.(Array.from(optimisticTempIds));
+        });
+
+      return optimisticFiles;
+    },
+    [
+      settingsContext,
+      getTempIdMap,
+      mergeUploadedFile,
+      removeOptimisticFilesByTempIds,
     ]
   );
 
@@ -589,7 +716,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
                 latest.name !== f.name ||
                 latest.file_type !== f.file_type
               ) {
-                next.push({ ...f, ...latest } as ProjectFile);
+                next.push(mergeUploadedFile(f, latest));
                 changed = true;
                 continue;
               }
@@ -615,7 +742,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
                 latest.file_type !== f.file_type
               ) {
                 changed = true;
-                return { ...f, ...latest } as ProjectFile;
+                return mergeUploadedFile(f, latest);
               }
             }
             return f;
@@ -701,6 +828,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
     currentProjectId,
     refreshCurrentProjectDetails,
     refreshRecentFiles,
+    mergeUploadedFile,
   ]);
 
   const value: ProjectsContextType = useMemo(
@@ -714,6 +842,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       allCurrentProjectFiles,
       isLoadingProjectDetails,
       beginUpload,
+      beginChatUpload,
       setCurrentMessageFiles,
       upsertInstructions,
       fetchProjects,
@@ -787,6 +916,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       allCurrentProjectFiles,
       isLoadingProjectDetails,
       beginUpload,
+      beginChatUpload,
       setCurrentMessageFiles,
       upsertInstructions,
       fetchProjects,

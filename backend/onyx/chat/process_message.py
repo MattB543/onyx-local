@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from onyx.cache.factory import get_cache_backend
 from onyx.cache.interface import CacheBackend
+from onyx.chat.chat_file_utils import enqueue_promoted_user_file_indexing
+from onyx.chat.chat_file_utils import promote_chat_uploads_to_user_files
 from onyx.chat.chat_processing_checker import set_processing_status
 from onyx.chat.chat_state import ChatStateContainer
 from onyx.chat.chat_state import run_chat_loop_with_state_containers
@@ -70,6 +72,7 @@ from onyx.db.tools import get_tools
 from onyx.deep_research.dr_loop import run_deep_research_llm_loop
 from onyx.file_processing.extract_file_text import extract_file_text
 from onyx.file_store.models import ChatFileType
+from onyx.file_store.models import FileDescriptor
 from onyx.file_store.models import InMemoryChatFile
 from onyx.file_store.utils import load_in_memory_chat_files
 from onyx.file_store.utils import verify_user_files
@@ -450,6 +453,7 @@ def handle_stream_message_objects(
     llm: LLM | None = None
     chat_session: ChatSession | None = None
     cache: CacheBackend | None = None
+    promoted_user_file_ids: list[UUID] = []
 
     user_id = user.id
     if user.is_anonymous:
@@ -524,6 +528,42 @@ def handle_stream_message_objects(
             llm_provider_api_key=llm.config.api_key,
         )
 
+        if new_msg_req.index_for_later_file_ids:
+            file_descriptor_ids = {
+                file_descriptor["id"] for file_descriptor in new_msg_req.file_descriptors
+            }
+            requested_file_ids = list(dict.fromkeys(new_msg_req.index_for_later_file_ids))
+            missing_file_ids = set(requested_file_ids) - file_descriptor_ids
+            if missing_file_ids:
+                raise ValueError(
+                    f"Cannot index files that are not attached to the message: {missing_file_ids}"
+                )
+
+            promotion_result = promote_chat_uploads_to_user_files(
+                file_ids=requested_file_ids,
+                user=user,
+                db_session=db_session,
+            )
+            promoted_user_file_ids = promotion_result.new_user_file_ids
+            if promotion_result.raw_file_id_to_user_file_id:
+                updated_file_descriptors: list[FileDescriptor] = []
+                for file_descriptor in new_msg_req.file_descriptors:
+                    promoted_user_file_id = (
+                        promotion_result.raw_file_id_to_user_file_id.get(
+                            file_descriptor["id"]
+                        )
+                    )
+                    if promoted_user_file_id is not None:
+                        updated_file_descriptors.append(
+                            {
+                                **file_descriptor,
+                                "user_file_id": promoted_user_file_id,
+                            }
+                        )
+                    else:
+                        updated_file_descriptors.append(file_descriptor)
+                new_msg_req.file_descriptors = updated_file_descriptors
+
         # Verify that the user specified files actually belong to the user
         verify_user_files(
             user_files=new_msg_req.file_descriptors,
@@ -574,6 +614,12 @@ def handle_stream_message_objects(
         # If the parent message is a user message, it's a regeneration and we use the existing user message.
         if parent_message.message_type == MessageType.USER:
             user_message = parent_message
+            if promoted_user_file_ids:
+                db_session.commit()
+                enqueue_promoted_user_file_indexing(
+                    user_file_ids=promoted_user_file_ids,
+                    tenant_id=tenant_id,
+                )
         else:
             user_message = create_new_chat_message(
                 chat_session_id=chat_session.id,
@@ -585,6 +631,11 @@ def handle_stream_message_objects(
                 db_session=db_session,
                 commit=True,
             )
+            if promoted_user_file_ids:
+                enqueue_promoted_user_file_indexing(
+                    user_file_ids=promoted_user_file_ids,
+                    tenant_id=tenant_id,
+                )
 
             chat_history.append(user_message)
 

@@ -5,6 +5,7 @@ import type { ProjectFile } from "@/app/app/projects/projectsService";
 import { UserFileStatus } from "@/app/app/projects/projectsService";
 import { cn, isImageFile } from "@/lib/utils";
 import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
+import Checkbox from "@/refresh-components/inputs/Checkbox";
 import { SvgFileText, SvgX } from "@opal/icons";
 import { Interactive } from "@opal/core";
 import { AttachmentItemLayout } from "@/layouts/general-layouts";
@@ -116,6 +117,7 @@ export interface FileCardProps {
   hideProcessingState?: boolean;
   onFileClick?: (file: ProjectFile) => void;
   compactImages?: boolean;
+  onToggleIndexForLater?: (fileId: string, checked: boolean) => void;
 }
 export function FileCard({
   file,
@@ -123,6 +125,7 @@ export function FileCard({
   hideProcessingState = false,
   onFileClick,
   compactImages = false,
+  onToggleIndexForLater,
 }: FileCardProps) {
   const typeLabel = useMemo(() => {
     const name = String(file.name || "");
@@ -152,22 +155,20 @@ export function FileCard({
   const isProcessing = hideProcessingState ? false : isActuallyProcessing;
 
   const doneUploading = String(file.status) !== UserFileStatus.UPLOADING;
-
-  // For images, always show the larger preview layout (even while processing)
-  if (isImage) {
-    return (
-      <ImageFileCard
-        file={file}
-        imageUrl={imageUrl}
-        removeFile={removeFile}
-        onFileClick={onFileClick}
-        isProcessing={isProcessing}
-        compact={compactImages}
-      />
-    );
-  }
-
-  return (
+  const showIndexForLaterCheckbox =
+    onToggleIndexForLater &&
+    file.attachment_source === "upload" &&
+    doneUploading;
+  const cardContent = isImage ? (
+    <ImageFileCard
+      file={file}
+      imageUrl={imageUrl}
+      removeFile={removeFile}
+      onFileClick={onFileClick}
+      isProcessing={isProcessing}
+      compact={compactImages}
+    />
+  ) : (
     <Removable
       onRemove={
         removeFile && doneUploading ? () => removeFile(file.id) : undefined
@@ -192,6 +193,24 @@ export function FileCard({
         </Interactive.Container>
       </div>
     </Removable>
+  );
+
+  if (!showIndexForLaterCheckbox) {
+    return cardContent;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {cardContent}
+      <label className="flex items-center gap-1 px-1 text-xs text-text-03">
+        <Checkbox
+          checked={Boolean(file.index_for_later)}
+          onCheckedChange={(checked) => onToggleIndexForLater(file.id, checked)}
+          aria-label={`Index ${file.name} for later`}
+        />
+        <span>Index for later</span>
+      </label>
+    </div>
   );
 }
 

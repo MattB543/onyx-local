@@ -145,7 +145,7 @@ export default function useChatController({
   const { pinnedAgents, togglePinnedAgent } = usePinnedAgents();
   const { agentPreferences } = useAgentPreferences();
   const { forcedToolIds } = useForcedTools();
-  const { fetchProjects, setCurrentMessageFiles, beginUpload } =
+  const { fetchProjects, beginChatUpload } =
     useProjectsContext();
 
   // Use selectors to access only the specific fields we need
@@ -579,6 +579,18 @@ export default function useChatController({
         ...projectFilesToFileDescriptors(currentMessageFiles),
         ...(!regenerationRequest ? messageToResend?.files ?? [] : []),
       ];
+      const indexForLaterFileIds = Array.from(
+        new Set(
+          currentMessageFiles
+            .filter(
+              (file) =>
+                file.attachment_source === "upload" &&
+                file.index_for_later === true &&
+                Boolean(file.file_id)
+            )
+            .map((file) => file.file_id)
+        )
+      );
 
       updateChatStateAction(frozenSessionId, "loading");
 
@@ -694,6 +706,7 @@ export default function useChatController({
           signal: controller.signal,
           message: currMessage,
           fileDescriptors: effectiveFileDescriptors,
+          indexForLaterFileIds,
           parentMessageId: (() => {
             const parentId =
               regenerationRequest?.parentMessage.messageId ||
@@ -998,14 +1011,13 @@ export default function useChatController({
         return;
       }
       updateChatStateAction(getCurrentSessionId(), "uploading");
-      const uploadedMessageFiles = await beginUpload(
-        Array.from(acceptedFiles),
-        null
-      );
-      setCurrentMessageFiles((prev) => [...prev, ...uploadedMessageFiles]);
-      updateChatStateAction(getCurrentSessionId(), "input");
+      try {
+        await beginChatUpload(Array.from(acceptedFiles));
+      } finally {
+        updateChatStateAction(getCurrentSessionId(), "input");
+      }
     },
-    [liveAgent, llmManager, forcedToolIds]
+    [beginChatUpload, liveAgent, llmManager, updateChatStateAction]
   );
 
   useEffect(() => {

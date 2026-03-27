@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from onyx.chat.chat_file_utils import get_chat_upload_token_count
 from onyx.db.memory import UserMemoryContext
 from onyx.db.persona import get_default_behavior_persona
 from onyx.db.user_file import calculate_user_files_token_count
@@ -109,18 +110,24 @@ def calculate_reserved_tokens(
     if files:
         # Extract user_file_id from each file descriptor
         user_file_ids: list[UUID] = []
+        raw_file_ids: list[str] = []
         for file in files:
             uid = file.get("user_file_id")
             if not uid:
+                raw_file_ids.append(file["id"])
                 continue
             try:
                 user_file_ids.append(UUID(uid))
             except (TypeError, ValueError, AttributeError):
-                # Skip invalid user_file_id values
-                continue
+                raw_file_ids.append(file["id"])
         if user_file_ids:
             file_token_count = calculate_user_files_token_count(
                 user_file_ids, db_session
+            )
+        if raw_file_ids:
+            file_token_count += sum(
+                get_chat_upload_token_count(file_id=file_id, db_session=db_session) or 0
+                for file_id in raw_file_ids
             )
 
     reserved_token_count += file_token_count

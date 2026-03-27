@@ -180,6 +180,8 @@ export default function EmailPasswordForm({
                     <FormField.Control>
                       <InputTypeIn
                         {...field}
+                        type="email"
+                        autoComplete="username"
                         onChange={(e) => {
                           if (showApiMessage && apiStatus === "error") {
                             setShowApiMessage(false);
@@ -207,6 +209,10 @@ export default function EmailPasswordForm({
                     <FormField.Control>
                       <PasswordInputTypeIn
                         {...field}
+                        useNativeType
+                        autoComplete={
+                          isSignup ? "new-password" : "current-password"
+                        }
                         onChange={(e) => {
                           if (showApiMessage && apiStatus === "error") {
                             setShowApiMessage(false);
