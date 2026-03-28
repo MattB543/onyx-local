@@ -4,6 +4,7 @@ import imaplib
 import os
 import re
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 from email.message import Message
 from email.utils import parseaddr
@@ -342,7 +343,10 @@ def _fetch_email_ids_in_mailbox(
         return []
 
     start_str = datetime.fromtimestamp(start, tz=timezone.utc).strftime("%d-%b-%Y")
-    end_str = datetime.fromtimestamp(end, tz=timezone.utc).strftime("%d-%b-%Y")
+    # IMAP BEFORE uses date-only granularity (excludes the given date),
+    # so add 1 day to include emails from the end date itself.
+    end_dt = datetime.fromtimestamp(end, tz=timezone.utc) + timedelta(days=1)
+    end_str = end_dt.strftime("%d-%b-%Y")
     search_criteria = f'(SINCE "{start_str}" BEFORE "{end_str}")'
 
     status, email_ids_byte_array = mail_client.search(None, search_criteria)
