@@ -41,7 +41,7 @@ from onyx.utils.logger import setup_logger
 logger = setup_logger()
 
 _EMAIL_SOURCES = {DocumentSource.GMAIL, DocumentSource.IMAP}
-_EMAIL_CRM_PAYLOAD_TEXT_LIMIT = 10_000
+_EMAIL_CRM_PAYLOAD_TEXT_LIMIT = 50_000
 _EMAIL_TRIGGER_SOURCE_TYPE = "email_indexed"
 
 

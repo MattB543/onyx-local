@@ -8,6 +8,7 @@ from unittest.mock import patch
 from onyx.custom_jobs.steps.fetch_email_trigger_payload import (
     FetchEmailTriggerPayloadStep,
 )
+from onyx.custom_jobs.steps.process_email_crm import _build_prompt
 from onyx.custom_jobs.steps.process_email_crm import ProcessEmailCrmStep
 from onyx.custom_jobs.types import StepContext
 from onyx.db.enums import CustomJobStepStatus
@@ -219,6 +220,59 @@ def test_process_email_crm_fails_when_chat_pipeline_returns_error() -> None:
 
     assert result.status == CustomJobStepStatus.FAILURE
     assert "Chat pipeline returned an error" in str(result.error_message)
+
+
+def test_build_prompt_expands_scope_beyond_headers_and_includes_all_crm_tools() -> None:
+    with patch(
+        "onyx.custom_jobs.steps.process_email_crm._get_internal_domains",
+        return_value=["internal.example", "team.local"],
+    ):
+        prompt = _build_prompt(
+            {
+                "from": "Alice <alice@internal.example>",
+                "to": "sales@internal.example",
+                "subject": "Warm intro",
+                "date": "2026-03-01T10:00:00+00:00",
+                "body": (
+                    "Please meet Bob Chen, VP Partnerships at Acme Corp. "
+                    "He is evaluating us for a pilot."
+                ),
+            }
+        )
+
+    assert "INTERNAL TEAM DOMAINS: @internal.example, @team.local" in prompt
+    assert "Do not limit yourself to the sender or recipients." in prompt
+    assert "another external person" in prompt
+    assert "`crm_search`" in prompt
+    assert "`crm_list`" in prompt
+    assert "`crm_get`" in prompt
+    assert "`crm_create`" in prompt
+    assert "`crm_update`" in prompt
+    assert "`crm_log_interaction`" in prompt
+
+
+def test_build_prompt_instructs_update_before_create_when_record_exists() -> None:
+    with patch(
+        "onyx.custom_jobs.steps.process_email_crm._get_internal_domains",
+        return_value=[],
+    ):
+        prompt = _build_prompt(
+            {
+                "from": "Alice Example <alice@example.com>",
+                "to": "sales@example.org",
+                "subject": "Partnership follow-up",
+                "date": "2026-03-02T11:30:00+00:00",
+                "body": "Call me at 555-1212. I moved to New York and now lead partnerships.",
+            }
+        )
+
+    assert "If a relevant contact already exists, update it with reliable net-new" in prompt
+    assert (
+        "If a relevant organization already exists, update it with reliable net-new"
+        in prompt
+    )
+    assert "Always search before creating to avoid duplicates." in prompt
+    assert "Sender email (for CRM lookup): alice@example.com" in prompt
 
 
 def test_process_email_crm_success_uses_context_db_session_and_legacy_fallbacks() -> None:

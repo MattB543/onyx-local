@@ -18,30 +18,73 @@ logger = setup_logger()
 
 CRM_PROMPT_TEMPLATE = """\
 You are processing an inbound email on behalf of a CRM automation.
-{internal_domains_block}
-Perform the following steps using the available CRM tools:
+Your job is to keep the CRM accurate, complete, and free of duplicates based on
+the entire email thread.
 
-1. Determine who the **external contact** is in this email:
-   - If the sender is from an internal domain, this email is likely sharing \
-information about an external person. Look at the email body, forwarded \
-content, or signature blocks to identify the real external contact.
-   - If the sender is NOT from an internal domain, they are the external contact.
-2. Search the CRM for the external contact's email address.
-3. If no matching contact is found, create a new contact with available \
-information (name, email, phone, title, company).
-4. Search the CRM for the external contact's organization (derive the org \
-from their email domain or any signature details).
-5. If no matching organization is found, create a new organization record.
-6. Log this email as an interaction/activity on the contact record. Include \
-relevant context from the email body.
+{internal_domains_block}
+
+You may have access to the following CRM tools:
+- `crm_search` for text search across contacts, organizations, interactions,
+  and tags.
+- `crm_list` for structured filtering, such as recent interactions for a
+  contact or organization.
+- `crm_get` for full details on an existing CRM record and its related history.
+- `crm_create` for creating missing contacts, organizations, or tags.
+- `crm_update` for enriching existing contacts or organizations with reliable
+  new information.
+- `crm_log_interaction` for logging this email thread as an activity.
+
+Perform the following workflow using the available CRM tools:
+
+1. Read the entire email carefully, including the body, quoted replies,
+   forwarded content, signature blocks, and relationship clues.
+2. Identify all relevant **external people and organizations** mentioned in the
+   email. Do not limit yourself to the sender or recipients. The From/To fields
+   are only starting points.
+   - If the sender is from an internal domain, the real CRM-relevant contact may
+     be someone mentioned in the body or forwarded content.
+   - If the email thread mentions another external person by name, title,
+     company, email, phone number, or relationship context, that person may
+     also deserve a CRM contact even if they are not in the headers.
+3. Determine the primary external contact and any additional external contacts
+   or organizations that are materially relevant to the relationship.
+4. For each relevant external contact, search the CRM first using the strongest
+   identifiers available:
+   - Prefer email when present.
+   - Otherwise use combinations of name, company, and context clues.
+   - Use `crm_get` or `crm_list` if you need full details or recent interaction
+     history before deciding what to do.
+5. If a relevant contact already exists, update it with reliable net-new
+   information from the email when appropriate (for example: phone, title,
+   organization, location, notes, or relationship context).
+   - Do not overwrite strong existing data with weak guesses.
+6. If no matching contact exists, create one with the best clearly supported
+   information available.
+7. Search for the relevant external organization(s) by company name, website,
+   or email domain, using `crm_get` or `crm_list` if needed for context.
+8. If a relevant organization already exists, update it with reliable net-new
+   information from the email when appropriate. If it does not exist, create it.
+9. Log this email as an interaction/activity. Use `interaction_type` "email"
+   or "note" as appropriate, and set `occurred_at` to the email date so the
+   interaction is recorded at the correct time. Include the key relationship
+   context from the email body, any action items, and link it to the best
+   matching contact and organization. Include attendees when useful.
 
 IMPORTANT:
-- Do NOT create or update contacts/organizations for internal domains. These \
-are team members, not CRM leads.
-- DO extract as much information as possible about external contacts from \
-the email body (names, phone numbers, titles, company names).
-- If the email contains no actionable external contact information, just log \
-the interaction on any existing contact that is referenced.
+- Do NOT create or update contacts/organizations for internal domains. These
+  are team members, not CRM leads.
+- Internal teammates may appear in the headers or body and can still be useful
+  as context or attendees, but they should not become CRM contacts or
+  organizations.
+- DO extract as much information as possible about relevant external people and
+  organizations from the email body (names, phone numbers, titles, company
+  names, websites, locations, and relationship context).
+- Mentioned external people can be valid CRM contacts even if they are not the
+  sender or direct recipients.
+- Always search before creating to avoid duplicates.
+- If the email contains no actionable external CRM data, avoid creating new
+  contacts or organizations and just log the interaction on any clearly
+  referenced existing record.
 
 Here is the email to process:
 
@@ -99,9 +142,11 @@ def _build_prompt(email_data: dict[str, Any]) -> str:
         domains_str = ", ".join(f"@{d}" for d in internal_domains)
         internal_domains_block = (
             f"INTERNAL TEAM DOMAINS: {domains_str}\n"
-            "Emails from these domains are from your own team members. "
-            "Do NOT create or update CRM contacts/organizations for them. "
-            "Instead, focus on any external contacts mentioned in the email."
+            "Any person or organization using one of these domains should be "
+            "treated as internal. Do NOT create or update CRM contacts or "
+            "organizations for them. Internal teammates may still appear in "
+            "the headers or body as useful context, but focus CRM actions on "
+            "external people and organizations."
         )
     else:
         internal_domains_block = ""
