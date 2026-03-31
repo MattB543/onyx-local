@@ -12,6 +12,9 @@ from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
 from onyx.db.crm import build_contact_email_lookup
 from onyx.db.crm import build_org_name_lookup
+from onyx.db.crm import delete_contact
+from onyx.db.crm import delete_interaction
+from onyx.db.crm import delete_organization
 from onyx.db.crm import find_contacts_for_attendee_resolution
 from onyx.db.crm import find_users_for_attendee_resolution
 from onyx.db.crm import export_all_contacts
@@ -236,6 +239,72 @@ def test_update_contact_sets_profile_picture_file_id() -> None:
     db_session.refresh.assert_called_once_with(contact)
 
 
+def test_update_contact_sets_organization_id() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(first_name="Alice", status="lead")
+    contact.id = uuid4()
+    organization_id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"organization_id": organization_id},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.organization_id == organization_id
+    db_session.flush.assert_called_once()
+    db_session.refresh.assert_called_once_with(contact)
+
+
+def test_update_contact_clears_organization_id() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        organization_id=uuid4(),
+    )
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"organization_id": None},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.organization_id is None
+    db_session.flush.assert_called_once()
+    db_session.refresh.assert_called_once_with(contact)
+
+
+def test_update_contact_organization_id_noop_does_not_mark_changed() -> None:
+    db_session = MagicMock()
+    organization_id = uuid4()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        organization_id=organization_id,
+    )
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"organization_id": organization_id},
+        commit=False,
+    )
+
+    assert updated is contact
+    assert changed is False
+    db_session.flush.assert_not_called()
+    db_session.refresh.assert_not_called()
+
+
 def test_update_contact_clears_profile_picture_file_id() -> None:
     db_session = MagicMock()
     contact = CrmContact(
@@ -450,6 +519,54 @@ def test_update_organization_semantically_identical_values_do_not_mark_changed()
     db_session.refresh.assert_not_called()
 
 
+def test_delete_contact_commits_by_default() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(first_name="Alice", status="lead")
+
+    delete_contact(db_session=db_session, contact=contact)
+
+    db_session.delete.assert_called_once_with(contact)
+    db_session.commit.assert_called_once()
+    db_session.flush.assert_not_called()
+
+
+def test_delete_contact_flushes_without_commit_when_requested() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(first_name="Alice", status="lead")
+
+    delete_contact(db_session=db_session, contact=contact, commit=False)
+
+    db_session.delete.assert_called_once_with(contact)
+    db_session.flush.assert_called_once()
+    db_session.commit.assert_not_called()
+
+
+def test_delete_organization_commits_by_default() -> None:
+    db_session = MagicMock()
+    organization = CrmOrganization(name="Acme")
+
+    delete_organization(db_session=db_session, organization=organization)
+
+    db_session.delete.assert_called_once_with(organization)
+    db_session.commit.assert_called_once()
+    db_session.flush.assert_not_called()
+
+
+def test_delete_organization_flushes_without_commit_when_requested() -> None:
+    db_session = MagicMock()
+    organization = CrmOrganization(name="Acme")
+
+    delete_organization(
+        db_session=db_session,
+        organization=organization,
+        commit=False,
+    )
+
+    db_session.delete.assert_called_once_with(organization)
+    db_session.flush.assert_called_once()
+    db_session.commit.assert_not_called()
+
+
 def test_create_interaction_does_not_auto_add_primary_contact_attendee() -> None:
     db_session = MagicMock()
     contact_id = uuid4()
@@ -472,6 +589,28 @@ def test_create_interaction_does_not_auto_add_primary_contact_attendee() -> None
     db_session.commit.assert_called_once()
     db_session.refresh.assert_called_once_with(interaction)
     mock_add_attendees.assert_not_called()
+
+
+def test_delete_interaction_commits_by_default() -> None:
+    db_session = MagicMock()
+    interaction = MagicMock()
+
+    delete_interaction(db_session=db_session, interaction=interaction)
+
+    db_session.delete.assert_called_once_with(interaction)
+    db_session.commit.assert_called_once()
+    db_session.flush.assert_not_called()
+
+
+def test_delete_interaction_flushes_without_commit_when_requested() -> None:
+    db_session = MagicMock()
+    interaction = MagicMock()
+
+    delete_interaction(db_session=db_session, interaction=interaction, commit=False)
+
+    db_session.delete.assert_called_once_with(interaction)
+    db_session.flush.assert_called_once()
+    db_session.commit.assert_not_called()
 
 
 def test_create_tag_rejects_empty_name() -> None:

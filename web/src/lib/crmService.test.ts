@@ -1,4 +1,7 @@
 import {
+  deleteCrmContact,
+  deleteCrmInteraction,
+  deleteCrmOrganization,
   deleteContactProfilePicture,
   uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
@@ -63,6 +66,66 @@ describe("CRM profile picture service", () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       "/api/user/crm/contacts/contact-123/profile-picture",
       { method: "DELETE" }
+    );
+  });
+
+  test("deleteCrmContact sends a delete request to the contact endpoint", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+    } as Response);
+
+    await expect(deleteCrmContact("contact-123")).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/user/crm/contacts/contact-123",
+      {
+        method: "DELETE",
+      }
+    );
+  });
+
+  test("deleteCrmContact throws when the delete fails", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+    } as Response);
+
+    await expect(deleteCrmContact("contact-123")).rejects.toThrow(
+      "Delete CRM contact failed (Status: 403)"
+    );
+  });
+
+  test("deleteCrmOrganization sends a delete request to the organization endpoint", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+    } as Response);
+
+    await expect(
+      deleteCrmOrganization("organization-123")
+    ).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/user/crm/organizations/organization-123",
+      {
+        method: "DELETE",
+      }
+    );
+  });
+
+  test("deleteCrmInteraction sends a delete request to the interaction endpoint", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+    } as Response);
+
+    await expect(
+      deleteCrmInteraction("interaction-123")
+    ).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/user/crm/interactions/interaction-123",
+      {
+        method: "DELETE",
+      }
     );
   });
 });

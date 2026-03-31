@@ -11,6 +11,7 @@ import {
 interface UseCrmInteractionsParams {
   contactId?: string;
   organizationId?: string;
+  includeContactInteractions?: boolean;
   interactionType?: CrmInteractionType;
   pageNum: number;
   pageSize: number;
@@ -19,6 +20,7 @@ interface UseCrmInteractionsParams {
 export function useCrmInteractions({
   contactId,
   organizationId,
+  includeContactInteractions,
   interactionType,
   pageNum,
   pageSize,
@@ -30,6 +32,7 @@ export function useCrmInteractions({
       "crm-interactions",
       contactId ?? "",
       organizationId ?? "",
+      includeContactInteractions ?? false,
       interactionType ?? "",
       pageNum,
       pageSize,
@@ -38,6 +41,7 @@ export function useCrmInteractions({
       listCrmInteractions({
         contact_id: contactId,
         organization_id: organizationId,
+        include_contact_interactions: includeContactInteractions,
         interaction_type: interactionType,
         page_num: pageNum,
         page_size: pageSize,

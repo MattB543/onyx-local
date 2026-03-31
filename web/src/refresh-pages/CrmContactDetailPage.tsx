@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  CrmInteraction,
   CrmContactSource,
   CrmContactStage,
+  deleteCrmContact,
+  deleteCrmInteraction,
   deleteContactProfilePicture,
   patchCrmContact,
   uploadContactProfilePicture,
@@ -17,10 +20,13 @@ import { toast } from "@/hooks/useToast";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
+import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
@@ -31,7 +37,7 @@ import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import ConfirmationModalLayout from "@/refresh-components/layouts/ConfirmationModalLayout";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/refresh-pages/crm/components/ActivityTimeline";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
@@ -39,6 +45,7 @@ import CrmBreadcrumbs from "@/refresh-pages/crm/components/CrmBreadcrumbs";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
 import DetailField from "@/refresh-pages/crm/components/DetailField";
 import LogInteractionModal from "@/refresh-pages/crm/components/LogInteractionModal";
+import OrganizationPicker from "@/refresh-pages/crm/components/OrganizationPicker";
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
 import TagManager from "@/refresh-pages/crm/components/TagManager";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
@@ -51,9 +58,12 @@ import {
   optionalText,
 } from "@/refresh-pages/crm/crmOptions";
 
-import { SvgEdit, SvgUser } from "@opal/icons";
+import { Disabled } from "@opal/core";
+import { Button as OpalButton } from "@opal/components";
+import { SvgEdit, SvgTrash, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
+const SYSTEM_OWNER_ID = "00000000-0000-0000-0000-000000000000";
 
 interface ContactEditValues {
   first_name: string;
@@ -68,6 +78,8 @@ interface ContactEditValues {
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
+  organization_id: string;
+  organization_name: string;
 }
 
 interface CrmContactDetailPageProps {
@@ -78,8 +90,15 @@ export default function CrmContactDetailPage({
   contactId,
 }: CrmContactDetailPageProps) {
   const router = useRouter();
+  const { isAdmin } = useUser();
+  const invalidateCrmCache = useInvalidateCrmCache();
   const [isEditing, setIsEditing] = useState(false);
   const [logInteractionModalOpen, setLogInteractionModalOpen] = useState(false);
+  const [contactDeleteModalOpen, setContactDeleteModalOpen] = useState(false);
+  const [interactionToDelete, setInteractionToDelete] =
+    useState<CrmInteraction | null>(null);
+  const [isDeletingContact, setIsDeletingContact] = useState(false);
+  const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
     INTERACTION_PAGE_SIZE
   );
@@ -145,6 +164,25 @@ export default function CrmContactDetailPage({
       ),
     [ownerOptions]
   );
+  const visibleOwnerIds = useMemo(
+    () =>
+      (contact?.owner_ids || []).filter(
+        (ownerId) => ownerId !== SYSTEM_OWNER_ID
+      ),
+    [contact?.owner_ids]
+  );
+  const hiddenOwnerIds = useMemo(
+    () =>
+      (contact?.owner_ids || []).filter(
+        (ownerId) => ownerId === SYSTEM_OWNER_ID
+      ),
+    [contact?.owner_ids]
+  );
+  const unresolvableOwnerIds = useMemo(
+    () =>
+      visibleOwnerIds.filter((ownerId) => !ownerLabelById.has(ownerId)),
+    [visibleOwnerIds, ownerLabelById]
+  );
   const attendeeUserNameById = useMemo(
     () =>
       new Map(
@@ -200,6 +238,47 @@ export default function CrmContactDetailPage({
     }
   }, [contact?.id, isEditing]);
 
+  async function handleDeleteContact() {
+    if (!contact || isDeletingContact) {
+      return;
+    }
+
+    setIsDeletingContact(true);
+    try {
+      await deleteCrmContact(contact.id);
+      await invalidateCrmCache();
+      toast.success("Contact deleted.");
+      setContactDeleteModalOpen(false);
+      router.push("/app/crm/contacts");
+    } catch (error) {
+      console.error("Failed to delete CRM contact:", error);
+      toast.error("Failed to delete contact.");
+    } finally {
+      setIsDeletingContact(false);
+    }
+  }
+
+  async function handleDeleteInteraction() {
+    if (!interactionToDelete || isDeletingInteraction) {
+      return;
+    }
+
+    setIsDeletingInteraction(true);
+    try {
+      await deleteCrmInteraction(interactionToDelete.id);
+      await invalidateCrmCache();
+      void refreshInteractions();
+      void refreshContact();
+      toast.success("Interaction deleted.");
+      setInteractionToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete CRM interaction:", error);
+      toast.error("Failed to delete interaction.");
+    } finally {
+      setIsDeletingInteraction(false);
+    }
+  }
+
   return (
     <AppLayouts.Root>
       <SettingsLayouts.Root width="lg">
@@ -232,15 +311,26 @@ export default function CrmContactDetailPage({
                   Cancel Edit
                 </Button>
               ) : (
-                <Button
-                  action
-                  primary
-                  type="button"
-                  leftIcon={SvgEdit}
-                  onClick={() => setIsEditing(true)}
-                >
-                  Edit
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <IconButton
+                      main
+                      tertiary
+                      icon={SvgTrash}
+                      tooltip="Delete contact"
+                      onClick={() => setContactDeleteModalOpen(true)}
+                    />
+                  )}
+                  <Button
+                    action
+                    primary
+                    type="button"
+                    leftIcon={SvgEdit}
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Edit
+                  </Button>
+                </div>
               ))
             }
           />
@@ -280,7 +370,9 @@ export default function CrmContactDetailPage({
                             href={`/app/crm/organizations/${contact.organization_id}`}
                             className="truncate hover:underline"
                           >
-                            {linkedOrganization?.name || "-"}
+                            {linkedOrganization?.name ||
+                              contact.organization_name ||
+                              "-"}
                           </Link>
                         </>
                       )}
@@ -309,7 +401,7 @@ export default function CrmContactDetailPage({
                 </div>
               </Card>
 
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                 <div className="min-w-0 flex-1">
                   {isEditing ? (
                     <Card
@@ -332,13 +424,29 @@ export default function CrmContactDetailPage({
                           linkedin_url: contact.linkedin_url || "",
                           status: contact.status,
                           category: contact.category || "",
-                          owner_ids: contact.owner_ids || [],
+                          owner_ids: visibleOwnerIds.filter(
+                            (id) => ownerLabelById.has(id)
+                          ),
                           source: contact.source || "",
                           notes: contact.notes || "",
+                          organization_id: contact.organization_id || "",
+                          organization_name:
+                            linkedOrganization?.name ||
+                            contact.organization_name ||
+                            "",
                         }}
                         validationSchema={contactValidationSchema}
                         onSubmit={async (values, { setStatus }) => {
                           let profilePictureWarning: string | null = null;
+                          if (
+                            values.organization_name.trim() &&
+                            !values.organization_id
+                          ) {
+                            setStatus(
+                              "Choose a valid organization from the list or clear the organization field."
+                            );
+                            return;
+                          }
 
                           try {
                             await patchCrmContact(contact.id, {
@@ -351,9 +459,16 @@ export default function CrmContactDetailPage({
                               linkedin_url: optionalText(values.linkedin_url),
                               status: values.status,
                               category: optionalText(values.category),
-                              owner_ids: values.owner_ids,
+                              owner_ids: Array.from(
+                                new Set([
+                                  ...values.owner_ids,
+                                  ...hiddenOwnerIds,
+                                  ...unresolvableOwnerIds,
+                                ])
+                              ),
                               source: values.source || undefined,
                               notes: optionalText(values.notes),
+                              organization_id: values.organization_id || null,
                             });
                           } catch {
                             setStatus("Failed to save contact.");
@@ -381,6 +496,7 @@ export default function CrmContactDetailPage({
                               "Contact details saved, but the profile picture could not be updated.";
                           }
 
+                          await invalidateCrmCache();
                           await refreshContact();
                           setIsEditing(false);
                           if (profilePictureWarning) {
@@ -486,16 +602,34 @@ export default function CrmContactDetailPage({
                                 >
                                   Organization
                                 </Text>
-                                <InputTypeIn
-                                  value={
-                                    linkedOrganization?.name ||
-                                    (contact.organization_id
-                                      ? "Linked organization"
-                                      : "")
+                                <OrganizationPicker
+                                  selectedOrganizationId={
+                                    values.organization_id || null
                                   }
-                                  placeholder="No organization"
-                                  variant="readOnly"
-                                  readOnly
+                                  inputValue={values.organization_name}
+                                  onInputChange={(nextOrganizationName) => {
+                                    setFieldValue(
+                                      "organization_name",
+                                      nextOrganizationName
+                                    );
+                                    if (values.organization_id) {
+                                      setFieldValue("organization_id", "");
+                                    }
+                                  }}
+                                  onOrganizationChange={(
+                                    nextOrganizationId,
+                                    nextOrganizationName
+                                  ) => {
+                                    setFieldValue(
+                                      "organization_id",
+                                      nextOrganizationId || ""
+                                    );
+                                    setFieldValue(
+                                      "organization_name",
+                                      nextOrganizationName
+                                    );
+                                  }}
+                                  placeholder="Organization"
                                 />
                               </div>
                               <div className="flex flex-col gap-1">
@@ -668,7 +802,7 @@ export default function CrmContactDetailPage({
                   ) : (
                     <Card
                       variant="secondary"
-                      className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
+                      className="[&>div]:items-stretch [&>div]:justify-start"
                     >
                       <Text as="p" mainUiAction text02 className="w-full">
                         Details
@@ -695,6 +829,7 @@ export default function CrmContactDetailPage({
                           value={
                             contact.organization_id
                               ? linkedOrganization?.name ||
+                                contact.organization_name ||
                                 "Linked organization"
                               : null
                           }
@@ -740,21 +875,22 @@ export default function CrmContactDetailPage({
                         <DetailField
                           label="Owners"
                           value={
-                            contact.owner_ids.length > 0
-                              ? contact.owner_ids
-                                  .map(
-                                    (ownerId) =>
-                                      ownerLabelById.get(ownerId) ||
-                                      `Unknown User (${ownerId.slice(0, 8)})`
+                            visibleOwnerIds.length > 0
+                              ? visibleOwnerIds
+                                  .filter((ownerId) =>
+                                    ownerLabelById.has(ownerId)
                                   )
-                                  .join(", ")
+                                  .map(
+                                    (ownerId) => ownerLabelById.get(ownerId)!
+                                  )
+                                  .join(", ") || null
                               : null
                           }
                           layout="stacked"
                         />
                       </div>
 
-                      <div className="mt-auto w-full border-t border-border-subtle" />
+                      <div className="mt-3 w-full border-t border-border-subtle" />
 
                       <div className="flex w-full flex-col gap-1">
                         <Text as="p" mainUiAction text02>
@@ -802,6 +938,10 @@ export default function CrmContactDetailPage({
                         hasMore={hasMoreInteractions}
                         attendeeUserNameById={attendeeUserNameById}
                         attendeeContactNameById={attendeeContactNameById}
+                        canDeleteInteractions={isAdmin}
+                        onDeleteInteraction={(interaction) => {
+                          setInteractionToDelete(interaction);
+                        }}
                         onLoadMore={() =>
                           setInteractionPageSize(
                             (value) => value + INTERACTION_PAGE_SIZE
@@ -829,6 +969,68 @@ export default function CrmContactDetailPage({
           void refreshContact();
         }}
       />
+
+      {contactDeleteModalOpen && contact && (
+        <ConfirmationModalLayout
+          icon={SvgTrash}
+          title="Delete Contact"
+          onClose={
+            isDeletingContact
+              ? undefined
+              : () => setContactDeleteModalOpen(false)
+          }
+          submit={
+            <Disabled disabled={isDeletingContact}>
+              <OpalButton
+                variant="danger"
+                onClick={() => void handleDeleteContact()}
+              >
+                {isDeletingContact ? "Deleting..." : "Delete Contact"}
+              </OpalButton>
+            </Disabled>
+          }
+        >
+          <Text as="p" text03>
+            Delete{" "}
+            <Text as="span" text05>
+              {contact.full_name || contact.first_name}
+            </Text>
+            ? This action cannot be undone. Linked interactions will remain, but
+            their primary contact link and attendee references to this contact
+            will be removed.
+          </Text>
+        </ConfirmationModalLayout>
+      )}
+
+      {interactionToDelete && (
+        <ConfirmationModalLayout
+          icon={SvgTrash}
+          title="Delete Interaction"
+          onClose={
+            isDeletingInteraction
+              ? undefined
+              : () => setInteractionToDelete(null)
+          }
+          submit={
+            <Disabled disabled={isDeletingInteraction}>
+              <OpalButton
+                variant="danger"
+                onClick={() => void handleDeleteInteraction()}
+              >
+                {isDeletingInteraction ? "Deleting..." : "Delete Interaction"}
+              </OpalButton>
+            </Disabled>
+          }
+        >
+          <Text as="p" text03>
+            Delete{" "}
+            <Text as="span" text05>
+              {interactionToDelete.title}
+            </Text>
+            ? This action cannot be undone.
+          </Text>
+        </ConfirmationModalLayout>
+      )}
     </AppLayouts.Root>
   );
 }

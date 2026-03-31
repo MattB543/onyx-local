@@ -2,9 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { useSWRConfig } from "swr";
 
 import { CrmImportResult, importCrmCsv } from "@/app/app/crm/crmService";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import Button from "@/refresh-components/buttons/Button";
 import Modal from "@/refresh-components/Modal";
 import Text from "@/refresh-components/texts/Text";
@@ -24,7 +24,7 @@ export default function ImportCsvModal({
   defaultEntityType = "contacts",
   onSuccess,
 }: ImportCsvModalProps) {
-  const { mutate } = useSWRConfig();
+  const invalidateCrmCache = useInvalidateCrmCache();
 
   const [entityType, setEntityType] = useState<
     "organizations" | "contacts" | "interactions"
@@ -66,18 +66,6 @@ export default function ImportCsvModal({
     [onOpenChange, resetState, defaultEntityType]
   );
 
-  const invalidateCache = useCallback(() => {
-    mutate(
-      (key: unknown) =>
-        Array.isArray(key) &&
-        (key[0] === "crm-contacts" ||
-          key[0] === "crm-organizations" ||
-          key[0] === "crm-interactions"),
-      undefined,
-      { revalidate: true }
-    );
-  }, [mutate]);
-
   const handleImport = useCallback(
     async (dryRun: boolean) => {
       if (!file) return;
@@ -90,7 +78,7 @@ export default function ImportCsvModal({
         setResult(importResult);
 
         if (!dryRun && (importResult.created > 0 || importResult.updated > 0)) {
-          invalidateCache();
+          await invalidateCrmCache();
           onSuccess?.();
         }
       } catch (err) {
@@ -101,7 +89,7 @@ export default function ImportCsvModal({
         setLoading(false);
       }
     },
-    [file, entityType, invalidateCache, onSuccess]
+    [entityType, file, invalidateCrmCache, onSuccess]
   );
 
   const formatFileSize = (bytes: number): string => {

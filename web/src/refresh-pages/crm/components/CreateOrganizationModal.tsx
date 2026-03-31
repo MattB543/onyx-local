@@ -7,6 +7,7 @@ import {
   createCrmOrganization,
   CrmOrganizationType,
 } from "@/app/app/crm/crmService";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import Button from "@/refresh-components/buttons/Button";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
@@ -56,6 +57,8 @@ export default function CreateOrganizationModal({
   onOpenChange,
   onSuccess,
 }: CreateOrganizationModalProps) {
+  const invalidateCrmCache = useInvalidateCrmCache();
+
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
       <Modal.Content width="md-sm" height="fit">
@@ -86,6 +89,7 @@ export default function CreateOrganizationModal({
                 size: optionalText(values.size),
                 notes: optionalText(values.notes),
               });
+              await invalidateCrmCache();
               onSuccess();
               onOpenChange(false);
             } catch {

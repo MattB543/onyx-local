@@ -12,6 +12,7 @@ import {
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { toast } from "@/hooks/useToast";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
@@ -33,6 +34,7 @@ import {
   formatCrmLabel,
   optionalText,
 } from "@/refresh-pages/crm/crmOptions";
+import OrganizationPicker from "@/refresh-pages/crm/components/OrganizationPicker";
 
 import { SvgUser } from "@opal/icons";
 
@@ -49,12 +51,15 @@ interface ContactCreateValues {
   notes: string;
   linkedin_url: string;
   location: string;
+  organization_id: string;
+  organization_name: string;
 }
 
 interface CreateContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId?: string;
+  organizationName?: string;
   onSuccess: () => void;
 }
 
@@ -62,10 +67,12 @@ export default function CreateContactModal({
   open,
   onOpenChange,
   organizationId,
+  organizationName,
   onSuccess,
 }: CreateContactModalProps) {
   const { user } = useUser();
   const { crmSettings } = useCrmSettings();
+  const invalidateCrmCache = useInvalidateCrmCache();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [pendingProfilePictureFile, setPendingProfilePictureFile] =
     useState<File | null>(null);
@@ -143,9 +150,18 @@ export default function CreateContactModal({
             notes: "",
             linkedin_url: "",
             location: "",
+            organization_id: organizationId ?? "",
+            organization_name: organizationName ?? "",
           }}
           validationSchema={contactValidationSchema}
           onSubmit={async (values, { setStatus }) => {
+            if (values.organization_name.trim() && !values.organization_id) {
+              setStatus(
+                "Choose a valid organization from the list or clear the organization field."
+              );
+              return;
+            }
+
             try {
               const createdContact = await createCrmContact({
                 first_name: values.first_name.trim(),
@@ -160,7 +176,7 @@ export default function CreateContactModal({
                 notes: optionalText(values.notes),
                 linkedin_url: optionalText(values.linkedin_url),
                 location: optionalText(values.location),
-                organization_id: organizationId,
+                organization_id: values.organization_id || undefined,
               });
               if (pendingProfilePictureFile) {
                 try {
@@ -178,6 +194,7 @@ export default function CreateContactModal({
                   );
                 }
               }
+              await invalidateCrmCache();
               onSuccess();
               onOpenChange(false);
             } catch {
@@ -228,6 +245,30 @@ export default function CreateContactModal({
                       placeholder="Title (e.g. VP of Engineering)"
                     />
                     <InputTypeInField name="location" placeholder="Location" />
+                    <OrganizationPicker
+                      selectedOrganizationId={values.organization_id || null}
+                      inputValue={values.organization_name}
+                      onInputChange={(nextOrganizationName) => {
+                        setFieldValue("organization_name", nextOrganizationName);
+                        if (values.organization_id) {
+                          setFieldValue("organization_id", "");
+                        }
+                      }}
+                      onOrganizationChange={(
+                        nextOrganizationId,
+                        nextOrganizationName
+                      ) => {
+                        setFieldValue(
+                          "organization_id",
+                          nextOrganizationId || ""
+                        );
+                        setFieldValue(
+                          "organization_name",
+                          nextOrganizationName
+                        );
+                      }}
+                      placeholder="Organization"
+                    />
                     <InputTypeInField
                       name="linkedin_url"
                       placeholder="LinkedIn URL"

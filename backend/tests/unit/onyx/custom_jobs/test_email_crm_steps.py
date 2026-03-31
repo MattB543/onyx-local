@@ -273,6 +273,10 @@ def test_build_prompt_instructs_update_before_create_when_record_exists() -> Non
     )
     assert "Always search before creating to avoid duplicates." in prompt
     assert "Sender email (for CRM lookup): alice@example.com" in prompt
+    assert "try multiple search terms" in prompt
+    assert "email domain" in prompt
+    assert "only use `contact_id` values from contacts you have" in prompt
+    assert "Do NOT pass raw email addresses" in prompt
 
 
 def test_process_email_crm_success_uses_context_db_session_and_legacy_fallbacks() -> None:

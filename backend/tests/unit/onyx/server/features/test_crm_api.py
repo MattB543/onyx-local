@@ -1,6 +1,10 @@
 from datetime import datetime
 from datetime import timezone
+from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from types import SimpleNamespace
+from unittest.mock import call
 from unittest.mock import MagicMock
 from unittest.mock import patch
 from uuid import uuid4
@@ -9,18 +13,38 @@ import pytest
 
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
+from onyx.configs.constants import FileOrigin
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
-from onyx.configs.constants import FileOrigin
-from onyx.server.features.crm.api import delete_contact_profile_picture
+from onyx.server.features.crm.api import current_admin_user
+from onyx.server.features.crm.api import current_user
+from onyx.server.features.crm.api import _delete_file_best_effort
 from onyx.server.features.crm.api import _serialize_interaction
+from onyx.server.features.crm.api import delete_contact_profile_picture
+from onyx.server.features.crm.api import delete_crm_contact
+from onyx.server.features.crm.api import delete_crm_interaction
+from onyx.server.features.crm.api import delete_crm_organization
 from onyx.server.features.crm.api import get_contacts
+from onyx.server.features.crm.api import get_session
 from onyx.server.features.crm.api import post_contact
 from onyx.server.features.crm.api import post_interaction
+from onyx.server.features.crm.api import router
+from onyx.server.features.crm.api import upload_contact_profile_picture
 from onyx.server.features.crm.models import CrmContactCreateRequest
 from onyx.server.features.crm.models import CrmContactSnapshot
 from onyx.server.features.crm.models import CrmInteractionCreateRequest
-from onyx.server.features.crm.api import upload_contact_profile_picture
+
+
+def _build_crm_test_client(
+    *,
+    override_admin_user,  # noqa: ANN001
+) -> TestClient:
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_session] = lambda: MagicMock()
+    app.dependency_overrides[current_user] = lambda: SimpleNamespace(id=uuid4())
+    app.dependency_overrides[current_admin_user] = override_admin_user
+    return TestClient(app, raise_server_exceptions=False)
 
 
 def test_post_contact_defaults_owner_and_uses_workspace_default_stage() -> None:
@@ -210,7 +234,7 @@ def test_upload_contact_profile_picture_updates_contact() -> None:
         file=MagicMock(),
         filename="avatar.png",
     )
-    contact = SimpleNamespace(id=contact_id)
+    contact = SimpleNamespace(id=contact_id, profile_picture_file_id=None)
 
     with (
         patch(
@@ -243,6 +267,91 @@ def test_upload_contact_profile_picture_updates_contact() -> None:
     )
 
 
+def test_upload_contact_profile_picture_replaces_existing_blob() -> None:
+    contact_id = uuid4()
+    db_session = MagicMock()
+    file_store = MagicMock()
+    file_store.save_file.return_value = "file-456"
+    upload = SimpleNamespace(
+        content_type="image/png",
+        file=MagicMock(),
+        filename="avatar.png",
+    )
+    contact = SimpleNamespace(id=contact_id, profile_picture_file_id="file-123")
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_contact_or_404",
+            return_value=contact,
+        ),
+        patch(
+            "onyx.server.features.crm.api.is_upload_too_large",
+            return_value=False,
+        ),
+        patch(
+            "onyx.server.features.crm.api.get_default_file_store",
+            return_value=file_store,
+        ),
+        patch("onyx.server.features.crm.api.update_contact"),
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
+    ):
+        result = upload_contact_profile_picture(
+            contact_id=contact_id,
+            file=upload,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert result == {"file_id": "file-456"}
+    mock_delete_file.assert_called_once_with("file-123")
+
+
+def test_upload_contact_profile_picture_cleans_up_new_blob_if_update_fails() -> None:
+    contact_id = uuid4()
+    db_session = MagicMock()
+    file_store = MagicMock()
+    file_store.save_file.return_value = "file-456"
+    upload = SimpleNamespace(
+        content_type="image/png",
+        file=MagicMock(),
+        filename="avatar.png",
+    )
+    contact = SimpleNamespace(id=contact_id, profile_picture_file_id="file-123")
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_contact_or_404",
+            return_value=contact,
+        ),
+        patch(
+            "onyx.server.features.crm.api.is_upload_too_large",
+            return_value=False,
+        ),
+        patch(
+            "onyx.server.features.crm.api.get_default_file_store",
+            return_value=file_store,
+        ),
+        patch(
+            "onyx.server.features.crm.api.update_contact",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
+    ):
+        with pytest.raises(RuntimeError, match="boom"):
+            upload_contact_profile_picture(
+                contact_id=contact_id,
+                file=upload,
+                db_session=db_session,
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    mock_delete_file.assert_called_once_with("file-456")
+
+
 def test_upload_contact_profile_picture_normalizes_content_type_and_filename() -> None:
     contact_id = uuid4()
     db_session = MagicMock()
@@ -253,7 +362,7 @@ def test_upload_contact_profile_picture_normalizes_content_type_and_filename() -
         file=MagicMock(),
         filename=None,
     )
-    contact = SimpleNamespace(id=contact_id)
+    contact = SimpleNamespace(id=contact_id, profile_picture_file_id=None)
 
     with (
         patch(
@@ -375,6 +484,9 @@ def test_delete_contact_profile_picture_clears_picture() -> None:
             return_value=contact,
         ),
         patch("onyx.server.features.crm.api.update_contact") as mock_update_contact,
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
     ):
         response = delete_contact_profile_picture(
             contact_id=contact.id,
@@ -388,6 +500,7 @@ def test_delete_contact_profile_picture_clears_picture() -> None:
         contact=contact,
         patches={"profile_picture_file_id": None},
     )
+    mock_delete_file.assert_called_once_with("file-123")
 
 
 def test_delete_contact_profile_picture_without_existing_picture_is_safe() -> None:
@@ -400,6 +513,9 @@ def test_delete_contact_profile_picture_without_existing_picture_is_safe() -> No
             return_value=contact,
         ),
         patch("onyx.server.features.crm.api.update_contact") as mock_update_contact,
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
     ):
         response = delete_contact_profile_picture(
             contact_id=contact.id,
@@ -413,6 +529,194 @@ def test_delete_contact_profile_picture_without_existing_picture_is_safe() -> No
         contact=contact,
         patches={"profile_picture_file_id": None},
     )
+    mock_delete_file.assert_called_once_with(None)
+
+
+def test_delete_crm_contact_deletes_contact_and_blob() -> None:
+    db_session = MagicMock()
+    contact = SimpleNamespace(id=uuid4(), profile_picture_file_id="file-123")
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_contact_or_404",
+            return_value=contact,
+        ),
+        patch("onyx.server.features.crm.api.delete_contact") as mock_delete_contact,
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
+    ):
+        call_order = MagicMock()
+        call_order.attach_mock(mock_delete_contact, "delete_contact")
+        call_order.attach_mock(mock_delete_file, "delete_file")
+        response = delete_crm_contact(
+            contact_id=contact.id,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert response.status_code == 204
+    mock_delete_contact.assert_called_once_with(db_session=db_session, contact=contact)
+    mock_delete_file.assert_called_once_with("file-123")
+    assert call_order.mock_calls == [
+        call.delete_contact(db_session=db_session, contact=contact),
+        call.delete_file("file-123"),
+    ]
+
+
+def test_delete_crm_contact_without_profile_picture_is_safe() -> None:
+    db_session = MagicMock()
+    contact = SimpleNamespace(id=uuid4(), profile_picture_file_id=None)
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_contact_or_404",
+            return_value=contact,
+        ),
+        patch("onyx.server.features.crm.api.delete_contact") as mock_delete_contact,
+        patch(
+            "onyx.server.features.crm.api._delete_file_best_effort"
+        ) as mock_delete_file,
+    ):
+        response = delete_crm_contact(
+            contact_id=contact.id,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert response.status_code == 204
+    mock_delete_contact.assert_called_once_with(db_session=db_session, contact=contact)
+    mock_delete_file.assert_called_once_with(None)
+
+
+def test_delete_crm_organization_deletes_organization() -> None:
+    db_session = MagicMock()
+    organization = SimpleNamespace(id=uuid4())
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_organization_or_404",
+            return_value=organization,
+        ),
+        patch(
+            "onyx.server.features.crm.api.delete_organization"
+        ) as mock_delete_organization,
+    ):
+        response = delete_crm_organization(
+            organization_id=organization.id,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert response.status_code == 204
+    mock_delete_organization.assert_called_once_with(
+        db_session=db_session,
+        organization=organization,
+    )
+
+
+def test_delete_crm_interaction_deletes_interaction() -> None:
+    db_session = MagicMock()
+    interaction = SimpleNamespace(id=uuid4())
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_interaction_or_404",
+            return_value=interaction,
+        ),
+        patch("onyx.server.features.crm.api.delete_interaction") as mock_delete_interaction,
+    ):
+        response = delete_crm_interaction(
+            interaction_id=interaction.id,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert response.status_code == 204
+    mock_delete_interaction.assert_called_once_with(
+        db_session=db_session,
+        interaction=interaction,
+    )
+
+
+def test_delete_crm_contact_missing_contact_raises_not_found() -> None:
+    not_found = OnyxError(OnyxErrorCode.NOT_FOUND, "CRM contact not found.")
+
+    with patch(
+        "onyx.server.features.crm.api._load_contact_or_404",
+        side_effect=not_found,
+    ):
+        with pytest.raises(OnyxError) as exc:
+            delete_crm_contact(
+                contact_id=uuid4(),
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.status_code == 404
+
+
+def test_delete_crm_organization_missing_organization_raises_not_found() -> None:
+    not_found = OnyxError(OnyxErrorCode.NOT_FOUND, "CRM organization not found.")
+
+    with patch(
+        "onyx.server.features.crm.api._load_organization_or_404",
+        side_effect=not_found,
+    ):
+        with pytest.raises(OnyxError) as exc:
+            delete_crm_organization(
+                organization_id=uuid4(),
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.status_code == 404
+
+
+def test_delete_crm_interaction_missing_interaction_raises_not_found() -> None:
+    not_found = OnyxError(OnyxErrorCode.NOT_FOUND, "CRM interaction not found.")
+
+    with patch(
+        "onyx.server.features.crm.api._load_interaction_or_404",
+        side_effect=not_found,
+    ):
+        with pytest.raises(OnyxError) as exc:
+            delete_crm_interaction(
+                interaction_id=uuid4(),
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.status_code == 404
+
+
+def test_delete_file_best_effort_noops_on_missing_file_id() -> None:
+    with patch(
+        "onyx.server.features.crm.api.get_default_file_store"
+    ) as mock_get_default_file_store:
+        _delete_file_best_effort(None)
+
+    mock_get_default_file_store.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        f"/user/crm/contacts/{uuid4()}",
+        f"/user/crm/organizations/{uuid4()}",
+        f"/user/crm/interactions/{uuid4()}",
+    ],
+)
+def test_delete_routes_require_admin_user(path: str) -> None:
+    client = _build_crm_test_client(
+        override_admin_user=lambda: (_ for _ in ()).throw(
+            HTTPException(status_code=403, detail="Admin only")
+        )
+    )
+
+    response = client.delete(path)
+
+    assert response.status_code == 403
 
 
 def test_post_interaction_omitted_attendees_adds_actor_and_primary_contact() -> None:

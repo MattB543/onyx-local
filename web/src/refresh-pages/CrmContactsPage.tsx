@@ -8,6 +8,7 @@ import { CrmContactStage, exportCrmContacts } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
+import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
@@ -93,6 +94,10 @@ export default function CrmContactsPage() {
     pageNum: 0,
     pageSize: 150,
   });
+  const selectedOrganizationId = organizationIdFilter ?? orgFilterId;
+  const { organization: selectedOrganization } = useCrmOrganization(
+    selectedOrganizationId ?? null
+  );
   const orgNameById = useMemo(
     () => new Map(orgLookup.map((o) => [o.id, o.name])),
     [orgLookup]
@@ -390,7 +395,13 @@ export default function CrmContactsPage() {
       <CreateContactModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        organizationId={organizationIdFilter}
+        organizationId={selectedOrganizationId}
+        organizationName={
+          selectedOrganizationId
+            ? orgNameById.get(selectedOrganizationId) ||
+              selectedOrganization?.name
+            : undefined
+        }
         onSuccess={() => {
           setPageNum(0);
           void refreshContacts();

@@ -60,22 +60,31 @@ Perform the following workflow using the available CRM tools:
    - Do not overwrite strong existing data with weak guesses.
 6. If no matching contact exists, create one with the best clearly supported
    information available.
-7. Search for the relevant external organization(s) by company name, website,
-   or email domain, using `crm_get` or `crm_list` if needed for context.
+7. Search for the relevant external organization(s). An abbreviation or short
+   name alone may not match; try multiple search terms:
+   - The full company name and any abbreviations or acronyms.
+   - The email domain (e.g., search for "flf.org" if the contact's email is
+     ben@flf.org).
+   - The website if mentioned in the email.
+   Use `crm_get` or `crm_list` if you need full details or context on a
+   candidate match before deciding.
 8. If a relevant organization already exists, update it with reliable net-new
    information from the email when appropriate. If it does not exist, create it.
 9. Log this email as an interaction/activity. Use `interaction_type` "email"
    or "note" as appropriate, and set `occurred_at` to the email date so the
    interaction is recorded at the correct time. Include the key relationship
    context from the email body, any action items, and link it to the best
-   matching contact and organization. Include attendees when useful.
+   matching contact and organization.
+   - For attendees, only use `contact_id` values from contacts you have
+     already found or created in the CRM. Do NOT pass raw email addresses or
+     names as attendees — unresolvable attendees can block the interaction
+     from being saved.
 
 IMPORTANT:
 - Do NOT create or update contacts/organizations for internal domains. These
   are team members, not CRM leads.
 - Internal teammates may appear in the headers or body and can still be useful
-  as context or attendees, but they should not become CRM contacts or
-  organizations.
+  as context, but they should not become CRM contacts or organizations.
 - DO extract as much information as possible about relevant external people and
   organizations from the email body (names, phone numbers, titles, company
   names, websites, locations, and relationship context).

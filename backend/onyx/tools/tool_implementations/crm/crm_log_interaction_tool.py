@@ -568,33 +568,10 @@ class CrmLogInteractionTool(Tool[None]):
                     if key not in deduped_attendees:
                         deduped_attendees[key] = CrmAttendeeRole.ATTENDEE
 
-            if needs_confirmation:
-                payload = {
-                    "status": "needs_confirmation",
-                    "message": "Some attendees could not be uniquely resolved.",
-                    "needs_confirmation": needs_confirmation,
-                    "resolved_attendees": [
-                        {
-                            "user_id": str(user_id) if user_id else None,
-                            "contact_id": str(attendee_contact_id) if attendee_contact_id else None,
-                            "role": role.value,
-                        }
-                        for (user_id, attendee_contact_id), role in deduped_attendees.items()
-                    ],
-                }
-                compact_payload = compact_tool_payload_for_model(payload)
-                self.emitter.emit(
-                    Packet(
-                        placement=placement,
-                        obj=CrmLogInteractionToolDelta(payload=compact_payload),
-                    )
-                )
-                rich_response = json.dumps(payload, default=str)
-                llm_response = as_llm_json(compact_payload, already_compacted=True)
-                return ToolResponse(
-                    rich_response=rich_response,
-                    llm_facing_response=llm_response,
-                )
+            # Proceed with creating the interaction even when some attendees
+            # could not be resolved. Unresolved attendees are reported in the
+            # response as a warning so the caller can decide whether to follow
+            # up separately and update the interaction with additional attendees.
 
             interaction = create_interaction(
                 db_session=db_session,
@@ -632,6 +609,8 @@ class CrmLogInteractionTool(Tool[None]):
             }
             if resolution_details:
                 payload["attendee_resolution"] = resolution_details
+            if needs_confirmation:
+                payload["unresolved_attendees"] = needs_confirmation
 
         compact_payload = compact_tool_payload_for_model(payload)
         self.emitter.emit(

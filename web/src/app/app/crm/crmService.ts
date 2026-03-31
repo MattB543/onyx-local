@@ -336,6 +336,13 @@ export async function deleteContactProfilePicture(
   );
 }
 
+export async function deleteCrmContact(contactId: string): Promise<void> {
+  await deleteNoContent(
+    `/api/user/crm/contacts/${contactId}`,
+    "Delete CRM contact"
+  );
+}
+
 export async function listCrmOrganizations(args?: {
   q?: string;
   type?: CrmOrganizationType;
@@ -386,9 +393,19 @@ export async function patchCrmOrganization(
   );
 }
 
+export async function deleteCrmOrganization(
+  organizationId: string
+): Promise<void> {
+  await deleteNoContent(
+    `/api/user/crm/organizations/${organizationId}`,
+    "Delete CRM organization"
+  );
+}
+
 export async function listCrmInteractions(args?: {
   contact_id?: string;
   organization_id?: string;
+  include_contact_interactions?: boolean;
   interaction_type?: CrmInteractionType;
   page_num?: number;
   page_size?: number;
@@ -396,6 +413,7 @@ export async function listCrmInteractions(args?: {
   const path = withQueryParams("/api/user/crm/interactions", {
     contact_id: args?.contact_id,
     organization_id: args?.organization_id,
+    include_contact_interactions: args?.include_contact_interactions || undefined,
     interaction_type: args?.interaction_type,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
@@ -416,6 +434,15 @@ export async function createCrmInteraction(
     }
 ): Promise<CrmInteraction> {
   return postJson("/api/user/crm/interactions", body, "Create CRM interaction");
+}
+
+export async function deleteCrmInteraction(
+  interactionId: string
+): Promise<void> {
+  await deleteNoContent(
+    `/api/user/crm/interactions/${interactionId}`,
+    "Delete CRM interaction"
+  );
 }
 
 export async function listCrmTags(args?: {

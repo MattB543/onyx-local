@@ -24,6 +24,9 @@ from onyx.db.crm import create_contact
 from onyx.db.crm import create_interaction
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
+from onyx.db.crm import delete_contact
+from onyx.db.crm import delete_interaction
+from onyx.db.crm import delete_organization
 from onyx.db.crm import ensure_tags_exist
 from onyx.db.crm import export_all_contacts
 from onyx.db.crm import export_all_interactions
@@ -32,6 +35,7 @@ from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
+from onyx.db.crm import get_interaction_by_id
 from onyx.db.crm import get_interaction_attendees
 from onyx.db.crm import get_or_create_crm_settings
 from onyx.db.crm import get_organization_by_id
@@ -122,6 +126,23 @@ def _load_tag_or_404(tag_id: UUID, db_session: Session):
     if tag is None:
         raise OnyxError(OnyxErrorCode.NOT_FOUND, "CRM tag not found.")
     return tag
+
+
+def _load_interaction_or_404(interaction_id: UUID, db_session: Session):
+    interaction = get_interaction_by_id(interaction_id, db_session)
+    if interaction is None:
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "CRM interaction not found.")
+    return interaction
+
+
+def _delete_file_best_effort(file_id: str | None) -> None:
+    if not file_id:
+        return
+
+    try:
+        get_default_file_store().delete_file(file_id)
+    except Exception:
+        logger.exception("Failed to delete CRM file: %s", file_id)
 
 
 def _serialize_contact(contact, db_session: Session) -> CrmContactSnapshot:
@@ -490,11 +511,21 @@ def upload_contact_profile_picture(
         file_origin=FileOrigin.CRM_UPLOAD,
         file_type=content_type,
     )
-    update_contact(
-        db_session=db_session,
-        contact=contact,
-        patches={"profile_picture_file_id": file_id},
-    )
+    previous_file_id = contact.profile_picture_file_id
+
+    try:
+        update_contact(
+            db_session=db_session,
+            contact=contact,
+            patches={"profile_picture_file_id": file_id},
+        )
+    except Exception:
+        _delete_file_best_effort(file_id)
+        raise
+
+    if previous_file_id and previous_file_id != file_id:
+        _delete_file_best_effort(previous_file_id)
+
     return {"file_id": file_id}
 
 
@@ -505,11 +536,26 @@ def delete_contact_profile_picture(
     _user: User = Depends(current_user),
 ) -> Response:
     contact = _load_contact_or_404(contact_id, db_session)
+    previous_file_id = contact.profile_picture_file_id
     update_contact(
         db_session=db_session,
         contact=contact,
         patches={"profile_picture_file_id": None},
     )
+    _delete_file_best_effort(previous_file_id)
+    return Response(status_code=204)
+
+
+@router.delete("/contacts/{contact_id}")
+def delete_crm_contact(
+    contact_id: UUID,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_admin_user),
+) -> Response:
+    contact = _load_contact_or_404(contact_id, db_session)
+    previous_file_id = contact.profile_picture_file_id
+    delete_contact(db_session=db_session, contact=contact)
+    _delete_file_best_effort(previous_file_id)
     return Response(status_code=204)
 
 
@@ -614,10 +660,22 @@ def patch_organization(
     return _serialize_organization(updated_organization, db_session)
 
 
+@router.delete("/organizations/{organization_id}")
+def delete_crm_organization(
+    organization_id: UUID,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_admin_user),
+) -> Response:
+    organization = _load_organization_or_404(organization_id, db_session)
+    delete_organization(db_session=db_session, organization=organization)
+    return Response(status_code=204)
+
+
 @router.get("/interactions")
 def get_interactions(
     contact_id: UUID | None = Query(None),
     organization_id: UUID | None = Query(None),
+    include_contact_interactions: bool = Query(False),
     interaction_type: CrmInteractionType | None = Query(None),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
@@ -630,6 +688,7 @@ def get_interactions(
         page_size=page_size,
         contact_id=contact_id,
         organization_id=organization_id,
+        include_contact_interactions=include_contact_interactions,
         interaction_type=interaction_type,
     )
 
@@ -730,6 +789,17 @@ def post_interaction(
         )
 
     return _serialize_interaction(interaction, db_session)
+
+
+@router.delete("/interactions/{interaction_id}")
+def delete_crm_interaction(
+    interaction_id: UUID,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_admin_user),
+) -> Response:
+    interaction = _load_interaction_or_404(interaction_id, db_session)
+    delete_interaction(db_session=db_session, interaction=interaction)
+    return Response(status_code=204)
 
 
 @router.get("/tags")

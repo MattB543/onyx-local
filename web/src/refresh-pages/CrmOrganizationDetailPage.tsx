@@ -7,20 +7,28 @@ import { useMemo, useState } from "react";
 import * as Yup from "yup";
 
 import {
+  CrmInteraction,
   CrmOrganizationType,
+  deleteCrmInteraction,
+  deleteCrmOrganization,
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
+import { toast } from "@/hooks/useToast";
 import * as AppLayouts from "@/layouts/app-layouts";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
+import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
+import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
+import ConfirmationModalLayout from "@/refresh-components/layouts/ConfirmationModalLayout";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/refresh-pages/crm/components/ActivityTimeline";
 import CrmBreadcrumbs from "@/refresh-pages/crm/components/CrmBreadcrumbs";
@@ -32,7 +40,9 @@ import TagManager from "@/refresh-pages/crm/components/TagManager";
 import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 
-import { SvgEdit, SvgOrganization } from "@opal/icons";
+import { Disabled } from "@opal/core";
+import { Button as OpalButton } from "@opal/components";
+import { SvgEdit, SvgOrganization, SvgTrash } from "@opal/icons";
 
 const ORGANIZATION_TYPES: CrmOrganizationType[] = [
   "customer",
@@ -77,8 +87,15 @@ export default function CrmOrganizationDetailPage({
   organizationId,
 }: CrmOrganizationDetailPageProps) {
   const router = useRouter();
+  const { isAdmin } = useUser();
+  const invalidateCrmCache = useInvalidateCrmCache();
   const [isEditing, setIsEditing] = useState(false);
   const [logInteractionModalOpen, setLogInteractionModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
+  const [interactionToDelete, setInteractionToDelete] =
+    useState<CrmInteraction | null>(null);
+  const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
     INTERACTION_PAGE_SIZE
   );
@@ -93,6 +110,7 @@ export default function CrmOrganizationDetailPage({
     refreshInteractions,
   } = useCrmInteractions({
     organizationId,
+    includeContactInteractions: true,
     pageNum: 0,
     pageSize: interactionPageSize,
   });
@@ -113,6 +131,47 @@ export default function CrmOrganizationDetailPage({
     ],
     [organization?.name]
   );
+
+  async function handleDeleteOrganization() {
+    if (!organization || isDeletingOrganization) {
+      return;
+    }
+
+    setIsDeletingOrganization(true);
+    try {
+      await deleteCrmOrganization(organization.id);
+      await invalidateCrmCache();
+      toast.success("Organization deleted.");
+      setDeleteModalOpen(false);
+      router.push("/app/crm/organizations");
+    } catch (error) {
+      console.error("Failed to delete CRM organization:", error);
+      toast.error("Failed to delete organization.");
+    } finally {
+      setIsDeletingOrganization(false);
+    }
+  }
+
+  async function handleDeleteInteraction() {
+    if (!interactionToDelete || isDeletingInteraction) {
+      return;
+    }
+
+    setIsDeletingInteraction(true);
+    try {
+      await deleteCrmInteraction(interactionToDelete.id);
+      await invalidateCrmCache();
+      void refreshInteractions();
+      void refreshOrganization();
+      toast.success("Interaction deleted.");
+      setInteractionToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete CRM interaction:", error);
+      toast.error("Failed to delete interaction.");
+    } finally {
+      setIsDeletingInteraction(false);
+    }
+  }
 
   return (
     <AppLayouts.Root>
@@ -146,15 +205,26 @@ export default function CrmOrganizationDetailPage({
                   Cancel Edit
                 </Button>
               ) : (
-                <Button
-                  action
-                  primary
-                  type="button"
-                  leftIcon={SvgEdit}
-                  onClick={() => setIsEditing(true)}
-                >
-                  Edit
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <IconButton
+                      main
+                      tertiary
+                      icon={SvgTrash}
+                      tooltip="Delete organization"
+                      onClick={() => setDeleteModalOpen(true)}
+                    />
+                  )}
+                  <Button
+                    action
+                    primary
+                    type="button"
+                    leftIcon={SvgEdit}
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Edit
+                  </Button>
+                </div>
               ))
             }
           />
@@ -208,7 +278,7 @@ export default function CrmOrganizationDetailPage({
                 </div>
               </Card>
 
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                 <div className="flex min-w-0 flex-[12] flex-col gap-4">
                   {isEditing ? (
                     <Card
@@ -242,6 +312,7 @@ export default function CrmOrganizationDetailPage({
                               size: optionalText(values.size),
                               notes: optionalText(values.notes),
                             });
+                            await invalidateCrmCache();
                             await refreshOrganization();
                             setIsEditing(false);
                           } catch {
@@ -393,7 +464,10 @@ export default function CrmOrganizationDetailPage({
                       </Formik>
                     </Card>
                   ) : (
-                    <Card variant="secondary" className="h-full gap-3 [&>div]:items-stretch">
+                    <Card
+                      variant="secondary"
+                      className="gap-3 [&>div]:items-stretch"
+                    >
                       <Text as="p" mainUiAction text02>
                         Details
                       </Text>
@@ -542,6 +616,10 @@ export default function CrmOrganizationDetailPage({
                         interactions={interactions}
                         isLoading={interactionsLoading}
                         hasMore={hasMoreInteractions}
+                        canDeleteInteractions={isAdmin}
+                        onDeleteInteraction={(interaction) => {
+                          setInteractionToDelete(interaction);
+                        }}
                         onLoadMore={() =>
                           setInteractionPageSize(
                             (value) => value + INTERACTION_PAGE_SIZE
@@ -569,6 +647,63 @@ export default function CrmOrganizationDetailPage({
           void refreshOrganization();
         }}
       />
+
+      {deleteModalOpen && organization && (
+        <ConfirmationModalLayout
+          icon={SvgTrash}
+          title="Delete Organization"
+          onClose={
+            isDeletingOrganization ? undefined : () => setDeleteModalOpen(false)
+          }
+          submit={
+            <Disabled disabled={isDeletingOrganization}>
+              <OpalButton
+                variant="danger"
+                onClick={() => void handleDeleteOrganization()}
+              >
+                {isDeletingOrganization ? "Deleting..." : "Delete Organization"}
+              </OpalButton>
+            </Disabled>
+          }
+        >
+          <Text as="p" text03>
+            Delete{" "}
+            <Text as="span" text05>
+              {organization.name}
+            </Text>
+            ? This action cannot be undone. Linked contacts and interactions
+            will remain, but their organization link will be cleared.
+          </Text>
+        </ConfirmationModalLayout>
+      )}
+
+      {interactionToDelete && (
+        <ConfirmationModalLayout
+          icon={SvgTrash}
+          title="Delete Interaction"
+          onClose={
+            isDeletingInteraction ? undefined : () => setInteractionToDelete(null)
+          }
+          submit={
+            <Disabled disabled={isDeletingInteraction}>
+              <OpalButton
+                variant="danger"
+                onClick={() => void handleDeleteInteraction()}
+              >
+                {isDeletingInteraction ? "Deleting..." : "Delete Interaction"}
+              </OpalButton>
+            </Disabled>
+          }
+        >
+          <Text as="p" text03>
+            Delete{" "}
+            <Text as="span" text05>
+              {interactionToDelete.title}
+            </Text>
+            ? This action cannot be undone.
+          </Text>
+        </ConfirmationModalLayout>
+      )}
     </AppLayouts.Root>
   );
 }

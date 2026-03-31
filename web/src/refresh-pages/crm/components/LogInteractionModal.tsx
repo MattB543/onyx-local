@@ -11,6 +11,7 @@ import {
 } from "@/app/app/crm/crmService";
 import type { CrmAttendeeRole } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
+import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
@@ -61,6 +62,7 @@ export default function LogInteractionModal({
   onSuccess,
 }: LogInteractionModalProps) {
   const { user } = useUser();
+  const invalidateCrmCache = useInvalidateCrmCache();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [selectedType, setSelectedType] = useState<CrmInteractionType>("note");
   const [contactOptions, setContactOptions] = useState<
@@ -186,6 +188,7 @@ export default function LogInteractionModal({
                 occurred_at: new Date().toISOString(),
                 attendees,
               });
+              await invalidateCrmCache();
               resetForm();
               onSuccess();
               onOpenChange(false);

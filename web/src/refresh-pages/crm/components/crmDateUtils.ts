@@ -25,6 +25,38 @@ export function formatRelativeDate(value: string | null | undefined): string {
 }
 
 /**
+ * Format a date string as a short date + time (e.g., "Today, 2:30 PM" or "Mar 10, 2025, 2:30 PM").
+ */
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.floor(
+    (today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const time = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (diffDays === 0) return `Today, ${time}`;
+  if (diffDays === 1) return `Yesterday, ${time}`;
+
+  const dateStr = date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${dateStr}, ${time}`;
+}
+
+/**
  * Format a date string as a time (e.g., "2:30 PM").
  */
 export function formatTime(value: string | null | undefined): string {

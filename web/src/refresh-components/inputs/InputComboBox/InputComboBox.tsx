@@ -211,6 +211,7 @@ const InputComboBox = ({
     value,
     options,
     strict,
+    isOpen,
     externalIsError,
     onValidationError,
   });

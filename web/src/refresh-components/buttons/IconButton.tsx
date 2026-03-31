@@ -368,6 +368,7 @@ export default function IconButton({
   const buttonElement = (
     <button
       type="button"
+      aria-label={props["aria-label"] ?? tooltip}
       className={cn(
         "flex items-center justify-center h-fit w-fit group/IconButton",
         small || internal ? "p-1" : "p-2",

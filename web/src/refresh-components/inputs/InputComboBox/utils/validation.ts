@@ -5,6 +5,7 @@ interface UseValidationProps {
   value: string;
   options: ComboBoxOption[];
   strict: boolean;
+  isOpen?: boolean;
   externalIsError?: boolean;
   onValidationError?: (errorMessage: string | null) => void;
 }
@@ -24,6 +25,7 @@ export function useValidation({
   value,
   options,
   strict,
+  isOpen,
   externalIsError,
   onValidationError,
 }: UseValidationProps): ValidationResult {
@@ -34,6 +36,11 @@ export function useValidation({
     // If external error is provided, use it
     if (externalIsError !== undefined) {
       return { isValid: !externalIsError, errorMessage: null };
+    }
+
+    // Skip strict validation while the user is still interacting with the dropdown
+    if (isOpen) {
+      return { isValid: true, errorMessage: null };
     }
 
     // Otherwise use internal validation
@@ -52,7 +59,7 @@ export function useValidation({
     }
 
     return { isValid: true, errorMessage: null };
-  }, [externalIsError, strict, hasOptions, value, options]);
+  }, [externalIsError, isOpen, strict, hasOptions, value, options]);
 
   // Notify parent of error state
   useEffect(() => {

@@ -566,6 +566,19 @@ def update_contact(
     return contact, changed
 
 
+def delete_contact(
+    db_session: Session,
+    *,
+    contact: CrmContact,
+    commit: bool = True,
+) -> None:
+    db_session.delete(contact)
+    if commit:
+        db_session.commit()
+    else:
+        db_session.flush()
+
+
 def get_organization_by_id(
     organization_id: UUID, db_session: Session
 ) -> CrmOrganization | None:
@@ -753,6 +766,19 @@ def update_organization(
     return organization, changed
 
 
+def delete_organization(
+    db_session: Session,
+    *,
+    organization: CrmOrganization,
+    commit: bool = True,
+) -> None:
+    db_session.delete(organization)
+    if commit:
+        db_session.commit()
+    else:
+        db_session.flush()
+
+
 def list_interactions(
     db_session: Session,
     *,
@@ -760,6 +786,7 @@ def list_interactions(
     page_size: int,
     contact_id: UUID | None = None,
     organization_id: UUID | None = None,
+    include_contact_interactions: bool = False,
     interaction_type: CrmInteractionType | None = None,
 ) -> tuple[list[CrmInteraction], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
@@ -768,7 +795,20 @@ def list_interactions(
     if contact_id:
         stmt = stmt.where(CrmInteraction.contact_id == contact_id)
     if organization_id:
-        stmt = stmt.where(CrmInteraction.organization_id == organization_id)
+        if include_contact_interactions:
+            contact_ids_subq = (
+                select(CrmContact.id)
+                .where(CrmContact.organization_id == organization_id)
+                .scalar_subquery()
+            )
+            stmt = stmt.where(
+                or_(
+                    CrmInteraction.organization_id == organization_id,
+                    CrmInteraction.contact_id.in_(contact_ids_subq),
+                )
+            )
+        else:
+            stmt = stmt.where(CrmInteraction.organization_id == organization_id)
     if interaction_type is not None:
         stmt = stmt.where(CrmInteraction.type == interaction_type)
 
@@ -822,6 +862,19 @@ def create_interaction(
     db_session.refresh(interaction)
 
     return interaction
+
+
+def delete_interaction(
+    db_session: Session,
+    *,
+    interaction: CrmInteraction,
+    commit: bool = True,
+) -> None:
+    db_session.delete(interaction)
+    if commit:
+        db_session.commit()
+    else:
+        db_session.flush()
 
 
 def get_interaction_attendees(
