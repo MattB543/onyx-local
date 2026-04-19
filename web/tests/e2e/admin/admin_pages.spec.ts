@@ -32,10 +32,6 @@ const ADMIN_PAGES: AdminPageSnapshot[] = [
     name: "Custom Agents - Agents",
     path: "agents",
     pageTitle: "Agents",
-    options: {
-      paragraphText:
-        "Agents are a way to build custom search/question-answering experiences for different use cases.",
-    },
   },
   {
     name: "Configuration - Document Processing",
@@ -88,7 +84,7 @@ const ADMIN_PAGES: AdminPageSnapshot[] = [
   {
     name: "User Management - Groups",
     path: "groups",
-    pageTitle: "Manage User Groups",
+    pageTitle: "Groups",
   },
   {
     name: "Appearance & Theming",
@@ -187,7 +183,10 @@ for (const theme of THEMES) {
           /\//g,
           "-"
         )}`;
-        await expectScreenshot(page, { name: screenshotName });
+        await expectScreenshot(page, {
+          name: screenshotName,
+          mask: ['[data-testid="admin-date-range-selector-button"]'],
+        });
       });
     }
   });
