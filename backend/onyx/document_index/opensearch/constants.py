@@ -53,6 +53,17 @@ DEFAULT_NUM_HYBRID_SUBQUERY_CANDIDATES = int(
 EF_SEARCH = DEFAULT_NUM_HYBRID_SUBQUERY_CANDIDATES
 
 
+class OpenSearchSearchType(str, Enum):
+    """Search type label used for Prometheus metrics."""
+
+    HYBRID = "hybrid"
+    KEYWORD = "keyword"
+    SEMANTIC = "semantic"
+    RANDOM = "random"
+    DOC_ID_RETRIEVAL = "doc_id_retrieval"
+    UNKNOWN = "unknown"
+
+
 class HybridSearchSubqueryConfiguration(Enum):
     TITLE_VECTOR_CONTENT_VECTOR_TITLE_CONTENT_COMBINED_KEYWORD = 1
     # Current default.

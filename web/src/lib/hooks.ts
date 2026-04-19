@@ -605,13 +605,16 @@ export function getValidLlmDescriptorForProviders(
     // This ensures we don't incorrectly match a model to the wrong provider
     // when the same model name exists across multiple providers (e.g., gpt-5 in Azure and OpenAI)
     if (model.provider && model.provider.length > 0) {
-      const matchingProvider = llmProviders.find(
-        (p) =>
-          p.provider === model.provider &&
-          p.model_configurations
-            .map((modelConfiguration) => modelConfiguration.name)
-            .includes(model.modelName)
+      const hasModel = (p: LLMProviderDescriptor) =>
+        p.model_configurations.some((mc) => mc.name === model.modelName);
+      const typeMatches = llmProviders.filter(
+        (p) => p.provider === model.provider && hasModel(p)
       );
+      // When multiple providers share the same type (e.g., two "anthropic"
+      // providers with different API keys), prefer the one whose name matches
+      // the user's explicit selection to avoid silently switching providers.
+      const matchingProvider =
+        typeMatches.find((p) => p.name === model.name) ?? typeMatches[0];
       if (matchingProvider) {
         return {
           ...model,
@@ -903,28 +906,40 @@ export const useUserGroups = (): {
   refreshUserGroups: () => void;
 } => {
   const combinedSettings = useContext(SettingsContext);
+  const isLoading = combinedSettings?.settingsLoading ?? false;
   const isPaidEnterpriseFeaturesEnabled =
-    combinedSettings && combinedSettings.enterpriseSettings !== null;
+    !isLoading &&
+    combinedSettings &&
+    combinedSettings.enterpriseSettings !== null;
 
   const swrResponse = useSWR<UserGroup[]>(
     isPaidEnterpriseFeaturesEnabled ? USER_GROUP_URL : null,
     errorHandlingFetcher
   );
 
+  const refreshUserGroups = () => mutate(USER_GROUP_URL);
+
+  if (isLoading) {
+    return {
+      data: undefined,
+      isLoading: true,
+      error: "",
+      refreshUserGroups,
+    };
+  }
+
   if (!isPaidEnterpriseFeaturesEnabled) {
     return {
-      ...{
-        data: [],
-        isLoading: false,
-        error: "",
-      },
-      refreshUserGroups: () => {},
+      data: [],
+      isLoading: false,
+      error: "",
+      refreshUserGroups,
     };
   }
 
   return {
     ...swrResponse,
-    refreshUserGroups: () => mutate(USER_GROUP_URL),
+    refreshUserGroups,
   };
 };
 

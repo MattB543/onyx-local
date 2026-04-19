@@ -103,7 +103,7 @@ export const MemoryToolRenderer: MessageRenderer<MemoryToolPacket, Record<string
         <MemoriesModal
           initialTargetMemoryId={memoryId}
           initialTargetIndex={index}
-          highlightFirstOnOpen
+          highlightOnOpen
         />
       </memoriesModal.Provider>
       {memoryText ? (
