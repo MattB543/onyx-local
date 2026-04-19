@@ -12,13 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Text from "@/components/ui/text";
+import { Text } from "@opal/components";
 import Title from "@/components/ui/title";
+import Spacer from "@/refresh-components/Spacer";
 import Button from "@/refresh-components/buttons/Button";
 import { Button as OpalButton } from "@opal/components";
-import { Disabled } from "@opal/core";
 import useSWR from "swr";
-import { useEffect, useRef, useState } from "react";
+import { SWR_KEYS } from "@/lib/swr-keys";
+import React, { useState } from "react";
 import { UsageReport } from "./types";
 import { ThreeDotsLoader } from "@/components/Loading";
 import Link from "next/link";
@@ -98,9 +99,8 @@ function GenerateReportInput({
   return (
     <div className="mb-8">
       <Title className="mb-2">Generate Usage Reports</Title>
-      <Text className="mb-8">
-        Generate usage statistics for users in the workspace.
-      </Text>
+      <Text as="p">Generate usage statistics for users in the workspace.</Text>
+      <Spacer rem={2} />
       <div className="grid gap-2 mb-3">
         <Popover>
           <Popover.Trigger asChild>
@@ -201,15 +201,14 @@ function GenerateReportInput({
           </Popover.Content>
         </Popover>
       </div>
-      <Disabled disabled={isLoading || isWaitingForReport}>
-        <OpalButton
-          color={"blue"}
-          icon={SvgDownloadCloud}
-          onClick={() => requestReport()}
-        >
-          {isWaitingForReport ? "Generating..." : "Generate Report"}
-        </OpalButton>
-      </Disabled>
+      <OpalButton
+        disabled={isLoading || isWaitingForReport}
+        color={"blue"}
+        icon={SvgDownloadCloud}
+        onClick={() => requestReport()}
+      >
+        {isWaitingForReport ? "Generating..." : "Generate Report"}
+      </OpalButton>
       <p className="mt-1 text-xs">
         {isWaitingForReport
           ? "A report is currently being generated. Please wait..."
@@ -225,7 +224,7 @@ function GenerateReportInput({
   );
 }
 
-const USAGE_REPORT_URL = "/api/admin/usage-report";
+const USAGE_REPORT_URL = SWR_KEYS.usageReport;
 
 function UsageReportsTable({
   refreshTrigger,
@@ -252,14 +251,14 @@ function UsageReportsTable({
   });
 
   // Refresh when refreshTrigger changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (refreshTrigger > 0) {
       mutate();
     }
   }, [refreshTrigger, mutate]);
 
   // Detect when a new report appears
-  useEffect(() => {
+  React.useEffect(() => {
     if (usageReportsMetadata && previousReportCount !== null) {
       if (usageReportsMetadata.length > previousReportCount) {
         onNewReportDetected();
@@ -362,7 +361,7 @@ export default function UsageReports() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isWaitingForReport, setIsWaitingForReport] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleReportGenerated = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -395,7 +394,7 @@ export default function UsageReports() {
   };
 
   // Cleanup on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -412,9 +411,9 @@ export default function UsageReports() {
           isWaitingForReport={isWaitingForReport}
         />
         {timeoutMessage && (
-          <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-regular">
+          <div className="mb-4 p-4 bg-status-warning-00 border border-status-warning-02 rounded-regular">
             <div className="flex items-start gap-2">
-              <div className="text-amber-600 dark:text-amber-500 mt-0.5">
+              <div className="text-status-warning-05 mt-0.5">
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -430,12 +429,15 @@ export default function UsageReports() {
                 </svg>
               </div>
               <div className="flex-1">
-                <Text className="text-amber-800 dark:text-amber-200 font-medium mb-1">
-                  Report Generation In Progress
-                </Text>
-                <Text className="text-amber-700 dark:text-amber-300 text-sm">
-                  {timeoutMessage}
-                </Text>
+                <div className="text-status-warning-05">
+                  <Text as="p" font="main-ui-action">
+                    Report Generation In Progress
+                  </Text>
+                </div>
+                <Spacer rem={0.25} />
+                <div className="text-status-warning-05">
+                  <Text as="p">{timeoutMessage}</Text>
+                </div>
               </div>
             </div>
           </div>

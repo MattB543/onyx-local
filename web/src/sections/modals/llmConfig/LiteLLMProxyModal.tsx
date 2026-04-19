@@ -157,8 +157,8 @@ export default function LiteLLMProxyModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -170,8 +170,6 @@ export default function LiteLLMProxyModal({
   const { wellKnownLLMProvider } = useWellKnownLLMProvider(
     LLMProviderName.LITELLM_PROXY
   );
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -190,7 +188,11 @@ export default function LiteLLMProxyModal({
         default_model_name: "",
       } as LiteLLMProxyModalValues)
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         api_key: existingLlmProvider?.api_key ?? "",
         api_base: existingLlmProvider?.api_base ?? DEFAULT_API_BASE,
       };

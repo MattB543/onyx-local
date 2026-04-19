@@ -14,6 +14,7 @@ import {
   submitOnboardingProvider,
 } from "@/sections/modals/llmConfig/svc";
 import {
+  APIKeyField,
   DisplayNameField,
   FieldSeparator,
   ModelsAccessField,
@@ -29,8 +30,8 @@ import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
 import { Button, Card, EmptyMessageCard } from "@opal/components";
-import { Disabled } from "@opal/core";
 import { SvgMinusCircle, SvgPlusCircle } from "@opal/icons";
+import { markdown } from "@opal/utils";
 import { toast } from "@/hooks/useToast";
 import { Content } from "@opal/layouts";
 import { Section } from "@/layouts/general-layouts";
@@ -98,13 +99,12 @@ function ModelConfigurationItem({
         showClearButton={false}
         type="number"
       />
-      <Disabled disabled={!canRemove}>
-        <Button
-          prominence="tertiary"
-          icon={SvgMinusCircle}
-          onClick={onRemove}
-        />
-      </Disabled>
+      <Button
+        disabled={!canRemove}
+        prominence="tertiary"
+        icon={SvgMinusCircle}
+        onClick={onRemove}
+      />
     </>
   );
 }
@@ -166,7 +166,7 @@ function ModelConfigurationList({ formikProps }: ModelConfigurationListProps) {
           ))}
         </div>
       ) : (
-        <EmptyMessageCard title="No models added yet." />
+        <EmptyMessageCard title="No models added yet." padding="sm" />
       )}
 
       <Button
@@ -183,20 +183,22 @@ function ModelConfigurationList({ formikProps }: ModelConfigurationListProps) {
 
 // ─── Custom Config Processing ─────────────────────────────────────────────────
 
-function customConfigProcessing(items: KeyValue[]) {
-  const customConfig: { [key: string]: string } = {};
-  items.forEach(({ key, value }) => {
-    customConfig[key] = value;
-  });
-  return customConfig;
+function keyValueListToDict(items: KeyValue[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const { key, value } of items) {
+    if (key.trim() !== "") {
+      result[key] = value;
+    }
+  }
+  return result;
 }
 
 export default function CustomModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
 }: LLMProviderFormProps) {
@@ -204,14 +206,19 @@ export default function CustomModal({
   const [isTesting, setIsTesting] = useState(false);
   const { mutate } = useSWRConfig();
 
-  if (open === false) return null;
-
   const onClose = () => onOpenChange?.(false);
 
   const initialValues = {
-    ...buildDefaultInitialValues(existingLlmProvider),
+    ...buildDefaultInitialValues(
+      existingLlmProvider,
+      undefined,
+      defaultModelName
+    ),
     ...(isOnboarding ? buildOnboardingInitialValues() : {}),
     provider: existingLlmProvider?.provider ?? "",
+    api_key: existingLlmProvider?.api_key ?? "",
+    api_base: existingLlmProvider?.api_base ?? "",
+    api_version: existingLlmProvider?.api_version ?? "",
     model_configurations: existingLlmProvider?.model_configurations.map(
       (mc) => ({
         name: mc.name,
@@ -280,13 +287,18 @@ export default function CustomModal({
           return;
         }
 
+        // Always send custom_config as a dict (even empty) so the backend
+        // preserves it as non-null — this is the signal that the provider was
+        // created via CustomModal.
+        const customConfig = keyValueListToDict(values.custom_config_list);
+
         if (isOnboarding && onboardingState && onboardingActions) {
           await submitOnboardingProvider({
             providerName: values.provider,
             payload: {
               ...values,
               model_configurations: modelConfigurations,
-              custom_config: customConfigProcessing(values.custom_config_list),
+              custom_config: customConfig,
             },
             onboardingState,
             onboardingActions,
@@ -304,11 +316,11 @@ export default function CustomModal({
             values: {
               ...values,
               selected_model_names: selectedModelNames,
-              custom_config: customConfigProcessing(values.custom_config_list),
+              custom_config: customConfig,
             },
             initialValues: {
               ...initialValues,
-              custom_config: customConfigProcessing(
+              custom_config: keyValueListToDict(
                 initialValues.custom_config_list
               ),
             },
@@ -334,32 +346,55 @@ export default function CustomModal({
           isSubmitting={formikProps.isSubmitting}
         >
           {!isOnboarding && (
-            <Section gap={0}>
-              <DisplayNameField disabled={!!existingLlmProvider} />
-
-              <FieldWrapper>
-                <InputLayouts.Vertical
+            <FieldWrapper>
+              <InputLayouts.Vertical
+                name="provider"
+                title="Provider Name"
+                subDescription={markdown(
+                  "Should be one of the providers listed at [LiteLLM](https://docs.litellm.ai/docs/providers)."
+                )}
+              >
+                <InputTypeInField
                   name="provider"
-                  title="Provider Name"
-                  subDescription="Should be one of the providers listed at https://docs.litellm.ai/docs/providers."
-                >
-                  <InputTypeInField
-                    name="provider"
-                    placeholder="Provider Name"
-                    variant={existingLlmProvider ? "disabled" : undefined}
-                  />
-                </InputLayouts.Vertical>
-              </FieldWrapper>
-            </Section>
+                  placeholder="Provider Name as shown on LiteLLM"
+                  variant={existingLlmProvider ? "disabled" : undefined}
+                />
+              </InputLayouts.Vertical>
+            </FieldWrapper>
           )}
 
-          <FieldSeparator />
+          <FieldWrapper>
+            <InputLayouts.Vertical
+              name="api_base"
+              title="API Base URL"
+              suffix="optional"
+            >
+              <InputTypeInField name="api_base" placeholder="https://" />
+            </InputLayouts.Vertical>
+          </FieldWrapper>
+
+          <FieldWrapper>
+            <InputLayouts.Vertical
+              name="api_version"
+              title="API Version"
+              suffix="optional"
+            >
+              <InputTypeInField name="api_version" />
+            </InputLayouts.Vertical>
+          </FieldWrapper>
+
+          <APIKeyField
+            optional
+            subDescription="Paste your API key if your model provider requires authentication."
+          />
 
           <FieldWrapper>
             <Section gap={0.75}>
               <Content
-                title="Provider Configs"
-                description="Add properties as needed by the model provider. This is passed to LiteLLM completion() call as arguments in the environment variable. See LiteLLM documentation for more instructions."
+                title="Additional Configs"
+                description={markdown(
+                  "Add extra properties as needed by the model provider. These are passed to LiteLLM's `completion()` call as [environment variables](https://docs.litellm.ai/docs/set_keys#environment-variables). See [documentation](https://docs.onyx.app/admins/ai_models/custom_inference_provider) for more instructions."
+                )}
                 widthVariant="full"
                 variant="section"
                 sizePreset="main-content"
@@ -377,6 +412,12 @@ export default function CustomModal({
 
           <FieldSeparator />
 
+          {!isOnboarding && (
+            <DisplayNameField disabled={!!existingLlmProvider} />
+          )}
+
+          <FieldSeparator />
+
           <Section gap={0.5}>
             <FieldWrapper>
               <Content
@@ -388,7 +429,7 @@ export default function CustomModal({
               />
             </FieldWrapper>
 
-            <Card>
+            <Card padding="sm">
               <ModelConfigurationList formikProps={formikProps as any} />
             </Card>
           </Section>

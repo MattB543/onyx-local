@@ -46,8 +46,8 @@ export default function VertexAIModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -58,8 +58,6 @@ export default function VertexAIModal({
   const { wellKnownLLMProvider } = useWellKnownLLMProvider(
     VERTEXAI_PROVIDER_NAME
   );
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -80,8 +78,16 @@ export default function VertexAIModal({
         },
       } as VertexAIModalValues)
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         default_model_name:
+          (defaultModelName &&
+          modelConfigurations.some((m) => m.name === defaultModelName)
+            ? defaultModelName
+            : undefined) ??
           wellKnownLLMProvider?.recommended_default_model?.name ??
           VERTEXAI_DEFAULT_MODEL,
         is_auto_mode: existingLlmProvider?.is_auto_mode ?? true,

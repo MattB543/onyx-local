@@ -33,8 +33,8 @@ export default function OpenAIModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -44,8 +44,6 @@ export default function OpenAIModal({
   const { mutate } = useSWRConfig();
   const { wellKnownLLMProvider } =
     useWellKnownLLMProvider(OPENAI_PROVIDER_NAME);
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -63,9 +61,17 @@ export default function OpenAIModal({
         default_model_name: DEFAULT_DEFAULT_MODEL_NAME,
       }
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         api_key: existingLlmProvider?.api_key ?? "",
         default_model_name:
+          (defaultModelName &&
+          modelConfigurations.some((m) => m.name === defaultModelName)
+            ? defaultModelName
+            : undefined) ??
           wellKnownLLMProvider?.recommended_default_model?.name ??
           DEFAULT_DEFAULT_MODEL_NAME,
         is_auto_mode: existingLlmProvider?.is_auto_mode ?? true,

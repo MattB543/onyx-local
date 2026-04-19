@@ -140,7 +140,7 @@ function OllamaModalInternals({
       isTesting={isTesting}
       isSubmitting={formikProps.isSubmitting}
     >
-      <Card backgroundVariant="light" borderVariant="none" sizeVariant="lg">
+      <Card background="light" border="none" padding="sm">
         <Tabs defaultValue={defaultTab}>
           <Tabs.List>
             <Tabs.Trigger value={TAB_SELF_HOSTED}>
@@ -210,8 +210,8 @@ export default function OllamaModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -222,8 +222,6 @@ export default function OllamaModal({
   const { mutate } = useSWRConfig();
   const { wellKnownLLMProvider } =
     useWellKnownLLMProvider(OLLAMA_PROVIDER_NAME);
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -244,7 +242,11 @@ export default function OllamaModal({
         },
       } as OllamaModalValues)
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         api_base: existingLlmProvider?.api_base ?? DEFAULT_API_BASE,
         custom_config: {
           OLLAMA_API_KEY:

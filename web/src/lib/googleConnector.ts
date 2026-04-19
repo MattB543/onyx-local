@@ -4,6 +4,7 @@ import { Credential } from "@/lib/connectors/credentials";
 import { ConnectorSnapshot } from "@/lib/connectors/connectors";
 import { ValidSources } from "@/lib/types";
 import { buildSimilarCredentialInfoURL } from "@/app/admin/connector/[ccPairId]/lib";
+import { SWR_KEYS } from "@/lib/swr-keys";
 
 // Constants for service names to avoid typos
 export const GOOGLE_SERVICES = {
@@ -14,7 +15,9 @@ export const GOOGLE_SERVICES = {
 
 type GoogleConnectorService = "gmail" | "google_drive" | "google_calendar";
 
-const mapServiceToEndpoint = (service: GoogleConnectorService) => {
+const mapServiceToEndpoint = (
+  service: GoogleConnectorService
+): "gmail" | "google-drive" | "google-calendar" => {
   if (service === "gmail") {
     return GOOGLE_SERVICES.GMAIL;
   }
@@ -52,7 +55,6 @@ export const useGoogleCredentials = (
     | ValidSources.GoogleDrive
     | ValidSources.GoogleCalendar
 ) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(source),
     errorHandlingFetcher,
@@ -74,10 +76,8 @@ export const useConnectorsByCredentialId = (credential_id: number | null) => {
 };
 
 export const checkCredentialsFetched = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   appCredentialData: any,
   appCredentialError: FetchError | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serviceAccountKeyData: any,
   serviceAccountKeyError: FetchError | undefined
 ) => {
@@ -137,6 +137,6 @@ export const refreshAllGoogleData = (
       : source === ValidSources.GoogleDrive
         ? GOOGLE_SERVICES.GOOGLE_DRIVE
         : GOOGLE_SERVICES.GOOGLE_CALENDAR;
-  mutate(`/api/manage/admin/connector/${service}/app-credential`);
-  mutate(`/api/manage/admin/connector/${service}/service-account-key`);
+  mutate(SWR_KEYS.googleConnectorAppCredential(service));
+  mutate(SWR_KEYS.googleConnectorServiceAccountKey(service));
 };

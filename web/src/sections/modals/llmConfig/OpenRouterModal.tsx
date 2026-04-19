@@ -156,8 +156,8 @@ export default function OpenRouterModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -169,8 +169,6 @@ export default function OpenRouterModal({
   const { wellKnownLLMProvider } = useWellKnownLLMProvider(
     OPENROUTER_PROVIDER_NAME
   );
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -189,7 +187,11 @@ export default function OpenRouterModal({
         default_model_name: "",
       } as OpenRouterModalValues)
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         api_key: existingLlmProvider?.api_key ?? "",
         api_base: existingLlmProvider?.api_base ?? DEFAULT_API_BASE,
       };

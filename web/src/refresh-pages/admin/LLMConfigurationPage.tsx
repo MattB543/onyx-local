@@ -8,8 +8,8 @@ import {
   useWellKnownLLMProviders,
 } from "@/hooks/useLLMProviders";
 import { ThreeDotsLoader } from "@/components/Loading";
-import { Content, ContentAction } from "@opal/layouts";
-import { Button } from "@opal/components";
+import { Content, Card } from "@opal/layouts";
+import { Button, SelectCard } from "@opal/components";
 import { Hoverable } from "@opal/core";
 import { SvgArrowExchange, SvgSettings, SvgTrash } from "@opal/icons";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
@@ -24,7 +24,7 @@ import { refreshLlmProviderCaches } from "@/lib/llmConfig/cache";
 import { deleteLlmProvider, setDefaultLlmModel } from "@/lib/llmConfig/svc";
 import Text from "@/refresh-components/texts/Text";
 import { Horizontal as HorizontalInput } from "@/layouts/input-layouts";
-import Card from "@/refresh-components/cards/Card";
+import LegacyCard from "@/refresh-components/cards/Card";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Message from "@/refresh-components/messages/Message";
 import ConfirmationModalLayout from "@/refresh-components/layouts/ConfirmationModalLayout";
@@ -45,6 +45,7 @@ import OpenRouterModal from "@/sections/modals/llmConfig/OpenRouterModal";
 import CustomModal from "@/sections/modals/llmConfig/CustomModal";
 import LMStudioForm from "@/sections/modals/llmConfig/LMStudioForm";
 import LiteLLMProxyModal from "@/sections/modals/llmConfig/LiteLLMProxyModal";
+import BifrostModal from "@/sections/modals/llmConfig/BifrostModal";
 import { Section } from "@/layouts/general-layouts";
 
 const route = ADMIN_ROUTES.LLM_MODELS;
@@ -65,78 +66,45 @@ const PROVIDER_DISPLAY_ORDER: string[] = [
   "ollama_chat",
   "openrouter",
   "lm_studio",
+  "bifrost",
 ];
 
 const PROVIDER_MODAL_MAP: Record<
   string,
   (
     shouldMarkAsDefault: boolean,
-    open: boolean,
     onOpenChange: (open: boolean) => void
   ) => React.ReactNode
 > = {
-  openai: (d, open, onOpenChange) => (
-    <OpenAIModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  openai: (d, onOpenChange) => (
+    <OpenAIModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  anthropic: (d, open, onOpenChange) => (
-    <AnthropicModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  anthropic: (d, onOpenChange) => (
+    <AnthropicModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  ollama_chat: (d, open, onOpenChange) => (
-    <OllamaModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  ollama_chat: (d, onOpenChange) => (
+    <OllamaModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  azure: (d, open, onOpenChange) => (
-    <AzureModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  azure: (d, onOpenChange) => (
+    <AzureModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  bedrock: (d, open, onOpenChange) => (
-    <BedrockModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  bedrock: (d, onOpenChange) => (
+    <BedrockModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  vertex_ai: (d, open, onOpenChange) => (
-    <VertexAIModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  vertex_ai: (d, onOpenChange) => (
+    <VertexAIModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  openrouter: (d, open, onOpenChange) => (
-    <OpenRouterModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  openrouter: (d, onOpenChange) => (
+    <OpenRouterModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  lm_studio: (d, open, onOpenChange) => (
-    <LMStudioForm
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  lm_studio: (d, onOpenChange) => (
+    <LMStudioForm shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
-  litellm_proxy: (d, open, onOpenChange) => (
-    <LiteLLMProxyModal
-      shouldMarkAsDefault={d}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+  litellm_proxy: (d, onOpenChange) => (
+    <LiteLLMProxyModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
+  ),
+  bifrost: (d, onOpenChange) => (
+    <BifrostModal shouldMarkAsDefault={d} onOpenChange={onOpenChange} />
   ),
 };
 
@@ -148,12 +116,14 @@ interface ExistingProviderCardProps {
   provider: LLMProviderView;
   isDefault: boolean;
   isLastProvider: boolean;
+  defaultModelName?: string;
 }
 
 function ExistingProviderCard({
   provider,
   isDefault,
   isLastProvider,
+  defaultModelName,
 }: ExistingProviderCardProps) {
   const { mutate } = useSWRConfig();
   const [isOpen, setIsOpen] = useState(false);
@@ -199,17 +169,25 @@ function ExistingProviderCard({
         </ConfirmationModalLayout>
       )}
 
-      <Hoverable.Root group="ExistingProviderCard">
-        <Card padding={0.5}>
-          <ContentAction
+      <Hoverable.Root
+        group="ExistingProviderCard"
+        interaction={deleteModal.isOpen ? "hover" : "rest"}
+      >
+        <SelectCard
+          state="filled"
+          padding="sm"
+          rounding="lg"
+          onClick={() => setIsOpen(true)}
+        >
+          <Card.Header
             icon={getProviderIcon(provider.provider)}
             title={provider.name}
             description={getProviderDisplayName(provider.provider)}
-            sizePreset="main-content"
+            sizePreset="main-ui"
             variant="section"
             tag={isDefault ? { title: "Default", color: "blue" } : undefined}
             rightChildren={
-              <Section flexDirection="row" gap={0} alignItems="start">
+              <div className="flex flex-row">
                 <Hoverable.Item
                   group="ExistingProviderCard"
                   variant="opacity-on-hover"
@@ -217,21 +195,28 @@ function ExistingProviderCard({
                   <Button
                     icon={SvgTrash}
                     prominence="tertiary"
-                    aria-label="Delete provider"
-                    onClick={() => deleteModal.toggle(true)}
+                    aria-label={`Delete ${provider.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteModal.toggle(true);
+                    }}
                   />
                 </Hoverable.Item>
                 <Button
                   icon={SvgSettings}
                   prominence="tertiary"
-                  aria-label="Edit provider"
-                  onClick={() => setIsOpen(true)}
+                  aria-label={`Edit ${provider.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(true);
+                  }}
                 />
-              </Section>
+              </div>
             }
           />
-          {getModalForExistingProvider(provider, isOpen, setIsOpen)}
-        </Card>
+          {isOpen &&
+            getModalForExistingProvider(provider, setIsOpen, defaultModelName)}
+        </SelectCard>
       </Hoverable.Root>
     </>
   );
@@ -246,7 +231,6 @@ interface NewProviderCardProps {
   isFirstProvider: boolean;
   formFn: (
     shouldMarkAsDefault: boolean,
-    open: boolean,
     onOpenChange: (open: boolean) => void
   ) => React.ReactNode;
 }
@@ -259,25 +243,33 @@ function NewProviderCard({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Card variant="secondary" padding={0.5}>
-      <ContentAction
+    <SelectCard
+      state="empty"
+      padding="sm"
+      rounding="lg"
+      onClick={() => setIsOpen(true)}
+    >
+      <Card.Header
         icon={getProviderIcon(provider.name)}
         title={getProviderProductName(provider.name)}
         description={getProviderDisplayName(provider.name)}
-        sizePreset="main-content"
+        sizePreset="main-ui"
         variant="section"
         rightChildren={
           <Button
             rightIcon={SvgArrowExchange}
             prominence="tertiary"
-            onClick={() => setIsOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(true);
+            }}
           >
             Connect
           </Button>
         }
       />
-      {formFn(isFirstProvider, isOpen, setIsOpen)}
-    </Card>
+      {isOpen && formFn(isFirstProvider, setIsOpen)}
+    </SelectCard>
   );
 }
 
@@ -295,29 +287,38 @@ function NewCustomProviderCard({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Card variant="secondary" padding={0.5}>
-      <ContentAction
+    <SelectCard
+      state="empty"
+      padding="sm"
+      rounding="lg"
+      onClick={() => setIsOpen(true)}
+    >
+      <Card.Header
         icon={getProviderIcon("custom")}
         title={getProviderProductName("custom")}
         description={getProviderDisplayName("custom")}
-        sizePreset="main-content"
+        sizePreset="main-ui"
         variant="section"
         rightChildren={
           <Button
             rightIcon={SvgArrowExchange}
             prominence="tertiary"
-            onClick={() => setIsOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(true);
+            }}
           >
             Set Up
           </Button>
         }
       />
-      <CustomModal
-        shouldMarkAsDefault={isFirstProvider}
-        open={isOpen}
-        onOpenChange={setIsOpen}
-      />
-    </Card>
+      {isOpen && (
+        <CustomModal
+          shouldMarkAsDefault={isFirstProvider}
+          onOpenChange={setIsOpen}
+        />
+      )}
+    </SelectCard>
   );
 }
 
@@ -381,7 +382,7 @@ export default function LLMConfigurationPage() {
 
       <SettingsLayouts.Body>
         {hasProviders ? (
-          <Card>
+          <LegacyCard>
             <HorizontalInput
               title="Default Model"
               description="This model will be used by Onyx by default in your chats."
@@ -412,7 +413,7 @@ export default function LLMConfigurationPage() {
                 </InputSelect.Content>
               </InputSelect>
             </HorizontalInput>
-          </Card>
+          </LegacyCard>
         ) : (
           <Message
             info
@@ -446,6 +447,11 @@ export default function LLMConfigurationPage() {
                     provider={provider}
                     isDefault={defaultText?.provider_id === provider.id}
                     isLastProvider={sortedProviders.length === 1}
+                    defaultModelName={
+                      defaultText?.provider_id === provider.id
+                        ? defaultText.model_name
+                        : undefined
+                    }
                   />
                 ))}
               </div>

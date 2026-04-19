@@ -53,6 +53,7 @@ export enum UserFileStatus {
   UPLOADING = "UPLOADING", //UI only
   PROCESSING = "PROCESSING",
   COMPLETED = "COMPLETED",
+  SKIPPED = "SKIPPED",
   FAILED = "FAILED",
   CANCELED = "CANCELED",
   DELETING = "DELETING",
@@ -61,7 +62,7 @@ export enum UserFileStatus {
 export type ProjectDetails = {
   project: Project;
   files?: ProjectFile[];
-  persona_id_to_featured?: Record<number, boolean>;
+  persona_id_to_is_featured?: Record<number, boolean>;
 };
 
 export async function fetchProjects(): Promise<Project[]> {

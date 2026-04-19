@@ -225,7 +225,7 @@ function BedrockModalInternals({
       </FieldWrapper>
 
       {authMethod === AUTH_METHOD_ACCESS_KEY && (
-        <Card backgroundVariant="light" borderVariant="none" sizeVariant="lg">
+        <Card background="light" border="none" padding="sm">
           <Section gap={1}>
             <InputLayouts.Vertical
               name={FIELD_AWS_ACCESS_KEY_ID}
@@ -251,7 +251,7 @@ function BedrockModalInternals({
 
       {authMethod === AUTH_METHOD_IAM && (
         <FieldWrapper>
-          <Card backgroundVariant="none" borderVariant="solid">
+          <Card background="none" border="solid" padding="sm">
             <Content
               icon={SvgAlertCircle}
               title="Onyx will use the IAM role attached to the environment it’s running in to authenticate."
@@ -263,7 +263,7 @@ function BedrockModalInternals({
       )}
 
       {authMethod === AUTH_METHOD_LONG_TERM_API_KEY && (
-        <Card backgroundVariant="light" borderVariant="none" sizeVariant="lg">
+        <Card background="light" border="none" padding="sm">
           <Section gap={0.5}>
             <InputLayouts.Vertical
               name={FIELD_AWS_BEARER_TOKEN_BEDROCK}
@@ -313,8 +313,8 @@ export default function BedrockModal({
   variant = "llm-configuration",
   existingLlmProvider,
   shouldMarkAsDefault,
-  open,
   onOpenChange,
+  defaultModelName,
   onboardingState,
   onboardingActions,
   llmDescriptor,
@@ -326,8 +326,6 @@ export default function BedrockModal({
   const { wellKnownLLMProvider } = useWellKnownLLMProvider(
     BEDROCK_PROVIDER_NAME
   );
-
-  if (open === false) return null;
 
   const onClose = () => onOpenChange?.(false);
 
@@ -351,7 +349,11 @@ export default function BedrockModal({
         },
       } as BedrockModalValues)
     : {
-        ...buildDefaultInitialValues(existingLlmProvider, modelConfigurations),
+        ...buildDefaultInitialValues(
+          existingLlmProvider,
+          modelConfigurations,
+          defaultModelName
+        ),
         custom_config: {
           AWS_REGION_NAME:
             (existingLlmProvider?.custom_config?.AWS_REGION_NAME as string) ??
