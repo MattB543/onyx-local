@@ -100,7 +100,7 @@ export default function ImportCsvModal({
 
   return (
     <Modal open={open} onOpenChange={handleOpenChange}>
-      <Modal.Content width="md-sm" height="fit">
+      <Modal.Content width="md" height="fit">
         <Modal.Header
           icon={SvgUploadCloud}
           title="Import CSV"

@@ -14,7 +14,7 @@ import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -180,7 +180,8 @@ export default function CrmInteractionsPage() {
               Loading interactions...
             </Text>
           ) : interactions.length === 0 ? (
-            <EmptyMessage
+            <EmptyMessageCard
+              sizePreset="main-ui"
               icon={SvgActivity}
               title="No interactions found"
               description={emptyDescription}

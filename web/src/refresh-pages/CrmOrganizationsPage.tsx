@@ -13,7 +13,7 @@ import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import { PageSelector } from "@/components/PageSelector";
@@ -198,7 +198,8 @@ export default function CrmOrganizationsPage() {
               Loading organizations...
             </Text>
           ) : organizations.length === 0 ? (
-            <EmptyMessage
+            <EmptyMessageCard
+              sizePreset="main-ui"
               icon={SvgOrganization}
               title="No organizations found"
               description={emptyDescription}

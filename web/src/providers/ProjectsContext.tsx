@@ -518,8 +518,14 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       onFailure?: (failedTempIds: string[]) => void
     ): Promise<ProjectFile[]> => {
       const rawMax = settingsContext?.settings?.user_file_max_upload_size_mb;
+      const defaultMax =
+        settingsContext?.settings?.default_user_file_max_upload_size_mb;
       const maxUploadSizeMb =
-        rawMax && rawMax > 0 ? rawMax : DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB;
+        rawMax && rawMax > 0
+          ? rawMax
+          : defaultMax && defaultMax > 0
+            ? defaultMax
+            : 100;
       const maxUploadSizeBytes = maxUploadSizeMb * 1024 * 1024;
 
       const oversizedFiles = files.filter(

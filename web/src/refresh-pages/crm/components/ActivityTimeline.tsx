@@ -2,7 +2,7 @@
 
 import { CrmInteraction } from "@/app/app/crm/crmService";
 import Button from "@/refresh-components/buttons/Button";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgActivity, SvgPlusCircle } from "@opal/icons";
@@ -54,7 +54,8 @@ export default function ActivityTimeline({
           Loading activity...
         </Text>
       ) : interactions.length === 0 ? (
-        <EmptyMessage
+        <EmptyMessageCard
+          sizePreset="main-ui"
           icon={SvgActivity}
           title="No activity yet"
           description="Log your first interaction to start tracking activity."

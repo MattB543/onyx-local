@@ -129,7 +129,7 @@ export default function CreateContactModal({
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <Modal.Content width="md-sm" height="fit">
+      <Modal.Content width="md" height="fit">
         <Modal.Header
           icon={SvgUser}
           title="New Contact"

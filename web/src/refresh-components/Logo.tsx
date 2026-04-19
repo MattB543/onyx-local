@@ -33,7 +33,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
             "flex items-center justify-center font-bold text-lg flex-shrink-0",
             className
           )}
-          style={{ width: foldedSize, height: foldedSize }}
+          style={{ width: resolvedSize, height: resolvedSize }}
         >
           {whitelabelName.charAt(0)}
         </div>

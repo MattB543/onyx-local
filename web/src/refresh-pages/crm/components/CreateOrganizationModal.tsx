@@ -61,7 +61,7 @@ export default function CreateOrganizationModal({
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <Modal.Content width="md-sm" height="fit">
+      <Modal.Content width="md" height="fit">
         <Modal.Header
           icon={SvgOrganization}
           title="New Organization"

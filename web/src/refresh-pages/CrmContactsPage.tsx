@@ -14,7 +14,7 @@ import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
@@ -305,7 +305,8 @@ export default function CrmContactsPage() {
               Loading contacts...
             </Text>
           ) : contacts.length === 0 ? (
-            <EmptyMessage
+            <EmptyMessageCard
+              sizePreset="main-ui"
               icon={SvgUser}
               title="No contacts found"
               description={emptyDescription}
