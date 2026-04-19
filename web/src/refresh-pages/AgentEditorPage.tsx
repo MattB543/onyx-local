@@ -1274,7 +1274,7 @@ export default function AgentEditorPage({
                           <InputLayouts.Vertical
                             name="description"
                             title="Description"
-                            optional
+                            suffix="optional"
                           >
                             <InputTextAreaField
                               name="description"
@@ -1299,7 +1299,7 @@ export default function AgentEditorPage({
                         <InputLayouts.Vertical
                           name="instructions"
                           title="Instructions"
-                          optional
+                          suffix="optional"
                           description="Add instructions to tailor the response for this agent."
                         >
                           <InputTextAreaField
@@ -1312,7 +1312,7 @@ export default function AgentEditorPage({
                           name="starter_messages"
                           title="Conversation Starters"
                           description="Example messages that help users understand what this agent can do and how to interact with it effectively."
-                          optional
+                          suffix="optional"
                         >
                           <StarterMessages />
                         </InputLayouts.Vertical>
@@ -1552,7 +1552,7 @@ export default function AgentEditorPage({
                               <InputLayouts.Horizontal
                                 name="knowledge_cutoff_date"
                                 title="Knowledge Cutoff Date"
-                                optional
+                                suffix="optional"
                                 description="Documents with a last-updated date prior to this will be ignored."
                               >
                                 <InputDatePickerField
@@ -1563,7 +1563,7 @@ export default function AgentEditorPage({
                               <InputLayouts.Horizontal
                                 name="replace_base_system_prompt"
                                 title="Overwrite System Prompt"
-                                titleSuffix="(Not Recommended)"
+                                suffix="(Not Recommended)"
                                 description='Remove the base system prompt which includes useful instructions (e.g. "You can use Markdown tables"). This may affect response quality.'
                               >
                                 <SwitchField name="replace_base_system_prompt" />
@@ -1574,7 +1574,7 @@ export default function AgentEditorPage({
                               <InputLayouts.Vertical
                                 name="reminders"
                                 title="Reminders"
-                                optional
+                                suffix="optional"
                               >
                                 <InputTextAreaField
                                   name="reminders"
