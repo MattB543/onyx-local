@@ -4,9 +4,8 @@ import { markdown } from "@opal/utils";
 import Link from "next/link";
 import Modal from "@/refresh-components/Modal";
 import Text from "@/refresh-components/texts/Text";
-import * as InputLayouts from "@/layouts/input-layouts";
+import { InputVertical } from "@opal/layouts";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
-import SimpleTooltip from "@/refresh-components/SimpleTooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CopyIconButton from "@/refresh-components/buttons/CopyIconButton";
 import { Button, Divider } from "@opal/components";
@@ -236,8 +235,8 @@ function FormContent({
       />
 
       <Modal.Body>
-        <InputLayouts.Vertical
-          name="definition"
+        <InputVertical
+          withLabel="definition"
           title="OpenAPI Schema Definition"
           subDescription={markdown(
             `Specify an OpenAPI schema that defines the APIs you want to make available as part of this action. Learn more about [OpenAPI actions](${DOCS_ADMINS_PATH}/actions/openapi).`
@@ -277,7 +276,7 @@ function FormContent({
               />
             </div>
           </Hoverable.Root>
-        </InputLayouts.Vertical>
+        </InputVertical>
 
         <Divider paddingParallel="fit" paddingPerpendicular="fit" />
 

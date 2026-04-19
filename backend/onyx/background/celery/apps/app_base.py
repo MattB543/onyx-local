@@ -10,6 +10,7 @@ from celery import bootsteps  # type: ignore
 from celery import Task
 from celery.app import trace
 from celery.exceptions import WorkerShutdown
+from celery.signals import before_task_publish
 from celery.signals import task_postrun
 from celery.signals import task_prerun
 from celery.states import READY_STATES
@@ -64,11 +65,14 @@ logger = setup_logger()
 task_logger = get_task_logger(__name__)
 
 if SENTRY_DSN:
+    from onyx.configs.sentry import _add_instance_tags
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[CeleryIntegration()],
         traces_sample_rate=0.1,
         release=__version__,
+        before_send=_add_instance_tags,
     )
     logger.info("Sentry initialized")
 else:
@@ -94,6 +98,17 @@ class TenantAwareTask(Task):
             # Clear or reset after the task runs
             # so it does not leak into any subsequent tasks on the same worker process
             CURRENT_TENANT_ID_CONTEXTVAR.set(None)
+
+
+@before_task_publish.connect
+def on_before_task_publish(
+    headers: dict[str, Any] | None = None,
+    **kwargs: Any,  # noqa: ARG001
+) -> None:
+    """Stamp the current wall-clock time into the task message headers so that
+    workers can compute queue wait time (time between publish and execution)."""
+    if headers is not None:
+        headers["enqueued_at"] = time.time()
 
 
 @task_prerun.connect
