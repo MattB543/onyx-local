@@ -15,6 +15,7 @@ import Button from "@/refresh-components/buttons/Button";
 import { Button as OpalButton } from "@opal/components";
 import { useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { ReindexingProgressTable } from "../../../../components/embedding/ReindexingProgressTable";
 import { ErrorCallout } from "@/components/ErrorCallout";
 import {
@@ -39,7 +40,7 @@ export default function UpgradingPage({
   const { data: connectors, isLoading: isLoadingConnectors } = useSWR<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Connector<any>[]
-  >(vectorDbEnabled ? "/api/manage/connector" : null, errorHandlingFetcher, {
+  >(vectorDbEnabled ? SWR_KEYS.connector : null, errorHandlingFetcher, {
     refreshInterval: 5000,
   });
 
@@ -70,7 +71,7 @@ export default function UpgradingPage({
       method: "POST",
     });
     if (response.ok) {
-      mutate("/api/search-settings/get-secondary-search-settings");
+      mutate(SWR_KEYS.secondarySearchSettings);
     } else {
       alert(
         `Failed to cancel embedding model update - ${await response.text()}`

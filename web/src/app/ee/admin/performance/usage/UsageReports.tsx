@@ -17,9 +17,9 @@ import Title from "@/components/ui/title";
 import Spacer from "@/refresh-components/Spacer";
 import Button from "@/refresh-components/buttons/Button";
 import { Button as OpalButton } from "@opal/components";
-import { Disabled } from "@opal/core";
 import useSWR from "swr";
-import { useEffect, useRef, useState } from "react";
+import { SWR_KEYS } from "@/lib/swr-keys";
+import React, { useState } from "react";
 import { UsageReport } from "./types";
 import { ThreeDotsLoader } from "@/components/Loading";
 import Link from "next/link";
@@ -201,15 +201,14 @@ function GenerateReportInput({
           </Popover.Content>
         </Popover>
       </div>
-      <Disabled disabled={isLoading || isWaitingForReport}>
-        <OpalButton
-          color={"blue"}
-          icon={SvgDownloadCloud}
-          onClick={() => requestReport()}
-        >
-          {isWaitingForReport ? "Generating..." : "Generate Report"}
-        </OpalButton>
-      </Disabled>
+      <OpalButton
+        disabled={isLoading || isWaitingForReport}
+        color={"blue"}
+        icon={SvgDownloadCloud}
+        onClick={() => requestReport()}
+      >
+        {isWaitingForReport ? "Generating..." : "Generate Report"}
+      </OpalButton>
       <p className="mt-1 text-xs">
         {isWaitingForReport
           ? "A report is currently being generated. Please wait..."
@@ -225,7 +224,7 @@ function GenerateReportInput({
   );
 }
 
-const USAGE_REPORT_URL = "/api/admin/usage-report";
+const USAGE_REPORT_URL = SWR_KEYS.usageReport;
 
 function UsageReportsTable({
   refreshTrigger,
@@ -252,14 +251,14 @@ function UsageReportsTable({
   });
 
   // Refresh when refreshTrigger changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (refreshTrigger > 0) {
       mutate();
     }
   }, [refreshTrigger, mutate]);
 
   // Detect when a new report appears
-  useEffect(() => {
+  React.useEffect(() => {
     if (usageReportsMetadata && previousReportCount !== null) {
       if (usageReportsMetadata.length > previousReportCount) {
         onNewReportDetected();
@@ -362,7 +361,7 @@ export default function UsageReports() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isWaitingForReport, setIsWaitingForReport] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleReportGenerated = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -395,7 +394,7 @@ export default function UsageReports() {
   };
 
   // Cleanup on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);

@@ -74,6 +74,7 @@ from onyx.db.enums import (
     CustomJobStepStatus,
     CustomJobTriggerEventStatus,
     CustomJobTriggerType,
+    DefaultAppMode,
     EmbeddingPrecision,
     GrantSource,
     HierarchyNodeType,
@@ -90,13 +91,12 @@ from onyx.db.enums import (
     Permission,
     ProcessingMode,
     SandboxStatus,
+    SharingScope,
+    SwitchoverType,
     SyncStatus,
     SyncType,
-    SwitchoverType,
     ThemePreference,
     UserFileStatus,
-    DefaultAppMode,
-    SharingScope,
 )
 from onyx.configs.constants import NotificationType
 from onyx.configs.constants import SearchFeedbackType
@@ -358,8 +358,11 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, native_enum=False, default=UserRole.BASIC)
     )
-    account_type: Mapped[AccountType | None] = mapped_column(
-        Enum(AccountType, native_enum=False), nullable=True
+    account_type: Mapped[AccountType] = mapped_column(
+        Enum(AccountType, native_enum=False),
+        nullable=False,
+        default=AccountType.STANDARD,
+        server_default="STANDARD",
     )
 
     """
@@ -404,6 +407,13 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
     pinned_assistants: Mapped[list[int] | None] = mapped_column(
         postgresql.JSONB(), nullable=True, default=None
+    )
+
+    effective_permissions: Mapped[list[str]] = mapped_column(
+        postgresql.JSONB(),
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
     )
 
     oidc_expiry: Mapped[datetime.datetime] = mapped_column(
@@ -4072,7 +4082,12 @@ class PermissionGrant(Base):
         ForeignKey("user_group.id", ondelete="CASCADE"), nullable=False
     )
     permission: Mapped[Permission] = mapped_column(
-        Enum(Permission, native_enum=False), nullable=False
+        Enum(
+            Permission,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
     )
     grant_source: Mapped[GrantSource] = mapped_column(
         Enum(GrantSource, native_enum=False), nullable=False

@@ -39,20 +39,18 @@ import { useUser } from "@/providers/UserProvider";
 import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
 import { updateTemperatureOverrideForChatSession } from "@/app/app/services/lib";
 import { useLLMProviders } from "@/hooks/useLLMProviders";
-
-const CREDENTIAL_URL = "/api/manage/admin/credential";
+import { SWR_KEYS } from "@/lib/swr-keys";
 
 export const usePublicCredentials = () => {
   const { mutate } = useSWRConfig();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const swrResponse = useSWR<Credential<any>[]>(
-    CREDENTIAL_URL,
+    SWR_KEYS.adminCredentials,
     errorHandlingFetcher
   );
 
   return {
     ...swrResponse,
-    refreshCredentials: () => mutate(CREDENTIAL_URL),
+    refreshCredentials: () => mutate(SWR_KEYS.adminCredentials),
   };
 };
 
@@ -87,9 +85,6 @@ export const useObjectState = <T>(
   };
   return [state, set];
 };
-
-const INDEXING_STATUS_URL = "/api/manage/admin/connector/indexing-status";
-const CONNECTOR_STATUS_URL = "/api/manage/admin/connector/status";
 
 export const useConnectorIndexingStatusWithPagination = (
   filters: Omit<IndexingStatusRequest, "source" | "source_to_page"> = {},
@@ -127,7 +122,7 @@ export const useConnectorIndexingStatusWithPagination = (
   );
 
   const swrKey = enabled
-    ? [INDEXING_STATUS_URL, JSON.stringify(mainRequest)]
+    ? [SWR_KEYS.indexingStatus, JSON.stringify(mainRequest)]
     : null;
 
   // Main data fetch with auto-refresh
@@ -216,8 +211,7 @@ export const useConnectorStatus = (
   enabled: boolean = true
 ) => {
   const { mutate } = useSWRConfig();
-  const url = CONNECTOR_STATUS_URL;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const url = SWR_KEYS.adminConnectorStatus;
   const swrResponse = useSWR<ConnectorStatus<any, any>[]>(
     enabled ? url : null,
     errorHandlingFetcher,
@@ -231,7 +225,7 @@ export const useConnectorStatus = (
 };
 
 export const useBasicConnectorStatus = (enabled: boolean = true) => {
-  const url = "/api/manage/connector-status";
+  const url = SWR_KEYS.connectorStatus;
   const swrResponse = useSWR<CCPairBasicInfo[]>(
     enabled ? url : null,
     errorHandlingFetcher
@@ -244,7 +238,7 @@ export const useBasicConnectorStatus = (enabled: boolean = true) => {
 
 export const useFederatedConnectors = () => {
   const { mutate } = useSWRConfig();
-  const url = "/api/federated";
+  const url = SWR_KEYS.federatedConnectors;
   const swrResponse = useSWR<FederatedConnectorDetail[]>(
     url,
     errorHandlingFetcher
@@ -259,16 +253,16 @@ export const useFederatedConnectors = () => {
 export const useLabels = () => {
   const { mutate } = useSWRConfig();
   const { data: labels, error } = useSWR<PersonaLabel[]>(
-    "/api/persona/labels",
+    SWR_KEYS.personaLabels,
     errorHandlingFetcher
   );
 
   const refreshLabels = async () => {
-    return mutate("/api/persona/labels");
+    return mutate(SWR_KEYS.personaLabels);
   };
 
   const createLabel = async (name: string): Promise<PersonaLabel | null> => {
-    const response = await fetch("/api/persona/labels", {
+    const response = await fetch(SWR_KEYS.personaLabels, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -280,7 +274,7 @@ export const useLabels = () => {
 
     const newLabel: PersonaLabel = await response.json();
     mutate(
-      "/api/persona/labels",
+      SWR_KEYS.personaLabels,
       (currentLabels: PersonaLabel[] | undefined) => [
         ...(currentLabels || []),
         newLabel,
@@ -299,7 +293,7 @@ export const useLabels = () => {
 
     if (response.ok) {
       mutate(
-        "/api/persona/labels",
+        SWR_KEYS.personaLabels,
         labels?.map((label) => (label.id === id ? { ...label, name } : label)),
         false
       );
@@ -316,7 +310,7 @@ export const useLabels = () => {
 
     if (response.ok) {
       mutate(
-        "/api/persona/labels",
+        SWR_KEYS.personaLabels,
         labels?.filter((label) => label.id !== id),
         false
       );
@@ -878,7 +872,7 @@ export function useLlmManager(
 
 export function useAuthType(): AuthType | null {
   const { data, error } = useSWR<{ auth_type: AuthType }>(
-    "/api/auth/type",
+    SWR_KEYS.authType,
     errorHandlingFetcher
   );
 
@@ -897,8 +891,6 @@ export function useAuthType(): AuthType | null {
 EE Only APIs
 */
 
-const USER_GROUP_URL = "/api/manage/admin/user-group";
-
 export const useUserGroups = (): {
   data: UserGroup[] | undefined;
   isLoading: boolean;
@@ -913,11 +905,11 @@ export const useUserGroups = (): {
     combinedSettings.enterpriseSettings !== null;
 
   const swrResponse = useSWR<UserGroup[]>(
-    isPaidEnterpriseFeaturesEnabled ? USER_GROUP_URL : null,
+    isPaidEnterpriseFeaturesEnabled ? SWR_KEYS.adminUserGroups : null,
     errorHandlingFetcher
   );
 
-  const refreshUserGroups = () => mutate(USER_GROUP_URL);
+  const refreshUserGroups = () => mutate(SWR_KEYS.adminUserGroups);
 
   if (isLoading) {
     return {
@@ -947,7 +939,7 @@ export const fetchConnectorIndexingStatus = async (
   request: IndexingStatusRequest = {},
   sourcePages: Record<ValidSources, number> | null = null
 ): Promise<ConnectorIndexingStatusLiteResponse[]> => {
-  const response = await fetch(INDEXING_STATUS_URL, {
+  const response = await fetch(SWR_KEYS.indexingStatus, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -973,14 +965,13 @@ export const fetchConnectorIndexingStatus = async (
 // Get source metadata for configured sources - deduplicated by source type
 function getConfiguredSources(
   availableSources: ValidSources[]
-): (SourceMetadata & { originalName: string; uniqueKey: string })[] {
+): Array<SourceMetadata & { originalName: string; uniqueKey: string }> {
   const allSources = getSourceMetadataForSources(availableSources);
 
   const seenSources = new Set<string>();
-  const configuredSources: (SourceMetadata & {
-    originalName: string;
-    uniqueKey: string;
-  })[] = [];
+  const configuredSources: Array<
+    SourceMetadata & { originalName: string; uniqueKey: string }
+  > = [];
 
   availableSources.forEach((sourceName) => {
     // Handle federated connectors by removing the federated_ prefix
