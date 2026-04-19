@@ -1,6 +1,7 @@
 """Tests for CRM tool streaming packet emissions and session replay helpers."""
 
 from queue import Queue
+from typing import Any
 from unittest.mock import MagicMock
 from unittest.mock import patch
 from uuid import uuid4
@@ -41,10 +42,33 @@ from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 from onyx.tools.models import ToolCallException
 
 
+class _TestBus:
+    """Unwraps ``(model_idx, packet)`` tuples from the Emitter merge queue.
+
+    Upstream #9803 (merge-queue) changed Emitter to put tuples on the queue;
+    our tests want to read the original Packet directly.
+    """
+
+    def __init__(self, queue: Queue) -> None:
+        self._queue = queue
+
+    def get_nowait(self) -> Any:
+        item = self._queue.get_nowait()
+        if isinstance(item, tuple) and len(item) == 2:
+            return item[1]
+        return item
+
+
+class _TestEmitter(Emitter):
+    def __init__(self) -> None:
+        queue: Queue = Queue()
+        super().__init__(queue)
+        self.bus: _TestBus = _TestBus(queue)
+
+
 @pytest.fixture
 def emitter() -> Emitter:
-    bus: Queue = Queue()
-    return Emitter(bus)
+    return _TestEmitter()
 
 
 @pytest.fixture
@@ -84,7 +108,8 @@ class TestCrmToolEmitStart:
 
         packet = emitter.bus.get_nowait()
         assert isinstance(packet.obj, CrmSearchToolStart)
-        assert packet.placement == placement
+        assert packet.placement.turn_index == placement.turn_index
+        assert packet.placement.tab_index == placement.tab_index
 
     def test_crm_create_emit_start(
         self, emitter: Emitter, db_session, placement: Placement
@@ -99,7 +124,8 @@ class TestCrmToolEmitStart:
 
         packet = emitter.bus.get_nowait()
         assert isinstance(packet.obj, CrmCreateToolStart)
-        assert packet.placement == placement
+        assert packet.placement.turn_index == placement.turn_index
+        assert packet.placement.tab_index == placement.tab_index
 
     def test_crm_update_emit_start(
         self, emitter: Emitter, db_session, placement: Placement
@@ -109,7 +135,8 @@ class TestCrmToolEmitStart:
 
         packet = emitter.bus.get_nowait()
         assert isinstance(packet.obj, CrmUpdateToolStart)
-        assert packet.placement == placement
+        assert packet.placement.turn_index == placement.turn_index
+        assert packet.placement.tab_index == placement.tab_index
 
     def test_crm_log_interaction_emit_start(
         self, emitter: Emitter, db_session, placement: Placement
@@ -124,7 +151,8 @@ class TestCrmToolEmitStart:
 
         packet = emitter.bus.get_nowait()
         assert isinstance(packet.obj, CrmLogInteractionToolStart)
-        assert packet.placement == placement
+        assert packet.placement.turn_index == placement.turn_index
+        assert packet.placement.tab_index == placement.tab_index
 
 
 class TestCrmToolRun:

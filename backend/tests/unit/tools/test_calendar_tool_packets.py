@@ -39,9 +39,10 @@ def test_calendar_search_emit_start() -> None:
 
         tool.emit_start(placement)
 
-        packet = emitter.bus.get_nowait()
+        _, packet = bus.get_nowait()
         assert isinstance(packet.obj, CalendarSearchToolStart)
-        assert packet.placement == placement
+        assert packet.placement.turn_index == placement.turn_index
+        assert packet.placement.tab_index == placement.tab_index
     finally:
         db_session.close()
 
@@ -93,7 +94,7 @@ def test_calendar_search_run_emits_delta() -> None:
                 page_size=10,
             )
 
-        packet = emitter.bus.get_nowait()
+        _, packet = bus.get_nowait()
         assert isinstance(packet.obj, CalendarSearchToolDelta)
         assert packet.obj.payload["status"] == "ok"
         assert packet.obj.payload["total_items"] == 1
