@@ -3,7 +3,7 @@
 import { markdown } from "@opal/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Formik, Form, useFormikContext } from "formik";
+import { Formik, Form } from "formik";
 import useSWR, { mutate } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { errorHandlingFetcher } from "@/lib/fetcher";
@@ -11,13 +11,11 @@ import * as SettingsLayouts from "@/layouts/settings-layouts";
 import * as InputLayouts from "@/layouts/input-layouts";
 import { Section } from "@/layouts/general-layouts";
 import Card from "@/refresh-components/cards/Card";
-import Separator from "@/refresh-components/Separator";
 import SimpleCollapsible from "@/refresh-components/SimpleCollapsible";
 import SimpleTooltip from "@/refresh-components/SimpleTooltip";
-import SwitchField from "@/refresh-components/form/SwitchField";
-import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
-import InputSelectField from "@/refresh-components/form/InputSelectField";
+import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import InputTextArea from "@/refresh-components/inputs/InputTextArea";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import {
   SvgAddLines,
@@ -47,9 +45,8 @@ import {
   PYTHON_TOOL_ID,
   OPEN_URL_TOOL_ID,
 } from "@/app/app/components/tools/constants";
-import { Button, Text, Card as OpalCard } from "@opal/components";
+import { Button, Divider, Text, Card as OpalCard } from "@opal/components";
 import Modal from "@/refresh-components/Modal";
-import InputTextArea from "@/refresh-components/inputs/InputTextArea";
 import Switch from "@/refresh-components/inputs/Switch";
 import useMcpServersForAgentEditor from "@/hooks/useMcpServersForAgentEditor";
 import useOpenApiTools from "@/hooks/useOpenApiTools";
@@ -58,17 +55,16 @@ import * as ActionsLayouts from "@/layouts/actions-layouts";
 import { getActionIcon } from "@/lib/tools/mcpUtils";
 import { Disabled, Hoverable } from "@opal/core";
 import IconButton from "@/refresh-components/buttons/IconButton";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
 import useFilter from "@/hooks/useFilter";
 import { MCPServer } from "@/lib/tools/interfaces";
 import type { IconProps } from "@opal/types";
-import InputTextArea from "@/refresh-components/inputs/InputTextArea";
 import { patchCrmSettings } from "@/app/app/crm/crmService";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import {
   DEFAULT_CRM_CATEGORY_SUGGESTIONS,
   DEFAULT_CRM_STAGE_OPTIONS,
 } from "@/refresh-pages/crm/crmOptions";
+import Separator from "@/refresh-components/Separator";
 
 const route = ADMIN_ROUTES.CHAT_PREFERENCES;
 
@@ -76,26 +72,6 @@ interface DefaultAgentConfiguration {
   tool_ids: number[];
   system_prompt: string | null;
   default_system_prompt: string;
-}
-
-interface ChatPreferencesFormValues {
-  // Features
-  search_ui_enabled: boolean;
-  deep_research_enabled: boolean;
-  auto_scroll: boolean;
-
-  // Team context
-  company_name: string;
-  company_description: string;
-
-  // Advanced
-  maximum_chat_retention_days: string;
-  anonymous_user_enabled: boolean;
-  disable_default_assistant: boolean;
-
-  // File limits
-  user_file_max_upload_size_mb: string;
-  file_token_count_threshold_k: string;
 }
 
 interface MCPServerCardTool {
@@ -206,6 +182,7 @@ type FileLimitFieldName =
 
 interface NumericLimitFieldProps {
   name: FileLimitFieldName;
+  initialValue: string;
   defaultValue: string;
   saveSettings: (updates: Partial<Settings>) => Promise<void>;
   maxValue?: number;
@@ -214,16 +191,15 @@ interface NumericLimitFieldProps {
 
 function NumericLimitField({
   name,
+  initialValue: initialValueProp,
   defaultValue,
   saveSettings,
   maxValue,
   allowZero = false,
 }: NumericLimitFieldProps) {
-  const { values, setFieldValue } =
-    useFormikContext<ChatPreferencesFormValues>();
-  const initialValue = useRef(values[name]);
+  const [value, setValue] = useState(initialValueProp);
+  const savedValue = useRef(initialValueProp);
   const restoringRef = useRef(false);
-  const value = values[name];
 
   const parsed = parseInt(value, 10);
   const isOverMax =
@@ -231,8 +207,8 @@ function NumericLimitField({
 
   const handleRestore = () => {
     restoringRef.current = true;
-    initialValue.current = defaultValue;
-    void setFieldValue(name, defaultValue);
+    savedValue.current = defaultValue;
+    setValue(defaultValue);
     void saveSettings({ [name]: parseInt(defaultValue, 10) });
   };
 
@@ -250,11 +226,11 @@ function NumericLimitField({
     if (!isValid) {
       if (allowZero) {
         // Empty/invalid means "no limit" — persist 0 and clear the field.
-        void setFieldValue(name, "");
+        setValue("");
         void saveSettings({ [name]: 0 });
-        initialValue.current = "";
+        savedValue.current = "";
       } else {
-        void setFieldValue(name, initialValue.current);
+        setValue(savedValue.current);
       }
       return;
     }
@@ -267,10 +243,10 @@ function NumericLimitField({
     // For allowZero fields, 0 means "no limit" — clear the display
     // so the "No limit" placeholder is visible, but still persist 0.
     if (allowZero && parsed === 0) {
-      void setFieldValue(name, "");
-      if (initialValue.current !== "") {
+      setValue("");
+      if (savedValue.current !== "") {
         void saveSettings({ [name]: 0 });
-        initialValue.current = "";
+        savedValue.current = "";
       }
       return;
     }
@@ -279,23 +255,24 @@ function NumericLimitField({
 
     // Update the display to the canonical form (e.g. strip leading zeros).
     if (value !== normalizedDisplay) {
-      void setFieldValue(name, normalizedDisplay);
+      setValue(normalizedDisplay);
     }
 
     // Persist only when the value actually changed.
-    if (normalizedDisplay !== initialValue.current) {
+    if (normalizedDisplay !== savedValue.current) {
       void saveSettings({ [name]: parsed });
-      initialValue.current = normalizedDisplay;
+      savedValue.current = normalizedDisplay;
     }
   };
 
   return (
     <Hoverable.Root group="numericLimit" widthVariant="full">
-      <InputTypeInField
-        name={name}
+      <InputTypeIn
         inputMode="numeric"
         showClearButton={false}
         pattern="[0-9]*"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
         placeholder={allowZero ? "No limit" : `Default: ${defaultValue}`}
         variant={isOverMax ? "error" : undefined}
         rightSection={
@@ -319,14 +296,18 @@ function NumericLimitField({
 
 interface FileSizeLimitFieldsProps {
   saveSettings: (updates: Partial<Settings>) => Promise<void>;
+  initialUploadSizeMb: string;
   defaultUploadSizeMb: string;
+  initialTokenThresholdK: string;
   defaultTokenThresholdK: string;
   maxAllowedUploadSizeMb?: number;
 }
 
 function FileSizeLimitFields({
   saveSettings,
+  initialUploadSizeMb,
   defaultUploadSizeMb,
+  initialTokenThresholdK,
   defaultTokenThresholdK,
   maxAllowedUploadSizeMb,
 }: FileSizeLimitFieldsProps) {
@@ -340,10 +321,10 @@ function FileSizeLimitFields({
               ? `Max: ${maxAllowedUploadSizeMb} MB`
               : undefined
           }
-          nonInteractive
         >
           <NumericLimitField
             name="user_file_max_upload_size_mb"
+            initialValue={initialUploadSizeMb}
             defaultValue={defaultUploadSizeMb}
             saveSettings={saveSettings}
             maxValue={maxAllowedUploadSizeMb}
@@ -351,12 +332,10 @@ function FileSizeLimitFields({
         </InputLayouts.Vertical>
       </div>
       <div className="flex-1">
-        <InputLayouts.Vertical
-          title="File Token Limit (thousand tokens)"
-          nonInteractive
-        >
+        <InputLayouts.Vertical title="File Token Limit (thousand tokens)">
           <NumericLimitField
             name="file_token_count_threshold_k"
+            initialValue={initialTokenThresholdK}
             defaultValue={defaultTokenThresholdK}
             saveSettings={saveSettings}
             allowZero
@@ -390,18 +369,10 @@ function parseMultiLineValues({
   return dedupedValues;
 }
 
-/**
- * Inner form component that uses useFormikContext to access values
- * and create save handlers for settings fields.
- */
 function ChatPreferencesForm() {
   const router = useRouter();
   const settings = useSettingsContext();
-  const { values } = useFormikContext<ChatPreferencesFormValues>();
-
-  // Track initial text values to avoid unnecessary saves on blur
-  const initialCompanyName = useRef(values.company_name);
-  const initialCompanyDescription = useRef(values.company_description);
+  const s = settings.settings;
 
   // CRM settings
   const {
@@ -422,6 +393,75 @@ function ChatPreferencesForm() {
       (crmSettings.contact_category_suggestions || []).join("\n")
     );
   }, [crmSettings]);
+
+  const handleSaveCrmSettings = useCallback(async () => {
+    const parsedStageOptions = parseMultiLineValues({
+      rawValue: crmStageOptionsRaw,
+      lowerCase: true,
+    });
+    const parsedCategorySuggestions = parseMultiLineValues({
+      rawValue: crmCategorySuggestionsRaw,
+      lowerCase: false,
+    });
+    if (parsedStageOptions.length === 0) {
+      toast.error("CRM stages must include at least one value.");
+      return;
+    }
+    setCrmSaveInProgress(true);
+    try {
+      const updatedCrmSettings = await patchCrmSettings({
+        contact_stage_options: parsedStageOptions,
+        contact_category_suggestions: parsedCategorySuggestions,
+      });
+      setCrmStageOptionsRaw(
+        (updatedCrmSettings.contact_stage_options || []).join("\n")
+      );
+      setCrmCategorySuggestionsRaw(
+        (updatedCrmSettings.contact_category_suggestions || []).join("\n")
+      );
+      await refreshCrmSettings();
+      toast.success("CRM settings updated successfully!");
+    } catch (error) {
+      console.error("Error updating CRM settings:", error);
+      toast.error("Failed to update CRM settings");
+    } finally {
+      setCrmSaveInProgress(false);
+    }
+  }, [crmStageOptionsRaw, crmCategorySuggestionsRaw, refreshCrmSettings]);
+
+  const handleResetCrmSettingsToDefaults = useCallback(() => {
+    setCrmStageOptionsRaw(DEFAULT_CRM_STAGE_OPTIONS.join("\n"));
+    setCrmCategorySuggestionsRaw(DEFAULT_CRM_CATEGORY_SUGGESTIONS.join("\n"));
+  }, []);
+
+  // Local state for text fields (save-on-blur)
+  const [companyName, setCompanyName] = useState(s.company_name ?? "");
+  const [companyDescription, setCompanyDescription] = useState(
+    s.company_description ?? ""
+  );
+  const savedCompanyName = useRef(companyName);
+  const savedCompanyDescription = useRef(companyDescription);
+
+  // Re-sync local state when settings change externally (e.g. another admin),
+  // but only when there's no in-progress edit (local matches last-saved value).
+  useEffect(() => {
+    const incoming = s.company_name ?? "";
+    if (companyName === savedCompanyName.current && incoming !== companyName) {
+      setCompanyName(incoming);
+      savedCompanyName.current = incoming;
+    }
+  }, [s.company_name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const incoming = s.company_description ?? "";
+    if (
+      companyDescription === savedCompanyDescription.current &&
+      incoming !== companyDescription
+    ) {
+      setCompanyDescription(incoming);
+      savedCompanyDescription.current = incoming;
+    }
+  }, [s.company_description]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tools availability
   const { tools: availableTools } = useAvailableTools();
@@ -561,46 +601,6 @@ function ChatPreferencesForm() {
     [settings, router]
   );
 
-  const handleSaveCrmSettings = useCallback(async () => {
-    const parsedStageOptions = parseMultiLineValues({
-      rawValue: crmStageOptionsRaw,
-      lowerCase: true,
-    });
-    const parsedCategorySuggestions = parseMultiLineValues({
-      rawValue: crmCategorySuggestionsRaw,
-      lowerCase: false,
-    });
-    if (parsedStageOptions.length === 0) {
-      toast.error("CRM stages must include at least one value.");
-      return;
-    }
-    setCrmSaveInProgress(true);
-    try {
-      const updatedCrmSettings = await patchCrmSettings({
-        contact_stage_options: parsedStageOptions,
-        contact_category_suggestions: parsedCategorySuggestions,
-      });
-      setCrmStageOptionsRaw(
-        (updatedCrmSettings.contact_stage_options || []).join("\n")
-      );
-      setCrmCategorySuggestionsRaw(
-        (updatedCrmSettings.contact_category_suggestions || []).join("\n")
-      );
-      await refreshCrmSettings();
-      toast.success("CRM settings updated successfully!");
-    } catch (error) {
-      console.error("Error updating CRM settings:", error);
-      toast.error("Failed to update CRM settings");
-    } finally {
-      setCrmSaveInProgress(false);
-    }
-  }, [crmStageOptionsRaw, crmCategorySuggestionsRaw, refreshCrmSettings]);
-
-  const handleResetCrmSettingsToDefaults = useCallback(() => {
-    setCrmStageOptionsRaw(DEFAULT_CRM_STAGE_OPTIONS.join("\n"));
-    setCrmCategorySuggestionsRaw(DEFAULT_CRM_CATEGORY_SUGGESTIONS.join("\n"));
-  }, []);
-
   return (
     <>
       <SettingsLayouts.Root>
@@ -612,21 +612,89 @@ function ChatPreferencesForm() {
         />
 
         <SettingsLayouts.Body>
+          {/* Features */}
+          <Card>
+            <SimpleTooltip
+              tooltip={
+                uniqueSources.length === 0
+                  ? "Set up connectors to use Search Mode"
+                  : undefined
+              }
+              side="top"
+            >
+              <Disabled disabled={uniqueSources.length === 0} allowClick>
+                <div className="w-full">
+                  <InputLayouts.Horizontal
+                    title="Search Mode"
+                    tag={{ title: "beta", color: "blue" }}
+                    description="UI mode for quick document search across your organization."
+                    disabled={uniqueSources.length === 0}
+                  >
+                    <Switch
+                      checked={s.search_ui_enabled ?? true}
+                      onCheckedChange={(checked) => {
+                        void saveSettings({ search_ui_enabled: checked });
+                      }}
+                      disabled={uniqueSources.length === 0}
+                    />
+                  </InputLayouts.Horizontal>
+                </div>
+              </Disabled>
+            </SimpleTooltip>
+            <InputLayouts.Horizontal
+              title="Multi-Model Generation"
+              tag={{ title: "beta", color: "blue" }}
+              description="Allow multiple models to generate responses in parallel in chat."
+            >
+              <Switch
+                checked={s.multi_model_chat_enabled ?? true}
+                onCheckedChange={(checked) => {
+                  void saveSettings({ multi_model_chat_enabled: checked });
+                }}
+              />
+            </InputLayouts.Horizontal>
+            <InputLayouts.Horizontal
+              title="Deep Research"
+              description="Agentic research system that works across the web and connected sources. Uses significantly more tokens per query."
+            >
+              <Switch
+                checked={s.deep_research_enabled ?? true}
+                onCheckedChange={(checked) => {
+                  void saveSettings({ deep_research_enabled: checked });
+                }}
+              />
+            </InputLayouts.Horizontal>
+            <InputLayouts.Horizontal
+              title="Chat Auto-Scroll"
+              description="Automatically scroll to new content as chat generates response. Users can override this in their personal settings."
+            >
+              <Switch
+                checked={s.auto_scroll ?? false}
+                onCheckedChange={(checked) => {
+                  void saveSettings({ auto_scroll: checked });
+                }}
+              />
+            </InputLayouts.Horizontal>
+          </Card>
+
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
+
           {/* Team Context */}
           <Section gap={1}>
             <InputLayouts.Vertical
               title="Team Name"
               subDescription="This is added to all chat sessions as additional context to provide a richer/customized experience."
             >
-              <InputTypeInField
-                name="company_name"
+              <InputTypeIn
                 placeholder="Enter team name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
                 onBlur={() => {
-                  if (values.company_name !== initialCompanyName.current) {
+                  if (companyName !== savedCompanyName.current) {
                     void saveSettings({
-                      company_name: values.company_name || null,
+                      company_name: companyName || null,
                     });
-                    initialCompanyName.current = values.company_name;
+                    savedCompanyName.current = companyName;
                   }
                 }}
               />
@@ -636,22 +704,19 @@ function ChatPreferencesForm() {
               title="Team Context"
               subDescription="Users can also provide additional individual context in their personal settings."
             >
-              <InputTextAreaField
-                name="company_description"
+              <InputTextArea
                 placeholder="Describe your team and how Onyx should behave."
                 rows={4}
                 maxRows={10}
                 autoResize
+                value={companyDescription}
+                onChange={(e) => setCompanyDescription(e.target.value)}
                 onBlur={() => {
-                  if (
-                    values.company_description !==
-                    initialCompanyDescription.current
-                  ) {
+                  if (companyDescription !== savedCompanyDescription.current) {
                     void saveSettings({
-                      company_description: values.company_description || null,
+                      company_description: companyDescription || null,
                     });
-                    initialCompanyDescription.current =
-                      values.company_description;
+                    savedCompanyDescription.current = companyDescription;
                   }
                 }}
               />
@@ -671,70 +736,9 @@ function ChatPreferencesForm() {
             </Button>
           </InputLayouts.Horizontal>
 
-          <Separator noPadding />
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
 
-          {/* Features */}
-          <Section gap={0.75}>
-            <Content
-              title="Features"
-              sizePreset="main-content"
-              variant="section"
-            />
-            <Card>
-              <SimpleTooltip
-                tooltip={
-                  uniqueSources.length === 0
-                    ? "Set up connectors to use Search Mode"
-                    : undefined
-                }
-                side="top"
-              >
-                <Disabled disabled={uniqueSources.length === 0} allowClick>
-                  <div className="w-full">
-                    <InputLayouts.Horizontal
-                      title="Search Mode"
-                      description="UI mode for quick document search across your organization."
-                      disabled={uniqueSources.length === 0}
-                    >
-                      <SwitchField
-                        name="search_ui_enabled"
-                        onCheckedChange={(checked) => {
-                          void saveSettings({ search_ui_enabled: checked });
-                        }}
-                        disabled={uniqueSources.length === 0}
-                      />
-                    </InputLayouts.Horizontal>
-                  </div>
-                </Disabled>
-              </SimpleTooltip>
-              <InputLayouts.Horizontal
-                title="Deep Research"
-                description="Agentic research system that works across the web and connected sources. Uses significantly more tokens per query."
-              >
-                <SwitchField
-                  name="deep_research_enabled"
-                  onCheckedChange={(checked) => {
-                    void saveSettings({ deep_research_enabled: checked });
-                  }}
-                />
-              </InputLayouts.Horizontal>
-              <InputLayouts.Horizontal
-                title="Chat Auto-Scroll"
-                description="Automatically scroll to new content as chat generates response. Users can override this in their personal settings."
-              >
-                <SwitchField
-                  name="auto_scroll"
-                  onCheckedChange={(checked) => {
-                    void saveSettings({ auto_scroll: checked });
-                  }}
-                />
-              </InputLayouts.Horizontal>
-            </Card>
-          </Section>
-
-          <Separator noPadding />
-
-          <Disabled disabled={values.disable_default_assistant}>
+          <Disabled disabled={s.disable_default_assistant ?? false}>
             <div>
               <Section gap={1.5}>
                 {/* Connectors */}
@@ -914,7 +918,10 @@ function ChatPreferencesForm() {
                     {/* Separator between built-in tools and MCP/OpenAPI tools */}
                     {(mcpServersWithTools.length > 0 ||
                       openApiTools.length > 0) && (
-                      <Separator noPadding className="py-3" />
+                      <Divider
+                        paddingPerpendicular="sm"
+                        paddingParallel="fit"
+                      />
                     )}
 
                     {/* MCP Servers & OpenAPI Tools */}
@@ -953,7 +960,7 @@ function ChatPreferencesForm() {
             </div>
           </Disabled>
 
-          <Separator noPadding />
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
 
           {/* Advanced Options */}
           <SimpleCollapsible defaultOpen={false}>
@@ -965,8 +972,10 @@ function ChatPreferencesForm() {
                     title="Keep Chat History"
                     description="Specify how long Onyx should retain chats in your organization."
                   >
-                    <InputSelectField
-                      name="maximum_chat_retention_days"
+                    <InputSelect
+                      value={
+                        s.maximum_chat_retention_days?.toString() ?? "forever"
+                      }
                       onValueChange={(value) => {
                         void saveSettings({
                           maximum_chat_retention_days:
@@ -986,7 +995,7 @@ function ChatPreferencesForm() {
                           365 days
                         </InputSelect.Item>
                       </InputSelect.Content>
-                    </InputSelectField>
+                    </InputSelect>
                   </InputLayouts.Horizontal>
                 </Card>
 
@@ -997,17 +1006,29 @@ function ChatPreferencesForm() {
                   >
                     <FileSizeLimitFields
                       saveSettings={saveSettings}
+                      initialUploadSizeMb={
+                        (s.user_file_max_upload_size_mb ?? 0) <= 0
+                          ? s.default_user_file_max_upload_size_mb?.toString() ??
+                            "100"
+                          : s.user_file_max_upload_size_mb!.toString()
+                      }
                       defaultUploadSizeMb={
-                        settings?.settings.default_user_file_max_upload_size_mb?.toString() ??
+                        s.default_user_file_max_upload_size_mb?.toString() ??
                         "100"
                       }
+                      initialTokenThresholdK={
+                        s.file_token_count_threshold_k == null
+                          ? s.default_file_token_count_threshold_k?.toString() ??
+                            "200"
+                          : s.file_token_count_threshold_k === 0
+                            ? ""
+                            : s.file_token_count_threshold_k.toString()
+                      }
                       defaultTokenThresholdK={
-                        settings?.settings.default_file_token_count_threshold_k?.toString() ??
+                        s.default_file_token_count_threshold_k?.toString() ??
                         "200"
                       }
-                      maxAllowedUploadSizeMb={
-                        settings?.settings.max_allowed_upload_size_mb
-                      }
+                      maxAllowedUploadSizeMb={s.max_allowed_upload_size_mb}
                     />
                   </InputLayouts.Vertical>
                 </Card>
@@ -1017,8 +1038,8 @@ function ChatPreferencesForm() {
                     title="Allow Anonymous Users"
                     description="Allow anyone to start chats without logging in. They do not see any other chats and cannot create agents or update settings."
                   >
-                    <SwitchField
-                      name="anonymous_user_enabled"
+                    <Switch
+                      checked={s.anonymous_user_enabled ?? false}
                       onCheckedChange={(checked) => {
                         void saveSettings({ anonymous_user_enabled: checked });
                       }}
@@ -1029,8 +1050,9 @@ function ChatPreferencesForm() {
                     title="Always Start with an Agent"
                     description="This removes the default chat. Users will always start in an agent, and new chats will be created in their last active agent. Set featured agents to help new users get started."
                   >
-                    <SwitchField
-                      name="disable_default_assistant"
+                    <Switch
+                      id="disable_default_assistant"
+                      checked={s.disable_default_assistant ?? false}
                       onCheckedChange={(checked) => {
                         void saveSettings({
                           disable_default_assistant: checked,
@@ -1197,50 +1219,5 @@ function ChatPreferencesForm() {
 }
 
 export default function ChatPreferencesPage() {
-  const settings = useSettingsContext();
-
-  const initialValues: ChatPreferencesFormValues = {
-    // Features
-    search_ui_enabled: settings.settings.search_ui_enabled ?? false,
-    deep_research_enabled: settings.settings.deep_research_enabled ?? true,
-    auto_scroll: settings.settings.auto_scroll ?? false,
-
-    // Team context
-    company_name: settings.settings.company_name ?? "",
-    company_description: settings.settings.company_description ?? "",
-
-    // Advanced
-    maximum_chat_retention_days:
-      settings.settings.maximum_chat_retention_days?.toString() ?? "forever",
-    anonymous_user_enabled: settings.settings.anonymous_user_enabled ?? false,
-    disable_default_assistant:
-      settings.settings.disable_default_assistant ?? false,
-
-    // File limits — for upload size: 0/null means "use default";
-    // for token threshold: null means "use default", 0 means "no limit".
-    user_file_max_upload_size_mb:
-      (settings.settings.user_file_max_upload_size_mb ?? 0) <= 0
-        ? settings.settings.default_user_file_max_upload_size_mb?.toString() ??
-          "100"
-        : settings.settings.user_file_max_upload_size_mb!.toString(),
-    file_token_count_threshold_k:
-      settings.settings.file_token_count_threshold_k == null
-        ? settings.settings.default_file_token_count_threshold_k?.toString() ??
-          "200"
-        : settings.settings.file_token_count_threshold_k === 0
-          ? ""
-          : settings.settings.file_token_count_threshold_k.toString(),
-  };
-
-  return (
-    <Formik
-      initialValues={initialValues}
-      onSubmit={() => {}}
-      enableReinitialize
-    >
-      <Form className="h-full w-full">
-        <ChatPreferencesForm />
-      </Form>
-    </Formik>
-  );
+  return <ChatPreferencesForm />;
 }

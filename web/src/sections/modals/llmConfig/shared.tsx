@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Formik, Form, useFormikContext } from "formik";
 import type { FormikConfig } from "formik";
 import { cn } from "@/lib/utils";
+import { markdown } from "@opal/utils";
 import { Interactive } from "@opal/core";
 import { usePaidEnterpriseFeaturesEnabled } from "@/components/settings/usePaidEnterpriseFeaturesEnabled";
 import { useAgents } from "@/hooks/useAgents";
@@ -482,7 +483,7 @@ export function ModelSelectionField({
         <InputLayouts.Horizontal
           title="Models"
           description="Select models to make available for this provider."
-          nonInteractive
+          withLabel={false}
           center
         >
           <Section flexDirection="row" gap={0}>
@@ -720,7 +721,7 @@ function ModalWrapperInner({
   } = getProvider(providerName);
 
   const title = llmProvider
-    ? `Configure "${llmProvider.name}"`
+    ? markdown(`Configure *${llmProvider.name}*`)
     : `Set up ${providerProductName}`;
   const description =
     descriptionOverride ??

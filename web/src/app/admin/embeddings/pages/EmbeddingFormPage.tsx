@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "@/hooks/useToast";
+import { markdown } from "@opal/utils";
 
 import EmbeddingModelSelection from "../EmbeddingModelSelectionForm";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
@@ -541,7 +542,9 @@ export default function EmbeddingForm() {
             <Modal.Content>
               <Modal.Header
                 icon={SvgAlertTriangle}
-                title={`Are you sure you want to select ${selectedProvider.model_name}?`}
+                title={markdown(
+                  `Are you sure you want to select *${selectedProvider.model_name}*?`
+                )}
                 onClose={() => setShowPoorModel(false)}
               />
               <Modal.Body>

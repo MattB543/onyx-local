@@ -3,19 +3,22 @@
 import type { RichStr, WithoutStyles } from "@opal/types";
 import { resolveStr } from "@opal/components/text/InlineMarkdown";
 import Text from "@/refresh-components/texts/Text";
-import Separator from "@/refresh-components/Separator";
+import { Divider } from "@opal/components";
 import { SvgXOctagon, SvgAlertCircle } from "@opal/icons";
 import { useField, useFormikContext } from "formik";
 import { Section } from "@/layouts/general-layouts";
 import { Content } from "@opal/layouts";
 import Label from "@/refresh-components/form/Label";
+import type { TagProps } from "@opal/components/tag/components";
 
 interface OrientationLayoutProps {
   name?: string;
   disabled?: boolean;
-  nonInteractive?: boolean;
+  withLabel?: boolean;
   children?: React.ReactNode;
   title: string | RichStr;
+  /** Tag rendered inline beside the title (passed through to Content). */
+  tag?: TagProps;
   description?: string | RichStr;
   suffix?: "optional" | (string & {});
   sizePreset?: "main-content" | "main-ui";
@@ -49,7 +52,7 @@ export interface VerticalLayoutProps extends OrientationLayoutProps {
 function VerticalInputLayout({
   name,
   disabled,
-  nonInteractive,
+  withLabel = true,
   children,
   subDescription,
   title,
@@ -76,7 +79,7 @@ function VerticalInputLayout({
     </Section>
   );
 
-  if (nonInteractive) return content;
+  if (!withLabel) return content;
   return (
     <Label name={name} disabled={disabled}>
       {content}
@@ -124,10 +127,11 @@ export interface HorizontalLayoutProps extends OrientationLayoutProps {
 function HorizontalInputLayout({
   name,
   disabled,
-  nonInteractive,
+  withLabel = true,
   children,
   center,
   title,
+  tag,
   description,
   suffix,
   sizePreset = "main-content",
@@ -144,6 +148,7 @@ function HorizontalInputLayout({
             title={title}
             description={description}
             suffix={suffix}
+            tag={tag}
             sizePreset={sizePreset}
             variant="section"
             widthVariant="full"
@@ -155,7 +160,7 @@ function HorizontalInputLayout({
     </Section>
   );
 
-  if (nonInteractive) return content;
+  if (!withLabel) return content;
   return (
     <Label name={name} disabled={disabled}>
       {content}
@@ -234,7 +239,7 @@ function ErrorTextLayout({ children, type = "error" }: ErrorTextLayoutProps) {
  * FieldSeparator - A horizontal rule with inline padding, used to visually separate field groups.
  */
 function FieldSeparator() {
-  return <Separator noPadding className="p-2" />;
+  return <Divider paddingParallel="sm" paddingPerpendicular="sm" />;
 }
 
 /**

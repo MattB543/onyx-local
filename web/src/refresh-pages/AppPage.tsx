@@ -426,16 +426,27 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [multiModel.isMultiModelActive]);
 
-  // Sync single-model selection to llmManager so the submission path
-  // uses the correct provider/version (replaces the old LLMPopover sync).
+  // Sync single-model selection to llmManager so the submission path uses
+  // the correct provider/version. Guard against echoing derived state back
+  // — only call updateCurrentLlm when the selection actually differs from
+  // currentLlm, otherwise the initial [] → [currentLlmModel] sync would
+  // pin `userHasManuallyOverriddenLLM=true` with whatever was resolved
+  // first (often the default model before the session's alt_model loads).
   useEffect(() => {
     if (multiModel.selectedModels.length === 1) {
       const model = multiModel.selectedModels[0]!;
-      llmManager.updateCurrentLlm({
-        name: model.name,
-        provider: model.provider,
-        modelName: model.modelName,
-      });
+      const current = llmManager.currentLlm;
+      if (
+        model.provider !== current.provider ||
+        model.modelName !== current.modelName ||
+        model.name !== current.name
+      ) {
+        llmManager.updateCurrentLlm({
+          name: model.name,
+          provider: model.provider,
+          modelName: model.modelName,
+        });
+      }
     }
   }, [multiModel.selectedModels]);
 
@@ -512,7 +523,8 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     onSubmit({
       message: lastUserMsg.message,
       currentMessageFiles: currentMessageFiles,
-      deepResearch: deepResearchEnabledForCurrentWorkflow,
+      deepResearch:
+        deepResearchEnabledForCurrentWorkflow && !multiModel.isMultiModelActive,
       messageIdToResend: lastUserMsg.messageId,
     });
   }, [
@@ -520,6 +532,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     onSubmit,
     currentMessageFiles,
     deepResearchEnabledForCurrentWorkflow,
+    multiModel.isMultiModelActive,
   ]);
 
   const toggleDocumentSidebar = useCallback(() => {
@@ -543,7 +556,9 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
       onSubmit({
         message,
         currentMessageFiles,
-        deepResearch: deepResearchEnabledForCurrentWorkflow,
+        deepResearch:
+          deepResearchEnabledForCurrentWorkflow &&
+          !multiModel.isMultiModelActive,
         selectedModels: multiModel.isMultiModelActive
           ? multiModel.selectedModels
           : undefined,
@@ -597,7 +612,9 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
         onSubmit({
           message,
           currentMessageFiles,
-          deepResearch: deepResearchEnabledForCurrentWorkflow,
+          deepResearch:
+            deepResearchEnabledForCurrentWorkflow &&
+            !multiModel.isMultiModelActive,
           selectedModels: multiModel.isMultiModelActive
             ? multiModel.selectedModels
             : undefined,
@@ -872,15 +889,20 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         agent={liveAgent}
                         isDefaultAgent={isDefaultAgent}
                       />
-                      {liveAgent && !llmManager.isLoadingProviders && (
-                        <ModelSelector
-                          llmManager={llmManager}
-                          selectedModels={multiModel.selectedModels}
-                          onAdd={multiModel.addModel}
-                          onRemove={multiModel.removeModel}
-                          onReplace={multiModel.replaceModel}
-                        />
-                      )}
+                      {!isSearch &&
+                        !(
+                          state.phase === "idle" && state.appMode === "search"
+                        ) &&
+                        liveAgent &&
+                        !llmManager.isLoadingProviders && (
+                          <ModelSelector
+                            llmManager={llmManager}
+                            selectedModels={multiModel.selectedModels}
+                            onAdd={multiModel.addModel}
+                            onRemove={multiModel.removeModel}
+                            onReplace={multiModel.replaceModel}
+                          />
+                        )}
                     </Section>
                     <Spacer rem={1.5} />
                   </Fade>
@@ -965,6 +987,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                           deepResearchEnabledForCurrentWorkflow
                         }
                         toggleDeepResearch={toggleDeepResearch}
+                        isMultiModelActive={multiModel.isMultiModelActive}
                         filterManager={filterManager}
                         llmManager={llmManager}
                         initialMessage={

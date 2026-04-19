@@ -10,7 +10,7 @@ import { Section } from "@/layouts/general-layouts";
 import { Content, ContentAction } from "@opal/layouts";
 import Text from "@/refresh-components/texts/Text";
 import AgentAvatar from "@/refresh-components/avatars/AgentAvatar";
-import Separator from "@/refresh-components/Separator";
+import { Divider } from "@opal/components";
 import SimpleCollapsible from "@/refresh-components/SimpleCollapsible";
 import {
   SvgActions,
@@ -283,7 +283,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
           {agent.description && <Text text03>{agent.description}</Text>}
 
           {/* Knowledge */}
-          <Separator noPadding />
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
           <Section gap={0.5} alignItems="start">
             <Content
               title="Knowledge"
@@ -336,7 +336,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
           </SimpleCollapsible>
 
           {/* More Info (Collapsible) */}
-          <Separator noPadding />
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
           <SimpleCollapsible>
             <SimpleCollapsible.Header title="More Info" />
             <SimpleCollapsible.Content>
@@ -353,7 +353,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
                   <Horizontal
                     title="Default Model"
                     description="This model will be used by Onyx by default in your chats."
-                    nonInteractive
+                    withLabel={false}
                     sizePreset="main-ui"
                   >
                     <Text>{defaultModel}</Text>
@@ -363,7 +363,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
                   <Horizontal
                     title="Knowledge Cutoff Date"
                     description="Documents with a last-updated date prior to this will be ignored."
-                    nonInteractive
+                    withLabel={false}
                     sizePreset="main-ui"
                   >
                     <Text mainUiMono>
@@ -374,7 +374,6 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
                 <Horizontal
                   title="Overwrite System Prompts"
                   description='Remove the base system prompt which includes useful instructions (e.g. "You can use Markdown tables"). This may affect response quality.'
-                  nonInteractive
                   sizePreset="main-ui"
                 >
                   <Switch disabled checked={agent.replace_base_system_prompt} />
@@ -386,7 +385,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
           {/* Prompt Reminders */}
           {agent.task_prompt && (
             <>
-              <Separator noPadding />
+              <Divider paddingParallel="fit" paddingPerpendicular="fit" />
               <Content
                 title="Prompt Reminders"
                 description={agent.task_prompt}
@@ -399,7 +398,7 @@ export default function AgentViewerModal({ agent }: AgentViewerModalProps) {
           {/* Conversation Starters */}
           {agent.starter_messages && agent.starter_messages.length > 0 && (
             <>
-              <Separator noPadding />
+              <Divider paddingParallel="fit" paddingPerpendicular="fit" />
               <Content
                 title="Conversation Starters"
                 sizePreset="main-content"
