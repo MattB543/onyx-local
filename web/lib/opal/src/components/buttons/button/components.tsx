@@ -1,4 +1,3 @@
-import "@opal/components/tooltip.css";
 import { Interactive, type InteractiveStatelessProps } from "@opal/core";
 import type { ContainerSizeVariants, ExtremaSizeVariants } from "@opal/types";
 import type { TooltipSide } from "@opal/components";
@@ -31,9 +30,6 @@ type ButtonProps = InteractiveStatelessProps &
      * Size preset — controls gap, text size, and Container height/rounding.
      */
     size?: ContainerSizeVariants;
-
-    /** HTML button type. When provided, Container renders a `<button>` element. */
-    type?: "submit" | "button" | "reset";
 
     /** Tooltip text shown on hover. */
     tooltip?: string;
@@ -76,7 +72,7 @@ function Button({
   ) : null;
 
   const button = (
-    <Interactive.Stateless {...interactiveProps}>
+    <Interactive.Stateless type={type} {...interactiveProps}>
       <Interactive.Container
         type={type}
         border={interactiveProps.prominence === "secondary"}
