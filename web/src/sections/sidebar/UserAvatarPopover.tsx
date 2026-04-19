@@ -5,15 +5,13 @@ import { LOGOUT_DISABLED } from "@/lib/constants";
 import { Notification } from "@/interfaces/settings";
 import useSWR, { preload } from "swr";
 import { errorHandlingFetcher } from "@/lib/fetcher";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { checkUserIsNoAuthUser, getUserDisplayName, logout } from "@/lib/user";
 import { useUser } from "@/providers/UserProvider";
-import InputAvatar from "@/refresh-components/inputs/InputAvatar";
-import Text from "@/refresh-components/texts/Text";
 import LineItem from "@/refresh-components/buttons/LineItem";
 import Popover, { PopoverMenu } from "@/refresh-components/Popover";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
-import SidebarTab from "@/refresh-components/buttons/SidebarTab";
+import { SidebarTab } from "@opal/components";
 import NotificationsPopover from "@/sections/sidebar/NotificationsPopover";
 import {
   SvgBell,
@@ -26,6 +24,7 @@ import { Section } from "@/layouts/general-layouts";
 import { toast } from "@/hooks/useToast";
 import useAppFocus from "@/hooks/useAppFocus";
 import { useVectorDbEnabled } from "@/providers/SettingsProvider";
+import UserAvatar from "@/refresh-components/avatars/UserAvatar";
 
 interface SettingsPopoverProps {
   onUserSettingsClick: () => void;
@@ -38,7 +37,7 @@ function SettingsPopover({
 }: SettingsPopoverProps) {
   const { user } = useUser();
   const { data: notifications } = useSWR<Notification[]>(
-    "/api/notifications",
+    SWR_KEYS.notifications,
     errorHandlingFetcher,
     { revalidateOnFocus: false }
   );
@@ -150,14 +149,13 @@ export default function UserAvatarPopover({
     "Settings" | "Notifications" | undefined
   >(undefined);
   const { user } = useUser();
-  const router = useRouter();
   const appFocus = useAppFocus();
   const vectorDbEnabled = useVectorDbEnabled();
 
   // Fetch notifications for display
   // The GET endpoint also triggers a refresh if release notes are stale
   const { data: notifications } = useSWR<Notification[]>(
-    "/api/notifications",
+    SWR_KEYS.notifications,
     errorHandlingFetcher
   );
 
@@ -186,18 +184,10 @@ export default function UserAvatarPopover({
       <Popover.Trigger asChild>
         <div id="onyx-user-dropdown">
           <SidebarTab
-            icon={({ className }) => (
-              <InputAvatar
-                className={cn(
-                  "flex items-center justify-center bg-background-neutral-inverted-00",
-                  className,
-                  "w-5 h-5"
-                )}
-              >
-                <Text as="p" inverted secondaryBody>
-                  {userDisplayName[0]?.toUpperCase()}
-                </Text>
-              </InputAvatar>
+            icon={() => (
+              <div className="w-[16px] flex flex-col justify-center items-center">
+                <UserAvatar user={user} size={18} />
+              </div>
             )}
             rightChildren={
               hasNotifications ? (
@@ -206,16 +196,9 @@ export default function UserAvatarPopover({
                 </Section>
               ) : undefined
             }
+            type="button"
             selected={!!popupState || appFocus.isUserSettings()}
             folded={folded}
-            // TODO (@raunakab)
-            //
-            // The internals of `SidebarTab` (`Interactive.Base`) was designed such that providing an `onClick` or `href` would trigger rendering a `cursor-pointer`.
-            // However, since instance is wired up as a "trigger", it doesn't have either of those explicitly specified.
-            // Therefore, the default cursor would be rendered.
-            //
-            // Specifying a dummy `onClick` handler solves that.
-            onClick={() => undefined}
           >
             {userDisplayName}
           </SidebarTab>

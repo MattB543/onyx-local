@@ -10,7 +10,6 @@ import Switch from "@/refresh-components/inputs/Switch";
 import CharacterCount from "@/refresh-components/CharacterCount";
 import InputImage from "@/refresh-components/inputs/InputImage";
 import { Button } from "@opal/components";
-import { Disabled } from "@opal/core";
 import { useFormikContext } from "formik";
 import {
   forwardRef,
@@ -26,6 +25,7 @@ import { SvgEdit } from "@opal/icons";
 interface AppearanceThemeSettingsProps {
   selectedLogo: File | null;
   setSelectedLogo: (file: File | null) => void;
+  logoVersion: number;
   charLimits: {
     application_name: number;
     custom_greeting_message: number;
@@ -38,7 +38,6 @@ interface AppearanceThemeSettingsProps {
 }
 
 export interface AppearanceThemeSettingsRef {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   focusFirstError: (errors: Record<string, any>) => void;
 }
 
@@ -46,10 +45,9 @@ export const AppearanceThemeSettings = forwardRef<
   AppearanceThemeSettingsRef,
   AppearanceThemeSettingsProps
 >(function AppearanceThemeSettings(
-  { selectedLogo, setSelectedLogo, charLimits },
+  { selectedLogo, setSelectedLogo, logoVersion, charLimits },
   ref
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { values, errors, setFieldValue } = useFormikContext<any>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const applicationNameInputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +84,6 @@ export const AppearanceThemeSettings = forwardRef<
 
   // Expose focusFirstError method to parent component
   useImperativeHandle(ref, () => ({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     focusFirstError: (errors: Record<string, any>) => {
       // Focus on the first field with an error, in priority order
       const fieldRefs = [
@@ -177,16 +174,15 @@ export const AppearanceThemeSettings = forwardRef<
     };
   }, [logoObjectUrl]);
 
-  const getLogoSrc = () => {
+  const logoSrc = useMemo(() => {
     if (logoObjectUrl) {
       return logoObjectUrl;
     }
     if (values.use_custom_logo) {
-      // eslint-disable-next-line react-hooks/purity -- cache-busting URL needs fresh timestamp
-      return `/api/enterprise-settings/logo?u=${Date.now()}`;
+      return `/api/enterprise-settings/logo?v=${logoVersion}`;
     }
     return undefined;
-  };
+  }, [logoObjectUrl, values.use_custom_logo, logoVersion]);
 
   // Determine which tabs should be enabled
   const hasLogo = Boolean(selectedLogo || values.use_custom_logo);
@@ -241,7 +237,7 @@ export const AppearanceThemeSettings = forwardRef<
               />
             </FormField.Control>
             <FormField.Description>
-              This name will show across the app and replace &ldquo;Onyx&rdquo; in the UI.
+              This name will show across the app and replace "Onyx" in the UI.
             </FormField.Description>
             <FormField.Message
               messages={{ error: errors.application_name as string }}
@@ -306,7 +302,7 @@ export const AppearanceThemeSettings = forwardRef<
           <FormField.Label>Application Logo</FormField.Label>
           <FormField.Control>
             <InputImage
-              src={getLogoSrc()}
+              src={logoSrc}
               onEdit={handleLogoEdit}
               onDrop={(file) => {
                 setSelectedLogo(file);
@@ -317,15 +313,14 @@ export const AppearanceThemeSettings = forwardRef<
             />
           </FormField.Control>
           <div className="mt-2 w-full justify-center items-center flex">
-            <Disabled disabled={!hasLogo}>
-              <Button
-                prominence="secondary"
-                onClick={handleLogoEdit}
-                icon={SvgEdit}
-              >
-                Update
-              </Button>
-            </Disabled>
+            <Button
+              disabled={!hasLogo}
+              prominence="secondary"
+              onClick={handleLogoEdit}
+              icon={SvgEdit}
+            >
+              Update
+            </Button>
           </div>
         </FormField>
       </div>
@@ -345,7 +340,7 @@ export const AppearanceThemeSettings = forwardRef<
         greeting_message={
           values.custom_greeting_message || "Welcome to Acme Chat"
         }
-        logoSrc={getLogoSrc()}
+        logoSrc={logoSrc}
         highlightTarget={highlightTarget}
       />
 

@@ -2,6 +2,7 @@
 
 import { useCallback, memo, useMemo, useState, useEffect, useRef } from "react";
 import useSWR from "swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { useRouter } from "next/navigation";
 import { useSettingsContext } from "@/providers/SettingsProvider";
 import { MinimalPersonaSnapshot } from "@/app/admin/agents/interfaces";
@@ -50,7 +51,7 @@ import {
   LOCAL_STORAGE_KEYS,
 } from "@/sections/sidebar/constants";
 import { showErrorNotification, handleMoveOperation } from "./sidebarUtils";
-import SidebarTab from "@/refresh-components/buttons/SidebarTab";
+import { SidebarTab } from "@opal/components";
 import { ChatSession } from "@/app/app/interfaces";
 import SidebarBody from "@/sections/sidebar/SidebarBody";
 import { useUser } from "@/providers/UserProvider";
@@ -254,7 +255,7 @@ const MemoizedAppSidebarInner = memo(
     // Fetch notifications for build mode intro
     const { data: notifications, mutate: mutateNotifications } = useSWR<
       Notification[]
-    >("/api/notifications", errorHandlingFetcher);
+    >(SWR_KEYS.notifications, errorHandlingFetcher);
 
     // Check if Onyx Craft is enabled via settings (backed by PostHog feature flag)
     // Only explicit true enables the feature; false or undefined = disabled
@@ -542,18 +543,7 @@ const MemoizedAppSidebarInner = memo(
       () => (
         <ChatSearchCommandMenu
           trigger={
-            <SidebarTab
-              icon={SvgSearchMenu}
-              folded={folded}
-              // TODO (@raunakab)
-              //
-              // The internals of `SidebarTab` (`Interactive.Base`) was designed such that providing an `onClick` or `href` would trigger rendering a `cursor-pointer`.
-              // However, since instance is wired up as a "trigger", it doesn't have either of those explicitly specified.
-              // Therefore, the default cursor would be rendered.
-              //
-              // Specifying a dummy `onClick` handler solves that.
-              onClick={() => undefined}
-            >
+            <SidebarTab icon={SvgSearchMenu} folded={folded}>
               Search Chats
             </SidebarTab>
           }
@@ -588,7 +578,7 @@ const MemoizedAppSidebarInner = memo(
             href="/app/agents"
             folded={folded}
             selected={activeSidebarTab.isMoreAgents()}
-            lowlight={!folded}
+            variant={folded ? "sidebar-heavy" : "sidebar-light"}
           >
             {visibleAgents.length === 0 ? "Explore Agents" : "More Agents"}
           </SidebarTab>
@@ -603,7 +593,7 @@ const MemoizedAppSidebarInner = memo(
           onClick={() => createProjectModal.toggle(true)}
           selected={createProjectModal.isOpen}
           folded={folded}
-          lowlight={!folded}
+          variant={folded ? "sidebar-heavy" : "sidebar-light"}
         >
           New Project
         </SidebarTab>
@@ -705,22 +695,19 @@ const MemoizedAppSidebarInner = memo(
           <SidebarBody
             scrollKey="app-sidebar"
             footer={settingsButton}
-            actionButtons={
+            pinnedContent={
               <div className="flex flex-col">
                 {newSessionButton}
                 {searchChatsButton}
                 {crmButton}
                 {isOnyxCraftEnabled && buildButton}
+                {folded && moreAgentsButton}
+                {folded && newProjectButton}
               </div>
             }
           >
-            {/* When folded, show icons immediately without waiting for data */}
-            {folded ? (
-              <>
-                {moreAgentsButton}
-                {newProjectButton}
-              </>
-            ) : isLoadingDynamicContent ? null : (
+            {/* When folded, all nav buttons are in pinnedContent — nothing here */}
+            {folded ? null : isLoadingDynamicContent ? null : (
               <>
                 {/* Agents */}
                 <DndContext
