@@ -120,6 +120,10 @@ function MCPServerCard({
   const allToolIds = tools.map((t) => t.id);
   const serverEnabled =
     tools.length > 0 && tools.some((t) => isToolEnabled(t.id));
+  const needsAuth = !server.is_authenticated;
+  const authTooltip = needsAuth
+    ? "Authenticate this MCP server before enabling its tools."
+    : undefined;
 
   return (
     <ExpandableCard.Root isFolded={isFolded} onFoldedChange={setIsFolded}>
@@ -128,10 +132,13 @@ function MCPServerCard({
         description={server.description}
         icon={getActionIcon(server.server_url, server.name)}
         rightChildren={
-          <Switch
-            checked={serverEnabled}
-            onCheckedChange={(checked) => onToggleTools(allToolIds, checked)}
-          />
+          <SimpleTooltip tooltip={authTooltip} side="top">
+            <Switch
+              checked={serverEnabled}
+              onCheckedChange={(checked) => onToggleTools(allToolIds, checked)}
+              disabled={needsAuth}
+            />
+          </SimpleTooltip>
         }
       >
         {tools.length > 0 && (
@@ -164,12 +171,15 @@ function MCPServerCard({
                 description={tool.description}
                 icon={tool.icon}
                 rightChildren={
-                  <Switch
-                    checked={isToolEnabled(tool.id)}
-                    onCheckedChange={(checked) =>
-                      onToggleTool(tool.id, checked)
-                    }
-                  />
+                  <SimpleTooltip tooltip={authTooltip} side="top">
+                    <Switch
+                      checked={isToolEnabled(tool.id)}
+                      onCheckedChange={(checked) =>
+                        onToggleTool(tool.id, checked)
+                      }
+                      disabled={needsAuth}
+                    />
+                  </SimpleTooltip>
                 }
               />
             ))}
@@ -910,7 +920,7 @@ function ChatPreferencesForm() {
         open={systemPromptModalOpen}
         onOpenChange={setSystemPromptModalOpen}
       >
-        <Modal.Content width="md" height="fit">
+        <Modal.Content width="xl" height="fit">
           <Modal.Header
             icon={SvgAddLines}
             title="System Prompt"
