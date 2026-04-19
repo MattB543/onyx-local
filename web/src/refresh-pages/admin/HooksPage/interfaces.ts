@@ -18,6 +18,8 @@ export interface HookResponse {
   name: string;
   hook_point: HookPoint;
   endpoint_url: string | null;
+  /** Partially-masked API key (e.g. "abcd••••••••wxyz"), or null if no key is set. */
+  api_key_masked: string | null;
   fail_strategy: HookFailStrategy;
   timeout_seconds: number;
   is_active: boolean;
@@ -25,6 +27,14 @@ export interface HookResponse {
   creator_email: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HookFormState {
+  name: string;
+  endpoint_url: string;
+  api_key: string;
+  fail_strategy: HookFailStrategy;
+  timeout_seconds: string;
 }
 
 export interface HookCreateRequest {

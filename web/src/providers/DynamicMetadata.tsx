@@ -8,9 +8,7 @@ export default function DynamicMetadata() {
 
   useEffect(() => {
     const title =
-      enterpriseSettings?.application_name ||
-      settings?.whitelabel_name ||
-      "Onyx";
+      enterpriseSettings?.application_name || settings?.whitelabel_name || "Onyx";
     if (document.title !== title) {
       document.title = title;
     }
