@@ -90,3 +90,6 @@ scripts/reencrypt-credentials.sh
 
 private_docs/.claude/worktrees/
 .claude/worktrees/
+
+# Added context for LLMs
+onyx-llm-context/

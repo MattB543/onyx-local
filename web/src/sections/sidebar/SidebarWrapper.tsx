@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@opal/components";
 import Logo from "@/refresh-components/Logo";
@@ -16,49 +16,54 @@ function LogoSection({ folded, onFoldClick }: LogoSectionProps) {
   const whitelabelName = settings.settings?.whitelabel_name;
   const logoDisplayStyle = settings.enterpriseSettings?.logo_display_style;
 
-  const logo = useCallback(
-    (className?: string) => <Logo folded={folded} className={className} />,
+  const logo = useMemo(
+    () => (
+      <div className="px-1">
+        <Logo folded={folded} size={28} />
+      </div>
+    ),
     [folded]
   );
-  const closeButton = useCallback(
-    (shouldFold: boolean) => (
-      <Button
-        icon={SvgSidebar}
-        prominence="tertiary"
-        tooltip="Close Sidebar"
-        onClick={onFoldClick}
-      />
+  const closeButton = useMemo(
+    () => (
+      <div className="px-1">
+        <Button
+          icon={SvgSidebar}
+          prominence="tertiary"
+          tooltip={folded ? "Open Sidebar" : "Close Sidebar"}
+          tooltipSide={folded ? "right" : "bottom"}
+          size="md"
+          onClick={onFoldClick}
+        />
+      </div>
     ),
-    [onFoldClick]
+    [folded, onFoldClick]
   );
 
   return (
     <div
       className={cn(
         "flex flex-row justify-between items-start pt-3 px-2",
-        folded ? "justify-center" : "justify-between",
         applicationName || whitelabelName
           ? "h-[3.75rem] min-h-[3.75rem]"
           : "h-[3.25rem] min-h-[3.25rem]"
       )}
     >
       {folded === undefined ? (
-        <div className="p-1">{logo()}</div>
+        logo
       ) : folded && logoDisplayStyle !== "name_only" ? (
         <>
-          <div className="group-hover/SidebarWrapper:hidden pt-1.5">
-            {logo()}
-          </div>
-          <div className="w-full justify-center hidden group-hover/SidebarWrapper:flex">
-            {closeButton(false)}
+          <div className="group-hover/SidebarWrapper:hidden">{logo}</div>
+          <div className="hidden group-hover/SidebarWrapper:flex">
+            {closeButton}
           </div>
         </>
       ) : folded ? (
-        <div className="flex w-full justify-center">{closeButton(false)}</div>
+        closeButton
       ) : (
         <>
-          <div className="p-1"> {logo()}</div>
-          {closeButton(true)}
+          {logo}
+          {closeButton}
         </>
       )}
     </div>

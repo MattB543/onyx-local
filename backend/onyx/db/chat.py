@@ -224,16 +224,21 @@ def delete_orphaned_search_docs(db_session: Session) -> None:
 
 def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_session: Session) -> None:
     # Select messages older than cutoff_time with files
-    messages_with_files = db_session.execute(
-        select(ChatMessage.id, ChatMessage.files).where(
-            ChatMessage.chat_session_id == chat_session_id,
+    messages_with_files = (
+        db_session.execute(
+            select(ChatMessage.id, ChatMessage.files).where(
+                ChatMessage.chat_session_id == chat_session_id,
+            )
         )
-    ).fetchall()
+        .tuples()
+        .all()
+    )
 
     raw_file_ids_to_consider: set[str] = set()
     for _, files in messages_with_files:
         for file_info in files or []:
             if file_info.get("user_file_id"):
+                # user files are managed by the user file lifecycle
                 continue
             file_id = file_info.get("id")
             if file_id:
@@ -248,13 +253,13 @@ def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_sessio
     file_store = get_default_file_store()
     for file_id in raw_file_ids_to_consider - protected_raw_file_ids:
         try:
-            file_store.delete_file(file_id=file_id)
+            file_store.delete_file(file_id=file_id, error_on_missing=False)
         except Exception as e:
             logger.warning(f"Failed to delete raw chat file {file_id}: {e}")
 
         plaintext_file_id = plaintext_file_name_for_id(file_id)
         try:
-            file_store.delete_file(file_id=plaintext_file_id)
+            file_store.delete_file(file_id=plaintext_file_id, error_on_missing=False)
         except Exception:
             logger.debug(
                 f"Plaintext cache {plaintext_file_id} did not exist during chat deletion"

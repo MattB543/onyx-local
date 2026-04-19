@@ -16,7 +16,7 @@ import Text from "@/refresh-components/texts/Text";
 import SidebarWrapper from "@/sections/sidebar/SidebarWrapper";
 import SidebarBody from "@/sections/sidebar/SidebarBody";
 import SidebarSection from "@/sections/sidebar/SidebarSection";
-import UserAvatarPopover from "@/sections/sidebar/UserAvatarPopover";
+import AccountPopover from "@/sections/sidebar/AccountPopover";
 import Popover, { PopoverMenu } from "@/refresh-components/Popover";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import ButtonRenaming from "@/refresh-components/buttons/ButtonRenaming";
@@ -238,9 +238,7 @@ function BuildSessionButton({
               <Text
                 as="p"
                 data-state={isActive ? "active" : "inactive"}
-                className={cn(
-                  "sidebar-tab-text-defaulted line-clamp-1 break-all text-left"
-                )}
+                className="line-clamp-1 break-all text-left"
                 mainUiBody
               >
                 <TypewriterText
@@ -400,7 +398,7 @@ const MemoizedBuildSidebarInner = memo(
       () => (
         <div>
           {backToChatButton}
-          <UserAvatarPopover folded={folded} />
+          <AccountPopover folded={folded} />
         </div>
       ),
       [folded, backToChatButton]

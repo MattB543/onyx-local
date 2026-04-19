@@ -19,6 +19,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from onyx.cache.factory import get_cache_backend
+from onyx.cache.interface import CacheBackend
 from onyx.chat.chat_file_utils import enqueue_promoted_user_file_indexing
 from onyx.chat.chat_file_utils import promote_chat_uploads_to_user_files
 from onyx.chat.chat_processing_checker import set_processing_status
@@ -605,10 +606,9 @@ def build_chat_turn(
     if not is_multi:
         model_display_names = [""]
 
-    # Promote any chat-scoped uploads requested to be indexed as user files
-    # (so they can be referenced later by name).  This rewrites the message's
-    # file IDs to the new user-file IDs before verify_user_files so the
-    # ownership check passes on the promoted IDs.
+    # Promote chat upload files to user files when index_for_later is requested.
+    # This happens BEFORE verify_user_files so that the updated file_descriptors
+    # (with user_file_id attached) pass the verify step.
     promoted_user_file_ids: list[UUID] = []
     if new_msg_req.index_for_later_file_ids:
         file_descriptor_ids = {
@@ -738,7 +738,6 @@ def build_chat_turn(
                 user_file_ids=promoted_user_file_ids,
                 tenant_id=tenant_id,
             )
-
         chat_history.append(user_message)
 
     # Collect file IDs for the file reader tool *before* summary truncation so
