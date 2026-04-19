@@ -4,8 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import * as SettingsLayouts from "@/layouts/settings-layouts";
 import * as GeneralLayouts from "@/layouts/general-layouts";
-import Button from "@/refresh-components/buttons/Button";
-import { Button as OpalButton, Divider } from "@opal/components";
+import { Button, Divider, MessageCard } from "@opal/components";
 import { Hoverable } from "@opal/core";
 import { FullPersona } from "@/app/admin/agents/interfaces";
 import { buildImgUrl } from "@/app/app/components/files/images/utils";
@@ -15,7 +14,6 @@ import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInElementField from "@/refresh-components/form/InputTypeInElementField";
 import InputDatePickerField from "@/refresh-components/form/InputDatePickerField";
-import Message from "@/refresh-components/messages/Message";
 import { InputHorizontal, InputVertical } from "@opal/layouts";
 import { useFormikContext } from "formik";
 import LLMSelector from "@/components/llm/LLMSelector";
@@ -223,7 +221,7 @@ function AgentIconEditor({ existingAgent }: AgentIconEditorProps) {
               {/* TODO(@raunakab): migrate to opal Button once className/iconClassName is resolved */}
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2">
                 <Hoverable.Item group="inputAvatar" variant="opacity-on-hover">
-                  <Button className="h-[1.75rem]" secondary>
+                  <Button size="md" prominence="secondary">
                     Edit
                   </Button>
                 </Hoverable.Item>
@@ -356,13 +354,13 @@ function MCPServerCard({
             onChange={(e) => setQuery(e.target.value)}
           />
           {enabledTools.length > 0 && (
-            <OpalButton
+            <Button
               prominence="internal"
               rightIcon={isFolded ? SvgExpand : SvgFold}
               onClick={() => setIsFolded((prev) => !prev)}
             >
               {isFolded ? "Expand" : "Fold"}
-            </OpalButton>
+            </Button>
           )}
         </GeneralLayouts.Section>
       </ActionsLayouts.Header>
@@ -1196,12 +1194,9 @@ export default function AgentEditorPage({
                       icon={SvgTrash}
                       title="Delete Agent"
                       submit={
-                        <OpalButton
-                          variant="danger"
-                          onClick={handleDeleteAgent}
-                        >
+                        <Button variant="danger" onClick={handleDeleteAgent}>
                           Delete Agent
-                        </OpalButton>
+                        </Button>
                       }
                       onClose={() => deleteAgentModal.toggle(false)}
                     >
@@ -1223,13 +1218,13 @@ export default function AgentEditorPage({
                       title={existingAgent ? "Edit Agent" : "Create Agent"}
                       rightChildren={
                         <div className="flex gap-2">
-                          <OpalButton
+                          <Button
                             prominence="secondary"
                             type="button"
                             onClick={() => router.back()}
                           >
                             Cancel
-                          </OpalButton>
+                          </Button>
                           <Tooltip
                             tooltip={
                               isSubmitting
@@ -1244,7 +1239,7 @@ export default function AgentEditorPage({
                             }
                             side="bottom"
                           >
-                            <OpalButton
+                            <Button
                               disabled={
                                 isSubmitting ||
                                 !isValid ||
@@ -1254,7 +1249,7 @@ export default function AgentEditorPage({
                               type="submit"
                             >
                               {existingAgent ? "Save" : "Create"}
-                            </OpalButton>
+                            </Button>
                           </Tooltip>
                         </div>
                       }
@@ -1523,13 +1518,13 @@ export default function AgentEditorPage({
                                 description="with other users, groups, or everyone in your organization."
                                 center
                               >
-                                <OpalButton
+                                <Button
                                   prominence="secondary"
                                   icon={isShared ? SvgUsers : SvgLock}
                                   onClick={() => shareAgentModal.toggle(true)}
                                 >
                                   Share
-                                </OpalButton>
+                                </Button>
                               </InputHorizontal>
                               {canUpdateFeaturedStatus && (
                                 <>
@@ -1541,12 +1536,7 @@ export default function AgentEditorPage({
                                     <SwitchField name="is_featured" />
                                   </InputHorizontal>
                                   {values.is_featured && !isShared && (
-                                    <Message
-                                      static
-                                      close={false}
-                                      className="w-full"
-                                      text="This agent is private to you and will only be featured for yourself."
-                                    />
+                                    <MessageCard title="This agent is private to you and will only be featured for yourself." />
                                   )}
                                 </>
                               )}
@@ -1627,13 +1617,13 @@ export default function AgentEditorPage({
                               description="Anyone using this agent will no longer be able to access it."
                               center
                             >
-                              <OpalButton
+                              <Button
                                 variant="danger"
                                 prominence="secondary"
                                 onClick={() => deleteAgentModal.toggle(true)}
                               >
                                 Delete Agent
-                              </OpalButton>
+                              </Button>
                             </InputHorizontal>
                           </Card>
                         </>

@@ -6,6 +6,7 @@ from celery.schedules import crontab
 
 from onyx.configs.app_configs import AUTO_LLM_CONFIG_URL
 from onyx.configs.app_configs import AUTO_LLM_UPDATE_INTERVAL_SECONDS
+from onyx.configs.app_configs import DISABLE_OPENSEARCH_MIGRATION_TASK
 from onyx.configs.app_configs import DISABLE_VECTOR_DB
 from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
 from onyx.configs.app_configs import ENABLE_OPENSEARCH_INDEXING_FOR_ONYX
@@ -269,7 +270,7 @@ if ENABLE_CUSTOM_JOBS:
     )
 
 # Add OpenSearch migration task if enabled.
-if ENABLE_OPENSEARCH_INDEXING_FOR_ONYX:
+if ENABLE_OPENSEARCH_INDEXING_FOR_ONYX and not DISABLE_OPENSEARCH_MIGRATION_TASK:
     beat_task_templates.append(
         {
             "name": "migrate-chunks-from-vespa-to-opensearch",
