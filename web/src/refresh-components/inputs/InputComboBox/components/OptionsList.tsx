@@ -28,6 +28,8 @@ interface OptionsListProps {
   onClear?: () => void;
   /** Show "Add" prefix in create option */
   showAddPrefix: boolean;
+  /** Prefix shown before the typed value in the create option (e.g., "Use", "Add") */
+  createPrefix?: string;
 }
 
 /**
@@ -51,6 +53,7 @@ export const OptionsList: React.FC<OptionsListProps> = ({
   showCreateOption,
   onClear,
   showAddPrefix,
+  createPrefix,
 }) => {
   // Index offset for other options when create option is shown
   const indexOffset = showCreateOption ? 1 : 0;
@@ -76,7 +79,7 @@ export const OptionsList: React.FC<OptionsListProps> = ({
           data-index={0}
           role="option"
           aria-selected={false}
-          aria-label={`${showAddPrefix ? "Add" : "Create"} "${inputValue}"`}
+          aria-label={`${createPrefix ?? "Create"} "${inputValue}"`}
           onClick={(e) => {
             e.stopPropagation();
             onSelect({ value: inputValue, label: inputValue });
@@ -91,18 +94,18 @@ export const OptionsList: React.FC<OptionsListProps> = ({
             "flex items-center justify-between rounded-08",
             highlightedIndex === 0 && "bg-background-tint-02",
             "hover:bg-background-tint-02",
-            showAddPrefix ? "px-1.5 py-1.5" : "px-3 py-2"
+            createPrefix ? "px-1.5 py-1.5" : "px-3 py-2"
           )}
         >
           <span
             className={cn(
               "font-main-ui-action truncate min-w-0",
-              showAddPrefix ? "px-1" : ""
+              createPrefix ? "px-1" : ""
             )}
           >
-            {showAddPrefix ? (
+            {createPrefix ? (
               <>
-                <span className="text-text-03">Add</span>
+                <span className="text-text-03">{createPrefix}</span>
                 <span className="text-text-04">{` ${inputValue}`}</span>
               </>
             ) : (
@@ -112,7 +115,7 @@ export const OptionsList: React.FC<OptionsListProps> = ({
           <SvgPlus
             className={cn(
               "w-4 h-4 flex-shrink-0",
-              showAddPrefix ? "text-text-04 mx-1" : "text-text-03 ml-2"
+              createPrefix ? "text-text-04 mx-1" : "text-text-03 ml-2"
             )}
           />
         </div>

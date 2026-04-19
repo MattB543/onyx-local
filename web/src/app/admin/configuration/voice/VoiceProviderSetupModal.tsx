@@ -1,5 +1,6 @@
 "use client";
 
+import { markdown } from "@opal/utils";
 import Image from "next/image";
 import { FunctionComponent, useState, useEffect } from "react";
 import {
@@ -16,7 +17,8 @@ import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import { FormField } from "@/refresh-components/form/FormField";
 import { Vertical, Horizontal } from "@/layouts/input-layouts";
 import { Section } from "@/layouts/general-layouts";
-import { SvgArrowExchange, SvgOnyxLogo } from "@opal/icons";
+import { SvgArrowExchange } from "@opal/icons";
+import { SvgOnyxLogo } from "@opal/logos";
 import { Disabled } from "@opal/core";
 import type { IconProps } from "@opal/types";
 import { VoiceProviderView } from "@/hooks/useVoiceProviders";
@@ -260,7 +262,7 @@ export default function VoiceProviderSetupModal({
         <SvgArrowExchange className="size-3 text-text-04" />
       </div>
       <div className="flex items-center justify-center size-7 p-0.5 shrink-0 overflow-clip">
-        <SvgOnyxLogo size={24} className="text-text-04 shrink-0" />
+        <SvgOnyxLogo size={24} className="shrink-0" />
       </div>
     </div>
   );
@@ -400,7 +402,7 @@ export default function VoiceProviderSetupModal({
                     options={existingApiKeyOptions}
                     separatorLabel="Reuse OpenAI API Keys"
                     strict={false}
-                    showAddPrefix
+                    createPrefix="Add"
                   />
                 ) : (
                   <PasswordInputTypeIn
@@ -436,22 +438,9 @@ export default function VoiceProviderSetupModal({
             {providerType === "azure" && (
               <Vertical
                 title="Target URI"
-                subDescription={
-                  <>
-                    Paste the endpoint shown in{" "}
-                    <a
-                      href="https://portal.azure.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      Azure Portal (Keys and Endpoint)
-                    </a>
-                    . Onyx extracts the speech region from this URL. Examples:
-                    https://westus.api.cognitive.microsoft.com/ or
-                    https://westus.tts.speech.microsoft.com/.
-                  </>
-                }
+                subDescription={markdown(
+                  "Paste the endpoint shown in [Azure Portal (Keys and Endpoint)](https://portal.azure.com/). Onyx extracts the speech region from this URL. Examples: https://westus.api.cognitive.microsoft.com/ or https://westus.tts.speech.microsoft.com/."
+                )}
                 nonInteractive
               >
                 <InputTypeIn
@@ -503,24 +492,14 @@ export default function VoiceProviderSetupModal({
             {mode === "tts" && (
               <Vertical
                 title="Voice"
-                subDescription={
-                  <>
-                    This voice will be used for spoken responses. See full list
-                    of supported languages and voices at{" "}
-                    <a
-                      href={
-                        PROVIDER_VOICE_DOCS_URLS[providerType]?.url ??
-                        PROVIDER_DOCS_URLS[providerType]
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      {PROVIDER_VOICE_DOCS_URLS[providerType]?.label ?? label}
-                    </a>
-                    .
-                  </>
-                }
+                subDescription={markdown(
+                  `This voice will be used for spoken responses. See full list of supported languages and voices at [${
+                    PROVIDER_VOICE_DOCS_URLS[providerType]?.label ?? label
+                  }](${
+                    PROVIDER_VOICE_DOCS_URLS[providerType]?.url ??
+                    PROVIDER_DOCS_URLS[providerType]
+                  }).`
+                )}
                 nonInteractive
               >
                 <InputComboBox

@@ -4,12 +4,12 @@ import {
   SvgActivity,
   SvgArrowExchange,
   SvgAudio,
+  SvgShareWebhook,
   SvgBarChart,
   SvgBookOpen,
   SvgBubbleText,
   SvgClipboard,
   SvgCpu,
-  SvgDiscordMono,
   SvgDownload,
   SvgEmpty,
   SvgFileText,
@@ -23,7 +23,6 @@ import {
   SvgPaintBrush,
   SvgProgressBars,
   SvgSearchMenu,
-  SvgSlack,
   SvgTerminal,
   SvgThumbsUp,
   SvgUploadCloud,
@@ -33,6 +32,8 @@ import {
   SvgUsers,
   SvgWallet,
   SvgZoomIn,
+  SvgDiscord,
+  SvgSlack,
 } from "@opal/icons";
 
 export interface AdminRouteEntry {
@@ -91,7 +92,7 @@ export const ADMIN_ROUTES = {
   },
   DISCORD_BOTS: {
     path: "/admin/discord-bot",
-    icon: SvgDiscordMono,
+    icon: SvgDiscord,
     title: "Discord Integration",
     sidebarLabel: "Discord Integration",
   },
@@ -180,7 +181,7 @@ export const ADMIN_ROUTES = {
     sidebarLabel: "Users",
   },
   API_KEYS: {
-    path: "/admin/api-key",
+    path: "/admin/service-accounts",
     icon: SvgUserKey,
     title: "Service Accounts",
     sidebarLabel: "Service Accounts",
@@ -226,6 +227,12 @@ export const ADMIN_ROUTES = {
     icon: SvgArrowExchange,
     title: "Document Index Migration",
     sidebarLabel: "Document Index Migration",
+  },
+  HOOKS: {
+    path: "/admin/hooks",
+    icon: SvgShareWebhook,
+    title: "Hook Extensions",
+    sidebarLabel: "Hook Extensions",
   },
   SCIM: {
     path: "/admin/scim",

@@ -12,6 +12,7 @@ import {
   FileChatDisplay,
   Message,
   MessageResponseIDInfo,
+  MultiModelMessageResponseIDInfo,
   ResearchType,
   RetrievalType,
   StreamingError,
@@ -96,6 +97,7 @@ export type PacketType =
   | FileChatDisplay
   | StreamingError
   | MessageResponseIDInfo
+  | MultiModelMessageResponseIDInfo
   | StreamStopInfo
   | UserKnowledgeFilePacket
   | Packet;
@@ -108,6 +110,13 @@ export type MessageOrigin =
   | "api"
   | "slackbot"
   | "unknown";
+
+export interface LLMOverride {
+  model_provider: string;
+  model_version: string;
+  temperature?: number;
+  display_name?: string;
+}
 
 export interface SendMessageParams {
   message: string;
@@ -125,6 +134,8 @@ export interface SendMessageParams {
   modelProvider?: string;
   modelVersion?: string;
   temperature?: number;
+  // Multi-model: send multiple LLM overrides for parallel generation
+  llmOverrides?: LLMOverride[];
   // Origin of the message for telemetry tracking
   origin?: MessageOrigin;
   // Additional context injected into the LLM call but not stored/shown in chat.
@@ -146,6 +157,7 @@ export async function* sendMessage({
   modelProvider,
   modelVersion,
   temperature,
+  llmOverrides,
   origin,
   additionalContext,
 }: SendMessageParams): AsyncGenerator<PacketType, void, unknown> {
@@ -168,6 +180,8 @@ export async function* sendMessage({
             model_version: modelVersion,
           }
         : null,
+    // Multi-model: list of LLM overrides for parallel generation
+    llm_overrides: llmOverrides ?? null,
     // Default to "unknown" for consistency with backend; callers should set explicitly
     origin: origin ?? "unknown",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -186,10 +200,25 @@ export async function* sendMessage({
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail ?? `HTTP error! status: ${response.status}`);
   }
 
   yield* handleSSEStream<PacketType>(response, signal);
+}
+
+export async function setPreferredResponse(
+  userMessageId: number,
+  preferredResponseId: number
+): Promise<Response> {
+  return fetch("/api/chat/set-preferred-response", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_message_id: userMessageId,
+      preferred_response_id: preferredResponseId,
+    }),
+  });
 }
 
 export async function nameChatSession(chatSessionId: string) {
@@ -336,7 +365,9 @@ export function processRawChatHistory(
       nodeId: messageInfo.message_id,
       messageId: messageInfo.message_id,
       message: messageInfo.message,
-      type: messageInfo.message_type as "user" | "assistant",
+      type: messageInfo.error
+        ? "error"
+        : (messageInfo.message_type as "user" | "assistant"),
       files: messageInfo.files,
       alternateAgentID:
         messageInfo.alternate_assistant_id !== null
@@ -361,6 +392,9 @@ export function processRawChatHistory(
       overridden_model: messageInfo.overridden_model,
       packets: packetsForMessage || [],
       currentFeedback: messageInfo.current_feedback as FeedbackType | null,
+      // Multi-model answer generation
+      preferredResponseId: messageInfo.preferred_response_id ?? null,
+      modelDisplayName: messageInfo.model_display_name ?? null,
     };
 
     messages.set(messageInfo.message_id, message);

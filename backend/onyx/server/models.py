@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from onyx.auth.schemas import UserRole
+from onyx.db.enums import AccountType
 from onyx.db.models import User
 
 
@@ -42,6 +43,7 @@ class FullUserSnapshot(BaseModel):
     id: UUID
     email: str
     role: UserRole
+    account_type: AccountType
     is_active: bool
     password_configured: bool
     personal_name: str | None
@@ -61,6 +63,7 @@ class FullUserSnapshot(BaseModel):
             id=user.id,
             email=user.email,
             role=user.role,
+            account_type=user.account_type,
             is_active=user.is_active,
             password_configured=user.password_configured,
             personal_name=user.personal_name,

@@ -10,8 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from onyx.auth.permissions import require_permission
 from onyx.auth.users import current_curator_or_admin_user
-from onyx.auth.users import current_user
 from onyx.background.celery.tasks.pruning.tasks import (
     try_creating_prune_generator_task,
 )
@@ -38,11 +38,15 @@ from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import AccessType
 from onyx.db.enums import ConnectorCredentialPairStatus
 from onyx.db.enums import IndexingStatus
+from onyx.db.enums import Permission
 from onyx.db.enums import PermissionSyncStatus
 from onyx.db.index_attempt import count_index_attempt_errors_for_cc_pair
 from onyx.db.index_attempt import count_index_attempts_for_cc_pair
 from onyx.db.index_attempt import get_index_attempt_errors_for_cc_pair
 from onyx.db.index_attempt import get_latest_index_attempt_for_cc_pair_id
+from onyx.db.index_attempt import (
+    get_latest_successful_index_attempt_for_cc_pair_id,
+)
 from onyx.db.index_attempt import get_paginated_index_attempts_for_cc_pair_id
 from onyx.db.indexing_coordination import IndexingCoordination
 from onyx.db.models import IndexAttempt
@@ -190,6 +194,11 @@ def get_cc_pair_full_info(
         only_finished=False,
     )
 
+    latest_successful_attempt = get_latest_successful_index_attempt_for_cc_pair_id(
+        db_session=db_session,
+        connector_credential_pair_id=cc_pair_id,
+    )
+
     # Get latest permission sync attempt for status
     latest_permission_sync_attempt = None
     if cc_pair.access_type == AccessType.SYNC:
@@ -207,6 +216,11 @@ def get_cc_pair_full_info(
             cc_pair_id=cc_pair_id,
         ),
         last_index_attempt=latest_attempt,
+        last_successful_index_time=(
+            latest_successful_attempt.time_started
+            if latest_successful_attempt
+            else None
+        ),
         latest_deletion_attempt=get_deletion_attempt_snapshot(
             connector_id=cc_pair.connector_id,
             credential_id=cc_pair.credential_id,
@@ -609,7 +623,7 @@ def associate_credential_to_connector(
 def dissociate_credential_from_connector(
     connector_id: int,
     credential_id: int,
-    user: User = Depends(current_user),
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse[int]:
     return remove_credential_from_connector(
