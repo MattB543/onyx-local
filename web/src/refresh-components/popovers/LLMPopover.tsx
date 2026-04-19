@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Popover from "@/refresh-components/Popover";
 import { LlmDescriptor, LlmManager } from "@/lib/hooks";
 import { structureValue } from "@/lib/llmConfig/utils";
-import {
-  getProviderIcon,
-  AGGREGATOR_PROVIDERS,
-} from "@/app/admin/configuration/llm/utils";
-import { LLMProviderDescriptor } from "@/interfaces/llm";
+import { getModelIcon } from "@/lib/llmConfig";
+import { AGGREGATOR_PROVIDERS } from "@/lib/llmConfig/svc";
+
 import { Slider } from "@/components/ui/slider";
 import { useUser } from "@/providers/UserProvider";
 import Text from "@/refresh-components/texts/Text";
@@ -26,54 +24,7 @@ export interface LLMPopoverProps {
   disabled?: boolean;
 }
 
-export function buildLlmOptions(
-  llmProviders: LLMProviderDescriptor[] | undefined,
-  currentModelName?: string
-): LLMOption[] {
-  if (!llmProviders) {
-    return [];
-  }
-
-  // Track seen combinations of provider + exact model name to avoid true duplicates
-  // (same model appearing from multiple LLM provider configs with same provider type)
-  const seenKeys = new Set<string>();
-  const options: LLMOption[] = [];
-
-  llmProviders.forEach((llmProvider) => {
-    llmProvider.model_configurations
-      .filter(
-        (modelConfiguration) =>
-          modelConfiguration.is_visible ||
-          modelConfiguration.name === currentModelName
-      )
-      .forEach((modelConfiguration) => {
-        // Deduplicate by exact provider + model name combination
-        const key = `${llmProvider.provider}:${modelConfiguration.name}`;
-        if (seenKeys.has(key)) {
-          return;
-        }
-        seenKeys.add(key);
-
-        options.push({
-          name: llmProvider.name,
-          provider: llmProvider.provider,
-          providerDisplayName:
-            llmProvider.provider_display_name || llmProvider.provider,
-          modelName: modelConfiguration.name,
-          displayName:
-            modelConfiguration.display_name || modelConfiguration.name,
-          vendor: modelConfiguration.vendor || null,
-          maxInputTokens: modelConfiguration.max_input_tokens,
-          region: modelConfiguration.region || null,
-          version: modelConfiguration.version || null,
-          supportsReasoning: modelConfiguration.supports_reasoning || false,
-          supportsImageInput: modelConfiguration.supports_image_input || false,
-        });
-      });
-  });
-
-  return options;
-}
+export { buildLlmOptions } from "./llmUtils";
 
 export function groupLlmOptions(
   filteredOptions: LLMOption[]
@@ -102,7 +53,7 @@ export function groupLlmOptions(
       groups.set(groupKey, {
         displayName,
         options: [],
-        Icon: getProviderIcon(provider),
+        Icon: getModelIcon(provider),
       });
     }
 
@@ -240,7 +191,7 @@ export default function LLMPopover({
             icon={
               foldable
                 ? SvgRefreshCw
-                : getProviderIcon(
+                : getModelIcon(
                     llmManager.currentLlm.provider,
                     llmManager.currentLlm.modelName
                   )

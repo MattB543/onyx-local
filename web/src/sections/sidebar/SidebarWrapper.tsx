@@ -44,6 +44,7 @@ function LogoSection({ folded, onFoldClick }: LogoSectionProps) {
     <div
       className={cn(
         "flex flex-row justify-between items-start pt-3 px-2",
+        folded ? "justify-center" : "justify-between",
         applicationName || whitelabelName
           ? "h-[3.75rem] min-h-[3.75rem]"
           : "h-[3.25rem] min-h-[3.25rem]"

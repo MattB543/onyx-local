@@ -44,6 +44,32 @@ SEND_USER_METADATA_TO_LLM_PROVIDER = (
 # User Facing Features Configs
 #####
 BLURB_SIZE = 128  # Number Encoder Tokens included in the chunk blurb
+
+# Hard ceiling for the admin-configurable file upload size (in MB).
+# Self-hosted customers can raise or lower this via the environment variable.
+_raw_max_upload_size_mb = int(os.environ.get("MAX_ALLOWED_UPLOAD_SIZE_MB", "250"))
+if _raw_max_upload_size_mb < 0:
+    logger.warning(
+        "MAX_ALLOWED_UPLOAD_SIZE_MB=%d is negative; falling back to 250",
+        _raw_max_upload_size_mb,
+    )
+    _raw_max_upload_size_mb = 250
+MAX_ALLOWED_UPLOAD_SIZE_MB = _raw_max_upload_size_mb
+
+# Default fallback for the per-user file upload size limit (in MB) when no
+# admin-configured value exists.  Clamped to MAX_ALLOWED_UPLOAD_SIZE_MB at
+# runtime so this never silently exceeds the hard ceiling.
+_raw_default_upload_size_mb = int(
+    os.environ.get("DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB", "100")
+)
+if _raw_default_upload_size_mb < 0:
+    logger.warning(
+        "DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB=%d is negative; falling back to 100",
+        _raw_default_upload_size_mb,
+    )
+    _raw_default_upload_size_mb = 100
+DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB = _raw_default_upload_size_mb
+
 GENERATIVE_MODEL_ACCESS_CHECK_FREQ = int(
     os.environ.get("GENERATIVE_MODEL_ACCESS_CHECK_FREQ") or 86400
 )  # 1 day

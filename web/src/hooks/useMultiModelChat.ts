@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   MAX_MODELS,
   SelectedModel,
 } from "@/refresh-components/popovers/ModelSelector";
 import { LLMOverride } from "@/app/app/services/lib";
 import { LlmManager } from "@/lib/hooks";
-import { buildLlmOptions } from "@/refresh-components/popovers/LLMPopover";
+import { buildLlmOptions } from "@/refresh-components/popovers/llmUtils";
 
 export interface UseMultiModelChatReturn {
   /** Currently selected models for multi-model comparison. */
@@ -40,7 +40,6 @@ export default function useMultiModelChat(
   llmManager: LlmManager
 ): UseMultiModelChatReturn {
   const [selectedModels, setSelectedModels] = useState<SelectedModel[]>([]);
-  const [defaultInitialized, setDefaultInitialized] = useState(false);
 
   // Initialize with the default model from llmManager once providers load
   const llmOptions = useMemo(
@@ -49,69 +48,99 @@ export default function useMultiModelChat(
     [llmManager.llmProviders]
   );
 
-  useEffect(() => {
-    if (defaultInitialized) return;
-    if (llmOptions.length === 0) return;
+  // In single-model mode, derive the displayed model directly from
+  // llmManager.currentLlm so it always stays in sync (no stale state).
+  // Only use the selectedModels state array when the user has manually
+  // added multiple models (multi-model mode).
+  const currentLlmModel = useMemo((): SelectedModel | null => {
+    if (llmOptions.length === 0) return null;
     const { currentLlm } = llmManager;
-    // Don't initialize if currentLlm hasn't loaded yet
-    if (!currentLlm.modelName) return;
+    if (!currentLlm.modelName) return null;
     const match = llmOptions.find(
       (opt) =>
         opt.provider === currentLlm.provider &&
         opt.modelName === currentLlm.modelName
     );
-    if (match) {
-      setSelectedModels([
-        {
-          name: match.name,
-          provider: match.provider,
-          modelName: match.modelName,
-          displayName: match.displayName,
-        },
-      ]);
-      setDefaultInitialized(true);
-    }
-  }, [llmOptions, llmManager.currentLlm, defaultInitialized]);
+    if (!match) return null;
+    return {
+      name: match.name,
+      provider: match.provider,
+      modelName: match.modelName,
+      displayName: match.displayName,
+    };
+  }, [llmOptions, llmManager.currentLlm]);
 
   const isMultiModelActive = selectedModels.length > 1;
 
-  const addModel = useCallback((model: SelectedModel) => {
-    setSelectedModels((prev) => {
-      if (prev.length >= MAX_MODELS) return prev;
-      if (
-        prev.some(
-          (m) =>
-            m.provider === model.provider && m.modelName === model.modelName
-        )
-      ) {
-        return prev;
-      }
-      return [...prev, model];
-    });
-  }, []);
+  // Expose the effective selection: multi-model state when active,
+  // otherwise the single model derived from llmManager.
+  const effectiveSelectedModels = useMemo(
+    () =>
+      isMultiModelActive
+        ? selectedModels
+        : currentLlmModel
+          ? [currentLlmModel]
+          : [],
+    [isMultiModelActive, selectedModels, currentLlmModel]
+  );
+
+  const addModel = useCallback(
+    (model: SelectedModel) => {
+      setSelectedModels((prev) => {
+        // When in effective single-model mode (prev <= 1), always re-seed from
+        // the current derived model so stale state from a prior remove doesn't persist.
+        const base =
+          prev.length <= 1 && currentLlmModel ? [currentLlmModel] : prev;
+        if (base.length >= MAX_MODELS) return base;
+        if (
+          base.some(
+            (m) =>
+              m.provider === model.provider && m.modelName === model.modelName
+          )
+        ) {
+          return base;
+        }
+        return [...base, model];
+      });
+    },
+    [currentLlmModel]
+  );
 
   const removeModel = useCallback((index: number) => {
     setSelectedModels((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const replaceModel = useCallback((index: number, model: SelectedModel) => {
-    setSelectedModels((prev) => {
-      // Don't replace with a model that's already selected elsewhere
-      if (
-        prev.some(
-          (m, i) =>
-            i !== index &&
-            m.provider === model.provider &&
-            m.modelName === model.modelName
-        )
-      ) {
-        return prev;
+  const replaceModel = useCallback(
+    (index: number, model: SelectedModel) => {
+      // In single-model mode, update llmManager directly so currentLlm
+      // (and thus effectiveSelectedModels) reflects the change immediately.
+      if (!isMultiModelActive) {
+        llmManager.updateCurrentLlm({
+          name: model.name,
+          provider: model.provider,
+          modelName: model.modelName,
+        });
+        return;
       }
-      const next = [...prev];
-      next[index] = model;
-      return next;
-    });
-  }, []);
+      setSelectedModels((prev) => {
+        // Don't replace with a model that's already selected elsewhere
+        if (
+          prev.some(
+            (m, i) =>
+              i !== index &&
+              m.provider === model.provider &&
+              m.modelName === model.modelName
+          )
+        ) {
+          return prev;
+        }
+        const next = [...prev];
+        next[index] = model;
+        return next;
+      });
+    },
+    [isMultiModelActive, llmManager]
+  );
 
   const clearModels = useCallback(() => {
     setSelectedModels([]);
@@ -141,7 +170,6 @@ export default function useMultiModelChat(
       }
       if (restored.length >= 2) {
         setSelectedModels(restored.slice(0, MAX_MODELS));
-        setDefaultInitialized(true);
       }
     },
     [llmOptions]
@@ -171,15 +199,15 @@ export default function useMultiModelChat(
   );
 
   const buildLlmOverrides = useCallback((): LLMOverride[] => {
-    return selectedModels.map((m) => ({
-      model_provider: m.provider,
+    return effectiveSelectedModels.map((m) => ({
+      model_provider: m.name,
       model_version: m.modelName,
       display_name: m.displayName,
     }));
-  }, [selectedModels]);
+  }, [effectiveSelectedModels]);
 
   return {
-    selectedModels,
+    selectedModels: effectiveSelectedModels,
     isMultiModelActive,
     addModel,
     removeModel,

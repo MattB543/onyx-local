@@ -28,6 +28,13 @@ if TYPE_CHECKING:
 T = TypeVar("T", "LLMProviderDescriptor", "LLMProviderView", "VisionProviderResponse")
 
 
+class CustomProviderOption(BaseModel):
+    """A provider slug + human-friendly label for the custom-provider picker."""
+
+    value: str
+    label: str
+
+
 class TestLLMRequest(BaseModel):
     # provider level
     id: int | None = None
@@ -465,6 +472,21 @@ class BifrostModelsRequest(BaseModel):
 class BifrostFinalModelResponse(BaseModel):
     name: str  # Model ID in provider/model format (e.g. "anthropic/claude-sonnet-4-6")
     display_name: str  # Human-readable name from Bifrost API
+    max_input_tokens: int | None
+    supports_image_input: bool
+    supports_reasoning: bool
+
+
+# OpenAI Compatible dynamic models fetch
+class OpenAICompatibleModelsRequest(BaseModel):
+    api_base: str
+    api_key: str | None = None
+    provider_name: str | None = None  # Optional: to save models to existing provider
+
+
+class OpenAICompatibleFinalModelResponse(BaseModel):
+    name: str  # Model ID (e.g. "meta-llama/Llama-3-8B-Instruct")
+    display_name: str  # Human-readable name from API
     max_input_tokens: int | None
     supports_image_input: bool
     supports_reasoning: bool

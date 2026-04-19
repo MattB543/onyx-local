@@ -252,18 +252,10 @@ def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_sessio
 
     file_store = get_default_file_store()
     for file_id in raw_file_ids_to_consider - protected_raw_file_ids:
-        try:
-            file_store.delete_file(file_id=file_id, error_on_missing=False)
-        except Exception as e:
-            logger.warning(f"Failed to delete raw chat file {file_id}: {e}")
+        file_store.delete_file(file_id=file_id, error_on_missing=False)
 
         plaintext_file_id = plaintext_file_name_for_id(file_id)
-        try:
-            file_store.delete_file(file_id=plaintext_file_id, error_on_missing=False)
-        except Exception:
-            logger.debug(
-                f"Plaintext cache {plaintext_file_id} did not exist during chat deletion"
-            )
+        file_store.delete_file(file_id=plaintext_file_id, error_on_missing=False)
 
     # Delete ChatMessage records - CASCADE constraints will automatically handle:
     # - ChatMessage__StandardAnswer relationship records

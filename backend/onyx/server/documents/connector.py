@@ -22,10 +22,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from onyx.auth.email_utils import send_email
-from onyx.auth.users import current_admin_user
+from onyx.auth.permissions import require_permission
 from onyx.auth.users import current_chat_accessible_user
 from onyx.auth.users import current_curator_or_admin_user
-from onyx.auth.users import current_user
 from onyx.background.celery.tasks.pruning.tasks import (
     try_creating_prune_generator_task,
 )
@@ -106,6 +105,7 @@ from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import AccessType
 from onyx.db.enums import ConnectorCredentialPairStatus
 from onyx.db.enums import IndexingMode
+from onyx.db.enums import Permission
 from onyx.db.enums import ProcessingMode
 from onyx.db.federated import fetch_all_federated_connectors_parallel
 from onyx.db.index_attempt import get_index_attempts_for_cc_pair
@@ -192,7 +192,8 @@ def check_google_app_gmail_credentials_exist(
 
 @router.put("/admin/connector/gmail/app-credential")
 def upsert_google_app_gmail_credentials(
-    app_credentials: GoogleAppCredentials, _: User = Depends(current_admin_user)
+    app_credentials: GoogleAppCredentials,
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
 ) -> StatusResponse:
     try:
         upsert_google_app_cred(app_credentials, DocumentSource.GMAIL)
@@ -206,7 +207,7 @@ def upsert_google_app_gmail_credentials(
 
 @router.delete("/admin/connector/gmail/app-credential")
 def delete_google_app_gmail_credentials(
-    _: User = Depends(current_admin_user),
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     try:
@@ -234,7 +235,8 @@ def check_google_app_credentials_exist(
 
 @router.put("/admin/connector/google-drive/app-credential")
 def upsert_google_app_credentials(
-    app_credentials: GoogleAppCredentials, _: User = Depends(current_admin_user)
+    app_credentials: GoogleAppCredentials,
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
 ) -> StatusResponse:
     try:
         upsert_google_app_cred(app_credentials, DocumentSource.GOOGLE_DRIVE)
@@ -248,7 +250,7 @@ def upsert_google_app_credentials(
 
 @router.delete("/admin/connector/google-drive/app-credential")
 def delete_google_app_credentials(
-    _: User = Depends(current_admin_user),
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     try:
@@ -324,7 +326,8 @@ def check_google_service_gmail_account_key_exist(
 
 @router.put("/admin/connector/gmail/service-account-key")
 def upsert_google_service_gmail_account_key(
-    service_account_key: GoogleServiceAccountKey, _: User = Depends(current_admin_user)
+    service_account_key: GoogleServiceAccountKey,
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
 ) -> StatusResponse:
     try:
         upsert_service_account_key(service_account_key, DocumentSource.GMAIL)
@@ -338,7 +341,7 @@ def upsert_google_service_gmail_account_key(
 
 @router.delete("/admin/connector/gmail/service-account-key")
 def delete_google_service_gmail_account_key(
-    _: User = Depends(current_admin_user),
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     try:
@@ -370,7 +373,8 @@ def check_google_service_account_key_exist(
 
 @router.put("/admin/connector/google-drive/service-account-key")
 def upsert_google_service_account_key(
-    service_account_key: GoogleServiceAccountKey, _: User = Depends(current_admin_user)
+    service_account_key: GoogleServiceAccountKey,
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
 ) -> StatusResponse:
     try:
         upsert_service_account_key(service_account_key, DocumentSource.GOOGLE_DRIVE)
@@ -384,7 +388,7 @@ def upsert_google_service_account_key(
 
 @router.delete("/admin/connector/google-drive/service-account-key")
 def delete_google_service_account_key(
-    _: User = Depends(current_admin_user),
+    _: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     try:
@@ -527,7 +531,7 @@ def upsert_google_calendar_service_account_credential(
 @router.get("/admin/connector/google-drive/check-auth/{credential_id}")
 def check_drive_tokens(
     credential_id: int,
-    user: User = Depends(current_admin_user),
+    user: User = Depends(require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> AuthStatus:
     db_credentials = fetch_credential_by_id_for_user(credential_id, user, db_session)
@@ -1914,7 +1918,9 @@ def connector_run_once(
 
 @router.get("/connector/gmail/authorize/{credential_id}")
 def gmail_auth(
-    response: Response, credential_id: str, _: User = Depends(current_user)
+    response: Response,
+    credential_id: str,
+    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
 ) -> AuthUrl:
     # set a cookie that we can read in the callback (used for `verify_csrf`)
     response.set_cookie(
@@ -1928,7 +1934,9 @@ def gmail_auth(
 
 @router.get("/connector/google-drive/authorize/{credential_id}")
 def google_drive_auth(
-    response: Response, credential_id: str, _: User = Depends(current_user)
+    response: Response,
+    credential_id: str,
+    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
 ) -> AuthUrl:
     # set a cookie that we can read in the callback (used for `verify_csrf`)
     response.set_cookie(
@@ -1961,7 +1969,7 @@ def google_calendar_auth(
 def gmail_callback(
     request: Request,
     callback: GmailCallback = Depends(),
-    user: User = Depends(current_user),
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     credential_id_cookie = request.cookies.get(_GMAIL_CREDENTIAL_ID_COOKIE_NAME)
@@ -1991,7 +1999,7 @@ def gmail_callback(
 def google_drive_callback(
     request: Request,
     callback: GDriveCallback = Depends(),
-    user: User = Depends(current_user),
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> StatusResponse:
     credential_id_cookie = request.cookies.get(_GOOGLE_DRIVE_CREDENTIAL_ID_COOKIE_NAME)
@@ -2055,7 +2063,7 @@ def google_calendar_callback(
 
 @router.get("/connector", tags=PUBLIC_API_TAGS)
 def get_connectors(
-    _: User = Depends(current_user),
+    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> list[ConnectorSnapshot]:
     connectors = fetch_connectors(db_session)
@@ -2070,7 +2078,7 @@ def get_connectors(
 
 @router.get("/indexed-sources", tags=PUBLIC_API_TAGS)
 def get_indexed_sources(
-    _: User = Depends(current_user),
+    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> IndexedSourcesResponse:
     sources = sorted(
@@ -2082,7 +2090,7 @@ def get_indexed_sources(
 @router.get("/connector/{connector_id}", tags=PUBLIC_API_TAGS)
 def get_connector_by_id(
     connector_id: int,
-    _: User = Depends(current_user),
+    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> ConnectorSnapshot | StatusResponse[int]:
     connector = fetch_connector_by_id(connector_id, db_session)
@@ -2111,7 +2119,7 @@ def get_connector_by_id(
 @router.post("/connector-request")
 def submit_connector_request(
     request_data: ConnectorRequestSubmission,
-    user: User = Depends(current_user),
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
 ) -> StatusResponse:
     """
     Submit a connector request for Cloud deployments.
