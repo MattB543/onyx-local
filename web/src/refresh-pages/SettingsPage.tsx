@@ -53,7 +53,7 @@ import CharacterCount from "@/refresh-components/CharacterCount";
 import { InputPrompt } from "@/app/app/interfaces";
 import usePromptShortcuts from "@/hooks/usePromptShortcuts";
 import ColorSwatch from "@/refresh-components/ColorSwatch";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 import Memories from "@/sections/settings/Memories";
 import { FederatedConnectorOAuthStatus } from "@/components/chat/FederatedOAuthModal";
 import {
@@ -269,7 +269,7 @@ function GeneralSettings() {
             title="Profile"
             sizePreset="main-content"
             variant="section"
-            widthVariant="full"
+            width="full"
           />
           <Card>
             <InputHorizontal
@@ -332,7 +332,7 @@ function GeneralSettings() {
             title="Appearance"
             sizePreset="main-content"
             variant="section"
-            widthVariant="full"
+            width="full"
           />
           <Card>
             <InputHorizontal
@@ -443,7 +443,7 @@ function GeneralSettings() {
             title="Danger Zone"
             sizePreset="main-content"
             variant="section"
-            widthVariant="full"
+            width="full"
           />
           <Card>
             <InputHorizontal
@@ -831,7 +831,7 @@ function ChatPreferencesSettings() {
           title="Chats"
           sizePreset="main-content"
           variant="section"
-          widthVariant="full"
+          width="full"
         />
         <Card>
           <InputHorizontal
@@ -920,7 +920,7 @@ function ChatPreferencesSettings() {
           title="Memory"
           sizePreset="main-content"
           variant="section"
-          widthVariant="full"
+          width="full"
         />
         <Card>
           <InputHorizontal
@@ -968,7 +968,7 @@ function ChatPreferencesSettings() {
           title="Prompt Shortcuts"
           sizePreset="main-content"
           variant="section"
-          widthVariant="full"
+          width="full"
         />
         <Card>
           <InputHorizontal
@@ -993,7 +993,7 @@ function ChatPreferencesSettings() {
           title="Voice"
           sizePreset="main-content"
           variant="section"
-          widthVariant="full"
+          width="full"
         />
         <Card>
           <InputHorizontal
@@ -1365,7 +1365,7 @@ function AccountsAccessSettings() {
             title="Accounts"
             sizePreset="main-content"
             variant="section"
-            widthVariant="full"
+            width="full"
           />
           <Card>
             <InputHorizontal
@@ -1401,7 +1401,7 @@ function AccountsAccessSettings() {
               title="Access Tokens"
               sizePreset="main-content"
               variant="section"
-              widthVariant="full"
+              width="full"
             />
             {canCreateTokens ? (
               <Card padding={0.25}>
@@ -1463,8 +1463,8 @@ function AccountsAccessSettings() {
                       return (
                         <Interactive.Container
                           key={pat.id}
-                          heightVariant="fit"
-                          widthVariant="full"
+                          size="fit"
+                          width="full"
                         >
                           <div className="w-full bg-background-tint-01">
                             <AttachmentItemLayout
@@ -1605,7 +1605,7 @@ function FederatedConnectorCard({
           }
           sizePreset="main-content"
           variant="section"
-          paddingVariant="sm"
+          padding="sm"
           rightChildren={
             connector.has_oauth_token ? (
               <Button
@@ -1678,7 +1678,7 @@ function ConnectorsSettings() {
           title="Connectors"
           sizePreset="main-content"
           variant="section"
-          widthVariant="full"
+          width="full"
         />
         {hasConnectors ? (
           <>
@@ -1701,7 +1701,10 @@ function ConnectorsSettings() {
             ))}
           </>
         ) : (
-          <EmptyMessage title="No connectors set up for your organization." />
+          <EmptyMessageCard
+            sizePreset="main-ui"
+            title="No connectors set up for your organization."
+          />
         )}
       </Section>
     </Section>

@@ -33,7 +33,7 @@ import {
 import InfoBlock from "@/refresh-components/messages/InfoBlock";
 import { getActionIcon } from "@/lib/tools/mcpUtils";
 import { Section } from "@/layouts/general-layouts";
-import EmptyMessage from "@/refresh-components/EmptyMessage";
+import { EmptyMessageCard } from "@opal/components";
 
 interface AddOpenAPIActionModalProps {
   skipOverlay?: boolean;
@@ -242,7 +242,7 @@ function FormContent({
             `Specify an OpenAPI schema that defines the APIs you want to make available as part of this action. Learn more about [OpenAPI actions](${DOCS_ADMINS_PATH}/actions/openapi).`
           )}
         >
-          <Hoverable.Root group="definitionField" widthVariant="full">
+          <Hoverable.Root group="definitionField" width="full">
             <div className="relative w-full">
               {values.definition.trim() && (
                 <div className="absolute z-[100000] top-2 right-2 bg-background-tint-00">
@@ -313,7 +313,8 @@ function FormContent({
             </Section>
           </>
         ) : (
-          <EmptyMessage
+          <EmptyMessageCard
+            sizePreset="main-ui"
             title="No Actions Found"
             icon={SvgActions}
             description="Provide OpenAPI schema to preview actions here."
