@@ -6,12 +6,14 @@ export default function NumberInput({
   optional,
   description,
   name,
+  min,
   showNeverIfZero,
 }: {
   label: string;
   name: string;
   optional?: boolean;
   description?: string;
+  min?: number;
   showNeverIfZero?: boolean;
 }) {
   const [field, meta, helpers] = useField(name);
@@ -39,7 +41,7 @@ export default function NumberInput({
       <input
         {...field}
         type="number"
-        min="-1"
+        min={min ?? -1}
         onChange={handleChange}
         value={
           field.value === undefined || field.value === null ? "" : field.value

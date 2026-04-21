@@ -9,6 +9,7 @@ from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy import select
+from sqlalchemy import text
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -215,8 +216,10 @@ def list_custom_job_runs(
     filters: RunListFilters,
 ) -> tuple[list[CustomJobRun], int]:
     stmt = select(CustomJobRun).where(CustomJobRun.custom_job_id == job_id)
-    count_stmt = select(func.count()).select_from(CustomJobRun).where(
-        CustomJobRun.custom_job_id == job_id
+    count_stmt = (
+        select(func.count())
+        .select_from(CustomJobRun)
+        .where(CustomJobRun.custom_job_id == job_id)
     )
 
     if filters.status is not None:
@@ -238,7 +241,9 @@ def list_custom_job_runs(
     else:
         stmt = stmt.order_by(CustomJobRun.started_at.desc().nullslast())
 
-    runs = list(db_session.scalars(stmt.offset(page * page_size).limit(page_size)).all())
+    runs = list(
+        db_session.scalars(stmt.offset(page * page_size).limit(page_size)).all()
+    )
     total = db_session.scalar(count_stmt) or 0
     return runs, total
 
@@ -260,7 +265,9 @@ def list_custom_job_run_steps(
         .select_from(CustomJobRunStep)
         .where(CustomJobRunStep.run_id == run_id)
     )
-    steps = list(db_session.scalars(stmt.offset(page * page_size).limit(page_size)).all())
+    steps = list(
+        db_session.scalars(stmt.offset(page * page_size).limit(page_size)).all()
+    )
     total = db_session.scalar(count_stmt) or 0
     return steps, total
 
@@ -294,7 +301,9 @@ def create_manual_run_if_allowed(
         .order_by(CustomJobRun.created_at.desc())
         .limit(1)
     )
-    if recent_run and recent_run.created_at >= now - timedelta(seconds=cooldown_seconds):
+    if recent_run and recent_run.created_at >= now - timedelta(
+        seconds=cooldown_seconds
+    ):
         raise ValueError(
             f"Manual trigger cooldown active ({cooldown_seconds}s). Try again later."
         )
@@ -586,24 +595,38 @@ def cleanup_custom_job_history(
             db_session.delete(run)
             deleted_rows += 1
 
-        terminal_events = list(
-            db_session.scalars(
-                select(CustomJobTriggerEvent).where(
-                    CustomJobTriggerEvent.custom_job_id == job.id,
-                    CustomJobTriggerEvent.status.in_(
-                        [
-                            CustomJobTriggerEventStatus.CONSUMED,
-                            CustomJobTriggerEventStatus.DROPPED,
-                            CustomJobTriggerEventStatus.FAILED,
-                        ]
-                    ),
-                    CustomJobTriggerEvent.created_at < cutoff,
-                )
-            ).all()
+        # Scrub-not-delete: for terminal trigger events older than
+        # retention_days, overwrite payload_json with an empty JSON object
+        # so all stored content (email body, etc.) is hard-removed while
+        # preserving the row itself. Keeping the row preserves the
+        # uq_custom_job_trigger_event_dedupe unique constraint on
+        # (custom_job_id, dedupe_key) -- that constraint is what prevents
+        # re-ingested emails (e.g. after a widened lookback or full
+        # re-sync) from re-emitting a trigger event and re-running
+        # through the LLM.
+        #
+        # The `payload_json IS NOT NULL AND payload_json <> '{}'::jsonb`
+        # filter makes the scrub idempotent so the returned rowcount is a
+        # meaningful per-run metric.
+        scrub_stmt = (
+            update(CustomJobTriggerEvent)
+            .where(
+                CustomJobTriggerEvent.custom_job_id == job.id,
+                CustomJobTriggerEvent.status.in_(
+                    [
+                        CustomJobTriggerEventStatus.CONSUMED,
+                        CustomJobTriggerEventStatus.DROPPED,
+                        CustomJobTriggerEventStatus.FAILED,
+                    ]
+                ),
+                CustomJobTriggerEvent.created_at < cutoff,
+                CustomJobTriggerEvent.payload_json.isnot(None),
+                text("custom_job_trigger_event.payload_json::text <> '{}'::text"),
+            )
+            .values(payload_json={})
         )
-        for event in terminal_events:
-            db_session.delete(event)
-            deleted_rows += 1
+        scrub_result = db_session.execute(scrub_stmt)
+        deleted_rows += scrub_result.rowcount or 0
 
     return deleted_rows
 

@@ -205,6 +205,7 @@ export const RenderField: FC<RenderFieldProps> = ({
           optional={field.optional}
           description={description}
           name={field.name}
+          min={field.min}
         />
       ) : field.type === "checkbox" ? (
         <GeneralLayouts.Section

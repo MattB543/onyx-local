@@ -74,6 +74,7 @@ export interface TextOption extends Option {
 export interface NumberOption extends Option {
   type: "number";
   default?: number;
+  min?: number;
 }
 
 export interface BooleanOption extends Option {
@@ -1792,6 +1793,16 @@ For example, specifying .*-support.* as a "channel" will cause the connector to 
         description:
           "Specify mailboxes to index (e.g., INBOX, Sent, Drafts). Leave empty to index all mailboxes.",
       },
+      {
+        type: "number",
+        query: "Email retention window (days):",
+        label: "Retention Lookback (Days)",
+        name: "lookback_days",
+        min: 0,
+        optional: true,
+        description:
+          "If set, only emails received within the last N days are kept in the index. Emails older than N days are hard-deleted from Vespa and Postgres on the next pruning run. Leave empty to disable (retain all indexed emails indefinitely). For the Email-to-CRM compliance use case, set to 7.",
+      },
     ],
     advanced_values: [],
   },
@@ -2138,4 +2149,5 @@ export interface ImapConfig {
   host: string;
   port?: number;
   mailboxes?: string[];
+  lookback_days?: number;
 }

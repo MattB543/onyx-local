@@ -397,6 +397,11 @@ class TestMarkStaleStartedRunsFailed:
 
 class TestCleanupCustomJobHistory:
     def test_deletes_terminal_runs_and_events_older_than_retention(self) -> None:
+        """Under the scrub-not-delete semantics, terminal CustomJobRun rows
+        older than retention_days are still hard-deleted (their cascade to
+        CustomJobRunStep removes the email body from output_json), but
+        terminal CustomJobTriggerEvent rows are UPDATED (payload_json -> {})
+        so the dedupe sentinel row survives."""
         job = SimpleNamespace(id=uuid4(), retention_days=30)
         old_run = SimpleNamespace(
             id=uuid4(),
@@ -404,38 +409,40 @@ class TestCleanupCustomJobHistory:
             status=CustomJobRunStatus.SUCCESS,
             created_at=datetime.now(timezone.utc) - timedelta(days=60),
         )
-        old_event = SimpleNamespace(
-            id=uuid4(),
-            custom_job_id=job.id,
-            status=CustomJobTriggerEventStatus.CONSUMED,
-            created_at=datetime.now(timezone.utc) - timedelta(days=60),
-        )
 
         db_session = MagicMock()
-        # First scalars call: list of jobs. Then two more for runs/events per job.
+        # First scalars call: list of jobs. Second: terminal runs for the job.
+        # Trigger events are now updated via `db_session.execute(update(...))`,
+        # not fetched + deleted, so there is no third scalars call.
         db_session.scalars.return_value.all.side_effect = [
             [job],
             [old_run],
-            [old_event],
         ]
+        # Simulate the scrub UPDATE affecting 1 row.
+        db_session.execute.return_value.rowcount = 1
 
         deleted = cleanup_custom_job_history(db_session=db_session)
 
+        # 1 run deleted + 1 event scrubbed.
         assert deleted == 2
-        assert db_session.delete.call_count == 2
-        db_session.delete.assert_any_call(old_run)
-        db_session.delete.assert_any_call(old_event)
+        # Run is DELETE'd.
+        assert db_session.delete.call_count == 1
+        db_session.delete.assert_called_once_with(old_run)
+        # Event is UPDATE'd via db_session.execute(update(...)).
+        assert db_session.execute.call_count == 1
 
     def test_preserves_recent_runs_and_events(self) -> None:
         job = SimpleNamespace(id=uuid4(), retention_days=90)
 
         db_session = MagicMock()
-        # Jobs come back, but no terminal runs or events within cutoff.
+        # Jobs come back, but no terminal runs within cutoff. The scrub
+        # UPDATE runs but matches zero rows because there are no terminal
+        # trigger events older than cutoff.
         db_session.scalars.return_value.all.side_effect = [
             [job],
             [],
-            [],
         ]
+        db_session.execute.return_value.rowcount = 0
 
         deleted = cleanup_custom_job_history(db_session=db_session)
 
@@ -449,12 +456,102 @@ class TestCleanupCustomJobHistory:
         db_session.scalars.return_value.all.side_effect = [
             [job],
             [],
-            [],
         ]
+        db_session.execute.return_value.rowcount = 0
 
         # Should not raise -- defaults to 90 days.
         deleted = cleanup_custom_job_history(db_session=db_session)
         assert deleted == 0
+
+    def test_scrubs_payload_of_terminal_trigger_events_older_than_retention(
+        self,
+    ) -> None:
+        """A CONSUMED trigger event older than retention_days should have
+        its payload_json scrubbed (not be deleted). The row + dedupe_key
+        survive as a dedupe sentinel."""
+        job = SimpleNamespace(id=uuid4(), retention_days=7)
+
+        db_session = MagicMock()
+        # Jobs, then no terminal runs (focus on the event side).
+        db_session.scalars.return_value.all.side_effect = [
+            [job],
+            [],
+        ]
+        # The scrub statement matches 1 row.
+        db_session.execute.return_value.rowcount = 1
+
+        deleted = cleanup_custom_job_history(db_session=db_session)
+
+        # 1 row scrubbed.
+        assert deleted == 1
+        # No rows deleted -- scrub is an UPDATE, not a DELETE.
+        db_session.delete.assert_not_called()
+        # Verify an UPDATE statement was executed.
+        assert db_session.execute.call_count == 1
+        executed_stmt = db_session.execute.call_args_list[0].args[0]
+        # SQLAlchemy Update objects render with "UPDATE " at the start
+        # when compiled to string.
+        assert "UPDATE" in str(executed_stmt).upper()
+
+    def test_scrub_is_idempotent_skips_already_empty_payloads(self) -> None:
+        """When all terminal trigger events already have payload_json = {},
+        the WHERE filter excludes them and the scrub UPDATE affects 0 rows."""
+        job = SimpleNamespace(id=uuid4(), retention_days=7)
+
+        db_session = MagicMock()
+        db_session.scalars.return_value.all.side_effect = [
+            [job],
+            [],
+        ]
+        # Scrub matches 0 rows (all payloads already '{}').
+        db_session.execute.return_value.rowcount = 0
+
+        deleted = cleanup_custom_job_history(db_session=db_session)
+
+        assert deleted == 0
+        db_session.delete.assert_not_called()
+        # The UPDATE still runs -- idempotency is enforced by the WHERE
+        # filter, not by skipping the UPDATE call.
+        assert db_session.execute.call_count == 1
+
+    def test_does_not_scrub_non_terminal_statuses(self) -> None:
+        """The scrub's WHERE clause restricts to CONSUMED/DROPPED/FAILED.
+        RECEIVED and ENQUEUED rows are never scrubbed even if they are
+        older than retention_days."""
+        job = SimpleNamespace(id=uuid4(), retention_days=7)
+
+        db_session = MagicMock()
+        db_session.scalars.return_value.all.side_effect = [
+            [job],
+            [],
+        ]
+        db_session.execute.return_value.rowcount = 0
+
+        deleted = cleanup_custom_job_history(db_session=db_session)
+
+        assert deleted == 0
+        # Verify the UPDATE statement was actually executed with the
+        # terminal-status filter baked in.
+        assert db_session.execute.call_count == 1
+        executed_stmt = db_session.execute.call_args_list[0].args[0]
+        # Pull the status IN(...) list out of the compiled statement's
+        # bind params (SQLAlchemy stores the raw Python list under a
+        # `status_N` key). We look at the enum members directly to
+        # confirm the filter contains the three terminal statuses and
+        # NOT the non-terminal ones.
+        compiled_params = executed_stmt.compile().params
+        status_values: list[CustomJobTriggerEventStatus] = []
+        for key, value in compiled_params.items():
+            if key.startswith("status_") and isinstance(value, list):
+                status_values = [
+                    s for s in value if isinstance(s, CustomJobTriggerEventStatus)
+                ]
+                break
+        assert CustomJobTriggerEventStatus.CONSUMED in status_values
+        assert CustomJobTriggerEventStatus.DROPPED in status_values
+        assert CustomJobTriggerEventStatus.FAILED in status_values
+        assert CustomJobTriggerEventStatus.RECEIVED not in status_values
+        assert CustomJobTriggerEventStatus.ENQUEUED not in status_values
 
 
 class TestMarkRunTerminal:

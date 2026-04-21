@@ -88,10 +88,17 @@ class ImapConnector(
         host: str,
         port: int = _DEFAULT_IMAP_PORT_NUMBER,
         mailboxes: list[str] | None = None,
+        lookback_days: int | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._mailboxes = mailboxes
+        # When set (>0), clamps the IMAP SINCE window so emails older than
+        # `lookback_days` are invisible to the connector. This cooperates with
+        # the existing connector-pruning flow (which calls the connector with
+        # start=epoch 0) to effectively hard-delete aged-out emails from Vespa
+        # and the Postgres Document table.
+        self._lookback_days = lookback_days
         self._credentials: dict[str, Any] | None = None
 
     @property
@@ -188,6 +195,7 @@ class ImapConnector(
                     mailbox=mailbox,
                     start=start,
                     end=end,
+                    lookback_days=self._lookback_days,
                 )
                 checkpoint.current_mailbox = CurrentMailbox(
                     mailbox=mailbox,
@@ -198,7 +206,8 @@ class ImapConnector(
                 mail_client=mail_client, mailbox=checkpoint.current_mailbox.mailbox
             )
             current_todos = cast(
-                list, copy.deepcopy(checkpoint.current_mailbox.todo_email_ids[:_PAGE_SIZE])
+                list,
+                copy.deepcopy(checkpoint.current_mailbox.todo_email_ids[:_PAGE_SIZE]),
             )
             checkpoint.current_mailbox.todo_email_ids = (
                 checkpoint.current_mailbox.todo_email_ids[_PAGE_SIZE:]
@@ -335,12 +344,27 @@ def _fetch_email_ids_in_mailbox(
     mailbox: str,
     start: SecondsSinceUnixEpoch,
     end: SecondsSinceUnixEpoch,
+    lookback_days: int | None = None,
 ) -> list[str]:
     try:
         _select_mailbox(mail_client=mail_client, mailbox=mailbox)
     except RuntimeError:
         logger.warning(f"Skipping non-selectable mailbox: {mailbox}")
         return []
+
+    # Retention clamp: when lookback_days is set and positive, emails older
+    # than `now - lookback_days` are invisible to the connector regardless
+    # of the caller-provided `start`. For steady-state indexing polls this
+    # is a no-op (start is already recent); for pruning (which passes
+    # start=epoch 0) it causes aged-out emails to disappear from the
+    # connector's view, so the diff computation in the pruning pipeline
+    # classifies them as to-be-removed and the existing deletion path
+    # removes them from Vespa and Postgres.
+    if lookback_days is not None and lookback_days > 0:
+        retention_cutoff = datetime.now(tz=timezone.utc).timestamp() - (
+            lookback_days * 86400
+        )
+        start = max(start, retention_cutoff)
 
     start_str = datetime.fromtimestamp(start, tz=timezone.utc).strftime("%d-%b-%Y")
     # IMAP BEFORE uses date-only granularity (excludes the given date),
@@ -426,7 +450,9 @@ def _convert_email_headers_and_body_into_document(
         metadata={},
         source=DocumentSource.IMAP,
         sections=[TextSection(text=section_text)],
-        doc_updated_at=email_headers.date.astimezone(timezone.utc) if email_headers.date else None,
+        doc_updated_at=(
+            email_headers.date.astimezone(timezone.utc) if email_headers.date else None
+        ),
         primary_owners=primary_owners,
         external_access=external_access,
     )
@@ -478,7 +504,6 @@ def _parse_email_body(
     soup = bs4.BeautifulSoup(markup=body, features="html.parser")
 
     return " ".join(str_section for str_section in soup.stripped_strings)
-
 
 
 def _parse_addrs(raw_header: str) -> list[tuple[str, str]]:
