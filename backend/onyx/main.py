@@ -38,9 +38,9 @@ from onyx.configs.app_configs import APP_HOST
 from onyx.configs.app_configs import APP_PORT
 from onyx.configs.app_configs import AUTH_RATE_LIMITING_ENABLED
 from onyx.configs.app_configs import AUTH_TYPE
-from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
 from onyx.configs.app_configs import CACHE_BACKEND
 from onyx.configs.app_configs import DISABLE_VECTOR_DB
+from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
 from onyx.configs.app_configs import GOOGLE_LOGIN_BASE_SCOPES
 from onyx.configs.app_configs import GOOGLE_OAUTH_SCOPE_OVERRIDE
 from onyx.configs.app_configs import LOG_ENDPOINT_LATENCY
@@ -79,10 +79,10 @@ from onyx.server.documents.document import router as document_router
 from onyx.server.documents.standard_oauth import router as standard_oauth_router
 from onyx.server.features.build.api.api import public_build_router
 from onyx.server.features.build.api.api import router as build_router
+from onyx.server.features.crm.api import router as crm_router
 from onyx.server.features.default_assistant.api import (
     router as default_assistant_router,
 )
-from onyx.server.features.crm.api import router as crm_router
 from onyx.server.features.document_set.api import router as document_set_router
 from onyx.server.features.hierarchy.api import router as hierarchy_router
 from onyx.server.features.input_prompt.api import (
@@ -143,9 +143,7 @@ from onyx.server.onyx_api.ingestion import router as onyx_api_router
 from onyx.server.pat.api import router as pat_router
 from onyx.server.query_and_chat.chat_backend import router as chat_router
 from onyx.server.query_and_chat.chat_files import router as chat_files_router
-from onyx.server.query_and_chat.query_backend import (
-    admin_router as admin_query_router,
-)
+from onyx.server.query_and_chat.query_backend import admin_router as admin_query_router
 from onyx.server.query_and_chat.query_backend import basic_router as query_router
 from onyx.server.saml import router as saml_router
 from onyx.server.settings.api import admin_router as settings_admin_router
@@ -156,11 +154,11 @@ from onyx.setup import setup_multitenant_onyx
 from onyx.setup import setup_onyx
 from onyx.tracing.setup import setup_tracing
 from onyx.utils.client_ip import ClientIPMiddleware
+from onyx.utils.encryption import ensure_secret_encryption_ready
 from onyx.utils.logger import setup_logger
 from onyx.utils.logger import setup_uvicorn_logger
 from onyx.utils.middleware import add_endpoint_context_middleware
 from onyx.utils.middleware import add_onyx_request_id_middleware
-from onyx.utils.encryption import ensure_secret_encryption_ready
 from onyx.utils.telemetry import get_or_generate_uuid
 from onyx.utils.telemetry import optional_telemetry
 from onyx.utils.telemetry import RecordType

@@ -161,10 +161,7 @@ export function isImageExtension(
 /**
  * Formats bytes to human-readable file size.
  */
-export function formatBytes(
-  bytes: number | undefined,
-  decimals = 2
-): string {
+export function formatBytes(bytes: number | undefined, decimals = 2): string {
   if (bytes == null) return "Unknown";
   if (bytes === 0) return "0 Bytes";
 
@@ -272,9 +269,7 @@ export function getFileIcon(
  * Checks if a collection of files contains any non-image files.
  * Useful for determining whether image previews should be compact.
  */
-export function hasNonImageFiles(
-  files: { name?: string | null }[]
-): boolean {
+export function hasNonImageFiles(files: { name?: string | null }[]): boolean {
   return files.some((file) => !isImageFile(file.name));
 }
 

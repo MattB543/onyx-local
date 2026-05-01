@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from pydantic import ValidationError
 from sqlalchemy import BigInteger
 from sqlalchemy import Boolean
+from sqlalchemy import CheckConstraint
 from sqlalchemy import Computed
 from sqlalchemy import DateTime
 from sqlalchemy import desc
@@ -31,7 +32,6 @@ from sqlalchemy import Sequence
 from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy import text
-from sqlalchemy import CheckConstraint
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import JSONB as PGJSONB
