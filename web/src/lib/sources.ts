@@ -1,19 +1,14 @@
 import {
-  LoopioIcon,
   R2Icon,
   S3Icon,
   GoogleStorageIcon,
-  HighspotIcon,
-  DrupalWikiIcon,
-  EmailIcon,
-  TestRailIcon,
   GoogleCalendarIcon,
 } from "@/components/icons/icons";
-import { ValidSources } from "./types";
-import { SourceCategory, SourceMetadata } from "./search/interfaces";
+import { ValidSources } from "@/lib/types";
+import { SourceCategory, SourceMetadata } from "@/lib/search/interfaces";
 import { Persona } from "@/app/admin/agents/interfaces";
 import React from "react";
-import { DOCS_ADMINS_PATH, DOCS_BASE_URL } from "./constants";
+import { DOCS_ADMINS_PATH, DOCS_BASE_URL } from "@/lib/constants";
 import { SvgFileText, SvgGlobe, SvgUploadCloud, SvgMail } from "@opal/icons";
 import {
   SvgAirtable,
@@ -28,6 +23,7 @@ import {
   SvgDiscourse,
   SvgDocument360,
   SvgDropbox,
+  SvgDrupal,
   SvgEgnyte,
   SvgFireflies,
   SvgFreshdesk,
@@ -39,9 +35,11 @@ import {
   SvgGoogleDrive,
   SvgGoogleSites,
   SvgGuru,
+  SvgHighspot,
   SvgHubspot,
   SvgJira,
   SvgLinear,
+  SvgLoopio,
   SvgMediawiki,
   SvgNotion,
   SvgOracle,
@@ -316,7 +314,7 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     category: SourceCategory.Messaging,
   },
   drupal_wiki: {
-    icon: DrupalWikiIcon,
+    icon: SvgDrupal,
     displayName: "Drupal Wiki",
     category: SourceCategory.Wiki,
     docs: `${DOCS_ADMINS_PATH}/connectors/official/drupal_wiki`,
@@ -373,13 +371,13 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     docs: `${DOCS_ADMINS_PATH}/connectors/official/fireflies`,
   },
   highspot: {
-    icon: HighspotIcon,
+    icon: SvgHighspot,
     displayName: "Highspot",
     category: SourceCategory.Sales,
     docs: `${DOCS_ADMINS_PATH}/connectors/official/highspot`,
   },
   loopio: {
-    icon: LoopioIcon,
+    icon: SvgLoopio,
     displayName: "Loopio",
     category: SourceCategory.Sales,
   },
@@ -507,9 +505,9 @@ export function getSourceDocLink(sourceType: ValidSources): string | null {
   return SOURCE_METADATA_MAP[sourceType].docs || null;
 }
 
-export const isValidSource = (sourceType: string) => {
+export function isValidSource(sourceType: string): boolean {
   return Object.keys(SOURCE_METADATA_MAP).includes(sourceType);
-};
+}
 
 export function getSourceDisplayName(sourceType: ValidSources): string | null {
   return getSourceMetadata(sourceType).displayName;
@@ -529,27 +527,4 @@ export function getSourcesForPersona(persona: Persona): ValidSources[] {
     });
   });
   return personaSources;
-}
-
-export async function fetchTitleFromUrl(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      // If the remote site has no CORS header, this may fail in the browser
-      mode: "cors",
-    });
-    if (!response.ok) {
-      // Non-200 response, treat as a failure
-      return null;
-    }
-    const html = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    // If the site has <title>My Demo Page</title>, we retrieve "My Demo Page"
-    const pageTitle = doc.querySelector("title")?.innerText.trim() ?? null;
-    return pageTitle;
-  } catch (error) {
-    console.error("Error fetching page title:", error);
-    return null;
-  }
 }
