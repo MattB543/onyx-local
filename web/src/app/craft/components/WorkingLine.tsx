@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import {
   Collapsible,
   CollapsibleContent,

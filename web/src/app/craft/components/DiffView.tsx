@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 
 interface DiffViewProps {
   oldContent: string;
@@ -112,7 +111,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
  */
 function collapseUnchanged(
   lines: DiffLine[],
-  contextLines = 3
+  contextLines: number = 3
 ): DiffLine[] {
   const result: DiffLine[] = [];
   const changeIndices: number[] = [];
