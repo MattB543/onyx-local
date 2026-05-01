@@ -4,6 +4,9 @@ import {
   S3Icon,
   GoogleStorageIcon,
   HighspotIcon,
+  DrupalWikiIcon,
+  EmailIcon,
+  TestRailIcon,
   GoogleCalendarIcon,
 } from "@/components/icons/icons";
 import { ValidSources } from "./types";
@@ -25,7 +28,6 @@ import {
   SvgDiscourse,
   SvgDocument360,
   SvgDropbox,
-  SvgDrupal,
   SvgEgnyte,
   SvgFireflies,
   SvgFreshdesk,
@@ -314,7 +316,7 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     category: SourceCategory.Messaging,
   },
   drupal_wiki: {
-    icon: SvgDrupal,
+    icon: DrupalWikiIcon,
     displayName: "Drupal Wiki",
     category: SourceCategory.Wiki,
     docs: `${DOCS_ADMINS_PATH}/connectors/official/drupal_wiki`,

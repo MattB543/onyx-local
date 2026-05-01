@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import { ComboBoxOption } from "../types";
 import { sanitizeOptionId } from "../utils/aria";
 

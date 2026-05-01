@@ -2,7 +2,54 @@
 
 import Image from "next/image";
 import { StaticImageData } from "next/image";
-import { FiCalendar } from "react-icons/fi";
+import { BrainIcon as Brain } from "@phosphor-icons/react";
+import {
+  FiAlertCircle,
+  FiAlertTriangle,
+  FiCalendar,
+  FiChevronDown,
+  FiChevronsDown,
+  FiChevronsUp,
+  FiClipboard,
+  FiCpu,
+  FiDatabase,
+  FiEdit2,
+  FiFile,
+  FiGlobe,
+  FiInfo,
+  FiMail,
+} from "react-icons/fi";
+import { FaRobot } from "react-icons/fa";
+import { SiBookstack } from "react-icons/si";
+import axeroImage from "@public/Axero.jpeg";
+import airtableIcon from "@public/Airtable.svg";
+import amazonSVG from "@public/Amazon.svg";
+import anthropicSVG from "@public/Anthropic.svg";
+import asanaIcon from "@public/Asana.png";
+import azureIcon from "@public/Azure.png";
+import bitbucketIcon from "@public/Bitbucket.svg";
+import clickupIcon from "@public/Clickup.svg";
+import codaIcon from "@public/Coda.png";
+import cohereIcon from "@public/Cohere.svg";
+import confluenceSVG from "@public/Confluence.svg";
+import deepseekSVG from "@public/Deepseek.svg";
+import discordIcon from "@public/discord.png";
+import discourseIcon from "@public/Discourse.png";
+import document360Icon from "@public/Document360.png";
+import dropboxIcon from "@public/Dropbox.png";
+import drupalwikiIcon from "@public/DrupalWiki.png";
+import egnyteIcon from "@public/Egnyte.png";
+import elevenLabsDarkSVG from "@public/ElevenLabsDark.svg";
+import elevenLabsSVG from "@public/ElevenLabs.svg";
+import firefliesIcon from "@public/Fireflies.png";
+import freshdeskIcon from "@public/Freshdesk.png";
+import geminiSVG from "@public/Gemini.svg";
+import gitbookDarkIcon from "@public/GitBookDark.png";
+import gitbookLightIcon from "@public/GitBookLight.png";
+import githubDarkIcon from "@public/GithubDarkMode.png";
+import githubLightIcon from "@public/Github.png";
+import gongIcon from "@public/Gong.png";
+import googleIcon from "@public/Google.png";
 import googleCloudStorageIcon from "@public/GoogleCloudStorage.png";
 import highspotIcon from "@public/Highspot.png";
 import openSourceIcon from "@public/OpenSource.png";
@@ -236,7 +283,48 @@ export const WindowsIcon = ({
 // THIRD-PARTY / COMPANY ICONS (Alphabetically)
 // Only icons that don't yet have opal logo equivalents remain here.
 // ============================================================================
+export const AirtableIcon = createLogoIcon(airtableIcon);
+export const AmazonIcon = createLogoIcon(amazonSVG);
+export const AnthropicIcon = createLogoIcon(anthropicSVG);
+export const AsanaIcon = createLogoIcon(asanaIcon);
+export const AxeroIcon = createLogoIcon(axeroImage);
+export const AzureIcon = createLogoIcon(azureIcon);
+export const BitbucketIcon = createLogoIcon(bitbucketIcon);
+export const BookstackIcon = createIcon(SiBookstack);
 export const BoxIcon = createLogoIcon(boxIcon);
+export const ClickupIcon = createLogoIcon(clickupIcon);
+export const CohereIcon = createLogoIcon(cohereIcon);
+export const ColorDiscordIcon = createLogoIcon(discordIcon);
+export const ColorSlackIcon = createLogoIcon(slackIcon);
+export const ConfluenceIcon = createLogoIcon(confluenceSVG, {
+  sizeAdjustment: 4,
+  classNameAddition: "-m-0.5",
+});
+export const DeepseekIcon = createLogoIcon(deepseekSVG);
+export const DiscourseIcon = createLogoIcon(discourseIcon);
+export const Document360Icon = createLogoIcon(document360Icon);
+export const DropboxIcon = createLogoIcon(dropboxIcon);
+export const DrupalWikiIcon = createLogoIcon(drupalwikiIcon);
+export const EgnyteIcon = createLogoIcon(egnyteIcon);
+export const ElevenLabsIcon = createLogoIcon(elevenLabsSVG, {
+  darkSrc: elevenLabsDarkSVG,
+});
+export const FirefliesIcon = createLogoIcon(firefliesIcon);
+export const FreshdeskIcon = createLogoIcon(freshdeskIcon);
+export const GeminiIcon = createLogoIcon(geminiSVG);
+export const GitbookIcon = createLogoIcon(gitbookDarkIcon, {
+  darkSrc: gitbookLightIcon,
+});
+export const GithubIcon = createLogoIcon(githubLightIcon, {
+  darkSrc: githubDarkIcon,
+});
+export const GitlabIcon = createLogoIcon(gitlabIcon);
+export const GmailIcon = createLogoIcon(gmailIcon);
+export const GoogleCalendarIcon = createIcon(FiCalendar);
+export const GongIcon = createLogoIcon(gongIcon);
+export const GoogleDriveIcon = createLogoIcon(googleDriveIcon);
+export const GoogleIcon = createLogoIcon(googleIcon);
+export const GoogleSitesIcon = createLogoIcon(googleSitesIcon);
 export const GoogleStorageIcon = createLogoIcon(googleCloudStorageIcon, {
   sizeAdjustment: 4,
   classNameAddition: "-m-0.5",
@@ -249,6 +337,3 @@ export const S3Icon = createLogoIcon(s3Icon);
 export const ServiceNowIcon = createLogoIcon(serviceNowIcon);
 export const TrelloIcon = createLogoIcon(trelloIcon);
 export const ZAIIcon = createLogoIcon(zAIIcon);
-
-// CRM/Calendar custom additions:
-export const GoogleCalendarIcon = createIcon(FiCalendar);

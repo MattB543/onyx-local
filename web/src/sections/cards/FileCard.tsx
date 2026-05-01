@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import type { ProjectFile } from "@/app/app/projects/projectsService";
 import { UserFileStatus } from "@/app/app/projects/projectsService";
-import { cn, isImageFile } from "@/lib/utils";
+import { isImageFile } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
-import Checkbox from "@/refresh-components/inputs/Checkbox";
+import { Checkbox } from "@opal/components";
 import { SvgFileText, SvgX } from "@opal/icons";
 import { Interactive, Hoverable } from "@opal/core";
 import { AttachmentItemLayout } from "@/layouts/general-layouts";

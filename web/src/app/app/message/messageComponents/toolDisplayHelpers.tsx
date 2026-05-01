@@ -1,4 +1,5 @@
-import { FiCircle, FiList, FiTool } from "react-icons/fi";
+import { JSX } from "react";
+import { FiCircle, FiList, FiTool, FiXCircle } from "react-icons/fi";
 import {
   Packet,
   PacketType,

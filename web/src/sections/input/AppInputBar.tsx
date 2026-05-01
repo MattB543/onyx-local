@@ -20,7 +20,7 @@ import { ChatState } from "@/app/app/interfaces";
 import { useForcedTools } from "@/lib/hooks/useForcedTools";
 import useAppFocus from "@/hooks/useAppFocus";
 import { getPastedFilesIfNoText } from "@/lib/clipboard";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import { Disabled } from "@opal/core";
 import { useUser } from "@/providers/UserProvider";
 import {
@@ -372,22 +372,6 @@ const AppInputBar = React.memo(
       [setCurrentMessageFiles]
     );
 
-    const handleToggleIndexForLater = useCallback(
-      (fileId: string, checked: boolean) => {
-        setCurrentMessageFiles((prev) =>
-          prev.map((file) =>
-            file.id === fileId
-              ? {
-                  ...file,
-                  index_for_later: checked,
-                }
-              : file
-          )
-        );
-      },
-      [setCurrentMessageFiles]
-    );
-
     const { activePromptShortcuts } = usePromptShortcuts();
     const vectorDbEnabled = useVectorDbEnabled();
     const { ccPairs, isLoading: ccPairsLoading } = useCCPairs(vectorDbEnabled);
@@ -567,14 +551,7 @@ const AppInputBar = React.memo(
                   (existingFile) => existingFile.file_id === file.file_id
                 )
               ) {
-                setCurrentMessageFiles((prev) => [
-                  ...prev,
-                  {
-                    ...file,
-                    attachment_source: "recent",
-                    index_for_later: false,
-                  },
-                ]);
+                setCurrentMessageFiles((prev) => [...prev, file]);
               }
             }}
             onUnpickRecent={(file: ProjectFile) => {

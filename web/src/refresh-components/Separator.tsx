@@ -2,7 +2,7 @@
 
 import React, { ComponentPropsWithoutRef, forwardRef } from "react";
 import * as SeparatorPrimitive from "@radix-ui/react-separator";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 
 export interface SeparatorProps
   extends ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {

@@ -10,6 +10,10 @@ import {
 } from "@opal/icons";
 import type { IconProps } from "@opal/types";
 
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 import { ALLOWED_URL_PROTOCOLS } from "./constants";
 
 const URI_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
@@ -17,10 +21,6 @@ const BARE_EMAIL_REGEX = /^[^\s@/]+@[^\s@/:]+\.[^\s@/:]+$/;
 
 export const INTERACTIVE_SELECTOR =
   "a, button, input, textarea, select, label, [role='button'], [tabindex]:not([tabindex='-1']), [contenteditable]:not([contenteditable='false'])";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export const truncateString = (str: string, maxLength: number) => {
   return str.length > maxLength ? str.slice(0, maxLength - 1) + "..." : str;
