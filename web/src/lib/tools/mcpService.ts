@@ -183,6 +183,11 @@ export async function upsertMCPServer(serverData: {
   api_token?: string;
   oauth_client_id?: string;
   oauth_client_secret?: string;
+  // Mirrors the LLM-provider `api_key_changed` pattern: explicitly signal
+  // whether the OAuth credential fields were edited so the backend doesn't
+  // overwrite stored values with masked placeholders on resubmit.
+  oauth_client_id_changed?: boolean;
+  oauth_client_secret_changed?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth_template?: any;
   admin_credentials?: Record<string, string>;

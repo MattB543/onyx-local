@@ -58,7 +58,7 @@ import ProjectContextPanel from "@/app/app/components/projects/ProjectContextPan
 import { useProjectsContext } from "@/providers/ProjectsContext";
 import { getProjectTokenCount } from "@/app/app/projects/projectsService";
 import ProjectChatSessionList from "@/app/app/components/projects/ProjectChatSessionList";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import Suggestions from "@/sections/Suggestions";
 import OnboardingFlow from "@/sections/onboarding/OnboardingFlow";
 import { OnboardingStep } from "@/interfaces/onboarding";
@@ -1009,7 +1009,6 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         // Intentionally enabled during name-only onboarding (showOnboarding=false)
                         // since LLM providers are already configured and the user can chat.
                         disabled={
-                          awaitingPreferredSelection ||
                           (!llmManager.isLoadingProviders &&
                             llmManager.hasAnyProvider === false) ||
                           (showOnboarding &&
@@ -1017,6 +1016,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                             onboardingState.currentStep !==
                               OnboardingStep.Complete)
                         }
+                        awaitingPreferredSelection={awaitingPreferredSelection}
                       />
                       <div
                         className={cn(

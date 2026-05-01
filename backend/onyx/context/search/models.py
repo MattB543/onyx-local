@@ -162,6 +162,10 @@ class InferenceChunk(BaseChunk):
 
     is_federated: bool = False
 
+    # `Document.file_id` for the doc this chunk belongs to. Populated post-
+    # retrieval via a Postgres lookup
+    file_id: str | None = None
+
     @property
     def unique_id(self) -> str:
         return f"{self.document_id}__{self.chunk_id}"
@@ -272,6 +276,10 @@ class SearchDoc(BaseModel):
     is_internet: bool = False
     image: str | None = None
 
+    # Mirrors `InferenceChunk.file_id`. Only present once sections have been
+    # run through `populate_file_ids_on_sections`.
+    file_id: str | None = None
+
     @classmethod
     def from_chunks_or_sections(
         cls,
@@ -299,6 +307,7 @@ class SearchDoc(BaseModel):
                 secondary_owners=chunk.secondary_owners,
                 is_internet=False,
                 image=extract_image_url_from_metadata(chunk.metadata),
+                file_id=chunk.file_id,
             )
             for item in items
         ]

@@ -13,7 +13,6 @@ from celery import Celery
 from celery import shared_task
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
-from fastapi import HTTPException
 from pydantic import BaseModel
 from redis import Redis
 from redis.lock import Lock as RedisLock
@@ -42,7 +41,7 @@ from onyx.background.indexing.checkpointing_utils import (
     get_index_attempts_with_old_checkpoints,
 )
 from onyx.background.indexing.index_attempt_utils import cleanup_index_attempts
-from onyx.background.indexing.index_attempt_utils import get_old_index_attempts
+from onyx.background.indexing.index_attempt_utils import get_old_index_attempt_ids
 from onyx.configs.app_configs import AUTH_TYPE
 from onyx.configs.app_configs import MANAGED_VESPA
 from onyx.configs.app_configs import VESPA_CLOUD_CERT_PATH
@@ -93,8 +92,10 @@ from onyx.db.search_settings import get_current_search_settings
 from onyx.db.search_settings import get_secondary_search_settings
 from onyx.db.swap_index import check_and_perform_index_swap
 from onyx.document_index.factory import get_all_document_indices
+from onyx.error_handling.exceptions import OnyxError
 from onyx.file_store.document_batch_storage import DocumentBatchStorage
 from onyx.file_store.document_batch_storage import get_document_batch_storage
+from onyx.file_store.staging import cleanup_staged_files_for_attempt
 from onyx.httpx.httpx_pool import HttpxPool
 from onyx.indexing.adapters.document_indexing_adapter import (
     DocumentIndexingBatchAdapter,
@@ -618,6 +619,23 @@ def check_indexing_completion(
         storage.cleanup_all_batches()
     except Exception:
         logger.exception("Failed to clean up document batches - continuing")
+
+    # Reap any STAGING files this attempt staged but never promoted.
+    # Safe to run here: indexing_completed guarantees every docprocessing
+    # batch has finished, so anything still STAGING for this attempt is a
+    # genuine drop (connector emitted no Document, or the Document was
+    # filtered as stale by `index_doc_batch_prepare`).
+    try:
+        with get_session_with_current_tenant() as cleanup_session:
+            cleanup_staged_files_for_attempt(
+                index_attempt_id=index_attempt_id,
+                db_session=cleanup_session,
+            )
+    except Exception:
+        logger.exception(
+            "Failed to run attempt-end staging cleanup; orphans will be "
+            "caught by the next attempt's start-of-run sweep."
+        )
 
     logger.info(f"Database coordination completed for attempt {index_attempt_id}")
 
@@ -1250,25 +1268,25 @@ def check_for_index_attempt_cleanup(self: Task, *, tenant_id: str) -> None:
         locked = True
         batch_size = INDEX_ATTEMPT_BATCH_SIZE
         with get_session_with_current_tenant() as db_session:
-            old_attempts = get_old_index_attempts(db_session)
+            old_attempt_ids = get_old_index_attempt_ids(db_session)
             # We need to batch this because during the initial run, the system might have a large number
             # of index attempts since they were never deleted. After that, the number will be
             # significantly lower.
-            if len(old_attempts) == 0:
+            if len(old_attempt_ids) == 0:
                 task_logger.info(
                     "check_for_index_attempt_cleanup - No index attempts to cleanup"
                 )
                 return
 
-            for i in range(0, len(old_attempts), batch_size):
-                batch = old_attempts[i : i + batch_size]
+            for i in range(0, len(old_attempt_ids), batch_size):
+                batch = old_attempt_ids[i : i + batch_size]
                 task_logger.info(
                     f"check_for_index_attempt_cleanup - Cleaning up index attempts {len(batch)}"
                 )
                 self.app.send_task(
                     OnyxCeleryTask.CLEANUP_INDEX_ATTEMPT,
                     kwargs={
-                        "index_attempt_ids": [attempt.id for attempt in batch],
+                        "index_attempt_ids": batch,
                         "tenant_id": tenant_id,
                     },
                     queue=OnyxCeleryQueues.INDEX_ATTEMPT_CLEANUP,
@@ -1453,14 +1471,18 @@ def _docprocessing_task(
     if tenant_id:
         CURRENT_TENANT_ID_CONTEXTVAR.set(tenant_id)
 
-    # Check if chunk indexing usage limit has been exceeded before processing
+    # Check if chunk indexing usage limit has been exceeded before processing.
+    # check_usage_and_raise raises OnyxError; hitting a trial/paid usage limit
+    # is an expected user-facing condition (not an actionable error), so we
+    # mark the attempt failed and return cleanly instead of raising (which
+    # would ship ONYX-BACKEND-H6ED to Sentry on every queued batch of an
+    # over-limit tenant).
     if USAGE_LIMITS_ENABLED:
         try:
             _check_chunk_usage_limit(tenant_id)
-        except HTTPException as e:
-            # Log the error and fail the indexing attempt
-            task_logger.error(
-                f"Chunk indexing usage limit exceeded for tenant {tenant_id}: {e}"
+        except OnyxError as e:
+            task_logger.warning(
+                f"Chunk indexing usage limit exceeded for tenant {tenant_id}: {e.detail}"
             )
             with get_session_with_current_tenant() as db_session:
                 from onyx.db.index_attempt import mark_attempt_failed
@@ -1468,9 +1490,9 @@ def _docprocessing_task(
                 mark_attempt_failed(
                     index_attempt_id=index_attempt_id,
                     db_session=db_session,
-                    failure_reason=str(e),
+                    failure_reason=e.detail,
                 )
-            raise
+            return
 
     task_logger.info(
         f"Processing document batch: attempt={index_attempt_id} batch_num={batch_num} "

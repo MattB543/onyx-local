@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 import { toast } from "@/hooks/useToast";
-import { cn } from "@/lib/utils";
+import { cn } from "@opal/utils";
 import Button from "@/refresh-components/buttons/Button";
 
 import { SvgLoader, SvgPlayCircle } from "@opal/icons";

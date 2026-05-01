@@ -103,7 +103,6 @@ const AdvancedEmbeddingFormPage = forwardRef<
             contextual_rag_llm: getCurrentLLMValue,
           }}
           validationSchema={Yup.object().shape({
-            multilingual_expansion: Yup.array().of(Yup.string()),
             multipass_indexing: Yup.boolean(),
             enable_contextual_rag: Yup.boolean(),
             contextual_rag_llm: Yup.string()
@@ -171,7 +170,6 @@ const AdvancedEmbeddingFormPage = forwardRef<
                 // Manually validate against the schema
                 Yup.object()
                   .shape({
-                    multilingual_expansion: Yup.array().of(Yup.string()),
                     multipass_indexing: Yup.boolean(),
                     enable_contextual_rag: Yup.boolean(),
                     contextual_rag_llm: Yup.string()

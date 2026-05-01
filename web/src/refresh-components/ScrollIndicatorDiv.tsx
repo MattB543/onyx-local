@@ -1,7 +1,7 @@
 "use client";
 
-import { HTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import React, { HTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@opal/utils";
 
 // Throttle interval for scroll events (~60fps)
 const SCROLL_THROTTLE_MS = 16;

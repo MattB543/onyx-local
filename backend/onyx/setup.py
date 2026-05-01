@@ -57,7 +57,6 @@ from shared_configs.configs import MODEL_SERVER_HOST
 from shared_configs.configs import MODEL_SERVER_PORT
 from shared_configs.configs import MULTI_TENANT
 
-
 logger = setup_logger()
 
 
@@ -107,12 +106,6 @@ def setup_onyx(
     if search_settings.query_prefix or search_settings.passage_prefix:
         logger.notice(f'Query embedding prefix: "{search_settings.query_prefix}"')
         logger.notice(f'Passage embedding prefix: "{search_settings.passage_prefix}"')
-
-    if search_settings:
-        if search_settings.multilingual_expansion:
-            logger.notice(
-                f"Multilingual query expansion is enabled with {search_settings.multilingual_expansion}."
-            )
 
     # setup Postgres with default credential, llm providers, etc.
     setup_postgres(db_session)
