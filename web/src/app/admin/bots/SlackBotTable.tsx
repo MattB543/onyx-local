@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { SlackBot } from "@/lib/types";
-import { EditIcon } from "@/components/icons/icons";
+import { SvgEdit } from "@opal/icons";
 
 const NUM_IN_PAGE = 20;
 
@@ -85,7 +85,7 @@ export const SlackBotTable = ({ slackBots }: { slackBots: SlackBot[] }) => {
               >
                 <TableCell>
                   <div className="flex items-center">
-                    <EditIcon className="mr-4" />
+                    <SvgEdit className="mr-4" />
                     {slackBot.name}
                   </div>
                 </TableCell>

@@ -43,34 +43,16 @@ from onyx.configs.constants import OnyxCeleryTask
 from onyx.configs.constants import PUBLIC_API_TAGS
 from onyx.connectors.exceptions import ConnectorValidationError
 from onyx.connectors.factory import validate_ccpair_for_user
-from onyx.connectors.google_utils.google_auth import (
-    get_google_oauth_creds,
-)
-from onyx.connectors.google_utils.google_kv import (
-    build_service_account_creds,
-)
-from onyx.connectors.google_utils.google_kv import (
-    delete_google_app_cred,
-)
-from onyx.connectors.google_utils.google_kv import (
-    delete_service_account_key,
-)
+from onyx.connectors.google_utils.google_auth import get_google_oauth_creds
+from onyx.connectors.google_utils.google_kv import build_service_account_creds
+from onyx.connectors.google_utils.google_kv import delete_google_app_cred
+from onyx.connectors.google_utils.google_kv import delete_service_account_key
 from onyx.connectors.google_utils.google_kv import get_auth_url
-from onyx.connectors.google_utils.google_kv import (
-    get_google_app_cred,
-)
-from onyx.connectors.google_utils.google_kv import (
-    get_service_account_key,
-)
-from onyx.connectors.google_utils.google_kv import (
-    update_credential_access_tokens,
-)
-from onyx.connectors.google_utils.google_kv import (
-    upsert_google_app_cred,
-)
-from onyx.connectors.google_utils.google_kv import (
-    upsert_service_account_key,
-)
+from onyx.connectors.google_utils.google_kv import get_google_app_cred
+from onyx.connectors.google_utils.google_kv import get_service_account_key
+from onyx.connectors.google_utils.google_kv import update_credential_access_tokens
+from onyx.connectors.google_utils.google_kv import upsert_google_app_cred
+from onyx.connectors.google_utils.google_kv import upsert_service_account_key
 from onyx.connectors.google_utils.google_kv import verify_csrf
 from onyx.connectors.google_utils.shared_constants import DB_CREDENTIALS_DICT_TOKEN_KEY
 from onyx.connectors.google_utils.shared_constants import (
@@ -113,9 +95,7 @@ from onyx.db.federated import fetch_all_federated_connectors_parallel
 from onyx.db.index_attempt import get_index_attempts_for_cc_pair
 from onyx.db.index_attempt import get_latest_index_attempts_by_status
 from onyx.db.index_attempt import get_latest_index_attempts_parallel
-from onyx.db.index_attempt import (
-    get_latest_successful_index_attempts_parallel,
-)
+from onyx.db.index_attempt import get_latest_successful_index_attempts_parallel
 from onyx.db.models import ConnectorCredentialPair
 from onyx.db.models import FederatedConnector
 from onyx.db.models import IndexAttempt
@@ -764,7 +744,7 @@ def upload_files_api(
     unzip: bool = True,
     _: User = Depends(current_curator_or_admin_user),
 ) -> FileUploadResponse:
-    return upload_files(files, FileOrigin.OTHER, unzip=unzip)
+    return upload_files(files, FileOrigin.CONNECTOR_FILE_UPLOAD, unzip=unzip)
 
 
 @router.get("/admin/connector/{connector_id}/files", tags=PUBLIC_API_TAGS)
@@ -1278,14 +1258,14 @@ def get_connector_indexing_status(
         # Get most recent index attempts
         (
             lambda: get_latest_index_attempts_parallel(
-                request.secondary_index, True, False
+                request.secondary_index, False, False
             ),
             (),
         ),
         # Get most recent finished index attempts
         (
             lambda: get_latest_index_attempts_parallel(
-                request.secondary_index, True, True
+                request.secondary_index, False, True
             ),
             (),
         ),

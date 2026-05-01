@@ -12,10 +12,16 @@ import InputComboBox, {
   InputComboBoxProps,
 } from "@/refresh-components/inputs/InputComboBox";
 
-export interface InputComboBoxFieldProps extends Omit<
-  InputComboBoxProps,
-  "value" | "onChange" | "onValueChange" | "isError"
-> {
+/**
+ * Formik-bound version of `InputComboBox`. Use this inside a `<Formik>` form
+ * when you need a combo box (free-text input with dropdown suggestions).
+ * For a plain combo box without Formik binding, use `InputComboBox` directly.
+ */
+export interface InputComboBoxFieldProps
+  extends Omit<
+    InputComboBoxProps,
+    "value" | "onChange" | "onValueChange" | "isError"
+  > {
   name: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   onValueChange?: (value: string) => void;

@@ -1,7 +1,7 @@
 "use client";
 
-import { HTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { cn } from "@opal/utils";
 
 // Throttle interval for scroll events (~60fps)
 const SCROLL_THROTTLE_MS = 16;
@@ -37,7 +37,7 @@ const SCROLL_THROTTLE_MS = 16;
  *    which becomes the scroll container instead of this component's inner div.
  */
 export interface ScrollIndicatorDivProps
-  extends HTMLAttributes<HTMLDivElement> {
+  extends React.HTMLAttributes<HTMLDivElement> {
   // Mask/Shadow options
   disableIndicators?: boolean;
   disableTopIndicator?: boolean;
