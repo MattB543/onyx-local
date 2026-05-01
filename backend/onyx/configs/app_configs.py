@@ -261,6 +261,13 @@ DISPOSABLE_EMAIL_DOMAINS_URL = os.environ.get(
     "https://disposable.github.io/disposable-email-domains/domains.json",
 )
 
+# Captcha cookie TTL — how long a verified captcha token remains valid in
+# the browser cookie before the user has to solve another challenge. Sized
+# to comfortably cover one Google OAuth round-trip (typically <10s) while
+# keeping the replay window tight. 120s also matches Google's own v3 token
+# lifetime, so a paired-up cookie + token never outlive each other.
+CAPTCHA_COOKIE_TTL_SECONDS = int(os.environ.get("CAPTCHA_COOKIE_TTL_SECONDS", "120"))
+
 # OAuth Login Flow
 # Used for both Google OAuth2 and OIDC flows
 OAUTH_CLIENT_ID = (
@@ -851,7 +858,7 @@ LEAVE_CONNECTOR_ACTIVE_ON_INITIALIZATION_FAILURE = (
     == "true"
 )
 
-DEFAULT_PRUNING_FREQ = 60 * 60 * 24  # Once a day
+DEFAULT_PRUNING_FREQ = 60 * 60 * 24 * 25  # 25 days
 
 ALLOW_SIMULTANEOUS_PRUNING = (
     os.environ.get("ALLOW_SIMULTANEOUS_PRUNING", "").lower() == "true"
@@ -949,6 +956,15 @@ MAX_EMBEDDED_IMAGES_PER_FILE = max(
 # to >= 0.
 MAX_EMBEDDED_IMAGES_PER_UPLOAD = max(
     0, int(os.environ.get("MAX_EMBEDDED_IMAGES_PER_UPLOAD") or 1000)
+)
+
+# Maximum non-empty cells to extract from a single xlsx worksheet. Protects
+# from OOM on honestly-huge spreadsheets: memory cost in the extractor is
+# roughly proportional to this count. Once exceeded, the scan stops and a
+# truncation marker row is appended to the sheet's CSV.
+# Peak Memory ~= 100 B * MAX_CELLS
+MAX_XLSX_CELLS_PER_SHEET = max(
+    0, int(os.environ.get("MAX_XLSX_CELLS_PER_SHEET") or 10_000_000)
 )
 
 # Use document summary for contextual rag
@@ -1146,6 +1162,12 @@ MANAGED_VESPA = os.environ.get("MANAGED_VESPA", "").lower() == "true"
 
 ENABLE_EMAIL_INVITES = os.environ.get("ENABLE_EMAIL_INVITES", "").lower() == "true"
 
+# When true, GET /users is restricted to callers with READ_USERS so non-admins
+# cannot enumerate the tenant directory. Off by default to preserve sharing UX.
+USER_DIRECTORY_ADMIN_ONLY = (
+    os.environ.get("USER_DIRECTORY_ADMIN_ONLY", "").lower() == "true"
+)
+
 # Limit on number of users a free trial tenant can invite (cloud only)
 NUM_FREE_TRIAL_USER_INVITES = int(os.environ.get("NUM_FREE_TRIAL_USER_INVITES", "10"))
 
@@ -1226,6 +1248,11 @@ RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 # Minimum score threshold for reCAPTCHA v3 (0.0-1.0, higher = more likely human)
 # 0.5 is the recommended default
 RECAPTCHA_SCORE_THRESHOLD = float(os.environ.get("RECAPTCHA_SCORE_THRESHOLD", "0.5"))
+
+# Opt-in per-IP rate limit on /auth/register.
+SIGNUP_RATE_LIMIT_ENABLED = (
+    os.environ.get("SIGNUP_RATE_LIMIT_ENABLED", "").lower() == "true"
+)
 
 MOCK_CONNECTOR_FILE_PATH = os.environ.get("MOCK_CONNECTOR_FILE_PATH")
 

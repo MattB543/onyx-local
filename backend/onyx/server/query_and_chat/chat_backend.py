@@ -63,6 +63,7 @@ from onyx.db.persona import get_persona_by_id
 from onyx.db.usage import increment_usage
 from onyx.db.usage import UsageType
 from onyx.db.user_file import get_file_id_by_user_file_id
+from onyx.db.user_file import user_can_access_chat_file
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
 from onyx.file_store.file_store import get_default_file_store
@@ -866,14 +867,18 @@ def seed_chat_from_slack(
 def fetch_chat_file(
     file_id: str,
     request: Request,
-    _: User = Depends(require_permission(Permission.BASIC_ACCESS)),
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
     db_session: Session = Depends(get_session),
 ) -> Response:
 
     # For user files, we need to get the file id from the user file id
-    file_id_from_user_file = get_file_id_by_user_file_id(file_id, db_session)
+    file_id_from_user_file = get_file_id_by_user_file_id(file_id, user.id, db_session)
     if file_id_from_user_file:
         file_id = file_id_from_user_file
+    elif not user_can_access_chat_file(file_id, user.id, db_session):
+        # Return 404 (rather than 403) so callers cannot probe for file
+        # existence across ownership boundaries.
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "File not found")
 
     file_store = get_default_file_store()
     file_record = file_store.read_file_record(file_id)
@@ -981,11 +986,21 @@ async def search_chats(
 @router.post("/stop-chat-session/{chat_session_id}", tags=PUBLIC_API_TAGS)
 def stop_chat_session(
     chat_session_id: UUID,
-    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),  # noqa: ARG001
+    user: User = Depends(require_permission(Permission.BASIC_ACCESS)),
+    db_session: Session = Depends(get_session),
 ) -> dict[str, str]:
     """
     Stop a chat session by setting a stop signal.
     This endpoint is called by the frontend when the user clicks the stop button.
     """
+    try:
+        get_chat_session_by_id(
+            chat_session_id=chat_session_id,
+            user_id=user.id,
+            db_session=db_session,
+        )
+    except ValueError:
+        raise OnyxError(OnyxErrorCode.SESSION_NOT_FOUND, "Chat session not found")
+
     set_fence(chat_session_id, get_cache_backend(), True)
     return {"message": "Chat session stopped"}

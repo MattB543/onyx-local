@@ -44,7 +44,6 @@ backend = [
     "chonkie==1.0.10",
     "cryptography==46.0.5",
     "dask==2026.1.1",
-    "ddtrace==3.10.0",
     "discord.py==2.4.0",
     "distributed==2026.1.1",
     "fastapi-users==15.0.4",
@@ -76,7 +75,7 @@ backend = [
     # backend/onyx/file_processing/extract_file_text.py and what impacts
     # updating might have on this behavior.
     "markitdown[pdf, docx, pptx, xlsx, xls]==0.1.2",
-    "mcp[cli]==1.26.0",
+    "mcp[cli]==1.27.0",
     "msal==1.34.0",
     "msoffcrypto-tool==5.4.2",
     "Office365-REST-Python-Client==2.6.2",

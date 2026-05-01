@@ -124,9 +124,9 @@ function MCPServerCard({
       padding="sm"
       expandedContent={
         hasContent ? (
-          <div className="flex flex-col gap-2 p-2">
+          <Section gap={0.5} padding={0.5}>
             {filteredTools.map((tool) => (
-              <Card key={tool.id} border="solid" rounding="lg" padding="sm">
+              <Card key={tool.id} border="solid" rounding="md" padding="sm">
                 <CardLayout.Header
                   headerChildren={
                     <Content
@@ -151,11 +151,12 @@ function MCPServerCard({
                 />
               </Card>
             ))}
-          </div>
+          </Section>
         ) : undefined
       }
     >
       <CardLayout.Header
+        headerPadding="sm"
         headerChildren={
           <ContentAction
             icon={getActionIcon(server.server_url, server.name)}
@@ -981,7 +982,7 @@ export default function ChatPreferencesPage() {
                           key={tool.id}
                           border="solid"
                           rounding="lg"
-                          padding="sm"
+                          padding="md"
                         >
                           <CardLayout.Header
                             headerChildren={
@@ -1084,6 +1085,23 @@ export default function ChatPreferencesPage() {
                       maxAllowedUploadSizeMb={s.max_allowed_upload_size_mb}
                     />
                   </InputVertical>
+                </Card>
+
+                <Card border="solid" rounding="lg">
+                  <InputHorizontal
+                    title="Image Extraction & Analysis"
+                    description="Extract embedded images from uploaded files (PDFs, DOCX, etc.) and summarize them with a vision-capable LLM so image-only documents become searchable and answerable. Requires a vision-capable default LLM."
+                    withLabel
+                  >
+                    <Switch
+                      checked={s.image_extraction_and_analysis_enabled ?? true}
+                      onCheckedChange={(checked) => {
+                        void saveSettings({
+                          image_extraction_and_analysis_enabled: checked,
+                        });
+                      }}
+                    />
+                  </InputHorizontal>
                 </Card>
 
                 <Card border="solid" rounding="lg">

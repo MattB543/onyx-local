@@ -943,7 +943,7 @@ class HierarchyNode(Base):
     # For hierarchy nodes that are also documents (e.g., Confluence pages)
     # SET NULL when document is deleted - node can exist without its document
     document_id: Mapped[str | None] = mapped_column(
-        ForeignKey("document.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("document.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     # Self-referential FK for tree structure
@@ -1001,6 +1001,7 @@ class Document(Base):
     semantic_id: Mapped[str] = mapped_column(NullFilteredString)
     # First Section's link
     link: Mapped[str | None] = mapped_column(NullFilteredString, nullable=True)
+    file_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # The updated time is also used as a measure of the last successful state of the doc
     # pulled from the source (to help skip reindexing already updated docs in case of
@@ -2148,10 +2149,6 @@ class SearchSettings(Base):
         String, nullable=True
     )
 
-    multilingual_expansion: Mapped[list[str]] = mapped_column(
-        postgresql.ARRAY(String), default=[]
-    )
-
     cloud_provider: Mapped["CloudEmbeddingProvider"] = relationship(
         "CloudEmbeddingProvider",
         back_populates="search_settings",
@@ -2252,6 +2249,7 @@ class IndexAttempt(Base):
     connector_credential_pair_id: Mapped[int] = mapped_column(
         ForeignKey("connector_credential_pair.id"),
         nullable=False,
+        index=True,
     )
 
     # Some index attempts that run from beginning will still have this as False
@@ -2455,10 +2453,12 @@ class IndexAttemptError(Base):
     index_attempt_id: Mapped[int] = mapped_column(
         ForeignKey("index_attempt.id"),
         nullable=False,
+        index=True,
     )
     connector_credential_pair_id: Mapped[int] = mapped_column(
         ForeignKey("connector_credential_pair.id"),
         nullable=False,
+        index=True,
     )
 
     document_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -4975,6 +4975,25 @@ class TenantAnonymousUserPath(Base):
     tenant_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     anonymous_user_path: Mapped[str] = mapped_column(
         String, nullable=False, unique=True
+    )
+
+
+# Lifetime invite counter per tenant. Incremented atomically on every
+# invite reservation; never decremented — removals do not free quota, so
+# loops of invite → remove → invite cannot bypass the trial cap.
+class TenantInviteCounter(Base):
+    __tablename__ = "tenant_invite_counter"
+    __table_args__ = {"schema": "public"}
+
+    tenant_id: Mapped[str] = mapped_column(String, primary_key=True)
+    total_invites_sent: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 
