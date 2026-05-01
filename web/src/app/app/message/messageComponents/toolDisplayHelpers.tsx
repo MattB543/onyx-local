@@ -6,7 +6,6 @@ import {
   PacketType,
   SearchToolPacket,
 } from "@/app/app/services/streamingModels";
-import { BrainIcon } from "@/components/icons/icons";
 
 import {
   SvgGlobe,

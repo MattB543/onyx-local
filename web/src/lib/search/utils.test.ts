@@ -17,6 +17,7 @@ function makeDocument(overrides: Partial<OnyxDocument>): OnyxDocument {
     metadata: {},
     updated_at: null,
     is_internet: false,
+    image: null,
     ...overrides,
   };
 }

@@ -372,6 +372,22 @@ const AppInputBar = React.memo(
       [setCurrentMessageFiles]
     );
 
+    const handleToggleIndexForLater = useCallback(
+      (fileId: string, checked: boolean) => {
+        setCurrentMessageFiles((prev) =>
+          prev.map((file) =>
+            file.id === fileId
+              ? {
+                  ...file,
+                  index_for_later: checked,
+                }
+              : file
+          )
+        );
+      },
+      [setCurrentMessageFiles]
+    );
+
     const { activePromptShortcuts } = usePromptShortcuts();
     const vectorDbEnabled = useVectorDbEnabled();
     const { ccPairs, isLoading: ccPairsLoading } = useCCPairs(vectorDbEnabled);
@@ -805,7 +821,6 @@ const AppInputBar = React.memo(
                     onFileClick={handleFileClick}
                     onToggleIndexForLater={handleToggleIndexForLater}
                     compactImages={shouldCompactImages}
-                    onToggleIndexForLater={handleToggleIndexForLater}
                   />
                 ))}
               </div>

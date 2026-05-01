@@ -79,6 +79,10 @@ export interface Settings {
   default_pruning_freq?: number;
   default_user_file_max_upload_size_mb?: number;
   default_file_token_count_threshold_k?: number;
+
+  // Whitelabel branding name (custom fork feature).
+  // Sourced from the NEXT_PUBLIC_WHITELABEL_NAME / WHITELABEL_NAME env vars.
+  whitelabel_name?: string | null;
 }
 
 export interface NavigationItem {
