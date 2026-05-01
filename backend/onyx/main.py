@@ -143,7 +143,9 @@ from onyx.server.onyx_api.ingestion import router as onyx_api_router
 from onyx.server.pat.api import router as pat_router
 from onyx.server.query_and_chat.chat_backend import router as chat_router
 from onyx.server.query_and_chat.chat_files import router as chat_files_router
-from onyx.server.query_and_chat.query_backend import admin_router as admin_query_router
+from onyx.server.query_and_chat.query_backend import (
+    admin_router as admin_query_router,
+)
 from onyx.server.query_and_chat.query_backend import basic_router as query_router
 from onyx.server.saml import router as saml_router
 from onyx.server.settings.api import admin_router as settings_admin_router

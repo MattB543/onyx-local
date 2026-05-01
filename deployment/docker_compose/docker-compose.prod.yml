@@ -16,6 +16,7 @@ services:
     depends_on:
       - relational_db
       - index
+      - opensearch
       - cache
       - minio
       - inference_model_server
@@ -73,6 +74,7 @@ services:
     depends_on:
       - relational_db
       - index
+      - opensearch
       - cache
       - inference_model_server
       - indexing_model_server

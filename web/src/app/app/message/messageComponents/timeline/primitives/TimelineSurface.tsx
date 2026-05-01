@@ -1,4 +1,4 @@
-import React, { Children } from "react";
+import React from "react";
 import { cn } from "@opal/utils";
 
 export type TimelineSurfaceBackground = "tint" | "transparent" | "error";
@@ -24,7 +24,7 @@ export function TimelineSurface({
   roundedBottom = false,
   background = "tint",
 }: TimelineSurfaceProps) {
-  if (Children.count(children) === 0) {
+  if (React.Children.count(children) === 0) {
     return null;
   }
 

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { HTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { cn } from "@opal/utils";
 
-export interface ShadowDivProps extends HTMLAttributes<HTMLDivElement> {
+export interface ShadowDivProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * Background color to use for the shadow gradients.
    * Defaults to --background-neutral-00
@@ -65,10 +65,9 @@ export default function ShadowDiv({
 }: ShadowDivProps) {
   const [showTopShadow, setShowTopShadow] = useState(false);
   const [showBottomShadow, setShowBottomShadow] = useState(false);
-  const internalRef = useRef<HTMLDivElement>(null);
+  const internalRef = React.useRef<HTMLDivElement>(null);
   const containerRef = scrollContainerRef || internalRef;
 
-  /* eslint-disable react-hooks/preserve-manual-memoization -- ref.current access differs from inferred */
   const checkScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -86,7 +85,6 @@ export default function ShadowDiv({
       setShowBottomShadow(hasMoreBelow);
     }
   }, [containerRef, bottomOnly, topOnly]);
-  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   useEffect(() => {
     const container = containerRef.current;

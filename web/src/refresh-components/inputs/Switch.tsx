@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useState } from "react";
+import React, { useState } from "react";
 import { cn } from "@opal/utils";
 import type { WithoutStyles } from "@opal/types";
 
@@ -16,7 +16,7 @@ export interface SwitchProps
   onCheckedChange?: (checked: boolean) => void;
 }
 
-const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
+const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
   (
     {
       disabled,

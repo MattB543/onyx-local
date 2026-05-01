@@ -1,9 +1,9 @@
 import datetime
 import json
 from typing import Any
+from typing import cast
 from typing import Literal
 from typing import NotRequired
-from typing import cast
 from uuid import UUID
 from uuid import uuid4
 

@@ -803,6 +803,7 @@ const AppInputBar = React.memo(
                     removeFile={handleRemoveMessageFile}
                     hideProcessingState={hideProcessingState}
                     onFileClick={handleFileClick}
+                    onToggleIndexForLater={handleToggleIndexForLater}
                     compactImages={shouldCompactImages}
                     onToggleIndexForLater={handleToggleIndexForLater}
                   />

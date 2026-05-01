@@ -82,6 +82,9 @@ from onyx.natural_language_processing.utils import tokenizer_trim_middle
 from onyx.prompts.contextual_retrieval import CONTEXTUAL_RAG_PROMPT1
 from onyx.prompts.contextual_retrieval import CONTEXTUAL_RAG_PROMPT2
 from onyx.prompts.contextual_retrieval import DOCUMENT_SUMMARY_PROMPT
+from onyx.tracing.flows import LLMFlow
+from onyx.tracing.llm_utils import llm_generation_span
+from onyx.tracing.llm_utils import record_llm_response
 from onyx.utils.batching import batch_generator
 from onyx.utils.logger import setup_logger
 from onyx.utils.postgres_sanitization import sanitize_documents_for_postgres
@@ -89,6 +92,19 @@ from onyx.utils.threadpool_concurrency import run_functions_tuples_in_parallel
 from onyx.utils.timing import log_function_time
 
 logger = setup_logger()
+
+MAX_CONTEXTUAL_RAG_WORKERS = 128  # Assume 8mb of memory per worker
+MAX_IMAGE_WORKERS = 16
+
+
+class _PendingImageSummarization(BaseModel):
+    """An image section awaiting LLM summarization."""
+
+    section: Section
+    image_data: bytes
+    context_name: str
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class DocumentBatchPrepareContext(BaseModel):
@@ -646,71 +662,81 @@ def process_image_sections(documents: list[Document]) -> list[IndexingDocument]:
         ]
 
     indexed_documents: list[IndexingDocument] = []
+    # Sections that need LLM summarization, paired with their image data.
+    # Each Section is already placed in its document's processed_sections
+    # list — we just fill in .text after the parallel run.
+    pending: list[_PendingImageSummarization] = []
+    file_store = get_default_file_store()
 
     for document in documents:
         processed_sections: list[Section] = []
 
         for section in document.sections:
-            # For ImageSection, process and create base Section with both text and image_file_id
-            if isinstance(section, ImageSection):
-                # Default section with image path preserved - ensure text is always a string
-                processed_section = Section(
-                    type=section.type,
-                    link=section.link,
-                    image_file_id=section.image_file_id,
-                    text="",  # Initialize with empty string
-                )
-
-                # Try to get image summary
-                try:
-                    file_store = get_default_file_store()
-
-                    file_record = file_store.read_file_record(
-                        file_id=section.image_file_id
+            if not isinstance(section, ImageSection):
+                processed_sections.append(
+                    Section(
+                        type=section.type,
+                        text=section.text or "",
+                        link=section.link,
+                        image_file_id=None,
                     )
-                    if not file_record:
-                        logger.warning(
-                            f"Image file {section.image_file_id} not found in FileStore"
-                        )
-
-                        processed_section.text = "[Image could not be processed]"
-                    else:
-                        # Get the image data
-                        image_data_io = file_store.read_file(
-                            file_id=section.image_file_id
-                        )
-                        image_data = image_data_io.read()
-                        summary = summarize_image_with_error_handling(
-                            llm=llm,
-                            image_data=image_data,
-                            context_name=file_record.display_name or "Image",
-                        )
-
-                        if summary:
-                            processed_section.text = summary
-                        else:
-                            processed_section.text = "[Image could not be summarized]"
-                except Exception as e:
-                    logger.error(f"Error processing image section: {e}")
-                    processed_section.text = "[Error processing image]"
-
-                processed_sections.append(processed_section)
-
-            # For TextSection, create a base Section with text and link
-            else:
-                processed_section = Section(
-                    type=section.type,
-                    text=section.text or "",  # Ensure text is always a string, not None
-                    link=section.link,
-                    image_file_id=None,
                 )
-                processed_sections.append(processed_section)
+                continue
 
-        # Create IndexingDocument with original sections and processed_sections
-        indexed_document = IndexingDocument(
-            **document.model_dump(), processed_sections=processed_sections
+            processed_section = Section(
+                type=section.type,
+                link=section.link,
+                image_file_id=section.image_file_id,
+                text="",
+            )
+            processed_sections.append(processed_section)
+
+            try:
+                file_record = file_store.read_file_record(file_id=section.image_file_id)
+                if not file_record:
+                    logger.warning(
+                        f"Image file {section.image_file_id} not found in FileStore"
+                    )
+                    processed_section.text = "[Image could not be processed]"
+                    continue
+
+                image_data = file_store.read_file(file_id=section.image_file_id).read()
+                pending.append(
+                    _PendingImageSummarization(
+                        section=processed_section,
+                        image_data=image_data,
+                        context_name=file_record.display_name or "Image",
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Error reading image section: {e}")
+                processed_section.text = "[Error processing image]"
+
+        indexed_documents.append(
+            IndexingDocument(
+                **document.model_dump(), processed_sections=processed_sections
+            )
         )
-        indexed_documents.append(indexed_document)
+
+    # Summarize all images in parallel
+    if pending:
+
+        def _summarize(image_data: bytes, context_name: str) -> str:
+            return (
+                summarize_image_with_error_handling(
+                    llm=llm, image_data=image_data, context_name=context_name
+                )
+                or "[Image could not be summarized]"
+            )
+
+        results = run_functions_tuples_in_parallel(
+            [(_summarize, (p.image_data, p.context_name)) for p in pending],
+            allow_failures=True,
+            max_workers=MAX_IMAGE_WORKERS,
+        )
+
+        for p, result in zip(pending, results):
+            p.section.text = result or "[Error processing image]"
 
     return indexed_documents
 
@@ -742,7 +768,13 @@ def add_document_summaries(
     summary_prompt = DOCUMENT_SUMMARY_PROMPT.format(document=doc_content)
     prompt_msg = UserMessage(content=summary_prompt)
 
-    response = llm.invoke(prompt_msg, max_tokens=MAX_CONTEXT_TOKENS)
+    with llm_generation_span(
+        llm=llm,
+        flow=LLMFlow.CONTEXTUAL_RAG_DOC_SUMMARY,
+        input_messages=[prompt_msg],
+    ) as span_generation:
+        response = llm.invoke(prompt_msg, max_tokens=MAX_CONTEXT_TOKENS)
+        record_llm_response(span_generation, response)
     doc_summary = llm_response_to_string(response)
 
     for chunk in chunks_by_doc:
@@ -785,7 +817,13 @@ def add_chunk_summaries(
         fallback_prompt = UserMessage(
             content=DOCUMENT_SUMMARY_PROMPT.format(document=doc_content)
         )
-        response = llm.invoke(fallback_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+        with llm_generation_span(
+            llm=llm,
+            flow=LLMFlow.CONTEXTUAL_RAG_DOC_SUMMARY,
+            input_messages=[fallback_prompt],
+        ) as span_generation:
+            response = llm.invoke(fallback_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+            record_llm_response(span_generation, response)
         doc_info = llm_response_to_string(response)
 
     from onyx.llm.prompt_cache.processor import process_with_prompt_cache
@@ -804,7 +842,13 @@ def add_chunk_summaries(
                 continuation=True,  # Append chunk to the document context
             )
 
-            response = llm.invoke(processed_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+            with llm_generation_span(
+                llm=llm,
+                flow=LLMFlow.CONTEXTUAL_RAG_CHUNK_CONTEXT,
+                input_messages=[processed_prompt],
+            ) as span_generation:
+                response = llm.invoke(processed_prompt, max_tokens=MAX_CONTEXT_TOKENS)
+                record_llm_response(span_generation, response)
             chunk.chunk_context = llm_response_to_string(response)
 
         except LLMRateLimitError as e:
@@ -817,7 +861,8 @@ def add_chunk_summaries(
             chunk.chunk_context = ""
 
     run_functions_tuples_in_parallel(
-        [(assign_context, (chunk,)) for chunk in chunks_by_doc]
+        functions_with_args=[(assign_context, (chunk,)) for chunk in chunks_by_doc],
+        max_workers=MAX_CONTEXTUAL_RAG_WORKERS,
     )
 
 
