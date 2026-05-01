@@ -8,6 +8,7 @@ import {
   ChatSessionSharedStatus,
   BackendChatSession,
   FeedbackType,
+  QueuedMessage,
 } from "../interfaces";
 import {
   getLatestMessageChain,
@@ -44,6 +45,9 @@ interface ChatSessionData {
 
   // Streaming duration tracking
   streamingStartTime?: number;
+
+  // Queued messages
+  queuedMessages: QueuedMessage[];
 }
 
 interface ChatSessionStore {
@@ -134,6 +138,12 @@ interface ChatSessionStore {
   setStreamingStartTime: (sessionId: string, time: number | null) => void;
   getStreamingStartTime: (sessionId: string) => number | undefined;
 
+  // Actions - Queued Messages
+  enqueueMessage: (sessionId: string, message: string) => void;
+  removeQueuedMessage: (sessionId: string, index: number) => void;
+  enqueueCurrentMessage: (message: string) => void;
+  removeCurrentQueuedMessage: (index: number) => void;
+
   // Actions - Abort Controllers
   setAbortController: (sessionId: string, controller: AbortController) => void;
   abortSession: (sessionId: string) => void;
@@ -173,8 +183,11 @@ const createInitialSessionData = (
 
   lastAccessed: new Date(),
   isLoaded: false,
+  queuedMessages: [],
   ...initialData,
 });
+
+let nextQueuedMessageId = 0;
 
 export const useChatSessionStore = create<ChatSessionStore>()((set, get) => ({
   // Initial state
@@ -480,6 +493,56 @@ export const useChatSessionStore = create<ChatSessionStore>()((set, get) => ({
     return get().sessions.get(sessionId)?.streamingStartTime;
   },
 
+  // Queued Messages Actions
+  enqueueMessage: (sessionId: string, message: string) => {
+    set((state) => {
+      const session = state.sessions.get(sessionId);
+      if (!session || session.queuedMessages.length >= 5) {
+        return state;
+      }
+      const updatedSession = {
+        ...session,
+        queuedMessages: [
+          ...session.queuedMessages,
+          { id: nextQueuedMessageId++, text: message },
+        ],
+      };
+      const newSessions = new Map(state.sessions);
+      newSessions.set(sessionId, updatedSession);
+      return { sessions: newSessions };
+    });
+  },
+
+  removeQueuedMessage: (sessionId: string, index: number) => {
+    set((state) => {
+      const session = state.sessions.get(sessionId);
+      if (!session) {
+        return state;
+      }
+      const updatedSession = {
+        ...session,
+        queuedMessages: session.queuedMessages.filter((_, i) => i !== index),
+      };
+      const newSessions = new Map(state.sessions);
+      newSessions.set(sessionId, updatedSession);
+      return { sessions: newSessions };
+    });
+  },
+
+  enqueueCurrentMessage: (message: string) => {
+    const { currentSessionId } = get();
+    if (currentSessionId) {
+      get().enqueueMessage(currentSessionId, message);
+    }
+  },
+
+  removeCurrentQueuedMessage: (index: number) => {
+    const { currentSessionId } = get();
+    if (currentSessionId) {
+      get().removeQueuedMessage(currentSessionId, index);
+    }
+  },
+
   // Abort Controller Actions
   setAbortController: (sessionId: string, controller: AbortController) => {
     get().updateSessionData(sessionId, { abortController: controller });
@@ -644,4 +707,14 @@ export const useStreamingStartTime = () =>
       ? sessions.get(currentSessionId)
       : null;
     return currentSession?.streamingStartTime;
+  });
+
+const EMPTY_QUEUED_MESSAGES: QueuedMessage[] = [];
+export const useCurrentQueuedMessages = () =>
+  useChatSessionStore((state) => {
+    const { currentSessionId, sessions } = state;
+    const currentSession = currentSessionId
+      ? sessions.get(currentSessionId)
+      : null;
+    return currentSession?.queuedMessages ?? EMPTY_QUEUED_MESSAGES;
   });

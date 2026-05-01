@@ -488,7 +488,7 @@ export default function AgentsNavigationPage() {
                       const isSelected = selectedCreatorIds.has(creator.id);
                       const isCurrentUser = user && creator.id === user.id;
 
-                      // Check if we need to add a separator after this item
+                      // Check if we need to add a divider after this item
                       const nextCreator = filteredCreators[index + 1];
                       const nextIsCurrentUser =
                         user && nextCreator && nextCreator.id === user.id;
@@ -524,7 +524,7 @@ export default function AgentsNavigationPage() {
                         </LineItem>
                       );
 
-                      // Return the line item, and optionally a separator
+                      // Return the line item, and optionally a divider
                       return needsSeparator ? [lineItem, null] : [lineItem];
                     }),
                   ]}
@@ -566,7 +566,7 @@ export default function AgentsNavigationPage() {
                         const systemIcon = SYSTEM_TOOL_ICONS[action.name];
                         const isSystemTool = !!systemIcon;
 
-                        // Check if we need to add a separator after this item
+                        // Check if we need to add a divider after this item
                         const nextAction = filteredActions[index + 1];
                         const nextIsSystemTool =
                           nextAction && nextAction.type === "tool"
