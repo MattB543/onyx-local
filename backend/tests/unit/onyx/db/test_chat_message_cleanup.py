@@ -47,12 +47,17 @@ def test_user_files_are_not_deleted(
 
     delete_messages_and_files_from_chat_session(uuid4(), db_session)
 
-    assert file_store.delete_file.call_count == 2
+    # Each chat file triggers two delete_file calls: one for the raw file
+    # and one for its plaintext sibling.
+    assert file_store.delete_file.call_count == 4
     file_store.delete_file.assert_has_calls(
         [
             call(file_id="chat-file-1", error_on_missing=False),
+            call(file_id="plaintext_chat-file-1", error_on_missing=False),
             call(file_id="chat-file-2", error_on_missing=False),
-        ]
+            call(file_id="plaintext_chat-file-2", error_on_missing=False),
+        ],
+        any_order=True,
     )
 
 

@@ -18,6 +18,7 @@ def _fake_user(
     user.id = uuid4()
     user.email = email
     user.account_type = account_type
+    user.personal_name = None
     return user
 
 

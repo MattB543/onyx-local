@@ -9,7 +9,7 @@ from onyx.db.chat import delete_messages_and_files_from_chat_session
 def test_delete_messages_and_files_from_chat_session_preserves_promoted_files() -> None:
     chat_session_id = uuid4()
     db_session = MagicMock()
-    db_session.execute.return_value.fetchall.return_value = [
+    db_session.execute.return_value.tuples.return_value.all.return_value = [
         (
             1,
             [
@@ -30,13 +30,16 @@ def test_delete_messages_and_files_from_chat_session_preserves_promoted_files() 
 
     file_store.delete_file.assert_has_calls(
         [
-            call(file_id="raw-chat-only"),
-            call(file_id="plaintext_raw-chat-only"),
+            call(file_id="raw-chat-only", error_on_missing=False),
+            call(file_id="plaintext_raw-chat-only", error_on_missing=False),
         ]
     )
-    assert call(file_id="promoted-raw-file") not in file_store.delete_file.call_args_list
     assert (
-        call(file_id="plaintext_promoted-raw-file")
+        call(file_id="promoted-raw-file", error_on_missing=False)
+        not in file_store.delete_file.call_args_list
+    )
+    assert (
+        call(file_id="plaintext_promoted-raw-file", error_on_missing=False)
         not in file_store.delete_file.call_args_list
     )
     db_session.commit.assert_called_once()
