@@ -17,7 +17,6 @@ from onyx.prompts.constants import REMINDER_TAG_DESCRIPTION
 from onyx.server.settings.store import load_settings
 from onyx.utils.logger import setup_logger
 
-
 logger = setup_logger()
 
 

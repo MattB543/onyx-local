@@ -100,8 +100,8 @@ backend = [
     "pytest-mock==3.12.0",
     "pytest-playwright==0.7.2",
     "python-docx==1.1.2",
-    "python-dotenv==1.1.1",
-    "python-multipart==0.0.22",
+    "python-dotenv==1.2.2",
+    "python-multipart==0.0.26",
     "pywikibot==9.0.0",
     "redis==5.0.8",
     "requests==2.33.0",
@@ -225,7 +225,7 @@ exclude = ["backend/generated", "backend/onyx/server/features/build/sandbox/kube
 typeCheckingMode = "off"
 
 [tool.ruff]
-line-length = 130
+line-length = 88
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -236,9 +236,20 @@ select = [
   "ARG",
   "E",
   "F",
+  "I",
   "S324",
   "W",
 ]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+order-by-type = false
+known-first-party = ["onyx", "ee", "tests", "shared_configs", "model_server"]
+
+[tool.ruff.lint.per-file-ignores]
+# alembic has a folder named `alembic` in backend/ which confuses import sorters
+"backend/alembic/**" = ["I"]
+"backend/alembic_tenants/**" = ["I"]
 
 [tool.setuptools.packages.find]
 where = ["backend"]
