@@ -149,9 +149,7 @@ def _decrypt_bytes(input_bytes: bytes, key: str | None = None) -> str:
 
 def _ensure_secret_encryption_ready() -> None:
     if SECRET_ENCRYPTION_MODE != "disabled":
-        from onyx.utils.encryption import (
-            _ensure_secret_encryption_ready as _kms_ready,
-        )
+        from onyx.utils.encryption import _ensure_secret_encryption_ready as _kms_ready
 
         return _kms_ready()
 

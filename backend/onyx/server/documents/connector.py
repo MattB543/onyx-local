@@ -27,9 +27,7 @@ from onyx.auth.users import current_admin_user
 from onyx.auth.users import current_chat_accessible_user
 from onyx.auth.users import current_curator_or_admin_user
 from onyx.auth.users import current_user
-from onyx.background.celery.tasks.pruning.tasks import (
-    try_creating_prune_generator_task,
-)
+from onyx.background.celery.tasks.pruning.tasks import try_creating_prune_generator_task
 from onyx.background.celery.versioned_apps.client import app as client_app
 from onyx.configs.app_configs import EMAIL_CONFIGURED
 from onyx.configs.app_configs import ENABLED_CONNECTOR_TYPES
@@ -128,8 +126,8 @@ from onyx.server.documents.models import FailedConnectorIndexingStatus
 from onyx.server.documents.models import FileUploadResponse
 from onyx.server.documents.models import GDriveCallback
 from onyx.server.documents.models import GmailCallback
-from onyx.server.documents.models import GoogleCalendarCallback
 from onyx.server.documents.models import GoogleAppCredentials
+from onyx.server.documents.models import GoogleCalendarCallback
 from onyx.server.documents.models import GoogleServiceAccountCredentialRequest
 from onyx.server.documents.models import GoogleServiceAccountKey
 from onyx.server.documents.models import IndexedSourcesResponse

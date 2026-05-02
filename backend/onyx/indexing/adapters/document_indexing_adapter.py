@@ -1,11 +1,11 @@
 import contextlib
-from functools import lru_cache
 import hashlib
 import re
 from collections.abc import Generator
 from datetime import datetime
 from datetime import timezone
 from email.utils import getaddresses
+from functools import lru_cache
 from uuid import UUID
 
 from sqlalchemy.engine.util import TransactionalContext

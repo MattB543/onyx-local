@@ -229,7 +229,7 @@ def is_versioned_encrypted_payload(payload: bytes) -> bool:
 
 
 # IMPORTANT DO NOT DELETE, THIS IS USED BY fetch_versioned_implementation
-def _encrypt_string(input_str: str, key: str | None = None) -> bytes:
+def _encrypt_string(input_str: str, key: str | None = None) -> bytes:  # noqa: ARG001
     _validate_encryption_mode()
     if SECRET_ENCRYPTION_MODE == _SECRET_ENCRYPTION_MODE_DISABLED:
         if SECRET_ENCRYPTION_REQUIRED:
@@ -281,7 +281,7 @@ def _decrypt_legacy_aes_cbc(input_bytes: bytes) -> str:
 
 
 # IMPORTANT DO NOT DELETE, THIS IS USED BY fetch_versioned_implementation
-def _decrypt_bytes(input_bytes: bytes, key: str | None = None) -> str:
+def _decrypt_bytes(input_bytes: bytes, key: str | None = None) -> str:  # noqa: ARG001
     _validate_encryption_mode()
     if SECRET_ENCRYPTION_MODE == _SECRET_ENCRYPTION_MODE_DISABLED:
         if SECRET_ENCRYPTION_REQUIRED:
