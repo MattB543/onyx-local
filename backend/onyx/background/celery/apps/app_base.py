@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from onyx import __version__
 from onyx.background.celery.apps.task_formatters import CeleryTaskColoredFormatter
+from onyx.background.celery.apps.task_formatters import CeleryTaskJsonFormatter
 from onyx.background.celery.apps.task_formatters import CeleryTaskPlainFormatter
 from onyx.background.celery.celery_utils import celery_is_worker_primary
 from onyx.background.celery.celery_utils import make_probe_path
@@ -50,11 +51,13 @@ from onyx.redis.redis_usergroup import RedisUserGroup
 from onyx.tracing.setup import setup_tracing
 from onyx.utils.encryption import ensure_secret_encryption_ready
 from onyx.utils.logger import ColoredFormatter
+from onyx.utils.logger import get_json_formatter
 from onyx.utils.logger import get_log_level_from_str
 from onyx.utils.logger import LoggerContextVars
 from onyx.utils.logger import PlainFormatter
 from onyx.utils.logger import setup_logger
 from shared_configs.configs import DEV_LOGGING_ENABLED
+from shared_configs.configs import JSON_LOGGING
 from shared_configs.configs import MULTI_TENANT
 from shared_configs.configs import POSTGRES_DEFAULT_SCHEMA
 from shared_configs.configs import SENTRY_CELERY_TRACES_SAMPLE_RATE
@@ -504,9 +507,10 @@ def on_setup_logging(
 
     # Set up the root handler
     root_handler = logging.StreamHandler()
-    root_formatter = ColoredFormatter(
-        log_format,
-        datefmt="%m/%d/%Y %I:%M:%S %p",
+    root_formatter: logging.Formatter = (
+        get_json_formatter()
+        if JSON_LOGGING
+        else ColoredFormatter(log_format, datefmt="%m/%d/%Y %I:%M:%S %p")
     )
     root_handler.setFormatter(root_formatter)
     root_logger.addHandler(root_handler)
@@ -520,9 +524,10 @@ def on_setup_logging(
                 pass  # Ignore errors, just proceed with normal logging
 
         root_file_handler = logging.FileHandler(logfile)
-        root_file_formatter = PlainFormatter(
-            log_format,
-            datefmt="%m/%d/%Y %I:%M:%S %p",
+        root_file_formatter: logging.Formatter = (
+            get_json_formatter()
+            if JSON_LOGGING
+            else PlainFormatter(log_format, datefmt="%m/%d/%Y %I:%M:%S %p")
         )
         root_file_handler.setFormatter(root_file_formatter)
         root_logger.addHandler(root_file_handler)
@@ -544,9 +549,10 @@ def on_setup_logging(
 
     task_handler = logging.StreamHandler()
     task_handler.addFilter(TenantContextFilter())
-    task_formatter = CeleryTaskColoredFormatter(
-        log_format,
-        datefmt="%m/%d/%Y %I:%M:%S %p",
+    task_formatter: logging.Formatter = (
+        CeleryTaskJsonFormatter()
+        if JSON_LOGGING
+        else CeleryTaskColoredFormatter(log_format, datefmt="%m/%d/%Y %I:%M:%S %p")
     )
     task_handler.setFormatter(task_formatter)
     task_logger.addHandler(task_handler)
@@ -555,9 +561,10 @@ def on_setup_logging(
         # No need to truncate again, already done above for root logger
         task_file_handler = logging.FileHandler(logfile)
         task_file_handler.addFilter(TenantContextFilter())
-        task_file_formatter = CeleryTaskPlainFormatter(
-            log_format,
-            datefmt="%m/%d/%Y %I:%M:%S %p",
+        task_file_formatter: logging.Formatter = (
+            CeleryTaskJsonFormatter()
+            if JSON_LOGGING
+            else CeleryTaskPlainFormatter(log_format, datefmt="%m/%d/%Y %I:%M:%S %p")
         )
         task_file_handler.setFormatter(task_file_formatter)
         task_logger.addHandler(task_file_handler)

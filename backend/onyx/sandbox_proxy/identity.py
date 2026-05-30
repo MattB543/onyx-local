@@ -14,7 +14,6 @@ with no verifiable session tag fails closed rather than routing to a
 guessed session.
 """
 
-from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Protocol
@@ -23,6 +22,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from onyx.db.engine.sql_engine import DBSessionFactory
 from onyx.db.engine.sql_engine import get_session_with_tenant
 from onyx.db.models import BuildSession
 from onyx.db.models import Sandbox
@@ -71,6 +71,16 @@ class SessionContext:
     sandbox_name: str
     sandbox_ip: str
 
+    def without_session(self) -> ResolvedSandbox:
+        """Inverse of `ResolvedSandbox.with_session(...)` — drops the session id."""
+        return ResolvedSandbox(
+            sandbox_id=self.sandbox_id,
+            user_id=self.user_id,
+            tenant_id=self.tenant_id,
+            sandbox_name=self.sandbox_name,
+            sandbox_ip=self.sandbox_ip,
+        )
+
 
 class SandboxIPLookup(Protocol):
     """Backend-specific IP → SandboxIdentity resolver.
@@ -88,11 +98,6 @@ class SandboxIPLookup(Protocol):
     def is_synced(self) -> bool: ...
 
     def stop(self) -> None: ...
-
-
-# Canonical type for the proxy's tenant-id -> DB-session factory. Imported by
-# action_matcher and the gate addon so the signature has a single source.
-DBSessionFactory = Callable[[str], AbstractContextManager[Session]]
 
 
 def default_session_factory(tenant_id: str) -> AbstractContextManager[Session]:
@@ -126,7 +131,9 @@ class IdentityResolver:
             return None
 
         with self._session_factory(identity.tenant_id) as db:
-            user_id = self._fetch_sandbox_user(db, identity.sandbox_id)
+            user_id = db.scalar(
+                select(Sandbox.user_id).where(Sandbox.id == identity.sandbox_id)
+            )
             if user_id is None:
                 return None
 
@@ -159,7 +166,3 @@ class IdentityResolver:
                 .where(BuildSession.user_id == user_id)
             )
             return db.scalar(stmt)
-
-    def _fetch_sandbox_user(self, db: Session, sandbox_id: UUID) -> UUID | None:
-        stmt = select(Sandbox.user_id).where(Sandbox.id == sandbox_id)
-        return db.scalar(stmt)

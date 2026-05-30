@@ -49,7 +49,6 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
-from urllib.parse import urlparse
 from uuid import UUID
 from uuid import uuid4
 
@@ -183,11 +182,33 @@ def _resolve_proxy_ip() -> str:
     )
 
 
+# Loopback only: the firewall permits nothing else to bypass the proxy, and the
+# Onyx API host must transit the proxy so the PAT can be injected on the wire.
+_NO_PROXY = "127.0.0.1,localhost"
+
+# Non-empty sentinel for every proxy-injected credential (ONYX_PAT + each
+# opencode apiKey); the proxy overwrites the real value on the wire.
+_PROXY_INJECTED_PLACEHOLDER = "replaced_by_egress_proxy"
+
+
+def _placeholder_llm_configs(
+    configs: list[LLMProviderConfig],
+) -> list[LLMProviderConfig]:
+    """Swap real LLM keys for the proxy placeholder before the opencode config
+    reaches the pod; provider/model/api_base stay so routing is unchanged."""
+    return [
+        c.model_copy(update={"api_key": _PROXY_INJECTED_PLACEHOLDER})
+        if c.api_key
+        else c
+        for c in configs
+    ]
+
+
 def _proxy_main_container_env_vars() -> list[client.V1EnvVar]:
     if not SANDBOX_PROXY_HOST:
         return []
     proxy_url = f"http://{_PROXY_ALIAS}:{SANDBOX_PROXY_PORT}"
-    no_proxy = _compute_no_proxy_list()
+    no_proxy = _NO_PROXY
     return [
         client.V1EnvVar(name="HTTPS_PROXY", value=proxy_url),
         client.V1EnvVar(name="HTTP_PROXY", value=proxy_url),
@@ -203,15 +224,6 @@ def _proxy_main_container_env_vars() -> list[client.V1EnvVar]:
         client.V1EnvVar(name="CURL_CA_BUNDLE", value=_PROXY_CA_BUNDLE_FILE),
         client.V1EnvVar(name="GIT_SSL_CAINFO", value=_PROXY_CA_BUNDLE_FILE),
     ]
-
-
-def _compute_no_proxy_list() -> str:
-    entries = ["127.0.0.1", "localhost"]
-    if SANDBOX_API_SERVER_URL:
-        parsed = urlparse(SANDBOX_API_SERVER_URL)
-        if parsed.hostname:
-            entries.append(parsed.hostname)
-    return ",".join(entries)
 
 
 def _proxy_init_container() -> client.V1Container:
@@ -576,7 +588,6 @@ class KubernetesSandboxManager(SandboxManager):
         self,
         sandbox_id: str,
         tenant_id: str,
-        onyx_pat: str,
     ) -> client.V1Pod:
         """Create Pod specification for sandbox (user-level).
 
@@ -604,7 +615,7 @@ class KubernetesSandboxManager(SandboxManager):
             command=["/workspace/entrypoint.sh"],
             ports=sandbox_ports,
             env=[
-                client.V1EnvVar(name="ONYX_PAT", value=onyx_pat),
+                client.V1EnvVar(name="ONYX_PAT", value=_PROXY_INJECTED_PLACEHOLDER),
                 client.V1EnvVar(name="ONYX_SERVER_URL", value=SANDBOX_API_SERVER_URL),
                 client.V1EnvVar(
                     name=OPENCODE_SERVER_PASSWORD,
@@ -1217,7 +1228,9 @@ class KubernetesSandboxManager(SandboxManager):
             user_id: User identifier who owns this sandbox
             tenant_id: Tenant identifier for multi-tenant isolation
             llm_config: LLM provider configuration
-            onyx_pat: Raw PAT token to inject as ONYX_PAT env var in the pod
+            onyx_pat: Required by the interface and the Docker backend; on K8s
+                the pod ships a placeholder and the proxy injects the real PAT,
+                so this is only checked as a provisioning precondition.
 
         Returns:
             SandboxInfo with the provisioned sandbox details
@@ -1278,11 +1291,10 @@ class KubernetesSandboxManager(SandboxManager):
                 self._terminated_sandboxes.discard(sandbox_id)
             self._invalidate_serve_connection_info(sandbox_id)
 
-            # Secret must exist before the Pod (env references it via
-            # secretKeyRef). Pre-load every configured provider so
-            # cross-provider per-prompt model overrides work without a
-            # pod restart.
-            providers = all_llm_configs or [llm_config]
+            # Secret must exist before the Pod (secretKeyRef). Pre-load every
+            # provider for cross-provider model overrides; keys are swapped for
+            # the proxy placeholder so the pod never holds them.
+            providers = _placeholder_llm_configs(all_llm_configs or [llm_config])
             # Only register the egress-tagging plugin when the proxy is
             # deployed; otherwise it would no-op (no HTTP(S)_PROXY to re-tag).
             session_tag_plugins = (
@@ -1304,7 +1316,6 @@ class KubernetesSandboxManager(SandboxManager):
             pod = self._create_sandbox_pod(
                 sandbox_id=str(sandbox_id),
                 tenant_id=tenant_id,
-                onyx_pat=onyx_pat,
             )
             try:
                 self._core_api.create_namespaced_pod(
@@ -2076,6 +2087,17 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
             ),
             password=self._read_opencode_password(sandbox_id),
         )
+
+    def _serve_health_check_base_url(self, sandbox_id: UUID) -> str | None:
+        """Probe the pod IP, not the Service FQDN ``base_url`` — an
+        out-of-cluster caller (CI test process) can't resolve cluster DNS.
+        ``None`` falls back to ``base_url`` until the IP is assigned."""
+        pod_name = self._get_pod_name(str(sandbox_id))
+        try:
+            pod_ip = self._get_pod_ip(pod_name)
+        except (FatalWriteError, RetriableWriteError):
+            return None
+        return f"http://{pod_ip}:{OPENCODE_SERVE_PORT}"
 
     def list_directory(
         self, sandbox_id: UUID, session_id: UUID, path: str

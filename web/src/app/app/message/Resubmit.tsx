@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SvgChevronDown, SvgChevronRight } from "@opal/icons";
 import { Button } from "@opal/components";
-import CopyIconButton from "@/refresh-components/buttons/CopyIconButton";
+import { CopyButton } from "@opal/components";
 import { getErrorIcon, getErrorTitle } from "./errorHelpers";
 
 interface ResubmitProps {
@@ -66,7 +66,7 @@ export const ErrorBanner = ({
                 >
                   Stack trace
                 </Button>
-                <CopyIconButton
+                <CopyButton
                   prominence="tertiary"
                   getCopyText={() => stackTrace}
                 />

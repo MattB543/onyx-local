@@ -3,7 +3,7 @@
 import { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
-import Tabs from "@/refresh-components/Tabs";
+import { Tabs } from "@opal/components";
 
 type CrmTab = "home" | "contacts" | "organizations" | "interactions";
 
@@ -33,44 +33,45 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
   const activeTab = getCurrentTab(pathname);
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => {
-        const nextTab = value as CrmTab;
-
-        if (nextTab === "home") {
-          router.push("/app/crm");
-          return;
-        }
-
-        if (nextTab === "contacts") {
-          router.push("/app/crm/contacts");
-          return;
-        }
-
-        if (nextTab === "interactions") {
-          router.push("/app/crm/interactions" as Route);
-          return;
-        }
-
-        router.push("/app/crm/organizations");
-      }}
+    <div
+      className={`
+        [&_.opal-tabs-list]:!bg-transparent
+        [&_[role=tab][data-state=active]]:!bg-transparent
+        [&_[role=tab][data-state=inactive]]:!bg-transparent
+        [&_[role=tab][data-state=active]]:!text-text-05
+      `}
     >
-      <Tabs.List
+      <Tabs
         variant="pill"
-        rightContent={rightContent}
-        className={`
-          !bg-transparent
-          [&_[role=tab][data-state=active]]:!bg-transparent
-          [&_[role=tab][data-state=inactive]]:!bg-transparent
-          [&_[role=tab][data-state=active]]:!text-text-05
-        `}
+        value={activeTab}
+        onValueChange={(value) => {
+          const nextTab = value as CrmTab;
+
+          if (nextTab === "home") {
+            router.push("/app/crm");
+            return;
+          }
+
+          if (nextTab === "contacts") {
+            router.push("/app/crm/contacts");
+            return;
+          }
+
+          if (nextTab === "interactions") {
+            router.push("/app/crm/interactions" as Route);
+            return;
+          }
+
+          router.push("/app/crm/organizations");
+        }}
       >
-        <Tabs.Trigger value="home">Home</Tabs.Trigger>
-        <Tabs.Trigger value="contacts">Contacts</Tabs.Trigger>
-        <Tabs.Trigger value="organizations">Organizations</Tabs.Trigger>
-        <Tabs.Trigger value="interactions">Interactions</Tabs.Trigger>
-      </Tabs.List>
-    </Tabs>
+        <Tabs.List rightChildren={rightContent}>
+          <Tabs.Trigger value="home">Home</Tabs.Trigger>
+          <Tabs.Trigger value="contacts">Contacts</Tabs.Trigger>
+          <Tabs.Trigger value="organizations">Organizations</Tabs.Trigger>
+          <Tabs.Trigger value="interactions">Interactions</Tabs.Trigger>
+        </Tabs.List>
+      </Tabs>
+    </div>
   );
 }

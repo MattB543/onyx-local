@@ -6163,10 +6163,11 @@ class BuildMessage(Base):
 
 
 class ActionApproval(Base):
-    """One agent-initiated gated action and its decision.
+    """One agent-initiated gated request and its decision.
 
-    `decision IS NULL` is pending (or an orphan left by a proxy crash).
-    Liveness vs. orphan is tracked by the `approval:live:{id}` Redis key, not the DB.
+    ``actions`` is a non-empty JSONB list of :class:`ActionMatch`-shaped
+    dicts, sorted strictest-policy-first; ``actions[0]`` drove the gating
+    decision. ``decision IS NULL`` is pending (or a proxy-crash orphan).
     """
 
     __tablename__ = "action_approval"
@@ -6179,7 +6180,8 @@ class ActionApproval(Base):
         ForeignKey("build_session.id", ondelete="CASCADE"),
         nullable=False,
     )
-    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    actions: Mapped[list[dict[str, Any]]] = mapped_column(PGJSONB, nullable=False)
+    app_name: Mapped[str] = mapped_column(String, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(PGJSONB, nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -6218,8 +6220,6 @@ class ScheduledTask(Base):
     # Canonical 5-field cron expression. The three UI editor modes (interval,
     # daily/weekly, advanced) all compile to this string on save.
     cron_expression: Mapped[str] = mapped_column(String, nullable=False)
-    # IANA timezone name (e.g. "America/Los_Angeles"). ZoneInfo handles DST.
-    timezone: Mapped[str] = mapped_column(String, nullable=False)
     # UI hint for which editor mode produced this schedule; the cron string
     # is the source of truth for execution.
     editor_mode: Mapped[str] = mapped_column(String, nullable=False)
@@ -6231,7 +6231,7 @@ class ScheduledTask(Base):
         server_default="ACTIVE",
     )
     # The dispatcher's only read field. NULL when paused; recomputed on
-    # every fire and every schedule/timezone edit. Stored UTC.
+    # every fire and every schedule edit. Stored UTC.
     next_run_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -6601,11 +6601,10 @@ class ExternalApp(Base):
         default=dict,
         server_default=text("'{}'::jsonb"),
     )
-    organization_credentials: Mapped[dict[str, Any]] = mapped_column(
-        postgresql.JSONB(),
+    organization_credentials: Mapped[SensitiveValue[dict[str, Any]]] = mapped_column(
+        EncryptedJson(),
         nullable=False,
         default=dict,
-        server_default=text("'{}'::jsonb"),
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
@@ -6647,8 +6646,10 @@ class ExternalAppUserCredential(Base):
         nullable=False,
         index=True,
     )
-    user_credentials: Mapped[dict[str, Any]] = mapped_column(
-        postgresql.JSONB(), nullable=False, default=dict
+    # Encrypted at rest: the calling user's credential values for this app.
+    # Read via .get_value(apply_mask=False).
+    user_credentials: Mapped[SensitiveValue[dict[str, Any]]] = mapped_column(
+        EncryptedJson(), nullable=False, default=dict
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
