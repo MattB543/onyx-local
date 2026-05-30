@@ -347,6 +347,7 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
                 self._emit_email_crm_trigger_events(
                     context=context,
                     custom_job_id=custom_job_id,
+                    db_session=db_session,
                 )
             except Exception:
                 logger.exception(
@@ -354,12 +355,13 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
                     "indexing will proceed without them."
                 )
 
-        self.db_session.commit()
+        db_session.commit()
 
     def _emit_email_crm_trigger_events(
         self,
         context: DocumentBatchPrepareContext,
         custom_job_id: UUID,
+        db_session: Session,
     ) -> None:
         """Emit CustomJobTriggerEvents for GMAIL/IMAP documents.
 
@@ -411,7 +413,7 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
             }
 
             event = create_trigger_event(
-                db_session=self.db_session,
+                db_session=db_session,
                 custom_job_id=custom_job_id,
                 source_type=_EMAIL_TRIGGER_SOURCE_TYPE,
                 source_event_id=doc.id,

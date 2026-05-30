@@ -201,8 +201,12 @@ def test_load_chat_file_uses_raw_chat_upload_token_count() -> None:
             db_session,
         )
 
-    assert loaded_file.file_id == "raw-file-1"
-    assert loaded_file.content == b"image-bytes"
+        assert loaded_file.file_id == "raw-file-1"
+        # `.content` is lazily materialized (upstream lazy-bytes refactor): it
+        # calls get_default_file_store().read_file(...) on first access, so the
+        # patch must still be active when we read it.
+        assert loaded_file.content == b"image-bytes"
+
     assert loaded_file.token_count == 17
     mock_get_chat_upload_token_count.assert_called_once_with(
         file_id="raw-file-1",
@@ -242,7 +246,11 @@ def test_load_chat_file_rewinds_stream_before_extracting_text() -> None:
             db_session,
         )
 
-    assert loaded_file.content == b"hello world"
+        # `.content` is lazily materialized (upstream lazy-bytes refactor) and
+        # reads from the (patched) file store on first access, so assert it
+        # while the get_default_file_store patch is still active.
+        assert loaded_file.content == b"hello world"
+
     assert loaded_file.content_text == "hello world"
     assert loaded_file.token_count == 3
 

@@ -53,9 +53,12 @@ def _make_doc(
     )
 
 
-def _make_adapter(db_session: MagicMock) -> DocumentIndexingBatchAdapter:
+def _make_adapter() -> DocumentIndexingBatchAdapter:
+    # NOTE: upstream's DocumentIndex interface refactor moved session ownership
+    # out of __init__; each phase now receives a short-lived db_session as a
+    # parameter. post_index(..., db_session=...) carries the session that the
+    # email-CRM trigger emission + final commit use.
     return DocumentIndexingBatchAdapter(
-        db_session=db_session,
         connector_id=1,
         credential_id=2,
         tenant_id="public",
@@ -115,7 +118,7 @@ def test_extract_document_text_truncates_across_sections() -> None:
 
 def test_post_index_emits_email_trigger_events_before_commit() -> None:
     db_session = MagicMock()
-    adapter = _make_adapter(db_session=db_session)
+    adapter = _make_adapter()
     updated_at = datetime(2026, 2, 20, 15, 30, tzinfo=timezone.utc)
     email_doc = _make_doc(
         doc_id="gmail-thread-99",
@@ -167,6 +170,7 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
             updatable_chunk_data=[],
             filtered_documents=[email_doc, non_email_doc],
             enrichment=_make_result(),
+            db_session=db_session,
         )
 
     assert call_order == ["create_trigger_event", "commit"]
@@ -197,7 +201,7 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
 
 def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
     db_session = MagicMock()
-    adapter = _make_adapter(db_session=db_session)
+    adapter = _make_adapter()
     email_doc = _make_doc(doc_id="imap-msg-2", source=DocumentSource.IMAP)
     context = DocumentBatchPrepareContext(
         updatable_docs=[email_doc],
@@ -233,6 +237,7 @@ def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
             updatable_chunk_data=[],
             filtered_documents=[email_doc],
             enrichment=_make_result(),
+            db_session=db_session,
         )
 
     mock_create_trigger_event.assert_not_called()

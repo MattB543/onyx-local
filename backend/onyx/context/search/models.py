@@ -14,6 +14,17 @@ from onyx.indexing.models import IndexingSetting
 from onyx.tools.tool_implementations.web_search.models import WEB_SEARCH_PREFIX
 
 
+def extract_image_url_from_metadata(
+    metadata: dict[str, str | list[str]],
+) -> str | None:
+    image = metadata.get("image")
+    if not isinstance(image, str):
+        return None
+
+    stripped_image = image.strip()
+    return stripped_image or None
+
+
 class QueryExpansions(BaseModel):
     keywords_expansions: list[str] | None = None
     semantic_expansions: list[str] | None = None
