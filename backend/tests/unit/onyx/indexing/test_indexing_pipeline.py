@@ -195,8 +195,9 @@ def test_contextual_rag(
     counter_lock = threading.Lock()
 
     def mock_llm_invoke(
-        *args: Any, **kwargs: Any  # noqa: ARG001
-    ) -> ModelResponse:  # noqa: ARG001
+        *args: Any,  # noqa: ARG001
+        **kwargs: Any,  # noqa: ARG001
+    ) -> ModelResponse:
         nonlocal mock_llm_invoke_count
         with counter_lock:
             mock_llm_invoke_count += 1
@@ -298,7 +299,7 @@ def _make_cc_pair(is_public: bool) -> MagicMock:
 
 
 def _make_insertion_records(doc_ids: list[str]) -> list[Any]:
-    from onyx.document_index.interfaces import DocumentInsertionRecord
+    from onyx.document_index.interfaces_new import DocumentInsertionRecord
 
     return [
         DocumentInsertionRecord(document_id=d, already_existed=False) for d in doc_ids

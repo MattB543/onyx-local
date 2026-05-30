@@ -305,10 +305,11 @@ def upsert_llm_provider(
         db_session.flush()
 
     for model_config in llm_provider_upsert_request.model_configurations:
-
         supported_flows = [LLMModelFlowType.CHAT]
         if model_config.supports_image_input:
             supported_flows.append(LLMModelFlowType.VISION)
+        if model_config.supports_reasoning:
+            supported_flows.append(LLMModelFlowType.REASONING)
 
         existing = existing_by_name.get(model_config.name)
         if existing:
@@ -388,6 +389,8 @@ def sync_model_configurations(
             supported_flows = [LLMModelFlowType.CHAT]
             if model.supports_image_input:
                 supported_flows.append(LLMModelFlowType.VISION)
+            if model.supports_reasoning:
+                supported_flows.append(LLMModelFlowType.REASONING)
 
             insert_new_model_configuration__no_commit(
                 db_session=db_session,

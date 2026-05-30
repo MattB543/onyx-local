@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ButtonHTMLAttributes, useMemo } from "react";
+import React, { useMemo } from "react";
 import type { IconProps } from "@opal/types";
 import { cn } from "@opal/utils";
 import { Tooltip } from "@opal/components";
@@ -280,8 +280,7 @@ const iconClasses = (transient: boolean | undefined) =>
     },
   }) as const;
 
-export interface IconButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   // Top level button variants
   main?: boolean;
   action?: boolean;
@@ -365,7 +364,6 @@ export default function IconButton({
   const buttonElement = (
     <button
       type="button"
-      aria-label={props["aria-label"] ?? tooltip}
       className={cn(
         "flex items-center justify-center h-fit w-fit group/IconButton",
         small || internal ? "p-1" : "p-2",

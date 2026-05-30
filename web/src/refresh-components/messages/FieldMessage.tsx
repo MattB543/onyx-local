@@ -1,5 +1,5 @@
 import { cn } from "@opal/utils";
-import React, { HTMLAttributes } from "react";
+import React from "react";
 import Text from "../texts/Text";
 import {
   SvgAlertCircle,
@@ -24,7 +24,7 @@ const iconMap: Record<MessageVariant, React.ReactNode> = {
   idle: null,
 };
 
-interface FieldMessageRootProps extends HTMLAttributes<HTMLDivElement> {
+interface FieldMessageRootProps extends React.HTMLAttributes<HTMLDivElement> {
   variant: MessageVariant;
   children: React.ReactNode;
 }
@@ -50,8 +50,7 @@ const FieldMessageRoot: React.FC<FieldMessageRootProps> = ({
   );
 };
 
-interface FieldMessageContentProps
-  extends HTMLAttributes<HTMLParagraphElement> {
+interface FieldMessageContentProps extends React.HTMLAttributes<HTMLParagraphElement> {
   children: React.ReactNode;
 }
 

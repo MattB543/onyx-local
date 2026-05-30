@@ -14,9 +14,9 @@ import { SvgOnyxLogo } from "@opal/logos";
 import { MessageCard } from "@opal/components";
 import { ADMIN_ROUTES } from "@/lib/admin-routes";
 import {
-  WebProviderSetupModal,
+  WebSearchSetupModal,
   type ProviderModalState,
-} from "@/refresh-pages/admin/WebSearchPage/WebProviderSetupModal";
+} from "@/refresh-pages/admin/WebSearchPage/WebSearchSetupModal";
 import { WebSearchDisconnectModal } from "@/refresh-pages/admin/WebSearchPage/WebSearchDisconnectModal";
 import {
   SEARCH_PROVIDER_DETAILS,
@@ -80,7 +80,7 @@ export default function WebSearchPage() {
     const isExa = providerType === "exa";
     const sharedExaMaskedKey =
       isExa && !hasStoredKey
-        ? exaContentProvider?.masked_api_key ?? null
+        ? (exaContentProvider?.masked_api_key ?? null)
         : null;
 
     const effectiveProvider: WebSearchProviderView | null =
@@ -558,7 +558,7 @@ export default function WebSearchPage() {
 
       {activeProvider && (
         <setupModal.Provider>
-          <WebProviderSetupModal state={activeProvider} />
+          <WebSearchSetupModal state={activeProvider} />
         </setupModal.Provider>
       )}
     </>

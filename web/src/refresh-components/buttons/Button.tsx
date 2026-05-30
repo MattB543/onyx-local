@@ -1,14 +1,13 @@
 "use client";
 
-import React, { ButtonHTMLAttributes, forwardRef } from "react";
+import React from "react";
 import { cn } from "@opal/utils";
 import Link from "next/link";
 import type { Route } from "next";
 import type { IconProps } from "@opal/types";
 import Text from "@/refresh-components/texts/Text";
 
-export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   // Button variants:
   main?: boolean;
   action?: boolean;
@@ -53,7 +52,7 @@ const BUTTON_SIZE_CLASS_MAP = {
   },
 } as const;
 
-const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
       main,

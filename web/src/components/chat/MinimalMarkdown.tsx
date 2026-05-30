@@ -59,7 +59,7 @@ export default function MinimalMarkdown({
 
     return {
       ...defaults,
-      ...(components ?? {}),
+      ...components,
     } satisfies Components;
   }, [content, components, showHeader]);
 

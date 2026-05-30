@@ -436,7 +436,7 @@ describe("packetProcessor", () => {
 
       const group = result.groupedPacketsMap.get("0-0");
       expect(
-        (group?.[0]?.obj as { is_internet_search?: boolean }).is_internet_search
+        (group![0]!.obj as { is_internet_search?: boolean }).is_internet_search
       ).toBe(true);
     });
 
@@ -447,7 +447,7 @@ describe("packetProcessor", () => {
 
       const group = result.groupedPacketsMap.get("0-0");
       expect(
-        (group?.[0]?.obj as { is_internet_search?: boolean }).is_internet_search
+        (group![0]!.obj as { is_internet_search?: boolean }).is_internet_search
       ).toBe(false);
     });
 
@@ -462,7 +462,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { queries: string[] }).queries).toEqual([
+      expect((group![1]!.obj as { queries: string[] }).queries).toEqual([
         "what is AI",
         "machine learning",
       ]);
@@ -590,7 +590,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { urls: string[] }).urls).toEqual([
+      expect((group![1]!.obj as { urls: string[] }).urls).toEqual([
         "https://example.com",
         "https://test.com",
       ]);
@@ -637,7 +637,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { urls: string[] }).urls.length).toBe(3);
+      expect((group![1]!.obj as { urls: string[] }).urls.length).toBe(3);
     });
 
     test("empty urls array handling", () => {
@@ -649,7 +649,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { urls: string[] }).urls).toEqual([]);
+      expect((group![1]!.obj as { urls: string[] }).urls).toEqual([]);
     });
 
     test("FETCH_TOOL_START resets finalAnswerComing if after message", () => {
@@ -699,7 +699,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[0]?.obj as { code: string }).code).toBe(code);
+      expect((group![0]!.obj as { code: string }).code).toBe(code);
     });
 
     test("PYTHON_TOOL_DELTA stores stdout/stderr/file_ids", () => {
@@ -711,7 +711,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      const delta = group?.[1]?.obj as {
+      const delta = group![1]!.obj as {
         stdout: string;
         stderr: string;
         file_ids: string[];
@@ -733,7 +733,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { file_ids: string[] }).file_ids).toEqual([
+      expect((group![1]!.obj as { file_ids: string[] }).file_ids).toEqual([
         "file-123",
         "file-456",
       ]);
@@ -771,7 +771,7 @@ describe("packetProcessor", () => {
       const result = processPackets(state, packets);
 
       const group = result.groupedPacketsMap.get("0-0");
-      expect((group?.[1]?.obj as { stderr: string }).stderr).toContain(
+      expect((group![1]!.obj as { stderr: string }).stderr).toContain(
         "NameError"
       );
     });

@@ -23,7 +23,6 @@ export function AccessTypeForm({
   currentCredential,
 }: {
   connector: ConfigurableSources;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentCredential?: Credential<any> | null;
 }) {
   const [access_type, meta, access_type_helpers] =
@@ -38,7 +37,6 @@ export function AccessTypeForm({
 
   // If the selected auth method is one that disables sync, return true
   const isSyncDisabledByAuth = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const template = (credentialTemplates as any)[connector];
     const authMethods = template?.authMethods as
       | { value: string; disablePermSync?: boolean }[]
@@ -48,23 +46,21 @@ export function AccessTypeForm({
     return method?.disablePermSync === true;
   }, [connector, selectedAuthMethod]);
 
-  useEffect(
-    () => {
-      // Only set default value if access_type.value is not already set
-      if (!access_type.value) {
-        if (!isPaidEnterpriseEnabled) {
-          access_type_helpers.setValue("public");
-        } else if (isAutoSyncSupported) {
-          access_type_helpers.setValue("sync");
-        } else {
-          access_type_helpers.setValue("private");
-        }
+  useEffect(() => {
+    // Only set default value if access_type.value is not already set
+    if (!access_type.value) {
+      if (!isPaidEnterpriseEnabled) {
+        access_type_helpers.setValue("public");
+      } else if (isAutoSyncSupported) {
+        access_type_helpers.setValue("sync");
+      } else {
+        access_type_helpers.setValue("private");
       }
-    },
+    }
+  }, [
     // Only run this effect once when the component mounts
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  ]);
 
   const options = [
     {

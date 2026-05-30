@@ -26,7 +26,9 @@ class QueryExpansionType(Enum):
 
 class SearchSettingsCreationRequest(IndexingSetting):
     @classmethod
-    def from_db_model(cls, search_settings: SearchSettings) -> "SearchSettingsCreationRequest":
+    def from_db_model(
+        cls, search_settings: SearchSettings
+    ) -> "SearchSettingsCreationRequest":
         indexing_setting = IndexingSetting.from_db_model(search_settings)
         return cls(**indexing_setting.model_dump())
 
@@ -224,7 +226,8 @@ class InferenceChunkUncleaned(InferenceChunk):
         inference_chunk_data = {
             k: v
             for k, v in self.model_dump().items()
-            if k not in ["metadata_suffix"]  # May be other fields to throw out in the future
+            if k
+            not in ["metadata_suffix"]  # May be other fields to throw out in the future
         }
         return InferenceChunk(**inference_chunk_data)
 
@@ -236,17 +239,6 @@ class InferenceSection(BaseModel):
     center_chunk: InferenceChunk
     chunks: list[InferenceChunk]
     combined_content: str
-
-
-def extract_image_url_from_metadata(
-    metadata: dict[str, str | list[str]],
-) -> str | None:
-    image = metadata.get("image")
-    if not isinstance(image, str):
-        return None
-
-    stripped_image = image.strip()
-    return stripped_image or None
 
 
 class SearchDoc(BaseModel):
@@ -274,7 +266,6 @@ class SearchDoc(BaseModel):
     primary_owners: list[str] | None = None
     secondary_owners: list[str] | None = None
     is_internet: bool = False
-    image: str | None = None
 
     # Mirrors `InferenceChunk.file_id`. Only present once sections have been
     # run through `populate_file_ids_on_sections`.
@@ -291,7 +282,13 @@ class SearchDoc(BaseModel):
 
         search_docs = [
             cls(
-                document_id=(chunk := (item.center_chunk if isinstance(item, InferenceSection) else item)).document_id,
+                document_id=(
+                    chunk := (
+                        item.center_chunk
+                        if isinstance(item, InferenceSection)
+                        else item
+                    )
+                ).document_id,
                 chunk_ind=chunk.chunk_id,
                 semantic_identifier=chunk.semantic_identifier or "Unknown",
                 link=chunk.source_links[0] if chunk.source_links else None,
@@ -306,13 +303,12 @@ class SearchDoc(BaseModel):
                 primary_owners=chunk.primary_owners,
                 secondary_owners=chunk.secondary_owners,
                 is_internet=False,
-                image=extract_image_url_from_metadata(chunk.metadata),
                 file_id=chunk.file_id,
             )
             for item in items
         ]
 
-        return search_docs
+        return search_docs  # ty: ignore[invalid-return-type]
 
     # TODO - there is likely a way to clean this all up and not have the switch between these
     @classmethod
@@ -324,12 +320,24 @@ class SearchDoc(BaseModel):
         return cls(**saved_search_doc_data)
 
     @classmethod
-    def from_saved_search_docs(cls, saved_search_docs: list["SavedSearchDoc"]) -> list["SearchDoc"]:
-        return [cls.from_saved_search_doc(saved_search_doc) for saved_search_doc in saved_search_docs]
+    def from_saved_search_docs(
+        cls, saved_search_docs: list["SavedSearchDoc"]
+    ) -> list["SearchDoc"]:
+        return [
+            cls.from_saved_search_doc(saved_search_doc)
+            for saved_search_doc in saved_search_docs
+        ]
 
-    def model_dump(self, *args: list, **kwargs: dict[str, Any]) -> dict[str, Any]:  # type: ignore
-        initial_dict = super().model_dump(*args, **kwargs)  # type: ignore
-        initial_dict["updated_at"] = self.updated_at.isoformat() if self.updated_at else None
+    def model_dump(  # ty: ignore[invalid-method-override]
+        self, *args: list, **kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        initial_dict = super().model_dump(
+            *args,
+            **kwargs,  # ty: ignore[invalid-argument-type]
+        )
+        initial_dict["updated_at"] = (
+            self.updated_at.isoformat() if self.updated_at else None
+        )
         return initial_dict
 
 
@@ -358,7 +366,9 @@ class SavedSearchDoc(SearchDoc):
     score: float | None = 0.0
 
     @classmethod
-    def from_search_doc(cls, search_doc: SearchDoc, db_doc_id: int = 0) -> "SavedSearchDoc":
+    def from_search_doc(
+        cls, search_doc: SearchDoc, db_doc_id: int = 0
+    ) -> "SavedSearchDoc":
         """IMPORTANT: careful using this and not providing a db_doc_id If db_doc_id is not
         provided, it won't be able to actually fetch the saved doc and info later on. So only skip
         providing this if the SavedSearchDoc will not be used in the future"""

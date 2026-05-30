@@ -60,7 +60,7 @@ attrs==25.4.0
     #   jsonschema
     #   referencing
     #   zeep
-authlib==1.6.11
+authlib==1.6.12
     # via fastmcp
 azure-cognitiveservices-speech==1.38.0
 babel==2.17.0
@@ -266,7 +266,7 @@ fsspec==2025.10.0
     #   huggingface-hub
 gitdb==4.0.12
     # via gitpython
-gitpython==3.1.47
+gitpython==3.1.50
     # via braintrust
 google-api-core==2.28.1
     # via
@@ -409,7 +409,7 @@ isodate==0.7.2
     #   zeep
 jaraco-classes==3.4.0
     # via keyring
-jaraco-context==6.0.2
+jaraco-context==6.1.2
     # via keyring
 jaraco-functools==4.4.0
     # via keyring
@@ -454,14 +454,16 @@ kombu==5.5.4
     # via celery
 kubernetes==31.0.0
     # via onyx
-langchain-core==1.2.28
+langchain-core==1.3.3
+langchain-protocol==0.0.15
+    # via langchain-core
 langdetect==1.0.9
     # via unstructured
 langfuse==3.10.0
-langsmith==0.7.32
+langsmith==0.8.0
     # via langchain-core
 lazy-imports==1.0.1
-litellm==1.83.0
+litellm==1.83.14
     # via onyx
 locket==1.0.0
     # via
@@ -486,7 +488,7 @@ magika==0.6.3
     # via markitdown
 makefun==1.16.0
     # via fastapi-users
-mako==1.3.11
+mako==1.3.12
     # via alembic
 mammoth==1.11.0
     # via markitdown
@@ -510,7 +512,7 @@ mcp==1.27.0
     #   fastmcp
 mdurl==0.1.2
     # via markdown-it-py
-mistune==3.2.0
+mistune==3.2.1
 more-itertools==10.8.0
     # via
     #   jaraco-classes
@@ -622,7 +624,7 @@ partd==1.4.2
 passlib==1.7.4
 pathable==0.5.0
     # via jsonschema-path
-pdfminer-six==20251107
+pdfminer-six==20260107
     # via markitdown
 pillow==12.2.0
     # via python-pptx
@@ -775,7 +777,7 @@ python-iso639==2025.11.16
     # via unstructured
 python-magic==0.4.27
     # via unstructured
-python-multipart==0.0.26
+python-multipart==0.0.27
     # via
     #   fastapi-users
     #   mcp
@@ -810,7 +812,7 @@ pyyaml==6.0.3
     #   jsonschema-path
     #   kubernetes
     #   langchain-core
-rapidfuzz==3.13.0
+rapidfuzz==3.14.5
     # via unstructured
 redis==5.0.8
     # via fastapi-limiter
@@ -1059,7 +1061,7 @@ unstructured-client==0.42.6
     # via unstructured
 uritemplate==4.2.0
     # via google-api-python-client
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   asana
     #   botocore

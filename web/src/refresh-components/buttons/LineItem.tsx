@@ -59,11 +59,10 @@ const iconClassNames = {
   skeleton: "line-item-icon-skeleton",
 } as const;
 
-export interface LineItemProps
-  extends Omit<
-    WithoutStyles<React.HTMLAttributes<HTMLDivElement>>,
-    "children"
-  > {
+export interface LineItemProps extends Omit<
+  WithoutStyles<React.HTMLAttributes<HTMLDivElement>>,
+  "children"
+> {
   /**
    * Whether the row should behave like a standalone interactive button.
    * Set to false when nested inside another interactive primitive
@@ -235,7 +234,7 @@ export default function LineItem({
       aria-disabled={disabled || undefined}
       className={cn(
         "flex flex-row w-full items-start p-2 rounded-08 group/LineItem gap-2",
-        !!(children && description) ? "items-start" : "items-center",
+        children && description ? "items-start" : "items-center",
         buttonClassNames[variant][emphasisKey]
       )}
       data-selected={selected}

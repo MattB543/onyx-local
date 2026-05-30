@@ -414,6 +414,7 @@ class LLMModelFlowType(str, PyEnum):
     CHAT = "chat"
     VISION = "vision"
     CONTEXTUAL_RAG = "contextual_rag"
+    REASONING = "reasoning"
 
 
 class CustomJobTriggerType(str, PyEnum):

@@ -5,6 +5,7 @@ An overview can be found in the README.md file in this directory.
 
 import contextvars
 import io
+import os
 import queue
 import re
 import threading
@@ -88,6 +89,7 @@ from onyx.file_processing.extract_file_text import extract_file_text
 from onyx.file_store.models import ChatFileType
 from onyx.file_store.models import FileDescriptor
 from onyx.file_store.models import InMemoryChatFile
+from onyx.file_store.utils import get_default_file_store
 from onyx.file_store.utils import load_in_memory_chat_files
 from onyx.file_store.utils import verify_user_files
 from onyx.hooks.executor import execute_hook
@@ -209,6 +211,59 @@ def _convert_loaded_files_to_chat_files(
                     content=loaded_file.content,
                 )
             )
+    return chat_files
+
+
+def _deduped_filename(filename: str, seen_filenames: set[str], file_id: str) -> str:
+    if filename not in seen_filenames:
+        seen_filenames.add(filename)
+        return filename
+
+    stem, suffix = os.path.splitext(filename)
+    deduped_filename = f"{stem}_{file_id}{suffix}"
+    seen_filenames.add(deduped_filename)
+    return deduped_filename
+
+
+def _load_context_user_files_for_tools(
+    user_files: list[UserFile],
+    existing_filenames: set[str],
+) -> list[ChatFile]:
+    """Load raw tabular project/persona files for code-interpreter staging."""
+    if not user_files:
+        return []
+
+    file_store = None
+    chat_files: list[ChatFile] = []
+    seen_file_ids: set[str] = set()
+
+    for user_file in user_files:
+        if user_file.file_id in seen_file_ids:
+            continue
+        seen_file_ids.add(user_file.file_id)
+
+        if not mime_type_to_chat_file_type(user_file.file_type).use_metadata_only():
+            continue
+
+        try:
+            if file_store is None:
+                file_store = get_default_file_store()
+            content = file_store.read_file(user_file.file_id, mode="b").read()
+        except Exception as e:
+            logger.warning(
+                "Failed to load context file %s for Python execution: %s",
+                user_file.id,
+                e,
+            )
+            continue
+
+        filename = _deduped_filename(
+            user_file.name or f"file_{user_file.id}",
+            existing_filenames,
+            str(user_file.id),
+        )
+        chat_files.append(ChatFile(filename=filename, content=content))
+
     return chat_files
 
 
@@ -863,6 +918,12 @@ def build_chat_turn(
     files = load_all_chat_files(chat_history, db_session)
     # Convert loaded files to ChatFile format for tools like PythonTool
     chat_files_for_tools = _convert_loaded_files_to_chat_files(files)
+    chat_files_for_tools.extend(
+        _load_context_user_files_for_tools(
+            context_user_files,
+            {chat_file.filename for chat_file in chat_files_for_tools},
+        )
+    )
 
     # ── Reserve assistant message ID(s) → yield to frontend ──────────────────
     if is_multi:
@@ -1435,9 +1496,9 @@ def _stream_chat_turn(
         if new_msg_req.mock_llm_response is not None:
             mock_response_token = set_llm_mock_response(new_msg_req.mock_llm_response)
 
-        assert (
-            setup is not None
-        ), "build_chat_turn must complete before _run_models is called"
+        assert setup is not None, (
+            "build_chat_turn must complete before _run_models is called"
+        )
         yield from _run_models(
             setup=setup,
             user=user,

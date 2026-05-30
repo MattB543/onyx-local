@@ -888,7 +888,7 @@ export default function AgentEditorPage({
 
       // Call API
       let personaResponse;
-      if (!!existingAgent) {
+      if (existingAgent) {
         personaResponse = await updateAgent(existingAgent.id, submissionData);
       } else {
         personaResponse = await createAgent(submissionData);

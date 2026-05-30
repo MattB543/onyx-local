@@ -552,6 +552,32 @@ try:
 except ValueError:
     POSTGRES_POOL_RECYCLE = POSTGRES_POOL_RECYCLE_DEFAULT
 
+# TCP keepalive settings for the sync psycopg2 engine.
+#
+# When PgBouncer (or any intermediary — NLB, NAT, firewall) silently closes
+# an idle TCP connection that's still parked in the SQLAlchemy pool,
+# `pool_pre_ping`'s `SELECT 1` can succeed (sub-ms) and then the very next
+# real query fails mid-flight with
+# `(psycopg2.OperationalError) server closed the connection unexpectedly`.
+# Enabling TCP keepalives causes the kernel to send periodic probes on
+# idle sockets, which (a) keeps the path warm so PgBouncer never sees it
+# as idle, and (b) detects dead sockets before SQLAlchemy tries to use
+# them, letting the pool invalidate them cleanly.
+#
+# Defaults are tuned so the first probe fires well under typical
+# intermediary idle timeouts (PgBouncer `server_idle_timeout` 600s, AWS
+# NLB idle 350s). Set `POSTGRES_TCP_KEEPALIVES=false` to opt out.
+POSTGRES_TCP_KEEPALIVES = (
+    os.environ.get("POSTGRES_TCP_KEEPALIVES", "true").lower() == "true"
+)
+POSTGRES_TCP_KEEPALIVES_IDLE = int(os.environ.get("POSTGRES_TCP_KEEPALIVES_IDLE") or 30)
+POSTGRES_TCP_KEEPALIVES_INTERVAL = int(
+    os.environ.get("POSTGRES_TCP_KEEPALIVES_INTERVAL") or 10
+)
+POSTGRES_TCP_KEEPALIVES_COUNT = int(
+    os.environ.get("POSTGRES_TCP_KEEPALIVES_COUNT") or 5
+)
+
 # RDS IAM authentication - enables IAM-based authentication for PostgreSQL
 USE_IAM_AUTH = os.getenv("USE_IAM_AUTH", "False").lower() == "true"
 
@@ -745,6 +771,15 @@ WEB_CONNECTOR_VALIDATE_URLS = os.environ.get("WEB_CONNECTOR_VALIDATE_URLS")
 # the Chromium binary installed).
 OPEN_URL_PLAYWRIGHT_FALLBACK_ENABLED = (
     os.environ.get("OPEN_URL_PLAYWRIGHT_FALLBACK_ENABLED", "true").lower() == "true"
+)
+
+# Whether the open_url tool enforces SSRF protection (rejecting URLs that
+# resolve to private/internal IPs). Default true to keep multi-tenant SaaS
+# safe. Self-hosted operators on trusted networks (e.g. internal docs that
+# resolve to RFC1918 addresses via split-horizon DNS) can set to false to
+# allow fetching from private ranges.
+OPEN_URL_VALIDATE_SSRF = (
+    os.environ.get("OPEN_URL_VALIDATE_SSRF", "true").lower() == "true"
 )
 
 HTML_BASED_CONNECTOR_TRANSFORM_LINKS_STRATEGY = os.environ.get(
@@ -1427,7 +1462,9 @@ AUTO_PROVISION_DEFAULT_LLM_PROVIDERS = (
 INSTANCE_TYPE = (
     "managed"
     if os.environ.get("IS_MANAGED_INSTANCE", "").lower() == "true"
-    else "cloud" if AUTH_TYPE == AuthType.CLOUD else "self_hosted"
+    else "cloud"
+    if AUTH_TYPE == AuthType.CLOUD
+    else "self_hosted"
 )
 
 
