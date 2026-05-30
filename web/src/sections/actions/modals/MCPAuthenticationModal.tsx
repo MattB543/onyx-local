@@ -7,7 +7,7 @@ import { errorHandlingFetcher } from "@/lib/fetcher";
 import Modal from "@/refresh-components/Modal";
 import { FormField } from "@/refresh-components/form/FormField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { InputTypeIn } from "@opal/components";
 import PasswordInputTypeIn from "@/refresh-components/inputs/PasswordInputTypeIn";
 import { Button, Divider, MessageCard } from "@opal/components";
 import { markdown } from "@opal/utils";
@@ -499,7 +499,6 @@ export default function MCPAuthenticationModal({
                             value={values.oauth_client_id}
                             onChange={handleChange}
                             placeholder=" "
-                            showClearButton={false}
                           />
                         </FormField.Control>
                         <FormField.Message
@@ -529,7 +528,6 @@ export default function MCPAuthenticationModal({
                             value={values.oauth_client_secret}
                             onChange={handleChange}
                             placeholder=" "
-                            showClearButton={false}
                           />
                         </FormField.Control>
                         <FormField.Message
@@ -637,7 +635,6 @@ export default function MCPAuthenticationModal({
                                   value={values.api_token}
                                   onChange={handleChange}
                                   placeholder="Shared API key for your organization"
-                                  showClearButton={false}
                                 />
                               </FormField.Control>
                               <FormField.Description>

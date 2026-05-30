@@ -6,7 +6,7 @@ import { ConnectorTitle } from "@/components/admin/connectors/ConnectorTitle";
 import { Label } from "@opal/layouts";
 import { ErrorMessage } from "formik";
 import Text from "@/refresh-components/texts/Text";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { InputTypeIn } from "@opal/components";
 import { SvgX } from "@opal/icons";
 import { Button } from "@opal/components";
 
@@ -124,7 +124,7 @@ export const ConnectorMultiSelect = ({
       <div className="relative">
         <InputTypeIn
           ref={inputRef}
-          leftSearchIcon
+          searchIcon
           placeholder={effectivePlaceholder}
           value={searchQuery}
           variant={isInputDisabled ? "disabled" : undefined}
@@ -138,7 +138,6 @@ export const ConnectorMultiSelect = ({
             setOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          className="rounded-12"
         />
 
         {open && (

@@ -343,6 +343,7 @@ googleapis-common-protos==1.72.0
     #   grpc-google-iam-v1
     #   grpcio-status
     #   opentelemetry-exporter-otlp-proto-http
+graphql-core==3.2.8
 greenlet==3.2.4
     # via
     #   playwright
@@ -368,7 +369,7 @@ h2==4.3.0
     # via
     #   httpx
     #   mitmproxy
-hf-xet==1.4.3 ; platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
+hf-xet==1.4.3 ; platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
     # via huggingface-hub
 hpack==4.1.0
     # via h2
@@ -391,7 +392,6 @@ httpx==0.28.1
     #   fastmcp
     #   google-genai
     #   httpx-oauth
-    #   huggingface-hub
     #   langfuse
     #   langsmith
     #   litellm
@@ -404,7 +404,7 @@ httpx-sse==0.4.3
     #   cohere
     #   mcp
 hubspot-api-client==11.1.0
-huggingface-hub==1.12.0
+huggingface-hub==0.36.2
     # via tokenizers
 humanfriendly==10.0
     # via coloredlogs
@@ -901,6 +901,7 @@ requests==2.33.0
     #   google-cloud-storage
     #   google-genai
     #   hubspot-api-client
+    #   huggingface-hub
     #   jira
     #   kubernetes
     #   langfuse
@@ -1058,9 +1059,7 @@ tqdm==4.67.1
     #   unstructured
 trafilatura==1.12.2
 typer==0.20.0
-    # via
-    #   huggingface-hub
-    #   mcp
+    # via mcp
 types-awscrt==0.28.4
     # via botocore-stubs
 types-docker==7.1.0.20260518

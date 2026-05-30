@@ -61,6 +61,7 @@ from onyx.configs.constants import TokenRateLimitScope
 from onyx.connectors.models import InputType
 from onyx.db.enums import AccessType
 from onyx.db.enums import AccountType
+from onyx.db.enums import ApprovalDecision
 from onyx.db.enums import ArtifactType
 from onyx.db.enums import BuildSessionStatus
 from onyx.db.enums import ChatSessionSharedStatus
@@ -75,6 +76,7 @@ from onyx.db.enums import CustomJobTriggerEventStatus
 from onyx.db.enums import CustomJobTriggerType
 from onyx.db.enums import DefaultAppMode
 from onyx.db.enums import EmbeddingPrecision
+from onyx.db.enums import EndpointPolicy
 from onyx.db.enums import ExternalAppType
 from onyx.db.enums import GrantSource
 from onyx.db.enums import HierarchyNodeType
@@ -5973,9 +5975,9 @@ class BuildSession(Base):
         default=SessionOrigin.INTERACTIVE,
         server_default="INTERACTIVE",
     )
-    # opencode-serve session id (populated lazily on first message
-    # under AGENT_TRANSPORT=serve) + user's LLM choice (sent as the
-    # per-prompt model override on opencode's prompt_async).
+    # opencode-serve session id (populated lazily on first message) +
+    # user's LLM choice (sent as the per-prompt model override on
+    # opencode's prompt_async).
     opencode_session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_model: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -6118,7 +6120,7 @@ class Snapshot(Base):
 class BuildMessage(Base):
     """Stores messages exchanged in build sessions.
 
-    All message data is stored in message_metadata as JSON (the raw ACP packet).
+    All message data is stored in message_metadata as JSON (the raw sandbox event packet).
     The turn_index groups all assistant responses under the user prompt they respond to.
 
     Packet types stored in message_metadata:
@@ -6157,6 +6159,37 @@ class BuildMessage(Base):
         Index(
             "ix_build_message_session_turn", "session_id", "turn_index", "created_at"
         ),
+    )
+
+
+class ActionApproval(Base):
+    """One agent-initiated gated action and its decision.
+
+    `decision IS NULL` is pending (or an orphan left by a proxy crash).
+    Liveness vs. orphan is tracked by the `approval:live:{id}` Redis key, not the DB.
+    """
+
+    __tablename__ = "action_approval"
+
+    approval_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("build_session.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(PGJSONB, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    decision: Mapped[ApprovalDecision | None] = mapped_column(
+        Enum(ApprovalDecision, native_enum=False, name="approvaldecision"),
+        nullable=True,
+    )
+    decided_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 
@@ -6281,7 +6314,7 @@ class ScheduledTaskRun(Base):
     # run was still in flight, or by the stuck-run sweeper for stuck rows.
     skip_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     # On `failed`: short classifier (e.g. "executor_crash", "budget",
-    # "acp_error", "stuck"). Full traceback / message lives in error_detail.
+    # "stuck"). Full traceback / message lives in error_detail.
     error_class: Mapped[str | None] = mapped_column(String, nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -6592,6 +6625,11 @@ class ExternalApp(Base):
         back_populates="external_app",
         cascade="all, delete-orphan",
     )
+    policies: Mapped[list["ExternalAppPolicy"]] = relationship(
+        "ExternalAppPolicy",
+        back_populates="external_app",
+        cascade="all, delete-orphan",
+    )
 
 
 class ExternalAppUserCredential(Base):
@@ -6633,5 +6671,55 @@ class ExternalAppUserCredential(Base):
             "external_app_id",
             "user_id",
             name="uq_external_app_user_credential_app_user",
+        ),
+    )
+
+
+class ExternalAppPolicy(Base):
+    """Admin's per-action policy override for an external app.
+
+    Sparse: only actions the admin has set are stored; an action without a row
+    resolves to ``ASK`` (the default ask-approval behaviour).
+
+    ``action_id`` is a catalog id; display (name/description) comes from the code
+    catalog. Admin-authored custom-app rules will add their own action
+    name/description/match columns when that feature lands.
+    """
+
+    __tablename__ = "external_app_policy"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_app_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("external_app.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Hierarchical action id, e.g. "slack.messages.read".
+    action_id: Mapped[str] = mapped_column(Text, nullable=False)
+    policy: Mapped[EndpointPolicy] = mapped_column(
+        Enum(EndpointPolicy, native_enum=False),
+        nullable=False,
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    external_app: Mapped["ExternalApp"] = relationship(
+        "ExternalApp", back_populates="policies"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "external_app_id",
+            "action_id",
+            name="uq_external_app_policy_app_action",
         ),
     )

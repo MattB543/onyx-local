@@ -9,7 +9,7 @@ import { ThreeDotsLoader } from "@/components/Loading";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Content, IllustrationContent } from "@opal/layouts";
 import SvgNoResult from "@opal/illustrations/no-result";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import * as GeneralLayouts from "@/layouts/general-layouts";
 import { InputHorizontal } from "@opal/layouts";
 import {
@@ -40,7 +40,7 @@ import {
 } from "@opal/icons";
 import Switch from "@/refresh-components/inputs/Switch";
 import SwitchField from "@/refresh-components/form/SwitchField";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { InputTypeIn } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { Disabled } from "@opal/core";
 import { ADMIN_ROUTES } from "@/lib/admin-routes";
@@ -83,7 +83,7 @@ import {
   useSecondarySearchSettings,
 } from "@/hooks/useSearchSettings";
 import { useLlmDefaults } from "@/hooks/useLanguageModels";
-import Spacer from "@/refresh-components/Spacer";
+import { Spacer } from "@opal/components";
 import useFilter from "@/hooks/useFilter";
 import { Popover } from "@opal/components";
 import ModelListContent from "@/refresh-components/popovers/ModelListContent";
@@ -461,7 +461,7 @@ function ProviderGroup({
       <GeneralLayouts.Section gap={0.25}>
         <div className="px-1 pt-1 w-full h-(--opal-line-height-lg)">
           <GeneralLayouts.Section flexDirection="row" gap={0}>
-            <Spacer horizontal rem={0.675} />
+            <Spacer orientation="horizontal" rem={0.675} />
             <div className="flex flex-row justify-between items-center w-full py-1">
               <Content
                 icon={provider.icon}
@@ -502,7 +502,7 @@ function ProviderGroup({
                     tooltip="Edit credentials"
                     onClick={() => editCredentialsModal.toggle(true)}
                   />
-                  <Spacer horizontal rem={0.25} />
+                  <Spacer orientation="horizontal" rem={0.25} />
                 </GeneralLayouts.Section>
               ) : undefined}
             </div>
@@ -1139,10 +1139,7 @@ export default function IndexSettingsPage() {
                               padding={viewAllModelsOpen ? "fit" : "sm"}
                               expandedContent={
                                 <>
-                                  <Tabs.Content
-                                    value={MODEL_TAB_CLOUD}
-                                    className="pt-0"
-                                  >
+                                  <Tabs.Content value={MODEL_TAB_CLOUD}>
                                     {filteredCloudProviders.length > 0 ? (
                                       <GeneralLayouts.Section
                                         gap={0.5}
@@ -1203,10 +1200,7 @@ export default function IndexSettingsPage() {
                                     )}
                                   </Tabs.Content>
 
-                                  <Tabs.Content
-                                    value={MODEL_TAB_SELF}
-                                    className="pt-0"
-                                  >
+                                  <Tabs.Content value={MODEL_TAB_SELF}>
                                     {filteredSelfHostedProviders.length > 0 ? (
                                       <GeneralLayouts.Section
                                         gap={0.5}
@@ -1253,7 +1247,10 @@ export default function IndexSettingsPage() {
                                               flexDirection="row"
                                               gap={0}
                                             >
-                                              <Spacer horizontal rem={0.675} />
+                                              <Spacer
+                                                orientation="horizontal"
+                                                rem={0.675}
+                                              />
                                               <div className="flex flex-row justify-between items-center w-full py-1">
                                                 <Content
                                                   icon={CUSTOM_PROVIDER.icon}
@@ -1313,7 +1310,7 @@ export default function IndexSettingsPage() {
                                     <InputTypeIn
                                       placeholder="Search models..."
                                       variant="internal"
-                                      leftSearchIcon
+                                      searchIcon
                                       value={query}
                                       onChange={(e) => setQuery(e.target.value)}
                                     />
@@ -1344,7 +1341,7 @@ export default function IndexSettingsPage() {
                                   </div>
 
                                   <div className="px-2">
-                                    <Tabs.List variant="underline">
+                                    <Tabs.List>
                                       <Tabs.Trigger value={MODEL_TAB_CLOUD}>
                                         Cloud-based
                                       </Tabs.Trigger>

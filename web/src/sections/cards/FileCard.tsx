@@ -10,7 +10,7 @@ import { Checkbox } from "@opal/components";
 import { SvgFileText, SvgX } from "@opal/icons";
 import { Interactive, Hoverable } from "@opal/core";
 import { AttachmentItemLayout } from "@/layouts/general-layouts";
-import Spacer from "@/refresh-components/Spacer";
+import { Spacer } from "@opal/components";
 
 interface RemovableProps {
   onRemove?: () => void;
@@ -198,7 +198,7 @@ export function FileCard({
                 : typeLabel
             }
           />
-          <Spacer horizontal rem={0.5} />
+          <Spacer orientation="horizontal" rem={0.5} />
         </Interactive.Container>
       </div>
     </Removable>

@@ -97,3 +97,4 @@ private_docs/.claude/worktrees/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+!.claude/settings.json
