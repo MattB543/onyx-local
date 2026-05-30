@@ -216,9 +216,7 @@ class ImapConnector(
             for email_id in current_todos:
                 email_msg = _fetch_email(mail_client=mail_client, email_id=email_id)
                 if not email_msg:
-                    logger.warning(
-                        "Failed to fetch message email_id=%r; skipping", email_id
-                    )
+                    logger.warning(f"Failed to fetch message {email_id=}; skipping")
                     continue
 
                 email_headers = EmailHeaders.from_email_msg(email_msg=email_msg)

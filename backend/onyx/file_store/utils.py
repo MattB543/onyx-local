@@ -379,10 +379,6 @@ def verify_user_files(
             try:
                 parsed_user_file_id = UUID(user_file_id)
             except (ValueError, TypeError):
-                logger.warning(
-                    "Invalid user_file_id in file descriptor: %s",
-                    file_descriptor["user_file_id"],
-                )
                 parsed_user_file_id = None
 
             if parsed_user_file_id is not None:

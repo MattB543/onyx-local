@@ -101,6 +101,17 @@ FILE_TOKEN_COUNT_THRESHOLD = int(
 USER_FILE_MAX_UPLOAD_SIZE_MB = int(os.environ.get("USER_FILE_MAX_UPLOAD_SIZE_MB") or 50)
 USER_FILE_MAX_UPLOAD_SIZE_BYTES = USER_FILE_MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
+# Cache query embeddings in the configured cache backend so identical queries
+# (across users / agentic sub-queries) don't re-hit the embedding provider.
+QUERY_EMBEDDING_CACHE_ENABLED = (
+    os.environ.get("QUERY_EMBEDDING_CACHE_ENABLED", "true").lower() == "true"
+)
+assert (
+    QUERY_EMBEDDING_CACHE_TTL_S := int(
+        os.environ.get("QUERY_EMBEDDING_CACHE_TTL_S", "900")
+    )
+) > 0, "QUERY_EMBEDDING_CACHE_TTL_S must be positive."
+
 # Show extra/uncommon connectors in the "Other" category by default.
 # Can be disabled by setting SHOW_EXTRA_CONNECTORS=false.
 SHOW_EXTRA_CONNECTORS = (
@@ -965,8 +976,10 @@ INDEXING_EMBEDDING_MODEL_NUM_THREADS = int(
     os.environ.get("INDEXING_EMBEDDING_MODEL_NUM_THREADS") or 8
 )
 
-# Maximum file size in a document to be indexed
-MAX_DOCUMENT_CHARS = int(os.environ.get("MAX_DOCUMENT_CHARS") or 5_000_000)
+# Maximum number of characters in a single document before it is skipped during indexing.
+# Documents exceeding this limit will surface a visible error rather than being silently dropped.
+# Default is 512MB worth of characters (536,870,912). Configurable via MAX_DOCUMENT_CHARS env var.
+MAX_DOCUMENT_CHARS = int(os.environ.get("MAX_DOCUMENT_CHARS") or 536_870_912)
 MAX_FILE_SIZE_BYTES = int(
     os.environ.get("MAX_FILE_SIZE_BYTES") or 2 * 1024 * 1024 * 1024
 )  # 2GB in bytes
