@@ -3,14 +3,14 @@
 Compatibility placeholder for legacy revision ID c4e5f6a7b8c9.
 
 Revision ID: c4e5f6a7b8c9
-Revises: b6c7d8e9f0a1
+Revises: b6c7d8e9f0a2
 Create Date: 2026-02-22 16:40:00.000000
 """
 
 
 # revision identifiers, used by Alembic.
 revision = "c4e5f6a7b8c9"
-down_revision = "b6c7d8e9f0a1"
+down_revision = "b6c7d8e9f0a2"
 branch_labels = None
 depends_on = None
 
