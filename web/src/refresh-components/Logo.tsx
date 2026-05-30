@@ -60,7 +60,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
   const logo = settings.enterpriseSettings?.use_custom_logo ? (
     <div
       className={cn(
-        "aspect-square rounded-full overflow-hidden relative flex-shrink-0",
+        "aspect-square rounded-full overflow-hidden relative shrink-0",
         className
       )}
       style={{ height: resolvedSize }}
@@ -73,10 +73,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
       />
     </div>
   ) : (
-    <SvgOnyxLogo
-      size={resolvedSize}
-      className={cn("flex-shrink-0", className)}
-    />
+    <SvgOnyxLogo size={resolvedSize} className={cn("shrink-0", className)} />
   );
 
   const renderNameAndPoweredBy = (opts: {
@@ -122,10 +119,7 @@ export default function Logo({ folded, size, className }: LogoProps) {
   return applicationName ? (
     renderNameAndPoweredBy({ includeLogo: true, includeName: true })
   ) : folded ? (
-    <SvgOnyxLogo
-      size={resolvedSize}
-      className={cn("flex-shrink-0", className)}
-    />
+    <SvgOnyxLogo size={resolvedSize} className={cn("shrink-0", className)} />
   ) : (
     <SvgOnyxLogoTyped size={resolvedSize} className={className} />
   );

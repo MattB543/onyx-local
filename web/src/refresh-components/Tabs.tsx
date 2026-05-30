@@ -515,7 +515,7 @@ const TabsList = forwardRef<
           {showScrollArrows && (
             <div
               ref={scrollArrowsRef}
-              className="flex items-center gap-1 pl-2 flex-shrink-0"
+              className="flex items-center gap-1 pl-2 shrink-0"
             >
               <Button
                 disabled={!canScrollLeft}
@@ -537,7 +537,7 @@ const TabsList = forwardRef<
           )}
 
           {isPill && rightContent && (
-            <div ref={rightContentRef} className="ml-auto flex-shrink-0">
+            <div ref={rightContentRef} className="ml-auto shrink-0">
               {rightContent}
             </div>
           )}
@@ -730,7 +730,7 @@ const TabsContent = forwardRef<
     ref={ref}
     value={value}
     className={cn(
-      "pt-4 focus:outline-none focus:border-theme-primary-05 w-full",
+      "pt-4 focus:outline-hidden focus:border-theme-primary-05 w-full",
       className
     )}
   >

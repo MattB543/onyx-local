@@ -138,7 +138,7 @@ const EditRow = ({
             }
           }}
         >
-          <FiEdit2 className="mr-2 flex-shrink-0" />
+          <FiEdit2 className="mr-2 shrink-0" />
           <span className="font-medium">{documentSet.name}</span>
         </div>
       </Tooltip>

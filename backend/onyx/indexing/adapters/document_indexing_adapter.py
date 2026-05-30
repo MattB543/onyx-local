@@ -34,6 +34,7 @@ from onyx.indexing.models import ChunkEnrichmentContext
 from onyx.indexing.models import DocAwareChunk
 from onyx.indexing.models import DocMetadataAwareIndexChunk
 from onyx.indexing.models import IndexChunk
+from onyx.indexing.models import IndexingBatchAdapter
 from onyx.indexing.models import UpdatableChunkData
 from onyx.redis.redis_hierarchy import get_ancestors_from_raw_id
 from onyx.redis.redis_pool import get_redis_client
@@ -136,7 +137,7 @@ def _extract_sender_email(doc: Document) -> str | None:
 
 
 
-class DocumentIndexingBatchAdapter:
+class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
     """Default adapter: handles DB prep, locking, metadata enrichment, and finalize.
 
     Keeps orchestration logic in the pipeline and side-effects in the adapter.
