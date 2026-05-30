@@ -75,6 +75,7 @@ from onyx.db.enums import CustomJobTriggerEventStatus
 from onyx.db.enums import CustomJobTriggerType
 from onyx.db.enums import DefaultAppMode
 from onyx.db.enums import EmbeddingPrecision
+from onyx.db.enums import ExternalAppType
 from onyx.db.enums import GrantSource
 from onyx.db.enums import HierarchyNodeType
 from onyx.db.enums import HookFailStrategy
@@ -4253,9 +4254,17 @@ class Skill(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Bundle bytes (single, replaced on re-upload).
-    bundle_file_id: Mapped[str] = mapped_column(String, nullable=False)
-    bundle_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Discriminator: when set, definition (source files, has_template, etc.)
+    # comes from BUILT_IN_SKILLS in `onyx.skills.built_in`. When NULL, the
+    # row is a custom (admin-uploaded) skill and bundle_file_id is set.
+    # Exactly one of (built_in_skill_id, bundle_file_id) is non-null —
+    # enforced by `ck_skill_definition_source` below.
+    built_in_skill_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Bundle bytes for custom skills. NULL for built-ins (their source
+    # files live on disk under SKILLS_TEMPLATE_PATH).
+    bundle_file_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    bundle_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     author_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
@@ -4286,7 +4295,13 @@ class Skill(Base):
         viewonly=True,
     )
 
-    __table_args__ = (UniqueConstraint("slug", name="uq_skill_slug"),)
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_skill_slug"),
+        CheckConstraint(
+            "(built_in_skill_id IS NULL) <> (bundle_file_id IS NULL)",
+            name="ck_skill_definition_source",
+        ),
+    )
 
 
 """
@@ -6567,3 +6582,113 @@ class HookExecutionLog(Base):
     )
 
     hook: Mapped["Hook"] = relationship("Hook", back_populates="execution_logs")
+
+
+class ExternalApp(Base):
+    __tablename__ = "external_app"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Display name, description, and lifecycle (including enabled state
+    # via skill presence) live on the linked Skill row. ON DELETE
+    # CASCADE: removing the skill removes the external_app gateway.
+    skill_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("skill.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    # Discriminator for the OAuth-provider dispatch layer. Decoupled
+    # from the linked skill's name so renaming the skill doesn't
+    # silently break OAuth.
+    #
+    # `CUSTOM` covers admin-defined apps that don't go through any
+    # built-in OAuth flow. Built-in values match entries in
+    # `external_apps.providers.PROVIDERS`.
+    #
+    # NOT unique — providers like self-hosted GitLab/Jira can have
+    # multiple distinct instances within one Onyx (each with its own
+    # client_id + base URL) and would all share the same app_type.
+    # Duplicate detection for the typical "one Slack" case happens
+    # at the UI layer.
+    app_type: Mapped[ExternalAppType] = mapped_column(
+        Enum(ExternalAppType, native_enum=False),
+        nullable=False,
+        default=ExternalAppType.CUSTOM,
+        server_default=ExternalAppType.CUSTOM.value,
+    )
+    upstream_url_patterns: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String), nullable=False, default=list, server_default="{}"
+    )
+    auth_template: Mapped[dict[str, Any]] = mapped_column(
+        postgresql.JSONB(),
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    organization_credentials: Mapped[dict[str, Any]] = mapped_column(
+        postgresql.JSONB(),
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    skill: Mapped["Skill"] = relationship("Skill")
+    user_credentials: Mapped[list["ExternalAppUserCredential"]] = relationship(
+        "ExternalAppUserCredential",
+        back_populates="external_app",
+        cascade="all, delete-orphan",
+    )
+
+
+class ExternalAppUserCredential(Base):
+    __tablename__ = "external_app_user_credential"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_app_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("external_app.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_credentials: Mapped[dict[str, Any]] = mapped_column(
+        postgresql.JSONB(), nullable=False, default=dict
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    external_app: Mapped["ExternalApp"] = relationship(
+        "ExternalApp", back_populates="user_credentials"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "external_app_id",
+            "user_id",
+            name="uq_external_app_user_credential_app_user",
+        ),
+    )

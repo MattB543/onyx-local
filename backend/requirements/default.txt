@@ -184,6 +184,7 @@ cryptography==46.0.5
     #   pyjwt
     #   secretstorage
     #   sendgrid
+    #   types-paramiko
     #   unstructured-client
 cyclopts==4.2.4
     # via fastmcp
@@ -212,6 +213,7 @@ distro==1.9.0
     #   zulip
 dnspython==2.8.0
     # via email-validator
+docker==7.1.0
 docstring-parser==0.17.0
     # via
     #   cyclopts
@@ -386,7 +388,7 @@ humanfriendly==10.0
     # via coloredlogs
 hyperframe==6.1.0
     # via h2
-idna==3.11
+idna==3.15
     # via
     #   anyio
     #   email-validator
@@ -799,6 +801,7 @@ pytz==2025.2
 pywikibot==9.0.0
 pywin32==311 ; sys_platform == 'win32'
     # via
+    #   docker
     #   mcp
     #   pympler
 pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
@@ -831,6 +834,7 @@ requests==2.33.0
     #   atlassian-python-api
     #   braintrust
     #   cohere
+    #   docker
     #   dropbox
     #   exa-py
     #   google-api-core
@@ -990,9 +994,14 @@ typer==0.20.0
     #   mcp
 types-awscrt==0.28.4
     # via botocore-stubs
+types-docker==7.1.0.20260518
 types-openpyxl==3.0.4.7
+types-paramiko==4.0.0.20260518
+    # via types-docker
 types-requests==2.32.0.20250328
-    # via cohere
+    # via
+    #   cohere
+    #   types-docker
 types-s3transfer==0.14.0
     # via boto3-stubs
 typing-extensions==4.15.0
@@ -1067,6 +1076,7 @@ urllib3==2.7.0
     #   botocore
     #   courlan
     #   distributed
+    #   docker
     #   htmldate
     #   hubspot-api-client
     #   kubernetes
@@ -1076,6 +1086,7 @@ urllib3==2.7.0
     #   requests
     #   sentry-sdk
     #   trafilatura
+    #   types-docker
     #   types-requests
 uuid-utils==0.14.0
     # via

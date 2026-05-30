@@ -138,7 +138,7 @@ function CredentialSelectionTable({
                         className="cursor-pointer my-auto"
                         aria-label="Edit credential"
                       >
-                        <SvgEdit />
+                        <SvgEdit size={16} />
                       </button>
                     )}
                   </td>

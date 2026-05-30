@@ -291,8 +291,6 @@ class LocalSandboxManager(SandboxManager):
         snapshot_path: str | None = None,  # noqa: ARG002
         user_name: str | None = None,
         user_role: str | None = None,
-        user_work_area: str | None = None,
-        user_level: str | None = None,
     ) -> None:
         """Set up a session workspace within an existing sandbox.
 
@@ -303,9 +301,8 @@ class LocalSandboxManager(SandboxManager):
         4. AGENTS.md
         5. .agent/skills/
         6. opencode.json
-        7. org_info/ (if user_work_area provided)
-        8. attachments/
-        9. Start Next.js dev server for this session (skipped when
+        7. attachments/
+        8. Start Next.js dev server for this session (skipped when
            ``nextjs_port`` is None — headless callers like the scheduled-task
            executor don't attach a preview).
 
@@ -316,8 +313,6 @@ class LocalSandboxManager(SandboxManager):
             snapshot_path: Optional storage path to restore outputs from
             user_name: User's name for personalization in AGENTS.md
             user_role: User's role/title for personalization in AGENTS.md
-            user_work_area: User's work area for persona (e.g., "engineering")
-            user_level: User's level for persona (e.g., "ic", "manager")
 
         Raises:
             RuntimeError: If workspace setup fails
@@ -342,15 +337,6 @@ class LocalSandboxManager(SandboxManager):
         logger.debug("Session directory created at %s", session_path)
 
         try:
-            # Setup org_info directory with user identity (at session root)
-            if user_work_area:
-                logger.debug(
-                    "Setting up org_info for %s/%s", user_work_area, user_level
-                )
-                self._directory_manager.setup_org_info(
-                    session_path, user_work_area, user_level
-                )
-
             logger.debug("Setting up outputs directory from template")
             self._directory_manager.setup_outputs_directory(session_path)
             logger.debug("Outputs directory ready")
@@ -438,7 +424,6 @@ class LocalSandboxManager(SandboxManager):
                 disabled_tools=OPENCODE_DISABLED_TOOLS,
                 user_name=user_name,
                 user_role=user_role,
-                include_org_info=bool(user_work_area),
             )
             logger.debug("Agent instructions ready")
 
@@ -687,6 +672,27 @@ class LocalSandboxManager(SandboxManager):
         session_path = self._get_session_path(sandbox_id, session_id)
         outputs_path = session_path / "outputs"
         return outputs_path.exists()
+
+    def list_session_workspaces(self, sandbox_id: UUID) -> list[UUID]:
+        """List UUID session directories under the sandbox's sessions/.
+
+        Used by idle cleanup. Local sandboxes never participate in idle
+        cleanup, but returning the actual list keeps behavior consistent
+        with other backends and is useful for tests and ad-hoc tooling.
+        """
+        sessions_root = self._get_sandbox_path(sandbox_id) / "sessions"
+        if not sessions_root.exists():
+            return []
+
+        result: list[UUID] = []
+        for entry in sessions_root.iterdir():
+            if not entry.is_dir():
+                continue
+            try:
+                result.append(UUID(entry.name))
+            except ValueError:
+                continue
+        return result
 
     def ensure_nextjs_running(
         self,

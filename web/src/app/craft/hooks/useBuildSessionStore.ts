@@ -1,11 +1,8 @@
 "use client";
 
 import { create } from "zustand";
+import { getBuildLlmSelection } from "@/app/craft/onboarding/constants";
 import { DELETE_SUCCESS_DISPLAY_DURATION_MS } from "@/app/craft/constants";
-import {
-  getBuildUserPersona,
-  getBuildLlmSelection,
-} from "@/app/craft/onboarding/constants";
 import {
   createSession as apiCreateSession,
   fetchSession,
@@ -1437,12 +1434,9 @@ export const useBuildSessionStore = create<BuildSessionStore>()((set, get) => ({
 
     const promise = (async (): Promise<string | null> => {
       try {
-        const persona = getBuildUserPersona();
         const llmSelection = getBuildLlmSelection();
 
         const sessionData = await apiCreateSession({
-          userWorkArea: persona?.workArea || null,
-          userLevel: persona?.level || null,
           llmProviderType: llmSelection?.provider || null,
           llmModelName: llmSelection?.modelName || null,
         });

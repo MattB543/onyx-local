@@ -85,7 +85,7 @@ export const SlackBotTable = ({ slackBots }: { slackBots: SlackBot[] }) => {
               >
                 <TableCell>
                   <div className="flex items-center">
-                    <SvgEdit className="mr-4" />
+                    <SvgEdit size={16} className="mr-4" />
                     {slackBot.name}
                   </div>
                 </TableCell>
