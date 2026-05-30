@@ -116,7 +116,7 @@ class PgRedisKVStore(KeyValueStore):
                     return json.loads(cached.decode("utf-8"))
             except Exception as e:
                 logger.error(
-                    f"Failed to get value from cache for key '{key}': {str(e)}"
+                    "Failed to get value from cache for key '%s': %s", key, str(e)
                 )
 
         with get_session_with_current_tenant() as db_session:
@@ -160,7 +160,9 @@ class PgRedisKVStore(KeyValueStore):
         try:
             self._get_cache().delete(REDIS_KEY_PREFIX + key)
         except Exception as e:
-            logger.error(f"Failed to delete value from cache for key '{key}': {str(e)}")
+            logger.error(
+                "Failed to delete value from cache for key '%s': %s", key, str(e)
+            )
 
         with get_session_with_current_tenant() as db_session:
             result = db_session.query(KVStore).filter_by(key=key).delete()

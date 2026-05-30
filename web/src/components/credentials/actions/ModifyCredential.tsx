@@ -136,6 +136,7 @@ function CredentialSelectionTable({
                         disabled={!editable}
                         onClick={() => onEditCredential(credential)}
                         className="cursor-pointer my-auto"
+                        aria-label="Edit credential"
                       >
                         <SvgEdit />
                       </button>
