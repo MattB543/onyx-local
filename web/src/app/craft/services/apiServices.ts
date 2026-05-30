@@ -13,13 +13,13 @@ import {
   DirectoryListing,
   SharingScope,
 } from "@/app/craft/types/streamingTypes";
+import { BUILD_API_BASE } from "@/app/craft/v1/constants";
 
 // =============================================================================
 // API Configuration
 // =============================================================================
 
-const API_BASE = "/api/build";
-export const USAGE_LIMITS_ENDPOINT = `${API_BASE}/limit`;
+export const USAGE_LIMITS_ENDPOINT = `${BUILD_API_BASE}/limit`;
 
 // =============================================================================
 // SSE Stream Processing
@@ -89,7 +89,7 @@ export interface CreateSessionOptions {
 export async function createSession(
   options?: CreateSessionOptions
 ): Promise<ApiDetailedSessionResponse> {
-  const res = await fetch(`${API_BASE}/sessions`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -109,7 +109,7 @@ export async function createSession(
 export async function fetchSession(
   sessionId: string
 ): Promise<ApiDetailedSessionResponse> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}`);
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}`);
 
   if (!res.ok) {
     throw new Error(`Failed to load session: ${res.status}`);
@@ -119,7 +119,7 @@ export async function fetchSession(
 }
 
 export async function fetchSessionHistory(): Promise<SessionHistoryItem[]> {
-  const res = await fetch(`${API_BASE}/sessions`);
+  const res = await fetch(`${BUILD_API_BASE}/sessions`);
 
   if (!res.ok) {
     throw new Error(`Failed to fetch session history: ${res.status}`);
@@ -134,10 +134,13 @@ export async function fetchSessionHistory(): Promise<SessionHistoryItem[]> {
 }
 
 export async function generateSessionName(sessionId: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/generate-name`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
+  const res = await fetch(
+    `${BUILD_API_BASE}/sessions/${sessionId}/generate-name`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
 
   if (!res.ok) {
     throw new Error(`Failed to generate session name: ${res.status}`);
@@ -158,7 +161,7 @@ export async function generateFollowupSuggestions(
   agentMessage: string
 ): Promise<SuggestionBubble[]> {
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/generate-suggestions`,
+    `${BUILD_API_BASE}/sessions/${sessionId}/generate-suggestions`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -181,7 +184,7 @@ export async function updateSessionName(
   sessionId: string,
   name: string | null
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/name`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/name`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -196,7 +199,7 @@ export async function setSessionSharing(
   sessionId: string,
   sharingScope: SharingScope
 ): Promise<{ session_id: string; sharing_scope: SharingScope }> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/public`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/public`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sharing_scope: sharingScope }),
@@ -210,7 +213,7 @@ export async function setSessionSharing(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}`, {
     method: "DELETE",
   });
 
@@ -232,7 +235,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function restoreSession(
   sessionId: string
 ): Promise<ApiDetailedSessionResponse> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/restore`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/restore`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
@@ -258,7 +261,7 @@ export async function checkPreProvisionedSession(
   sessionId: string
 ): Promise<{ valid: boolean; session_id: string | null }> {
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/pre-provisioned-check`
+    `${BUILD_API_BASE}/sessions/${sessionId}/pre-provisioned-check`
   );
 
   if (!res.ok) {
@@ -294,7 +297,7 @@ function extractContentFromMetadata(
 export async function fetchMessages(
   sessionId: string
 ): Promise<BuildMessage[]> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/messages`);
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/messages`);
 
   if (!res.ok) {
     throw new Error(`Failed to fetch messages: ${res.status}`);
@@ -334,12 +337,15 @@ export async function sendMessageStream(
   content: string,
   signal?: AbortSignal
 ): Promise<Response> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/send-message`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-    signal,
-  });
+  const res = await fetch(
+    `${BUILD_API_BASE}/sessions/${sessionId}/send-message`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+      signal,
+    }
+  );
 
   if (!res.ok) {
     // Handle rate limit errors specifically so UI can show upsell modal
@@ -357,7 +363,7 @@ export async function sendMessageStream(
 // =============================================================================
 
 export async function fetchArtifacts(sessionId: string): Promise<Artifact[]> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/artifacts`);
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/artifacts`);
 
   if (!res.ok) {
     throw new Error(`Failed to fetch artifacts: ${res.status}`);
@@ -384,7 +390,9 @@ export async function fetchArtifacts(sessionId: string): Promise<Artifact[]> {
 export async function fetchWebappInfo(
   sessionId: string
 ): Promise<ApiWebappInfoResponse> {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/webapp-info`);
+  const res = await fetch(
+    `${BUILD_API_BASE}/sessions/${sessionId}/webapp-info`
+  );
 
   if (!res.ok) {
     throw new Error(`Failed to fetch webapp info: ${res.status}`);
@@ -402,7 +410,7 @@ export async function fetchDirectoryListing(
   path = ""
 ): Promise<DirectoryListing> {
   const url = new URL(
-    `${API_BASE}/sessions/${sessionId}/files`,
+    `${BUILD_API_BASE}/sessions/${sessionId}/files`,
     window.location.origin
   );
   if (path) {
@@ -427,7 +435,7 @@ export function downloadArtifactFile(sessionId: string, path: string): void {
     .map((segment) => encodeURIComponent(segment))
     .join("/");
   const link = document.createElement("a");
-  link.href = `${API_BASE}/sessions/${sessionId}/artifacts/${encodedPath}`;
+  link.href = `${BUILD_API_BASE}/sessions/${sessionId}/artifacts/${encodedPath}`;
   link.download = path.split("/").pop() || path;
   document.body.appendChild(link);
   link.click();
@@ -443,7 +451,7 @@ export function downloadDirectory(sessionId: string, path: string): void {
     .map((segment) => encodeURIComponent(segment))
     .join("/");
   const link = document.createElement("a");
-  link.href = `${API_BASE}/sessions/${sessionId}/download-directory/${encodedPath}`;
+  link.href = `${BUILD_API_BASE}/sessions/${sessionId}/download-directory/${encodedPath}`;
   link.download = "";
   document.body.appendChild(link);
   link.click();
@@ -475,7 +483,7 @@ export async function fetchFileContent(
     .join("/");
 
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/artifacts/${encodedPath}`
+    `${BUILD_API_BASE}/sessions/${sessionId}/artifacts/${encodedPath}`
   );
 
   if (!res.ok) {
@@ -577,7 +585,7 @@ export async function uploadFile(
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/upload`, {
+  const res = await fetch(`${BUILD_API_BASE}/sessions/${sessionId}/upload`, {
     method: "POST",
     body: formData,
   });
@@ -604,7 +612,7 @@ export async function deleteFile(
     .join("/");
 
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/files/${encodedPath}`,
+    `${BUILD_API_BASE}/sessions/${sessionId}/files/${encodedPath}`,
     {
       method: "DELETE",
     }
@@ -630,7 +638,7 @@ export async function exportDocx(
     .join("/");
 
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/export-docx/${encodedPath}`
+    `${BUILD_API_BASE}/sessions/${sessionId}/export-docx/${encodedPath}`
   );
 
   if (!res.ok) {
@@ -667,7 +675,7 @@ export async function fetchPptxPreview(
     .join("/");
 
   const res = await fetch(
-    `${API_BASE}/sessions/${sessionId}/pptx-preview/${encodedPath}`
+    `${BUILD_API_BASE}/sessions/${sessionId}/pptx-preview/${encodedPath}`
   );
 
   if (!res.ok) {
@@ -690,7 +698,7 @@ import {
   UploadResponse,
 } from "@/app/craft/types/user-library";
 
-const USER_LIBRARY_BASE = `${API_BASE}/user-library`;
+const USER_LIBRARY_BASE = `${BUILD_API_BASE}/user-library`;
 
 /**
  * Fetch the user's library tree (uploaded files).

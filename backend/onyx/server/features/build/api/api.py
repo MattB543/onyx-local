@@ -20,8 +20,12 @@ from onyx.db.enums import Permission
 from onyx.db.enums import SharingScope
 from onyx.db.models import BuildSession
 from onyx.db.models import User
+from onyx.server.features.build.api.debug_api import router as debug_router
 from onyx.server.features.build.api.external_apps_api import (
     router as external_apps_router,
+)
+from onyx.server.features.build.api.external_apps_oauth_api import (
+    router as external_apps_oauth_router,
 )
 from onyx.server.features.build.api.messages_api import router as messages_router
 from onyx.server.features.build.api.models import RateLimitResponse
@@ -66,6 +70,8 @@ router.include_router(messages_router, tags=["build"])
 router.include_router(user_library_router, tags=["build"])
 router.include_router(scheduled_tasks_router, tags=["build"])
 router.include_router(external_apps_router, tags=["build"])
+router.include_router(external_apps_oauth_router, tags=["build"])
+router.include_router(debug_router, tags=["build-debug"])
 
 
 # -----------------------------------------------------------------------------

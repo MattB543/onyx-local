@@ -191,6 +191,8 @@ export async function upsertMCPServer(serverData: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth_template?: any;
   admin_credentials?: Record<string, string>;
+  // Per-key analogue of `oauth_client_*_changed` for `admin_credentials`.
+  admin_credentials_changed?: Record<string, boolean>;
   existing_server_id?: number;
 }): Promise<ApiResponse<UpsertMCPServerResponse>> {
   try {

@@ -95,4 +95,5 @@ private_docs/.claude/worktrees/
 # Added context for LLMs
 .claude/CLAUDE.md
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 .claude/worktrees/
