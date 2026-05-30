@@ -1025,6 +1025,11 @@ class Document(Base):
     # Only null for documents indexed prior to this change
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # MD5 hash of title + section text at last successful index.
+    # Used to skip re-indexing when content hasn't changed.
+    # Null for documents indexed before this column was added.
+    content_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+
     # last time any vespa relevant row metadata or the doc changed.
     # does not include last_synced
     last_modified: Mapped[datetime.datetime | None] = mapped_column(
@@ -3296,6 +3301,10 @@ class ModelConfiguration(Base):
     # For static providers (OpenAI, Anthropic), this may be null and will fall back to LiteLLM.
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Admin-specified override for the display name. When set, this takes precedence
+    # over both display_name and the LiteLLM-derived name everywhere in the UI.
+    custom_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+
     llm_provider: Mapped["LLMProvider"] = relationship(
         "LLMProvider",
         back_populates="model_configurations",
@@ -4264,6 +4273,11 @@ class Skill(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    author: Mapped[User | None] = relationship(
+        "User",
+        foreign_keys=[author_user_id],
     )
 
     groups: Mapped[list["UserGroup"]] = relationship(

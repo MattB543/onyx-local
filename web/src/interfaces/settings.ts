@@ -7,6 +7,12 @@ export enum ApplicationStatus {
   SEAT_LIMIT_EXCEEDED = "seat_limit_exceeded",
 }
 
+export enum Tier {
+  COMMUNITY = "community",
+  BUSINESS = "business",
+  ENTERPRISE = "enterprise",
+}
+
 export enum QueryHistoryType {
   DISABLED = "disabled",
   ANONYMIZED = "anonymized",
@@ -53,6 +59,7 @@ export interface Settings {
   // Whether EE features are unlocked (user has a valid enterprise license).
   // Controls UI visibility of EE features like user groups, analytics, RBAC.
   ee_features_enabled?: boolean;
+  tier?: Tier;
 
   // Seat usage - populated when seat limit is exceeded
   seat_count?: number | null;
@@ -82,6 +89,10 @@ export interface Settings {
   // Whitelabel branding name (custom fork feature).
   // Sourced from the NEXT_PUBLIC_WHITELABEL_NAME / WHITELABEL_NAME env vars.
   whitelabel_name?: string | null;
+
+  // True when the backend runs inside a container (Docker/Podman).
+  // Used to default local-service URLs to host.docker.internal.
+  is_containerized?: boolean;
 }
 
 export interface NavigationItem {
@@ -110,6 +121,13 @@ export interface EnterpriseSettings {
   consent_screen_prompt: string | null;
   show_first_visit_notice: boolean | null;
   custom_greeting_message: string | null;
+
+  // Custom help link surfaced in the profile dropdown alongside "Help & FAQ".
+  custom_help_link_url: string | null;
+  custom_help_link_label: string | null;
+
+  // Hide the "Powered by Onyx" tagline under the sidebar logo.
+  hide_onyx_branding: boolean | null;
 }
 
 export interface CombinedSettings {
