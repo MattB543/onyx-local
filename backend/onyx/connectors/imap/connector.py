@@ -494,7 +494,7 @@ def _parse_email_body(
             elif content_type == "text/html" and html_body is None:
                 html_body = decoded
         except (UnicodeDecodeError, LookupError) as e:
-            logger.warning(f"Could not decode part with charset {charset}. Error: {e}")
+            logger.warning("Could not decode part with charset %s: %s", charset, e)
             continue
 
     body = plain_body or html_body

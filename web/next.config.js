@@ -19,7 +19,7 @@ const cspHeader = `
 const nextConfig = {
   productionBrowserSourceMaps: false,
   output: "standalone",
-  transpilePackages: ["@onyx/opal", "mime"],
+  transpilePackages: ["@onyx-ai/opal", "mime"],
   typedRoutes: true,
   reactCompiler: true,
   images: {

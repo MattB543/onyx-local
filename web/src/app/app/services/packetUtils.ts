@@ -43,6 +43,11 @@ export function isToolPacket(packet: Packet, includeSectionEnd = true) {
     PacketType.INTERMEDIATE_REPORT_START,
     PacketType.INTERMEDIATE_REPORT_DELTA,
     PacketType.INTERMEDIATE_REPORT_CITED_DOCS,
+    PacketType.CODING_AGENT_START,
+    PacketType.CODING_AGENT_THINKING_DELTA,
+    PacketType.CODING_AGENT_FINAL,
+    PacketType.BASH_TOOL_START,
+    PacketType.BASH_TOOL_DELTA,
   ];
   if (includeSectionEnd) {
     toolPacketTypes.push(PacketType.SECTION_END);

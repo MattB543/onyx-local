@@ -29,6 +29,7 @@ CRM_LIST_TOOL_ID = "CrmListTool"
 CRM_GET_TOOL_ID = "CrmGetTool"
 CALENDAR_SEARCH_TOOL_ID = "SearchCalendarTool"
 MEMORY_TOOL_ID = "MemoryTool"
+CODING_AGENT_TOOL_ID = "CodingAgentTool"
 
 # Tool names as referenced by tool results / tool calls (read_file)
 FILE_READER_TOOL_NAME = "read_file"

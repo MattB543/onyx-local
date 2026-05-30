@@ -1,10 +1,10 @@
 "use client";
 
-import React, { ComponentPropsWithoutRef, useState } from "react";
-import Popover from "@/refresh-components/Popover";
+import React, { useState } from "react";
+import { Popover } from "@opal/components";
 
 export interface SimplePopoverProps
-  extends ComponentPropsWithoutRef<typeof Popover.Content> {
+  extends React.ComponentPropsWithoutRef<typeof Popover.Content> {
   onOpenChange?: (open: boolean) => void;
   trigger: React.ReactNode | ((open: boolean) => React.ReactNode);
 }
