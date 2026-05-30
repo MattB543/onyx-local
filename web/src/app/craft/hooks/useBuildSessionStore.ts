@@ -4,6 +4,12 @@ import { create } from "zustand";
 import { getBuildLlmSelection } from "@/app/craft/onboarding/constants";
 import { DELETE_SUCCESS_DISPLAY_DURATION_MS } from "@/app/craft/constants";
 import {
+  QueuedMessage,
+  MAX_QUEUED_MESSAGES,
+  EMPTY_QUEUED_MESSAGES,
+} from "@/app/app/interfaces";
+
+import {
   createSession as apiCreateSession,
   fetchSession,
   fetchSessionHistory,
@@ -256,6 +262,9 @@ export type PreProvisioningState =
 // Module-level variable to store the provisioning promise (not in Zustand state for serializability)
 let provisioningPromise: Promise<string | null> | null = null;
 
+// Monotonic id for queued messages (kept out of Zustand state for simplicity).
+let nextQueuedMessageId = 1;
+
 /** File preview tab data */
 export interface FilePreviewTab {
   path: string;
@@ -297,6 +306,11 @@ export interface BuildSessionData {
    * Rendered directly without transformation.
    */
   streamItems: StreamItem[];
+  /**
+   * Messages typed while a response is streaming. Auto-sent FIFO once the
+   * current run finishes (see the auto-send effect in BuildChatPanel).
+   */
+  queuedMessages: QueuedMessage[];
   error: string | null;
   webappUrl: string | null;
   /** Sandbox info from backend */
@@ -409,6 +423,10 @@ interface BuildSessionStore {
   ) => void;
   clearStreamItems: (sessionId: string) => void;
 
+  // Actions - Queued Messages
+  enqueueMessage: (sessionId: string, text: string) => void;
+  removeQueuedMessage: (sessionId: string, index: number) => void;
+
   // Actions - Abort Control
   setAbortController: (sessionId: string, controller: AbortController) => void;
   abortSession: (sessionId: string) => void;
@@ -478,6 +496,7 @@ const createInitialSessionData = (
   artifacts: [],
   toolCalls: [],
   streamItems: [],
+  queuedMessages: [],
   error: null,
   webappUrl: null,
   sandbox: null,
@@ -1056,6 +1075,45 @@ export const useBuildSessionStore = create<BuildSessionStore>()((set, get) => ({
       const updatedSession: BuildSessionData = {
         ...session,
         streamItems: [],
+        lastAccessed: new Date(),
+      };
+      const newSessions = new Map(state.sessions);
+      newSessions.set(sessionId, updatedSession);
+      return { sessions: newSessions };
+    });
+  },
+
+  // ===========================================================================
+  // Queued Messages
+  // ===========================================================================
+
+  enqueueMessage: (sessionId: string, text: string) => {
+    set((state) => {
+      const session = state.sessions.get(sessionId);
+      if (!session || session.queuedMessages.length >= MAX_QUEUED_MESSAGES) {
+        return state;
+      }
+      const updatedSession: BuildSessionData = {
+        ...session,
+        queuedMessages: [
+          ...session.queuedMessages,
+          { id: nextQueuedMessageId++, text },
+        ],
+        lastAccessed: new Date(),
+      };
+      const newSessions = new Map(state.sessions);
+      newSessions.set(sessionId, updatedSession);
+      return { sessions: newSessions };
+    });
+  },
+
+  removeQueuedMessage: (sessionId: string, index: number) => {
+    set((state) => {
+      const session = state.sessions.get(sessionId);
+      if (!session) return state;
+      const updatedSession: BuildSessionData = {
+        ...session,
+        queuedMessages: session.queuedMessages.filter((_, i) => i !== index),
         lastAccessed: new Date(),
       };
       const newSessions = new Map(state.sessions);
@@ -2022,6 +2080,16 @@ export const useStreamItems = () =>
     const { currentSessionId, sessions } = state;
     if (!currentSessionId) return EMPTY_ARRAY;
     return sessions.get(currentSessionId)?.streamItems ?? EMPTY_ARRAY;
+  });
+
+// Queued messages selector
+export const useQueuedMessages = () =>
+  useBuildSessionStore((state) => {
+    const { currentSessionId, sessions } = state;
+    if (!currentSessionId) return EMPTY_QUEUED_MESSAGES;
+    return (
+      sessions.get(currentSessionId)?.queuedMessages ?? EMPTY_QUEUED_MESSAGES
+    );
   });
 
 // Webapp refresh selector

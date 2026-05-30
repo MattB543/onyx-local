@@ -495,6 +495,7 @@ lxml==6.1.0
     #   justext
     #   lxml-html-clean
     #   markitdown
+    #   python-docx
     #   python-pptx
     #   python3-saml
     #   trafilatura
@@ -760,7 +761,6 @@ pyopenssl==24.3.0
     # via
     #   aioquic
     #   mitmproxy
-pypandoc-binary==1.16.2
 pyparsing==3.2.0
     # via
     #   httplib2
@@ -787,6 +787,7 @@ python-dateutil==2.9.0.post0
     #   kubernetes
     #   opensearch-py
     #   pandas
+python-docx==1.1.2
 python-dotenv==1.2.2
     # via
     #   braintrust
@@ -1053,6 +1054,7 @@ typing-extensions==4.15.0
     #   pydantic-core
     #   pyee
     #   pygithub
+    #   python-docx
     #   python-oxmsg
     #   referencing
     #   simple-salesforce
