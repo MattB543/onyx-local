@@ -57,7 +57,7 @@ def store_plaintext(file_id: str, plaintext_content: str) -> bool:
         )
         return True
     except Exception as e:
-        logger.warning(f"Failed to store plaintext for {file_id}: {e}")
+        logger.warning("Failed to store plaintext for %s: %s", file_id, e)
         return False
 
 
@@ -136,7 +136,7 @@ def load_user_file(file_id: UUID, db_session: Session) -> InMemoryChatFile:
         status = "plaintext"
         return chat_file
     except Exception as e:
-        logger.warning(f"Failed to load plaintext for user file {user_file.id}: {e}")
+        logger.warning("Failed to load plaintext for user file %s: %s", user_file.id, e)
         # Fall back to original file if plaintext not available
         file_io = file_store.read_file(user_file.file_id, mode="b")
 
@@ -150,7 +150,10 @@ def load_user_file(file_id: UUID, db_session: Session) -> InMemoryChatFile:
         return chat_file
     finally:
         logger.debug(
-            f"load_user_file finished: file_id={user_file.file_id} chat_file_type={chat_file_type} status={status}"
+            "load_user_file finished: file_id=%s chat_file_type=%s status=%s",
+            user_file.file_id,
+            chat_file_type,
+            status,
         )
 
 

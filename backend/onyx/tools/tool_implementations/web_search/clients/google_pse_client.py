@@ -90,7 +90,11 @@ class GooglePSEClient(WebSearchProvider):
                     try:
                         published_date = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
                     except ValueError:
-                        logger.debug(f"Failed to parse published_date '{published_str}' for link {link}")
+                        logger.debug(
+                            "Failed to parse published_date '%s' for link %s",
+                            published_str,
+                            link,
+                        )
                         published_date = None
 
             # Extract image URL from pagemap

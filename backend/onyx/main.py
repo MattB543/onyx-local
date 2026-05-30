@@ -77,6 +77,7 @@ from onyx.server.documents.connector import router as connector_router
 from onyx.server.documents.credential import router as credential_router
 from onyx.server.documents.document import router as document_router
 from onyx.server.documents.standard_oauth import router as standard_oauth_router
+from onyx.server.documents.targeted_reindex import router as targeted_reindex_router
 from onyx.server.features.build.api.api import public_build_router
 from onyx.server.features.build.api.api import router as build_router
 from onyx.server.features.crm.api import router as crm_router
@@ -196,19 +197,19 @@ setup_uvicorn_logger(shared_file_handlers=file_handlers)
 def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, RequestValidationError):
         logger.error(
-            f"Unexpected exception type in validation_exception_handler - {type(exc)}"
+            "Unexpected exception type in validation_exception_handler - %s", type(exc)
         )
         raise exc
 
     exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
-    logger.exception(f"{request}: {exc_str}")
+    logger.exception("%s: %s", request, exc_str)
     content = {"status_code": 422, "message": exc_str, "data": None}
     return JSONResponse(content=content, status_code=422)
 
 
 def value_error_handler(_: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, ValueError):
-        logger.error(f"Unexpected exception type in value_error_handler - {type(exc)}")
+        logger.error("Unexpected exception type in value_error_handler - %s", type(exc))
         raise exc
 
     try:
@@ -323,7 +324,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     # Set recursion limit
     if SYSTEM_RECURSION_LIMIT is not None:
         sys.setrecursionlimit(SYSTEM_RECURSION_LIMIT)
-        logger.notice(f"System recursion limit set to {SYSTEM_RECURSION_LIMIT}")
+        logger.notice("System recursion limit set to %s", SYSTEM_RECURSION_LIMIT)
 
     SqlEngine.set_app_name(POSTGRES_WEB_APP_NAME)
 
@@ -420,11 +421,11 @@ def log_http_error(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, BasicAuthenticationError):
         # For BasicAuthenticationError, just log a brief message without stack trace
         # (almost always spammy)
-        logger.debug(f"Authentication failed: {str(exc)}")
+        logger.debug("Authentication failed: %s", str(exc))
 
     elif status_code == 404 and request.url.path == "/metrics":
         # Log 404 errors for the /metrics endpoint with debug level
-        logger.debug(f"404 error for /metrics endpoint: {str(exc)}")
+        logger.debug("404 error for /metrics endpoint: %s", str(exc))
 
     elif status_code >= 400:
         error_msg = f"{str(exc)}\n"
@@ -485,6 +486,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, input_prompt_router)
     include_router_with_global_prefix_prepended(application, admin_input_prompt_router)
     include_router_with_global_prefix_prepended(application, cc_pair_router)
+    include_router_with_global_prefix_prepended(application, targeted_reindex_router)
     include_router_with_global_prefix_prepended(application, projects_router)
     include_router_with_global_prefix_prepended(application, public_build_router)
     include_router_with_global_prefix_prepended(application, build_router)
@@ -617,7 +619,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
             if "offline_access" not in oidc_scopes:
                 oidc_scopes.append("offline_access")
         except Exception as e:
-            logger.warning(f"Error configuring OIDC scopes: {e}")
+            logger.warning("Error configuring OIDC scopes: %s", e)
             # Fall back to default scopes if there's an error
             oidc_scopes = BASE_SCOPES
 
@@ -722,7 +724,10 @@ app = fetch_versioned_implementation(module="onyx.main", attribute="get_applicat
 
 if __name__ == "__main__":
     logger.notice(
-        f"Starting Onyx Backend version {__version__} on http://{APP_HOST}:{str(APP_PORT)}/"
+        "Starting Onyx Backend version %s on http://%s:%s/",
+        __version__,
+        APP_HOST,
+        str(APP_PORT),
     )
 
     if global_version.is_ee_version():

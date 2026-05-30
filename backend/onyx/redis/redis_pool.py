@@ -125,6 +125,54 @@ class TenantRedis(redis.Redis):
 
         return wrapper
 
+    def _prefix_keys_arg(self, keys: Any) -> Any:
+        # BLPOP/BRPOP accept either a single key or an iterable of keys.
+        if isinstance(keys, (str, bytes, memoryview)):
+            return self._prefixed(keys)
+        return [self._prefixed(k) for k in keys]
+
+    def _prefix_blpop(self, method: Callable) -> Callable:
+        @functools.wraps(method)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if "keys" in kwargs:
+                kwargs["keys"] = self._prefix_keys_arg(kwargs["keys"])
+            elif len(args) > 0:
+                args = (self._prefix_keys_arg(args[0]),) + args[1:]
+            result = method(*args, **kwargs)
+            if result is None:
+                return None
+            # BLPOP/BRPOP returns (key, value). Strip our prefix from the key
+            # so callers see the same name they passed in, matching the symmetry
+            # of _prefix_scan_iter.
+            key, value = result[0], result[1]
+            if isinstance(key, bytes):
+                prefix_bytes = f"{self.tenant_id}:".encode()
+                if key.startswith(prefix_bytes):
+                    key = key[len(prefix_bytes) :]
+            elif isinstance(key, str):
+                prefix_str = f"{self.tenant_id}:"
+                if key.startswith(prefix_str):
+                    key = key[len(prefix_str) :]
+            return (key, value)
+
+        return wrapper
+
+    def _prefix_eval(self, method: Callable) -> Callable:
+        # EVAL/EVALSHA signature: (script, numkeys, *keys_and_args). The next
+        # ``numkeys`` positional args after ``numkeys`` are keys; everything
+        # else (script, numkeys, trailing args) is left untouched.
+        @functools.wraps(method)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if len(args) < 2 or not isinstance(args[1], int) or args[1] <= 0:
+                return method(*args, **kwargs)
+            numkeys = args[1]
+            keys_end = 2 + numkeys
+            prefixed = tuple(self._prefixed(k) for k in args[2:keys_end])
+            new_args = args[:2] + prefixed + args[keys_end:]
+            return method(*new_args, **kwargs)
+
+        return wrapper
+
     def __getattribute__(self, item: str) -> Any:
         original_attr = super().__getattribute__(item)
         methods_to_wrap = [
@@ -156,14 +204,24 @@ class TenantRedis(redis.Redis):
             "zscore",
             "zcard",
             "hexists",
-            "hset",
             "hdel",
             "ttl",
             "pttl",
+            "expire",
+            "expireat",
+            "pexpire",
+            "pexpireat",
+            "hmget",
+            "incr",
+            "rpush",
         ]  # Regular methods that need simple prefixing
 
         if item == "scan_iter" or item == "sscan_iter":
             return self._prefix_scan_iter(original_attr)
+        elif item in ("blpop", "brpop"):
+            return self._prefix_blpop(original_attr)
+        elif item in ("eval", "evalsha"):
+            return self._prefix_eval(original_attr)
         elif item in methods_to_wrap and callable(original_attr):
             return self._prefix_method(original_attr)
         return original_attr
@@ -468,7 +526,7 @@ async def retrieve_auth_token_data(token: str) -> dict | None:
         token_data_str = await redis.get(redis_key)
 
         if not token_data_str:
-            logger.debug(f"Token key {redis_key} not found or expired in Redis")
+            logger.debug("Token key %s not found or expired in Redis", redis_key)
             return None
 
         return json.loads(token_data_str)
@@ -476,7 +534,7 @@ async def retrieve_auth_token_data(token: str) -> dict | None:
         logger.error("Error decoding token data from Redis")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error in retrieve_auth_token_data: {str(e)}")
+        logger.error("Unexpected error in retrieve_auth_token_data: %s", str(e))
         raise ValueError(f"Unexpected error in retrieve_auth_token_data: {str(e)}")
 
 
@@ -526,7 +584,7 @@ async def store_ws_token(token: str, user_id: str) -> None:
     if new_count > WS_TOKEN_RATE_LIMIT_MAX:
         # Over limit — decrement back since we won't use this slot
         await redis.decr(rate_limit_key)
-        logger.warning(f"WS token rate limit exceeded for user {user_id}")
+        logger.warning("WS token rate limit exceeded for user %s", user_id)
         raise WsTokenRateLimitExceeded(
             f"Rate limit exceeded. Maximum {WS_TOKEN_RATE_LIMIT_MAX} tokens per minute."
         )
@@ -564,7 +622,7 @@ async def retrieve_ws_token_data(token: str) -> dict | None:
         logger.error("Error decoding WS token data from Redis")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error in retrieve_ws_token_data: {str(e)}")
+        logger.error("Unexpected error in retrieve_ws_token_data: %s", str(e))
         return None
 
 
@@ -584,11 +642,11 @@ def redis_lock_dump(lock: RedisLock, r: Redis) -> None:
         remote_token = None
 
     logger.warning(
-        f"RedisLock diagnostic: "
-        f"name={name} "
-        f"locked={locked} "
-        f"owned={owned} "
-        f"local_token={local_token} "
-        f"remote_token={remote_token} "
-        f"ttl={ttl}"
+        "RedisLock diagnostic: name=%s locked=%s owned=%s local_token=%s remote_token=%s ttl=%s",
+        name,
+        locked,
+        owned,
+        local_token,
+        remote_token,
+        ttl,
     )
