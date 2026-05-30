@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useMemo, useState } from "react";
 
 import { CrmContactStage, exportCrmContacts } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
@@ -18,7 +18,7 @@ import { EmptyMessageCard } from "@opal/components";
 import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
@@ -42,7 +42,7 @@ import {
 } from "@opal/icons";
 import CopyEmailButton from "@/refresh-pages/crm/components/CopyEmailButton";
 import { Section } from "@/layouts/general-layouts";
-import Popover from "@/refresh-components/Popover";
+import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 
@@ -213,12 +213,12 @@ export default function CrmContactsPage() {
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto] md:items-center">
             <InputTypeIn
               value={searchText}
-              onChange={(event) => {
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
                 setSearchText(event.target.value);
                 setPageNum(0);
               }}
               placeholder="Search contacts"
-              leftSearchIcon
+              searchIcon
             />
 
             <InputSelect
@@ -279,7 +279,7 @@ export default function CrmContactsPage() {
               options={orgOptions}
               placeholder="Filter by org"
               strict
-              leftSearchIcon
+              searchIcon
               isError={false}
               disabled={!!organizationIdFilter}
             />

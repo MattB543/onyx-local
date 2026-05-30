@@ -9,7 +9,6 @@ import { SWR_KEYS } from "@/lib/swr-keys";
 import { errorHandlingFetcher } from "@/lib/fetcher";
 import { SettingsLayouts } from "@opal/layouts";
 import { Section } from "@/layouts/general-layouts";
-import Separator from "@/refresh-components/Separator";
 import SimpleCollapsible from "@/refresh-components/SimpleCollapsible";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import { InputTypeIn } from "@opal/components";
@@ -1222,7 +1221,7 @@ export default function ChatPreferencesPage() {
             </SimpleCollapsible.Content>
           </SimpleCollapsible>
 
-          <Separator noPadding />
+          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
           <SimpleCollapsible defaultOpen={false}>
             <SimpleCollapsible.Header
               title="CRM Settings"

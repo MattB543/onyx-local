@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import {
   addTagToContact,
@@ -13,8 +13,8 @@ import {
 } from "@/app/app/crm/crmService";
 import { cn } from "@/lib/utils";
 import Button from "@/refresh-components/buttons/Button";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
-import Popover from "@/refresh-components/Popover";
+import { InputTypeIn } from "@opal/components";
+import { Popover } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgPlus, SvgTag, SvgX } from "@opal/icons";
@@ -162,9 +162,11 @@ export default function TagManager({
             <div className="flex w-full flex-col gap-2 p-1">
               <InputTypeIn
                 value={tagSearch}
-                onChange={(event) => setTagSearch(event.target.value)}
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  setTagSearch(event.target.value)
+                }
                 placeholder="Search or create tag..."
-                leftSearchIcon
+                searchIcon
                 autoFocus
               />
 

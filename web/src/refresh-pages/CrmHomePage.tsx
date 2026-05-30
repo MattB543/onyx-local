@@ -10,7 +10,7 @@ import {
   exportCrmOrganizations,
 } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
@@ -18,7 +18,7 @@ import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import Popover from "@/refresh-components/Popover";
+import { Popover } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";

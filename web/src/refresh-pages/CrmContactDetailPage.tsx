@@ -18,7 +18,7 @@ import {
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { toast } from "@/hooks/useToast";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";

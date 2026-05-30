@@ -150,7 +150,7 @@ export default function OrganizationPicker({
         placeholder={placeholder}
         strict
         disabled={disabled}
-        leftSearchIcon
+        searchIcon
       />
       {isLoading && (
         <Text as="p" secondaryBody text03 className="text-sm">

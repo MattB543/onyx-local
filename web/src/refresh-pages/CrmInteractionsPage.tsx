@@ -9,7 +9,7 @@ import {
   exportCrmInteractions,
 } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
@@ -31,7 +31,7 @@ import {
   SvgUploadCloud,
 } from "@opal/icons";
 import { Section } from "@/layouts/general-layouts";
-import Popover from "@/refresh-components/Popover";
+import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 

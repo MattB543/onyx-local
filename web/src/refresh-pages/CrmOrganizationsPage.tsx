@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useMemo, useState } from "react";
 
 import {
   CrmOrganizationType,
   exportCrmOrganizations,
 } from "@/app/app/crm/crmService";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import { EmptyMessageCard } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import InputTypeIn from "@/refresh-components/inputs/InputTypeIn";
+import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import CreateOrganizationModal from "@/refresh-pages/crm/components/CreateOrganizationModal";
@@ -37,7 +37,7 @@ import {
   SvgUploadCloud,
 } from "@opal/icons";
 import { Section } from "@/layouts/general-layouts";
-import Popover from "@/refresh-components/Popover";
+import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 
@@ -151,12 +151,12 @@ export default function CrmOrganizationsPage() {
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
             <InputTypeIn
               value={searchText}
-              onChange={(event) => {
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
                 setSearchText(event.target.value);
                 setPageNum(0);
               }}
               placeholder="Search organizations"
-              leftSearchIcon
+              searchIcon
             />
 
             <InputSelect

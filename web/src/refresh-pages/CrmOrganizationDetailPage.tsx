@@ -15,7 +15,7 @@ import {
 } from "@/app/app/crm/crmService";
 import { toast } from "@/hooks/useToast";
 import * as AppLayouts from "@/layouts/app-layouts";
-import * as SettingsLayouts from "@/layouts/settings-layouts";
+import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
