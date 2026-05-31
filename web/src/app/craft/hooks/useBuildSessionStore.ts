@@ -38,7 +38,6 @@ import {
 } from "@/app/craft/types/streamingTypes";
 import { parsePacket } from "@/app/craft/utils/parsePacket";
 import { genId } from "@/app/craft/utils/streamItemHelpers";
-import { getDemoDataEnabled } from "@/app/craft/v1/constants";
 
 /**
  * Convert loaded messages (with message_metadata) to StreamItem[] format.
