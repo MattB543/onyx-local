@@ -18,12 +18,11 @@ from onyx.custom_jobs.runner import execute_custom_job_run
 from onyx.db.custom_jobs import claim_due_scheduled_jobs
 from onyx.db.custom_jobs import claim_trigger_events_for_runs
 from onyx.db.custom_jobs import cleanup_custom_job_history
-from onyx.db.custom_jobs import mark_stale_started_runs_failed
 from onyx.db.custom_jobs import fetch_pending_triggered_jobs
+from onyx.db.custom_jobs import mark_stale_started_runs_failed
 from onyx.db.engine.sql_engine import get_session_with_current_tenant
 from onyx.redis.redis_pool import get_redis_client
 from onyx.redis.redis_pool import redis_lock_dump
-
 
 # Drop an enqueued custom-job run if a dead/backed-up consumer hasn't picked it up
 # within 15 min; the beat-driven check_for_custom_jobs + stale-run sweeper re-claims
@@ -140,7 +139,9 @@ def check_for_custom_job_trigger_events(self: Task, *, tenant_id: str) -> int | 
         task_logger.info("check_for_custom_job_trigger_events soft time limit reached.")
         return None
     except Exception:
-        task_logger.exception("Unexpected error in check_for_custom_job_trigger_events.")
+        task_logger.exception(
+            "Unexpected error in check_for_custom_job_trigger_events."
+        )
         return None
     finally:
         if locked:
@@ -259,7 +260,10 @@ def cleanup_custom_job_history_task(self: Task, *, tenant_id: str) -> int | None
     bind=True,
 )
 def run_custom_job(
-    self: Task, *, run_id: str, tenant_id: str  # noqa: ARG001
+    self: Task,  # noqa: ARG001
+    *,
+    run_id: str,
+    tenant_id: str,
 ) -> None:
     if not ENABLE_CUSTOM_JOBS:
         return None
@@ -270,4 +274,3 @@ def run_custom_job(
             tenant_id=tenant_id,
             max_runtime_seconds=JOB_TIMEOUT,
         )
-

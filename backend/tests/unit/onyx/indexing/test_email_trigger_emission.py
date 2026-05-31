@@ -4,22 +4,18 @@ import hashlib
 from datetime import datetime
 from datetime import timezone
 from types import SimpleNamespace
-from uuid import UUID
-from uuid import uuid4
 from unittest.mock import MagicMock
 from unittest.mock import patch
+from uuid import UUID
+from uuid import uuid4
 
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.models import BasicExpertInfo
 from onyx.connectors.models import Document
 from onyx.connectors.models import IndexAttemptMetadata
 from onyx.connectors.models import TextSection
-from onyx.indexing.adapters.document_indexing_adapter import (
-    _build_email_crm_dedupe_key,
-)
-from onyx.indexing.adapters.document_indexing_adapter import (
-    _extract_document_text,
-)
+from onyx.indexing.adapters.document_indexing_adapter import _build_email_crm_dedupe_key
+from onyx.indexing.adapters.document_indexing_adapter import _extract_document_text
 from onyx.indexing.adapters.document_indexing_adapter import (
     _get_email_crm_custom_job_uuid,
 )
@@ -95,7 +91,9 @@ def test_build_email_crm_dedupe_key_gmail_uses_doc_updated_at() -> None:
     )
 
 
-def test_build_email_crm_dedupe_key_gmail_fallback_hash_when_missing_updated_at() -> None:
+def test_build_email_crm_dedupe_key_gmail_fallback_hash_when_missing_updated_at() -> (
+    None
+):
     doc = _make_doc(doc_id="gmail-thread-2", source=DocumentSource.GMAIL)
     expected_hash = hashlib.sha256(doc.id.encode()).hexdigest()[:12]
     assert _build_email_crm_dedupe_key(doc) == f"gmail:{doc.id}:{expected_hash}"
@@ -189,13 +187,12 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
     assert payload["body"]
     assert payload["source"] == "gmail"
 
-
-# NOTE: sender-domain allowlist filtering was intentionally removed from the
-# indexing adapter (see comment in `_emit_email_crm_trigger_events`): the
-# downstream CRM prompt handles internal-vs-external classification itself,
-# and early filtering would prevent external-lead emails from ever reaching
-# the CRM pipeline. The test that asserted the filter's presence was
-# deleted alongside the filter.
+    # NOTE: sender-domain allowlist filtering was intentionally removed from the
+    # indexing adapter (see comment in `_emit_email_crm_trigger_events`): the
+    # downstream CRM prompt handles internal-vs-external classification itself,
+    # and early filtering would prevent external-lead emails from ever reaching
+    # the CRM pipeline. The test that asserted the filter's presence was
+    # deleted alongside the filter.
     db_session.commit.assert_called_once()
 
 
@@ -333,7 +330,9 @@ def test_get_email_crm_custom_job_uuid_invalid_value_returns_none() -> None:
                 "onyx.indexing.adapters.document_indexing_adapter.EMAIL_CRM_CUSTOM_JOB_ID",
                 "definitely-not-a-uuid",
             ),
-            patch("onyx.indexing.adapters.document_indexing_adapter.logger.error") as mock_error,
+            patch(
+                "onyx.indexing.adapters.document_indexing_adapter.logger.error"
+            ) as mock_error,
         ):
             parsed = _get_email_crm_custom_job_uuid()
             assert parsed is None

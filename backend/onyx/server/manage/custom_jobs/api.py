@@ -12,8 +12,8 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import Query
 from fastapi import Response
-from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as jsonschema_validate
+from jsonschema import ValidationError as JsonSchemaValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,8 +34,8 @@ from onyx.db.custom_jobs import add_custom_job_audit_log
 from onyx.db.custom_jobs import compute_next_run_at
 from onyx.db.custom_jobs import create_manual_run_if_allowed
 from onyx.db.custom_jobs import fetch_custom_job
-from onyx.db.custom_jobs import list_custom_job_runs
 from onyx.db.custom_jobs import list_custom_job_run_steps
+from onyx.db.custom_jobs import list_custom_job_runs
 from onyx.db.custom_jobs import list_custom_jobs
 from onyx.db.custom_jobs import RunListFilters
 from onyx.db.engine.sql_engine import get_session
@@ -45,36 +45,16 @@ from onyx.db.models import CustomJob
 from onyx.db.models import CustomJobRun
 from onyx.db.models import User
 from onyx.db.slack_bot import fetch_slack_bot
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobCreateRequest,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobDryRunResponse,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobManualTriggerResponse,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobRunStepView,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobRunView,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobStepCatalogItem,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobUpdateRequest,
-)
-from onyx.server.manage.custom_jobs.models import (
-    CustomJobView,
-)
-from onyx.server.manage.custom_jobs.models import (
-    PaginatedCustomJobRuns,
-)
-from onyx.server.manage.custom_jobs.models import (
-    PaginatedCustomJobRunSteps,
-)
+from onyx.server.manage.custom_jobs.models import CustomJobCreateRequest
+from onyx.server.manage.custom_jobs.models import CustomJobDryRunResponse
+from onyx.server.manage.custom_jobs.models import CustomJobManualTriggerResponse
+from onyx.server.manage.custom_jobs.models import CustomJobRunStepView
+from onyx.server.manage.custom_jobs.models import CustomJobRunView
+from onyx.server.manage.custom_jobs.models import CustomJobStepCatalogItem
+from onyx.server.manage.custom_jobs.models import CustomJobUpdateRequest
+from onyx.server.manage.custom_jobs.models import CustomJobView
+from onyx.server.manage.custom_jobs.models import PaginatedCustomJobRuns
+from onyx.server.manage.custom_jobs.models import PaginatedCustomJobRunSteps
 from onyx.utils.logger import setup_logger
 from shared_configs.contextvars import get_current_tenant_id
 
@@ -123,7 +103,9 @@ def _validate_schedule_fields(
     try:
         ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError as e:
-        raise HTTPException(status_code=400, detail=f"Unknown timezone: {timezone_name}") from e
+        raise HTTPException(
+            status_code=400, detail=f"Unknown timezone: {timezone_name}"
+        ) from e
 
     if trigger_type == CustomJobTriggerType.WEEKLY and (
         day_of_week is None or day_of_week < 0 or day_of_week > 6
@@ -196,7 +178,9 @@ def _validate_workflow_and_step_configs(
     job_config: dict[str, Any],
 ) -> WorkflowDefinition:
     if workflow_key not in list_workflow_keys():
-        raise HTTPException(status_code=400, detail=f"Unknown workflow_key: {workflow_key}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown workflow_key: {workflow_key}"
+        )
 
     try:
         workflow = build_workflow_definition(
@@ -462,9 +446,7 @@ def update_custom_job_endpoint(
     workflow_key = str(updates.get("workflow_key", job.workflow_key))
     job_config = updates.get("job_config", job.job_config or {})
 
-    trigger_type = CustomJobTriggerType(
-        updates.get("trigger_type", job.trigger_type)
-    )
+    trigger_type = CustomJobTriggerType(updates.get("trigger_type", job.trigger_type))
     enabled = bool(updates["enabled"]) if "enabled" in updates else job.enabled
 
     day_of_week = updates.get("day_of_week", job.day_of_week)
@@ -487,7 +469,9 @@ def update_custom_job_endpoint(
     )
     _validate_trigger_source_config(
         trigger_type=trigger_type,
-        trigger_source_config=updates.get("trigger_source_config", job.trigger_source_config),
+        trigger_source_config=updates.get(
+            "trigger_source_config", job.trigger_source_config
+        ),
     )
     _validate_workflow_and_step_configs(
         workflow_key=workflow_key,

@@ -31,7 +31,6 @@ from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 
-
 # The six CRM tools that make up the fork's CRM feature.
 CRM_TOOLS = [
     CrmSearchTool,

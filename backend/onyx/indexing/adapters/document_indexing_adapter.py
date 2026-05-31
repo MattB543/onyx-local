@@ -136,7 +136,6 @@ def _extract_sender_email(doc: Document) -> str | None:
     return None
 
 
-
 class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
     """Default adapter: handles DB prep, locking, metadata enrichment, and finalize.
 
@@ -370,9 +369,7 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
         handled at the DB level via a unique constraint on (custom_job_id, dedupe_key).
         """
         email_docs = [
-            doc
-            for doc in context.updatable_docs
-            if doc.source in _EMAIL_SOURCES
+            doc for doc in context.updatable_docs if doc.source in _EMAIL_SOURCES
         ]
         if not email_docs:
             return

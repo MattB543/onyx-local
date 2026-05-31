@@ -13,7 +13,6 @@ Revises: a9f1c2d3e4f5
 Create Date: 2026-02-22 16:40:00.000000
 """
 
-
 # revision identifiers, used by Alembic.
 revision = "b6c7d8e9f0a2"
 down_revision = "a9f1c2d3e4f5"
@@ -29,4 +28,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # No-op compatibility placeholder.
     pass
-

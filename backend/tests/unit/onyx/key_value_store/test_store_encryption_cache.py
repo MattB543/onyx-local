@@ -18,8 +18,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from onyx.key_value_store.store import REDIS_KEY_PREFIX
 from onyx.key_value_store.store import PgRedisKVStore
+from onyx.key_value_store.store import REDIS_KEY_PREFIX
 
 
 @contextmanager
@@ -127,7 +127,9 @@ def test_load_plain_value_is_cached(
     store, cache, db_session = patched_store
     cache.get.return_value = None  # force a DB read
 
-    db_obj = _FakeKVStore(key="feature-flag", value={"enabled": True}, encrypted_value=None)
+    db_obj = _FakeKVStore(
+        key="feature-flag", value={"enabled": True}, encrypted_value=None
+    )
     db_session.query.return_value.filter_by.return_value.first.return_value = db_obj
 
     value = store.load("feature-flag")

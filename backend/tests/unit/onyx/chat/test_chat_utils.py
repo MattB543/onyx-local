@@ -189,8 +189,9 @@ def test_load_chat_file_uses_raw_chat_upload_token_count() -> None:
 
     with (
         patch("onyx.chat.chat_utils.get_default_file_store", return_value=file_store),
-        patch("onyx.chat.chat_utils.get_chat_upload_token_count", return_value=17)
-        as mock_get_chat_upload_token_count,
+        patch(
+            "onyx.chat.chat_utils.get_chat_upload_token_count", return_value=17
+        ) as mock_get_chat_upload_token_count,
     ):
         loaded_file = load_chat_file(
             {
@@ -218,21 +219,27 @@ def test_load_chat_file_rewinds_stream_before_extracting_text() -> None:
     db_session = MagicMock()
     file_store = MagicMock()
 
-    def _read_file_side_effect(file_id: str, mode: str = "b") -> BytesIO:
+    def _read_file_side_effect(file_id: str, mode: str = "b") -> BytesIO:  # noqa: ARG001
         if file_id == "raw-file-1":
             return BytesIO(b"hello world")
         raise FileNotFoundError(file_id)
 
     file_store.read_file.side_effect = _read_file_side_effect
 
+    # mock signature must match extract_file_text's keyword args even though the
+    # mock body only needs `file`.
+    def _extract_file_text_side_effect(
+        file: BytesIO, file_name: str, break_on_unprocessable: bool
+    ) -> str:
+        del file_name, break_on_unprocessable  # accepted to match signature
+        return file.read().decode("utf-8")
+
     with (
         patch("onyx.chat.chat_utils.get_default_file_store", return_value=file_store),
         patch("onyx.chat.chat_utils.get_chat_upload_token_count", return_value=None),
         patch(
             "onyx.chat.chat_utils.extract_file_text",
-            side_effect=lambda file, file_name, break_on_unprocessable: file.read().decode(
-                "utf-8"
-            ),
+            side_effect=_extract_file_text_side_effect,
         ),
         patch("onyx.chat.chat_utils.store_plaintext"),
         patch("onyx.chat.chat_utils.estimate_token_count_for_text", return_value=3),
