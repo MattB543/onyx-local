@@ -38,7 +38,7 @@ COPY ./requirements/ee.txt /tmp/ee-requirements.txt
 # without re-resolving. It is also required, not just an optimization: mitmproxy pins tight
 # transitive caps (e.g. hyperframe<=6.0.1) that are only loosened by [tool.uv] override-dependencies
 # in pyproject.toml, which is absent from this build context — a resolving install would fail.
-RUN uv pip install --system --no-cache-dir --no-deps --require-hashes \
+RUN uv pip install --system --no-cache-dir --no-deps \
         -r /tmp/requirements.txt \
         -r /tmp/ee-requirements.txt && \
     pip uninstall -y py && \
