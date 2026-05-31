@@ -244,6 +244,87 @@ def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
     db_session.commit.assert_called_once()
 
 
+def test_post_index_passes_its_db_session_to_trigger_creation() -> None:
+    """Regression guard for the upstream DocumentIndex interface refactor.
+
+    Upstream removed ``db_session`` from ``DocumentIndexingBatchAdapter.__init__``
+    and now passes a short-lived session INTO ``post_index(..., db_session=...)``.
+    The email-CRM trigger emission MUST use that passed-in session. If someone
+    reintroduces an adapter-owned ``self.db_session`` (or wires the wrong
+    session through), indexing crashes in production.
+
+    This test asserts:
+      * the adapter does NOT hold its own ``self.db_session`` attribute, and
+      * ``create_trigger_event`` (the trigger-event persistence call) receives
+        the EXACT session object that was passed to ``post_index``.
+    """
+    sentinel_session = MagicMock(name="post_index_db_session")
+    adapter = _make_adapter()
+
+    # The sync's contract: session ownership moved out of __init__.
+    assert not hasattr(adapter, "db_session"), (
+        "adapter must not own a db_session; it is passed into post_index()"
+    )
+
+    email_doc = _make_doc(
+        doc_id="gmail-thread-77",
+        source=DocumentSource.GMAIL,
+        doc_updated_at=datetime(2026, 3, 1, 9, 0, tzinfo=timezone.utc),
+    )
+    context = DocumentBatchPrepareContext(
+        updatable_docs=[email_doc],
+        id_to_boost_map={},
+    )
+
+    captured_sessions: list[object] = []
+
+    def _capture_session(**kwargs: object) -> SimpleNamespace:
+        captured_sessions.append(kwargs["db_session"])
+        return SimpleNamespace(id=uuid4())
+
+    with (
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_updated_at__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_last_modified__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_docs_chunk_count__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.mark_document_as_indexed_for_cc_pair__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.update_chunk_boost_components__no_commit"
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter._get_email_crm_custom_job_uuid",
+            return_value=UUID("22222222-2222-2222-2222-222222222222"),
+        ),
+        patch(
+            "onyx.indexing.adapters.document_indexing_adapter.create_trigger_event",
+            side_effect=_capture_session,
+        ) as mock_create_trigger_event,
+    ):
+        adapter.post_index(
+            context=context,
+            updatable_chunk_data=[],
+            filtered_documents=[email_doc],
+            enrichment=_make_result(),
+            db_session=sentinel_session,
+        )
+
+    # The trigger-event persistence used the session passed into post_index,
+    # not some adapter-owned or otherwise-constructed session.
+    mock_create_trigger_event.assert_called_once()
+    assert captured_sessions == [sentinel_session]
+    assert mock_create_trigger_event.call_args.kwargs["db_session"] is sentinel_session
+
+    # And the final commit happens on that same session.
+    sentinel_session.commit.assert_called_once()
+
+
 def test_get_email_crm_custom_job_uuid_invalid_value_returns_none() -> None:
     _get_email_crm_custom_job_uuid.cache_clear()
     try:
