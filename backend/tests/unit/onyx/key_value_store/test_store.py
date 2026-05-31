@@ -25,7 +25,9 @@ def test_store_encrypted_value_never_writes_plaintext_to_redis(
     )
 
     kv_store = PgRedisKVStore(cache=redis_client)
-    kv_store.store("secret-key", "sensitive", encrypt=True)
+    # encrypted_value is an EncryptedJson column (dict-only since upstream #9177),
+    # so the stored payload must be a dict — this still exercises the cache guard.
+    kv_store.store("secret-key", {"value": "sensitive"}, encrypt=True)
 
     redis_client.set.assert_not_called()
     redis_client.delete.assert_called_once()

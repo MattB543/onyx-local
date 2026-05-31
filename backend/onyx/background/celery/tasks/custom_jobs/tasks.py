@@ -25,12 +25,20 @@ from onyx.redis.redis_pool import get_redis_client
 from onyx.redis.redis_pool import redis_lock_dump
 
 
+# Drop an enqueued custom-job run if a dead/backed-up consumer hasn't picked it up
+# within 15 min; the beat-driven check_for_custom_jobs + stale-run sweeper re-claims
+# any genuinely-due work. Mirrors scheduled_tasks.RUN_EXPIRES_SECONDS (AGENTS.md: every
+# enqueue must set expires= so a dead consumer can't grow the queue unbounded).
+RUN_CUSTOM_JOB_EXPIRES_SECONDS = 15 * 60
+
+
 def _enqueue_run_task(task: Task, run_id: UUID, tenant_id: str) -> None:
     task.app.send_task(
         OnyxCeleryTask.RUN_CUSTOM_JOB,
         kwargs={"run_id": str(run_id), "tenant_id": tenant_id},
         queue=OnyxCeleryQueues.CSV_GENERATION,
         priority=OnyxCeleryPriority.MEDIUM,
+        expires=RUN_CUSTOM_JOB_EXPIRES_SECONDS,
     )
 
 

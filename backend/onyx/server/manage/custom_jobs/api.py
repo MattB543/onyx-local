@@ -84,6 +84,11 @@ admin_router = APIRouter(prefix="/admin/custom-jobs")
 
 _ALLOWED_RUN_SORTS = {"-started_at", "started_at", "-created_at", "created_at"}
 
+# Drop a manually-triggered run if a dead/backed-up consumer hasn't started it within
+# 15 min (AGENTS.md: every enqueue must set expires=). Matches the dispatcher's
+# RUN_CUSTOM_JOB_EXPIRES_SECONDS and scheduled_tasks.RUN_EXPIRES_SECONDS.
+RUN_CUSTOM_JOB_EXPIRES_SECONDS = 15 * 60
+
 
 def _ensure_custom_jobs_enabled() -> None:
     if not ENABLE_CUSTOM_JOBS:
@@ -685,6 +690,7 @@ def manual_trigger_custom_job_endpoint(
             },
             queue=OnyxCeleryQueues.CSV_GENERATION,
             priority=OnyxCeleryPriority.MEDIUM,
+            expires=RUN_CUSTOM_JOB_EXPIRES_SECONDS,
         )
     except Exception as e:
         failed_run = db_session.scalar(
