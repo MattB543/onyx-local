@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from onyx.access.access import collect_user_file_access
 from onyx.access.access import get_access_for_user_files_impl
+from onyx.access.access import user_can_access_chat_file
 from onyx.access.utils import prefix_user_email
 from onyx.configs.constants import PUBLIC_DOC_PAT
 
@@ -161,3 +162,17 @@ class TestGetAccessForUserFiles:
         assert access.is_public is True
         acl = access.to_acl()
         assert PUBLIC_DOC_PAT in acl
+
+
+class TestUserCanAccessChatFile:
+    def test_crm_contact_profile_picture_is_accessible(self) -> None:
+        user = _make_user("crm-user@test.com")
+        db_session = MagicMock()
+        db_session.execute.return_value.first.return_value = None
+        db_session.query.return_value.scalar.side_effect = [
+            False,  # not an owned UserFile
+            False,  # not CHAT_IMAGE_GEN
+            True,  # is a CRM contact profile picture
+        ]
+
+        assert user_can_access_chat_file("crm-file-123", user, db_session) is True

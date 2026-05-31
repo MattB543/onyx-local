@@ -120,6 +120,15 @@ def _mask_string(value: str) -> str:
     return value[:4] + "****" + value[-4:]
 
 
+def _list_bedrock_inference_profiles(bedrock_client: Any) -> list[dict[str, Any]]:
+    """Return all system-defined Bedrock inference profile summaries."""
+    inference_profiles: list[dict[str, Any]] = []
+    paginator = bedrock_client.get_paginator("list_inference_profiles")
+    for page in paginator.paginate(typeEquals="SYSTEM_DEFINED"):
+        inference_profiles.extend(page.get("inferenceProfileSummaries", []))
+    return inference_profiles
+
+
 def _resolve_api_key(
     api_key: str | None,
     provider_name: str | None,
@@ -1040,9 +1049,7 @@ def get_bedrock_available_models(
         profile_ids: set[str] = set()
         cross_region_models: set[str] = set()
         try:
-            inference_profiles = bedrock.list_inference_profiles(
-                typeEquals="SYSTEM_DEFINED"
-            ).get("inferenceProfileSummaries", [])
+            inference_profiles = _list_bedrock_inference_profiles(bedrock)
             for profile in inference_profiles:
                 if not (profile_id := profile.get("inferenceProfileId")):
                     continue

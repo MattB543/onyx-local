@@ -18,6 +18,7 @@ from onyx.db.models import ChatMessage
 from onyx.db.models import ChatSession
 from onyx.db.models import ChatSessionSharedStatus
 from onyx.db.models import Connector
+from onyx.db.models import CrmContact
 from onyx.db.models import Document
 from onyx.db.models import DocumentByConnectorCredentialPair
 from onyx.db.models import FileRecord
@@ -223,6 +224,8 @@ def user_can_access_chat_file(file_id: str, user: User, db_session: Session) -> 
     - `ChatMessage.files` of a session the user owns or that is shared as
       `ChatSessionSharedStatus.PUBLIC`.
     - `FileRecord` with origin `CHAT_IMAGE_GEN` (see inline TODO).
+    - `FileRecord` with origin `CRM_UPLOAD` when referenced by a CRM contact
+      profile picture.
     - `Document` whose ACL grants access (covers connector-ingested files).
 
     TODO(auth-perf): split `/chat/file` into per-asset-class endpoints so the
@@ -268,6 +271,18 @@ def user_can_access_chat_file(file_id: str, user: User, db_session: Session) -> 
         .exists()
     ).scalar()
     if is_chat_image_gen:
+        return True
+
+    is_crm_profile_picture = db_session.query(
+        select(CrmContact.id)
+        .join(FileRecord, FileRecord.file_id == CrmContact.profile_picture_file_id)
+        .where(
+            CrmContact.profile_picture_file_id == file_id,
+            FileRecord.file_origin == FileOrigin.CRM_UPLOAD,
+        )
+        .exists()
+    ).scalar()
+    if is_crm_profile_picture:
         return True
 
     return _user_can_access_connector_file(file_id, user, db_session)

@@ -40,7 +40,6 @@ from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.utils.logger import setup_logger
 
-
 CRM_UPDATE_ENTITY_TYPES = {"contact", "organization"}
 logger = setup_logger()
 
@@ -149,6 +148,17 @@ class CrmUpdateTool(Tool[None]):
                             "Failed to download CRM contact profile picture during update: %s",
                             e,
                         )
+                        raise ToolCallException(
+                            message=(
+                                "Failed to download CRM contact profile picture "
+                                f"from {normalized_url}: {e}"
+                            ),
+                            llm_facing_message=(
+                                "I could not download the image from "
+                                f"{normalized_url!r}, so the contact was not updated "
+                                "with a new profile picture. Use a reachable image URL."
+                            ),
+                        ) from e
             else:
                 raise ToolCallException(
                     message=f"Invalid profile_picture_url payload type: {type(profile_picture_url)}",

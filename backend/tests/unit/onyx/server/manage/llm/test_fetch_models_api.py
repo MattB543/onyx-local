@@ -13,6 +13,8 @@ import pytest
 
 from onyx.db.enums import LLMModelFlowType
 from onyx.error_handling.exceptions import OnyxError
+from onyx.server.manage.llm.models import BedrockFinalModelResponse
+from onyx.server.manage.llm.models import BedrockModelsRequest
 from onyx.server.manage.llm.models import BifrostFinalModelResponse
 from onyx.server.manage.llm.models import BifrostModelsRequest
 from onyx.server.manage.llm.models import LitellmFinalModelResponse
@@ -23,6 +25,76 @@ from onyx.server.manage.llm.models import OllamaFinalModelResponse
 from onyx.server.manage.llm.models import OllamaModelsRequest
 from onyx.server.manage.llm.models import OpenRouterFinalModelResponse
 from onyx.server.manage.llm.models import OpenRouterModelsRequest
+
+
+class TestGetBedrockAvailableModels:
+    """Tests for the AWS Bedrock model fetch endpoint."""
+
+    def test_paginates_inference_profiles(self) -> None:
+        from onyx.server.manage.llm.api import get_bedrock_available_models
+
+        mock_session = MagicMock()
+        mock_bedrock = MagicMock()
+        mock_session.client.return_value = mock_bedrock
+        mock_bedrock.list_foundation_models.return_value = {
+            "modelSummaries": [
+                {
+                    "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+                    "modelName": "Claude 3.5 Sonnet v2",
+                    "responseStreamingSupported": True,
+                    "inputModalities": ["TEXT", "IMAGE"],
+                },
+            ]
+        }
+        mock_paginator = MagicMock()
+        mock_paginator.paginate.return_value = [
+            {
+                "inferenceProfileSummaries": [
+                    {
+                        "inferenceProfileId": (
+                            "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+                        ),
+                        "inferenceProfileName": "US Claude 3.5 Sonnet v2",
+                    },
+                ]
+            },
+            {
+                "inferenceProfileSummaries": [
+                    {
+                        "inferenceProfileId": "us.anthropic.claude-opus-4-8",
+                        "inferenceProfileName": "US Anthropic Claude Opus 4.8",
+                    },
+                    {
+                        "inferenceProfileId": "global.anthropic.claude-opus-4-8",
+                        "inferenceProfileName": "Global Anthropic Claude Opus 4.8",
+                    },
+                ]
+            },
+        ]
+        mock_bedrock.get_paginator.return_value = mock_paginator
+
+        with patch("onyx.server.manage.llm.api.boto3.Session", return_value=mock_session):
+            results = get_bedrock_available_models(
+                BedrockModelsRequest(aws_region_name="us-east-2"),
+                MagicMock(),
+                MagicMock(),
+            )
+
+        assert all(isinstance(result, BedrockFinalModelResponse) for result in results)
+        result_by_name = {result.name: result for result in results}
+        assert "us.anthropic.claude-opus-4-8" in result_by_name
+        assert "global.anthropic.claude-opus-4-8" in result_by_name
+        assert (
+            result_by_name["us.anthropic.claude-opus-4-8"].display_name
+            == "US Anthropic Claude Opus 4.8 (us)"
+        )
+        assert (
+            result_by_name["global.anthropic.claude-opus-4-8"].display_name
+            == "Global Anthropic Claude Opus 4.8 (global)"
+        )
+        mock_bedrock.get_paginator.assert_called_once_with("list_inference_profiles")
+        mock_paginator.paginate.assert_called_once_with(typeEquals="SYSTEM_DEFINED")
+        mock_bedrock.list_inference_profiles.assert_not_called()
 
 
 class TestGetOllamaAvailableModels:

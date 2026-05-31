@@ -12,6 +12,9 @@ from sqlalchemy.orm import sessionmaker
 
 from onyx.chat.emitter import Emitter
 from onyx.configs.constants import FileOrigin
+from onyx.db.enums import CrmInteractionType
+from onyx.db.models import CrmContact
+from onyx.db.models import CrmInteraction
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.session_loading import create_crm_create_packets
 from onyx.server.query_and_chat.session_loading import (
@@ -28,18 +31,15 @@ from onyx.server.query_and_chat.streaming_models import CrmSearchToolStart
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
 from onyx.server.query_and_chat.streaming_models import SectionEnd
-from onyx.db.enums import CrmInteractionType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmInteraction
 from onyx.tools.built_in_tools import CITEABLE_TOOLS_NAMES
+from onyx.tools.models import ToolCallException
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
-from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
-from onyx.tools.models import ToolCallException
+from onyx.tools.tool_implementations.crm.models import serialize_contact
 
 
 class _TestBus:
@@ -487,7 +487,7 @@ class TestCrmToolRun:
 
         assert "string URL or null" in exc.value.llm_facing_message
 
-    def test_crm_update_normalize_contact_updates_profile_picture_download_failure_is_non_fatal(
+    def test_crm_update_normalize_contact_updates_profile_picture_download_failure_raises(
         self, emitter: Emitter, db_session
     ) -> None:
         tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
@@ -496,15 +496,16 @@ class TestCrmToolRun:
             "onyx.tools.tool_implementations.crm.crm_update_tool.save_file_from_url",
             side_effect=Exception("boom"),
         ):
-            updates = tool._normalize_contact_updates(
-                {
-                    "first_name": "Alice",
-                    "profile_picture_url": "https://example.com/avatar.png",
-                }
-            )
+            with pytest.raises(ToolCallException) as exc:
+                tool._normalize_contact_updates(
+                    {
+                        "first_name": "Alice",
+                        "profile_picture_url": "https://example.com/avatar.png",
+                    }
+                )
 
-        assert updates["first_name"] == "Alice"
-        assert "profile_picture_file_id" not in updates
+        assert "could not download" in exc.value.llm_facing_message
+        assert "contact was not updated" in exc.value.llm_facing_message
 
     def test_serialize_contact_profile_picture_none(self) -> None:
         contact = CrmContact(
