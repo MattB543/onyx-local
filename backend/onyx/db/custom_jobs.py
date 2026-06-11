@@ -196,6 +196,18 @@ def fetch_custom_job(
     )
 
 
+def get_custom_job_enabled(
+    *,
+    db_session: Session,
+    job_id: UUID,
+) -> bool | None:
+    """Lightweight existence/enabled check that avoids loading the job's runs.
+
+    Returns the job's enabled flag, or None if no job with this id exists.
+    """
+    return db_session.scalar(select(CustomJob.enabled).where(CustomJob.id == job_id))
+
+
 def list_custom_jobs(
     *,
     db_session: Session,
@@ -421,6 +433,32 @@ def claim_trigger_events_for_runs(
     db_session: Session,
     claim_limit: int = DEFAULT_CLAIM_LIMIT,
 ) -> list[CustomJobRun]:
+    # The claim query below only considers events whose job is enabled, so
+    # RECEIVED events for disabled (or missing) jobs would otherwise sit
+    # unclaimed silently. Surface them here so operators can see why the
+    # queue is not draining.
+    skipped_disabled_counts = db_session.execute(
+        select(
+            CustomJobTriggerEvent.custom_job_id,
+            func.count(CustomJobTriggerEvent.id),
+        )
+        .outerjoin(CustomJob, CustomJob.id == CustomJobTriggerEvent.custom_job_id)
+        .where(
+            CustomJobTriggerEvent.status == CustomJobTriggerEventStatus.RECEIVED,
+            (CustomJob.id.is_(None)) | (CustomJob.enabled.is_(False)),
+        )
+        .group_by(CustomJobTriggerEvent.custom_job_id)
+    ).all()
+    for skipped_job_id, skipped_count in skipped_disabled_counts:
+        if not skipped_count:
+            continue
+        logger.info(
+            "Skipping %d RECEIVED trigger event(s) for custom job %s: "
+            "job is disabled or missing.",
+            skipped_count,
+            skipped_job_id,
+        )
+
     claim_stmt = (
         select(CustomJobTriggerEvent)
         .join(CustomJob, CustomJob.id == CustomJobTriggerEvent.custom_job_id)
@@ -455,6 +493,13 @@ def claim_trigger_events_for_runs(
         ).all()
     )
     claimed_for_job: dict[UUID, int] = {}
+    # job_id -> reason -> skipped event count, aggregated so each claim cycle
+    # emits at most one info log per job instead of one per skipped event.
+    skipped_reason_counts: dict[UUID, dict[str, int]] = {}
+
+    def _record_skip(job_id: UUID, reason: str) -> None:
+        reason_counts = skipped_reason_counts.setdefault(job_id, {})
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
     runs: list[CustomJobRun] = []
     for event in events:
@@ -466,11 +511,34 @@ def claim_trigger_events_for_runs(
             current_active = int(active_counts.get(event.custom_job_id, 0))
             current_claimed = claimed_for_job.get(event.custom_job_id, 0)
             if current_active + current_claimed >= max_concurrent_runs:
+                logger.debug(
+                    "Skipping trigger event %s for custom job %s: "
+                    "max_concurrent_runs limit reached "
+                    "(active=%d, claimed_this_cycle=%d, limit=%d). "
+                    "Event remains RECEIVED for a later claim cycle.",
+                    event.id,
+                    event.custom_job_id,
+                    current_active,
+                    current_claimed,
+                    max_concurrent_runs,
+                )
+                _record_skip(event.custom_job_id, "max_concurrent_runs")
                 continue
 
         max_events_per_claim = trigger_config.get("max_events_per_claim")
         if isinstance(max_events_per_claim, int) and max_events_per_claim > 0:
             if claimed_for_job.get(event.custom_job_id, 0) >= max_events_per_claim:
+                logger.debug(
+                    "Skipping trigger event %s for custom job %s: "
+                    "max_events_per_claim limit reached "
+                    "(claimed_this_cycle=%d, limit=%d). "
+                    "Event remains RECEIVED for a later claim cycle.",
+                    event.id,
+                    event.custom_job_id,
+                    claimed_for_job.get(event.custom_job_id, 0),
+                    max_events_per_claim,
+                )
+                _record_skip(event.custom_job_id, "max_events_per_claim")
                 continue
 
         event.status = CustomJobTriggerEventStatus.ENQUEUED
@@ -492,6 +560,21 @@ def claim_trigger_events_for_runs(
             event.status = CustomJobTriggerEventStatus.DROPPED
             event.error_message = "Duplicate trigger event run suppressed."
             continue
+
+    for skip_job_id, reason_counts in skipped_reason_counts.items():
+        total_skipped = sum(reason_counts.values())
+        if not total_skipped:
+            continue
+        logger.info(
+            "Skipped %d trigger event(s) for custom job %s this claim cycle "
+            "(events remain RECEIVED for a later cycle). Reasons: %s.",
+            total_skipped,
+            skip_job_id,
+            ", ".join(
+                f"{reason}={count}" for reason, count in sorted(reason_counts.items())
+            ),
+        )
+
     return runs
 
 
@@ -608,6 +691,12 @@ def cleanup_custom_job_history(
         # The `payload_json IS NOT NULL AND payload_json <> '{}'::jsonb`
         # filter makes the scrub idempotent so the returned rowcount is a
         # meaningful per-run metric.
+        #
+        # NOTE: FAILED events get a bounded partial scrub instead of the
+        # full scrub (see below) so the permanent failed list stays
+        # diagnosable (e.g. in the CRM "Email Queue" UI) without storing
+        # email bodies indefinitely. All other terminal statuses are
+        # fully scrubbed here.
         scrub_stmt = (
             update(CustomJobTriggerEvent)
             .where(
@@ -616,7 +705,6 @@ def cleanup_custom_job_history(
                     [
                         CustomJobTriggerEventStatus.CONSUMED,
                         CustomJobTriggerEventStatus.DROPPED,
-                        CustomJobTriggerEventStatus.FAILED,
                     ]
                 ),
                 CustomJobTriggerEvent.created_at < cutoff,
@@ -627,6 +715,35 @@ def cleanup_custom_job_history(
         )
         scrub_result = db_session.execute(scrub_stmt)
         deleted_rows += scrub_result.rowcount or 0
+
+        # Bounded retention for FAILED events: after retention_days, drop
+        # only the bulky content keys ('text', 'body') from payload_json
+        # while keeping metadata keys (document_id, source,
+        # semantic_identifier, from, to, subject, date, doc_updated_at,
+        # primary_owner_emails, secondary_owner_emails) and the row's
+        # error_message column, so failures remain diagnosable without
+        # retaining email bodies forever. The WHERE filter only matches
+        # rows that would actually change, keeping the scrub idempotent.
+        failed_scrub_stmt = (
+            update(CustomJobTriggerEvent)
+            .where(
+                CustomJobTriggerEvent.custom_job_id == job.id,
+                CustomJobTriggerEvent.status == CustomJobTriggerEventStatus.FAILED,
+                CustomJobTriggerEvent.created_at < cutoff,
+                CustomJobTriggerEvent.payload_json.isnot(None),
+                text(
+                    "custom_job_trigger_event.payload_json::text <> "
+                    "((custom_job_trigger_event.payload_json - 'text') - 'body')::text"
+                ),
+            )
+            .values(
+                payload_json=text(
+                    "(custom_job_trigger_event.payload_json - 'text') - 'body'"
+                )
+            )
+        )
+        failed_scrub_result = db_session.execute(failed_scrub_stmt)
+        deleted_rows += failed_scrub_result.rowcount or 0
 
     return deleted_rows
 
@@ -778,6 +895,68 @@ def get_completed_step_outputs(
             continue
         output[step.step_id] = step.output_json
     return output
+
+
+def list_trigger_events_with_runs(
+    *,
+    db_session: Session,
+    custom_job_id: UUID,
+    statuses: list[CustomJobTriggerEventStatus] | None = None,
+    page_num: int = 0,
+    page_size: int = 25,
+) -> tuple[list[tuple[CustomJobTriggerEvent, CustomJobRun | None]], int]:
+    """List trigger events for a custom job, newest first, with their run (if any).
+
+    Each trigger event has at most one run (enforced by the
+    uq_custom_job_run_trigger_event partial unique index), so a plain
+    LEFT JOIN never duplicates event rows.
+    """
+    base_filter = [CustomJobTriggerEvent.custom_job_id == custom_job_id]
+    if statuses:
+        base_filter.append(CustomJobTriggerEvent.status.in_(statuses))
+
+    stmt = (
+        select(CustomJobTriggerEvent, CustomJobRun)
+        .outerjoin(
+            CustomJobRun,
+            CustomJobRun.trigger_event_id == CustomJobTriggerEvent.id,
+        )
+        .where(*base_filter)
+        .order_by(
+            CustomJobTriggerEvent.created_at.desc(),
+            CustomJobTriggerEvent.id.desc(),
+        )
+        .offset(page_num * page_size)
+        .limit(page_size)
+    )
+    rows = [
+        (event, run)
+        for event, run in db_session.execute(stmt).all()
+    ]
+
+    count_stmt = (
+        select(func.count())
+        .select_from(CustomJobTriggerEvent)
+        .where(*base_filter)
+    )
+    total = db_session.scalar(count_stmt) or 0
+    return rows, total
+
+
+def count_trigger_events_by_status(
+    *,
+    db_session: Session,
+    custom_job_id: UUID,
+) -> dict[CustomJobTriggerEventStatus, int]:
+    rows = db_session.execute(
+        select(
+            CustomJobTriggerEvent.status,
+            func.count(CustomJobTriggerEvent.id),
+        )
+        .where(CustomJobTriggerEvent.custom_job_id == custom_job_id)
+        .group_by(CustomJobTriggerEvent.status)
+    ).all()
+    return {status: count for status, count in rows}
 
 
 def try_create_run_for_trigger_event(

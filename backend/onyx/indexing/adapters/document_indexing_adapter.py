@@ -353,6 +353,16 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
                     "Failed to emit email-CRM trigger events; "
                     "indexing will proceed without them."
                 )
+        else:
+            email_doc_count = sum(
+                1 for doc in context.updatable_docs if doc.source in _EMAIL_SOURCES
+            )
+            if email_doc_count > 0:
+                logger.warning(
+                    "%d email documents indexed but EMAIL_CRM_CUSTOM_JOB_ID is "
+                    "not configured; no CRM trigger events emitted.",
+                    email_doc_count,
+                )
 
         db_session.commit()
 
@@ -380,6 +390,8 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
         # VALID_EMAIL_DOMAINS list.  Filtering here would prevent emails from
         # external senders from ever reaching the CRM pipeline, which is the
         # primary use-case (capturing inbound leads/contacts).
+
+        dedupe_suppressed_doc_ids: list[str] = []
 
         for doc in email_docs:
             sender_email = _extract_sender_email(doc)
@@ -429,12 +441,16 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
                     event.id,
                 )
             else:
-                logger.debug(
-                    "Email-CRM trigger event dedupe-suppressed for doc '%s' "
-                    "(dedupe_key=%s)",
-                    doc.id,
-                    dedupe_key,
-                )
+                dedupe_suppressed_doc_ids.append(doc.id)
+
+        if dedupe_suppressed_doc_ids:
+            sample_doc_ids = dedupe_suppressed_doc_ids[:5]
+            logger.info(
+                "Email-CRM trigger events dedupe-suppressed for %d doc(s) "
+                "in this batch (sample doc ids: %s)",
+                len(dedupe_suppressed_doc_ids),
+                ", ".join(sample_doc_ids),
+            )
 
 
 class DocumentChunkEnricher:

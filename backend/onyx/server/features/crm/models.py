@@ -289,6 +289,16 @@ class CrmInteractionCreateRequest(BaseModel):
     attendees: list[CrmInteractionAttendeeInput] | None = Field(default=None)
 
 
+class CrmInteractionPatchRequest(BaseModel):
+    contact_id: UUID | None = None
+    organization_id: UUID | None = None
+    type: CrmInteractionType | None = None
+    title: str | None = None
+    summary: str | None = None
+    occurred_at: datetime | None = None
+    attendees: list[CrmInteractionAttendeeInput] | None = None
+
+
 class CrmInteractionSnapshot(BaseModel):
     id: UUID
     contact_id: UUID | None

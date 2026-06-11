@@ -6,28 +6,33 @@ from uuid import uuid4
 
 import pytest
 
+from onyx.db.crm import build_contact_email_lookup
+from onyx.db.crm import build_org_name_lookup
 from onyx.db.crm import create_contact
 from onyx.db.crm import create_interaction
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
-from onyx.db.crm import build_contact_email_lookup
-from onyx.db.crm import build_org_name_lookup
 from onyx.db.crm import delete_contact
 from onyx.db.crm import delete_interaction
 from onyx.db.crm import delete_organization
+from onyx.db.crm import export_all_contacts
 from onyx.db.crm import find_contacts_for_attendee_resolution
 from onyx.db.crm import find_users_for_attendee_resolution
-from onyx.db.crm import export_all_contacts
 from onyx.db.crm import get_contact_by_email
 from onyx.db.crm import get_organization_by_name
 from onyx.db.crm import list_contacts
 from onyx.db.crm import list_organizations
 from onyx.db.crm import list_tags
+from onyx.db.crm import replace_interaction_attendees
 from onyx.db.crm import search_crm_entities
 from onyx.db.crm import update_contact
+from onyx.db.crm import update_interaction
 from onyx.db.crm import update_organization
+from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
 from onyx.db.models import CrmContact
+from onyx.db.models import CrmInteraction
+from onyx.db.models import CrmInteractionAttendee
 from onyx.db.models import CrmOrganization
 
 
@@ -485,7 +490,9 @@ def test_update_organization_rejects_duplicate_name() -> None:
     db_session.commit.assert_not_called()
 
 
-def test_update_organization_semantically_identical_values_do_not_mark_changed() -> None:
+def test_update_organization_semantically_identical_values_do_not_mark_changed() -> (
+    None
+):
     db_session = MagicMock()
     db_session.scalar.return_value = None
     organization = CrmOrganization(
@@ -589,6 +596,167 @@ def test_create_interaction_does_not_auto_add_primary_contact_attendee() -> None
     db_session.commit.assert_called_once()
     db_session.refresh.assert_called_once_with(interaction)
     mock_add_attendees.assert_not_called()
+
+
+def test_update_interaction_updates_title_and_summary() -> None:
+    db_session = MagicMock()
+    interaction = CrmInteraction(
+        type=CrmInteractionType.NOTE,
+        title="Old title",
+        summary="Old summary",
+    )
+    interaction.id = uuid4()
+
+    updated, changed = update_interaction(
+        db_session=db_session,
+        interaction=interaction,
+        patches={"title": "  New title ", "summary": "  New summary "},
+    )
+
+    assert updated is interaction
+    assert changed is True
+    assert interaction.title == "New title"
+    assert interaction.summary == "New summary"
+    db_session.commit.assert_called_once()
+    db_session.refresh.assert_called_once_with(interaction)
+
+
+def test_update_interaction_noop_does_not_mark_changed() -> None:
+    db_session = MagicMock()
+    interaction = CrmInteraction(
+        type=CrmInteractionType.NOTE,
+        title=" Intro ",
+        summary=" Summary ",
+    )
+    interaction.id = uuid4()
+
+    updated, changed = update_interaction(
+        db_session=db_session,
+        interaction=interaction,
+        patches={"title": "Intro", "summary": "Summary"},
+        commit=False,
+    )
+
+    assert updated is interaction
+    assert changed is False
+    db_session.flush.assert_not_called()
+    db_session.commit.assert_not_called()
+    db_session.refresh.assert_not_called()
+
+
+def test_update_interaction_rejects_empty_title() -> None:
+    db_session = MagicMock()
+    interaction = CrmInteraction(
+        type=CrmInteractionType.NOTE,
+        title="Has title",
+        summary=None,
+    )
+    interaction.id = uuid4()
+
+    with pytest.raises(ValueError, match="title cannot be empty"):
+        update_interaction(
+            db_session=db_session,
+            interaction=interaction,
+            patches={"title": "   "},
+        )
+
+    db_session.commit.assert_not_called()
+
+
+def test_update_interaction_sets_and_clears_occurred_at() -> None:
+    db_session = MagicMock()
+    interaction = CrmInteraction(
+        type=CrmInteractionType.NOTE,
+        title="Has title",
+        summary=None,
+    )
+    interaction.id = uuid4()
+    interaction.occurred_at = None
+
+    occurred_at = datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc)
+    _, changed = update_interaction(
+        db_session=db_session,
+        interaction=interaction,
+        patches={"occurred_at": occurred_at},
+    )
+    assert changed is True
+    assert interaction.occurred_at == occurred_at
+
+    db_session.reset_mock()
+    _, changed = update_interaction(
+        db_session=db_session,
+        interaction=interaction,
+        patches={"occurred_at": None},
+    )
+    assert changed is True
+    assert interaction.occurred_at is None
+    db_session.commit.assert_called_once()
+
+
+def test_update_interaction_changes_type() -> None:
+    db_session = MagicMock()
+    interaction = CrmInteraction(
+        type=CrmInteractionType.NOTE,
+        title="Has title",
+        summary=None,
+    )
+    interaction.id = uuid4()
+
+    _, changed = update_interaction(
+        db_session=db_session,
+        interaction=interaction,
+        patches={"type": CrmInteractionType.CALL},
+    )
+
+    assert changed is True
+    assert interaction.type == CrmInteractionType.CALL
+
+
+def test_replace_interaction_attendees_replaces_set() -> None:
+    db_session = MagicMock()
+    interaction_id = uuid4()
+    user_id = uuid4()
+    contact_id = uuid4()
+
+    final_attendees = [MagicMock(), MagicMock()]
+    db_session.scalars.return_value = final_attendees
+
+    result = replace_interaction_attendees(
+        db_session=db_session,
+        interaction_id=interaction_id,
+        attendees=[
+            (user_id, None, CrmAttendeeRole.ATTENDEE),
+            (user_id, None, CrmAttendeeRole.ORGANIZER),
+            (None, contact_id, CrmAttendeeRole.ATTENDEE),
+        ],
+    )
+
+    # delete existing + add deduped rows
+    db_session.execute.assert_called_once()
+    added = [call.args[0] for call in db_session.add.call_args_list]
+    assert len(added) == 2
+    by_pair = {(a.user_id, a.contact_id): a for a in added}
+    assert by_pair[(user_id, None)].role == CrmAttendeeRole.ORGANIZER
+    assert by_pair[(None, contact_id)].role == CrmAttendeeRole.ATTENDEE
+    assert all(isinstance(a, CrmInteractionAttendee) for a in added)
+    db_session.commit.assert_called_once()
+    assert result == final_attendees
+
+
+def test_replace_interaction_attendees_empty_clears_all() -> None:
+    db_session = MagicMock()
+    db_session.scalars.return_value = []
+
+    result = replace_interaction_attendees(
+        db_session=db_session,
+        interaction_id=uuid4(),
+        attendees=[],
+    )
+
+    db_session.execute.assert_called_once()
+    db_session.add.assert_not_called()
+    db_session.commit.assert_called_once()
+    assert result == []
 
 
 def test_delete_interaction_commits_by_default() -> None:

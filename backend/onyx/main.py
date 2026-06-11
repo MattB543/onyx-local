@@ -82,6 +82,9 @@ from onyx.server.documents.targeted_reindex import router as targeted_reindex_ro
 from onyx.server.features.build.api.api import public_build_router
 from onyx.server.features.build.api.api import router as build_router
 from onyx.server.features.crm.api import router as crm_router
+from onyx.server.features.crm.email_queue_api import (
+    router as crm_email_queue_router,
+)
 from onyx.server.features.default_assistant.api import (
     router as default_assistant_router,
 )
@@ -530,6 +533,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, admin_agents_router)
     include_router_with_global_prefix_prepended(application, default_assistant_router)
     include_router_with_global_prefix_prepended(application, crm_router)
+    include_router_with_global_prefix_prepended(application, crm_email_queue_router)
     include_router_with_global_prefix_prepended(application, notification_router)
     include_router_with_global_prefix_prepended(application, tool_router)
     include_router_with_global_prefix_prepended(application, admin_tool_router)

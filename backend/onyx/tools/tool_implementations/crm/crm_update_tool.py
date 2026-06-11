@@ -15,11 +15,17 @@ from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
+from onyx.db.crm import get_interaction_attendees
+from onyx.db.crm import get_interaction_by_id
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_tags
+from onyx.db.crm import replace_interaction_attendees
 from onyx.db.crm import update_contact
+from onyx.db.crm import update_interaction
 from onyx.db.crm import update_organization
+from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmContactSource
+from onyx.db.enums import CrmInteractionType
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import User
 from onyx.file_store.utils import save_file_from_url
@@ -30,17 +36,20 @@ from onyx.server.query_and_chat.streaming_models import Packet
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException
 from onyx.tools.models import ToolResponse
+from onyx.tools.tool_implementations.crm.attendee_resolution import resolve_attendees
 from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
+from onyx.tools.tool_implementations.crm.models import parse_datetime_maybe
 from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
 from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
+from onyx.tools.tool_implementations.crm.models import serialize_interaction
 from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.utils.logger import setup_logger
 
-CRM_UPDATE_ENTITY_TYPES = {"contact", "organization"}
+CRM_UPDATE_ENTITY_TYPES = {"contact", "organization", "interaction"}
 logger = setup_logger()
 
 
@@ -48,10 +57,11 @@ class CrmUpdateTool(Tool[None]):
     NAME = "crm_update"
     DISPLAY_NAME = "CRM Update"
     DESCRIPTION = (
-        "Update fields on an existing CRM contact or organization. Requires the entity's UUID "
-        "(from a prior search, list, or create). Only include fields you want to change in the "
-        "updates object — omitted fields are left unchanged. Use this to fix info, change status, "
-        "reassign ownership, or link a contact to an organization."
+        "Update fields on an existing CRM contact, organization, or interaction. Requires the "
+        "entity's UUID (from a prior search, list, or create). Only include fields you want to "
+        "change in the updates object — omitted fields are left unchanged. Use this to fix info, "
+        "change status, reassign ownership, link a contact to an organization, or correct an "
+        "interaction's details (including its occurred_at time and attendees)."
     )
 
     def __init__(
@@ -59,9 +69,11 @@ class CrmUpdateTool(Tool[None]):
         tool_id: int,
         db_session: Session,
         emitter: Emitter,
+        user_id: str | None = None,
     ) -> None:
         super().__init__(emitter=emitter)
         self._id = tool_id
+        self._user_id = user_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
         self._stage_options = get_allowed_contact_stages(db_session)
 
@@ -98,7 +110,7 @@ class CrmUpdateTool(Tool[None]):
                         "entity_type": {
                             "type": "string",
                             "enum": sorted(list(CRM_UPDATE_ENTITY_TYPES)),
-                            "description": "Whether to update a 'contact' or 'organization'.",
+                            "description": "Whether to update a 'contact', 'organization', or 'interaction'.",
                         },
                         "entity_id": {
                             "type": "string",
@@ -113,7 +125,11 @@ class CrmUpdateTool(Tool[None]):
                                 "status (workspace-defined contact stages), category, notes, linkedin_url, location, "
                                 "profile_picture_url (remote image URL or null to clear). "
                                 "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
-                                "sector, location, size, notes."
+                                "sector, location, size, notes. "
+                                "For interactions: title, summary, type (note|call|email|meeting|event), "
+                                "occurred_at (ISO datetime, or null to clear), contact_id, organization_id, "
+                                "attendees (full replacement: array of {email|name|contact_id|user_id, role}; "
+                                "omit to leave attendees unchanged, [] to remove all)."
                             ),
                         },
                     },
@@ -137,11 +153,13 @@ class CrmUpdateTool(Tool[None]):
                     normalized_updates["profile_picture_file_id"] = None
                 else:
                     try:
-                        normalized_updates["profile_picture_file_id"] = save_file_from_url(
-                            normalized_url,
-                            display_name="crm_profile_picture",
-                            file_origin=FileOrigin.CRM_UPLOAD,
-                            require_image=True,
+                        normalized_updates["profile_picture_file_id"] = (
+                            save_file_from_url(
+                                normalized_url,
+                                display_name="crm_profile_picture",
+                                file_origin=FileOrigin.CRM_UPLOAD,
+                                require_image=True,
+                            )
                         )
                     except Exception as e:
                         logger.warning(
@@ -190,7 +208,9 @@ class CrmUpdateTool(Tool[None]):
                 owner_ids: list[UUID] = []
                 seen_owner_ids: set[UUID] = set()
                 for owner_id_raw in owner_ids_raw:
-                    parsed_owner_id = parse_uuid_maybe(owner_id_raw, "updates.owner_ids[]")
+                    parsed_owner_id = parse_uuid_maybe(
+                        owner_id_raw, "updates.owner_ids[]"
+                    )
                     if parsed_owner_id is None or parsed_owner_id in seen_owner_ids:
                         continue
                     seen_owner_ids.add(parsed_owner_id)
@@ -204,7 +224,9 @@ class CrmUpdateTool(Tool[None]):
 
         return normalized_updates
 
-    def _normalize_organization_updates(self, updates: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_organization_updates(
+        self, updates: dict[str, Any]
+    ) -> dict[str, Any]:
         normalized_updates = dict(updates)
         if "type" in normalized_updates:
             normalized_updates["type"] = parse_enum_maybe(
@@ -212,6 +234,67 @@ class CrmUpdateTool(Tool[None]):
                 normalized_updates.get("type"),
                 "updates.type",
             )
+        return normalized_updates
+
+    def _normalize_interaction_updates(self, updates: dict[str, Any]) -> dict[str, Any]:
+        """Normalize interaction column patches (excludes 'attendees').
+
+        Returns a dict of column patches suitable for update_interaction. The
+        'attendees' key is intentionally left untouched here and handled
+        separately by the caller (full-replace semantics).
+        """
+        normalized_updates = dict(updates)
+
+        if "type" in normalized_updates:
+            interaction_type = parse_enum_maybe(
+                CrmInteractionType,
+                normalized_updates.get("type"),
+                "updates.type",
+            )
+            if interaction_type is None:
+                raise ToolCallException(
+                    message="Missing/invalid interaction type in crm_update",
+                    llm_facing_message=(
+                        "'updates.type' must be one of: "
+                        f"{', '.join(member.value for member in CrmInteractionType)}."
+                    ),
+                )
+            normalized_updates["type"] = interaction_type
+
+        if "occurred_at" in normalized_updates:
+            normalized_updates["occurred_at"] = parse_datetime_maybe(
+                normalized_updates.get("occurred_at"),
+                "updates.occurred_at",
+            )
+
+        if "contact_id" in normalized_updates:
+            normalized_updates["contact_id"] = parse_uuid_maybe(
+                normalized_updates.get("contact_id"),
+                "updates.contact_id",
+            )
+
+        if "organization_id" in normalized_updates:
+            normalized_updates["organization_id"] = parse_uuid_maybe(
+                normalized_updates.get("organization_id"),
+                "updates.organization_id",
+            )
+
+        if "title" in normalized_updates:
+            title_value = normalized_updates.get("title")
+            if not isinstance(title_value, str) or not title_value.strip():
+                raise ToolCallException(
+                    message="Empty interaction title in crm_update",
+                    llm_facing_message="'updates.title' cannot be empty.",
+                )
+
+        if "summary" in normalized_updates:
+            summary_value = normalized_updates.get("summary")
+            if summary_value is not None and not isinstance(summary_value, str):
+                raise ToolCallException(
+                    message=f"Invalid summary payload type: {type(summary_value)}",
+                    llm_facing_message="'updates.summary' must be a string or null.",
+                )
+
         return normalized_updates
 
     def run(
@@ -224,14 +307,14 @@ class CrmUpdateTool(Tool[None]):
         if not isinstance(entity_type_raw, str):
             raise ToolCallException(
                 message=f"Missing/invalid entity_type in {self.name}",
-                llm_facing_message="'entity_type' must be one of: contact, organization.",
+                llm_facing_message="'entity_type' must be one of: contact, organization, interaction.",
             )
 
         entity_type = entity_type_raw.strip().lower()
         if entity_type not in CRM_UPDATE_ENTITY_TYPES:
             raise ToolCallException(
                 message=f"Unsupported entity_type in {self.name}: {entity_type}",
-                llm_facing_message="'entity_type' must be one of: contact, organization.",
+                llm_facing_message="'entity_type' must be one of: contact, organization, interaction.",
             )
 
         entity_id = parse_uuid_maybe(llm_kwargs.get("entity_id"), "entity_id")
@@ -260,7 +343,9 @@ class CrmUpdateTool(Tool[None]):
 
                     updates = self._normalize_contact_updates(updates_raw)
                     if updates.get("organization_id") is not None:
-                        organization = get_organization_by_id(updates["organization_id"], db_session)
+                        organization = get_organization_by_id(
+                            updates["organization_id"], db_session
+                        )
                         if organization is None:
                             raise ToolCallException(
                                 message=f"Organization not found: {updates['organization_id']}",
@@ -291,7 +376,7 @@ class CrmUpdateTool(Tool[None]):
                             tags=tags,
                         ),
                     }
-                else:
+                elif entity_type == "organization":
                     organization = get_organization_by_id(entity_id, db_session)
                     if organization is None:
                         raise ToolCallException(
@@ -314,6 +399,133 @@ class CrmUpdateTool(Tool[None]):
                             tags=tags,
                         ),
                     }
+                else:
+                    interaction = get_interaction_by_id(entity_id, db_session)
+                    if interaction is None:
+                        raise ToolCallException(
+                            message=f"Interaction not found: {entity_id}",
+                            llm_facing_message="Could not find the specified interaction.",
+                        )
+
+                    # Pull attendees out of the column patches; they are
+                    # full-replaced separately and only when the key is present.
+                    attendees_present = "attendees" in updates_raw
+                    attendees_raw = updates_raw.get("attendees")
+
+                    updates = self._normalize_interaction_updates(updates_raw)
+                    updates.pop("attendees", None)
+
+                    if updates.get("contact_id") is not None:
+                        if get_contact_by_id(updates["contact_id"], db_session) is None:
+                            raise ToolCallException(
+                                message=f"Contact not found: {updates['contact_id']}",
+                                llm_facing_message="Could not find the provided contact_id.",
+                            )
+                    if updates.get("organization_id") is not None:
+                        if (
+                            get_organization_by_id(
+                                updates["organization_id"], db_session
+                            )
+                            is None
+                        ):
+                            raise ToolCallException(
+                                message=f"Organization not found: {updates['organization_id']}",
+                                llm_facing_message="Could not find the provided organization_id.",
+                            )
+
+                    # Validate and resolve attendees BEFORE applying any column
+                    # patches so a failure here leaves the interaction untouched.
+                    attendee_resolution_details: list[dict[str, Any]] = []
+                    attendee_tuples: list[
+                        tuple[UUID | None, UUID | None, CrmAttendeeRole]
+                    ] = []
+                    if attendees_present:
+                        if attendees_raw is None:
+                            attendees_to_resolve: list[Any] = []
+                        elif isinstance(attendees_raw, list):
+                            attendees_to_resolve = attendees_raw
+                        else:
+                            raise ToolCallException(
+                                message=(
+                                    "Invalid attendees payload in crm_update: "
+                                    f"{type(attendees_raw)}"
+                                ),
+                                llm_facing_message="'updates.attendees' must be an array.",
+                            )
+
+                        (
+                            resolved_attendees,
+                            unresolved_attendees,
+                            attendee_resolution_details,
+                        ) = resolve_attendees(
+                            db_session=db_session,
+                            attendees_to_resolve=attendees_to_resolve,
+                        )
+
+                        if unresolved_attendees:
+                            # 'attendees' is a full replacement; replacing with
+                            # only the resolved subset would silently drop the
+                            # unresolved ones (or wipe all existing attendees if
+                            # nothing resolved). Refuse the whole update instead.
+                            unresolved_summary = json.dumps(
+                                unresolved_attendees, default=str
+                            )
+                            raise ToolCallException(
+                                message=(
+                                    "Unresolved attendees in crm_update: "
+                                    f"{unresolved_summary}"
+                                ),
+                                llm_facing_message=(
+                                    "The interaction was NOT updated because some "
+                                    "attendees could not be resolved and "
+                                    "'updates.attendees' replaces the full attendee "
+                                    "list. Unresolved attendees (with candidate "
+                                    f"matches): {unresolved_summary}. Retry with "
+                                    "exact contact_id/user_id values or corrected "
+                                    "emails/names, or omit 'attendees' to leave the "
+                                    "attendee list unchanged."
+                                ),
+                            )
+
+                        attendee_tuples = [
+                            (
+                                attendee["user_id"],
+                                attendee["contact_id"],
+                                attendee["role"],
+                            )
+                            for attendee in resolved_attendees
+                        ]
+
+                    updated_interaction, _ = update_interaction(
+                        db_session=db_session,
+                        interaction=interaction,
+                        patches=updates,
+                        commit=False,
+                    )
+
+                    if attendees_present:
+                        replace_interaction_attendees(
+                            db_session=db_session,
+                            interaction_id=updated_interaction.id,
+                            attendees=attendee_tuples,
+                            commit=False,
+                        )
+
+                    db_session.commit()
+
+                    attendees = get_interaction_attendees(
+                        updated_interaction.id, db_session
+                    )
+                    payload = {
+                        "status": "updated",
+                        "entity_type": "interaction",
+                        "interaction": serialize_interaction(
+                            updated_interaction,
+                            attendees=attendees,
+                        ),
+                    }
+                    if attendee_resolution_details:
+                        payload["attendee_resolution"] = attendee_resolution_details
             except IntegrityError:
                 raise ToolCallException(
                     message="Unique constraint violation while updating CRM entity",

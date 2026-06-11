@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 
 from onyx.auth.users import current_admin_user
 from onyx.auth.users import current_user
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_MB
+from onyx.configs.constants import FileOrigin
 from onyx.db.crm import add_interaction_attendees
 from onyx.db.crm import add_tag_to_contact
 from onyx.db.crm import add_tag_to_organization
@@ -35,8 +38,8 @@ from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
-from onyx.db.crm import get_interaction_by_id
 from onyx.db.crm import get_interaction_attendees
+from onyx.db.crm import get_interaction_by_id
 from onyx.db.crm import get_or_create_crm_settings
 from onyx.db.crm import get_organization_by_id
 from onyx.db.crm import get_organization_by_name
@@ -48,9 +51,11 @@ from onyx.db.crm import list_organizations
 from onyx.db.crm import list_tags
 from onyx.db.crm import remove_tag_from_contact
 from onyx.db.crm import remove_tag_from_organization
+from onyx.db.crm import replace_interaction_attendees
 from onyx.db.crm import search_crm_entities
 from onyx.db.crm import update_contact
 from onyx.db.crm import update_crm_settings
+from onyx.db.crm import update_interaction
 from onyx.db.crm import update_organization
 from onyx.db.crm import validate_stage_string
 from onyx.db.engine.sql_engine import get_session
@@ -64,9 +69,6 @@ from onyx.db.models import User
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
 from onyx.file_store.file_store import get_default_file_store
-from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_MB
-from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
-from onyx.configs.constants import FileOrigin
 from onyx.server.documents.models import PaginatedReturn
 from onyx.server.features.crm.csv_utils import build_csv_bytes
 from onyx.server.features.crm.csv_utils import CONTACT_CSV_HEADERS
@@ -89,6 +91,7 @@ from onyx.server.features.crm.models import CrmImportError
 from onyx.server.features.crm.models import CrmImportResult
 from onyx.server.features.crm.models import CrmInteractionAttendeeSnapshot
 from onyx.server.features.crm.models import CrmInteractionCreateRequest
+from onyx.server.features.crm.models import CrmInteractionPatchRequest
 from onyx.server.features.crm.models import CrmInteractionSnapshot
 from onyx.server.features.crm.models import CrmOrganizationCreateRequest
 from onyx.server.features.crm.models import CrmOrganizationPatchRequest
@@ -100,7 +103,6 @@ from onyx.server.features.crm.models import CrmTagCreateRequest
 from onyx.server.features.crm.models import CrmTagSnapshot
 from onyx.server.features.projects.projects_file_utils import is_upload_too_large
 from onyx.utils.logger import setup_logger
-
 
 logger = setup_logger()
 
@@ -161,7 +163,9 @@ def _serialize_contact(contact, db_session: Session) -> CrmContactSnapshot:
     )
 
 
-def _serialize_organization(organization, db_session: Session) -> CrmOrganizationSnapshot:
+def _serialize_organization(
+    organization, db_session: Session
+) -> CrmOrganizationSnapshot:
     tags = get_organization_tags(organization.id, db_session)
     return CrmOrganizationSnapshot.from_model(organization=organization, tags=tags)
 
@@ -276,7 +280,9 @@ def search_entities(
     db_session: Session = Depends(get_session),
     _user: User = Depends(current_user),
 ) -> PaginatedReturn[CrmSearchResultItem]:
-    requested_entity_types = [entity_type.value for entity_type in entity_types] if entity_types else None
+    requested_entity_types = (
+        [entity_type.value for entity_type in entity_types] if entity_types else None
+    )
     search_results, total_items = search_crm_entities(
         db_session=db_session,
         query=q,
@@ -316,6 +322,9 @@ def get_contacts(
         None, description="Filter by CRM organization."
     ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
+    owner_ids: list[UUID] | None = Query(
+        None, description="Filter to contacts owned by any of these user ids."
+    ),
     sort_by: str | None = Query(
         None,
         description="Sort field: 'updated_at' (default) or 'created_at'.",
@@ -351,6 +360,7 @@ def get_contacts(
         category=normalized_category,
         organization_id=organization_id,
         tag_ids=tag_ids,
+        owner_ids=owner_ids,
         sort_by=sort_by,
     )
     return PaginatedReturn(
@@ -475,7 +485,9 @@ def patch_contact(
     except ValueError as e:
         message = str(e)
         raise OnyxError(
-            OnyxErrorCode.DUPLICATE_RESOURCE if "already exists" in message else OnyxErrorCode.VALIDATION_ERROR,
+            OnyxErrorCode.DUPLICATE_RESOURCE
+            if "already exists" in message
+            else OnyxErrorCode.VALIDATION_ERROR,
             message,
         )
 
@@ -567,6 +579,9 @@ def get_organizations(
         description="Filter by organization type.",
     ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
+    owner_id: UUID | None = Query(
+        None, description="Filter to organizations created by this user id."
+    ),
     sort_by: str | None = Query(
         None,
         description="Sort field: 'updated_at' (default) or 'created_at'.",
@@ -583,6 +598,7 @@ def get_organizations(
         query=q,
         org_type=type,
         tag_ids=tag_ids,
+        created_by=owner_id,
         sort_by=sort_by,
     )
     return PaginatedReturn(
@@ -653,7 +669,9 @@ def patch_organization(
     except ValueError as e:
         message = str(e)
         raise OnyxError(
-            OnyxErrorCode.DUPLICATE_RESOURCE if "already exists" in message else OnyxErrorCode.VALIDATION_ERROR,
+            OnyxErrorCode.DUPLICATE_RESOURCE
+            if "already exists" in message
+            else OnyxErrorCode.VALIDATION_ERROR,
             message,
         )
 
@@ -677,6 +695,9 @@ def get_interactions(
     organization_id: UUID | None = Query(None),
     include_contact_interactions: bool = Query(False),
     interaction_type: CrmInteractionType | None = Query(None),
+    logged_by: UUID | None = Query(
+        None, description="Filter to interactions logged by this user id."
+    ),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
@@ -690,6 +711,7 @@ def get_interactions(
         organization_id=organization_id,
         include_contact_interactions=include_contact_interactions,
         interaction_type=interaction_type,
+        logged_by=logged_by,
     )
 
     return PaginatedReturn(
@@ -710,7 +732,9 @@ def post_interaction(
     if interaction_create_request.contact_id:
         _load_contact_or_404(interaction_create_request.contact_id, db_session)
     if interaction_create_request.organization_id:
-        _load_organization_or_404(interaction_create_request.organization_id, db_session)
+        _load_organization_or_404(
+            interaction_create_request.organization_id, db_session
+        )
 
     attendees_were_omitted = (
         "attendees" not in interaction_create_request.model_fields_set
@@ -791,6 +815,87 @@ def post_interaction(
     return _serialize_interaction(interaction, db_session)
 
 
+@router.patch("/interactions/{interaction_id}")
+def patch_interaction(
+    interaction_id: UUID,
+    interaction_patch_request: CrmInteractionPatchRequest,
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_user),
+) -> CrmInteractionSnapshot:
+    interaction = _load_interaction_or_404(interaction_id, db_session)
+
+    fields_set = interaction_patch_request.model_fields_set
+    patches: dict = {}
+
+    if "title" in fields_set:
+        if interaction_patch_request.title is None:
+            raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, "'title' cannot be null.")
+        patches["title"] = interaction_patch_request.title
+    if "type" in fields_set:
+        if interaction_patch_request.type is None:
+            raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, "'type' cannot be null.")
+        patches["type"] = interaction_patch_request.type
+    if "summary" in fields_set:
+        patches["summary"] = interaction_patch_request.summary
+    if "occurred_at" in fields_set:
+        patches["occurred_at"] = interaction_patch_request.occurred_at
+    if "contact_id" in fields_set:
+        if interaction_patch_request.contact_id is not None:
+            _load_contact_or_404(interaction_patch_request.contact_id, db_session)
+        patches["contact_id"] = interaction_patch_request.contact_id
+    if "organization_id" in fields_set:
+        if interaction_patch_request.organization_id is not None:
+            _load_organization_or_404(
+                interaction_patch_request.organization_id, db_session
+            )
+        patches["organization_id"] = interaction_patch_request.organization_id
+
+    # Validate attendees BEFORE applying any writes so a 404 here does not
+    # leave column patches committed. Full-replace attendees only when the
+    # key was explicitly provided.
+    attendee_tuples: list[tuple[UUID | None, UUID | None, CrmAttendeeRole]] = []
+    if "attendees" in fields_set:
+        attendee_inputs = interaction_patch_request.attendees or []
+        for attendee in attendee_inputs:
+            if attendee.user_id:
+                if db_session.get(User, attendee.user_id) is None:
+                    raise OnyxError(
+                        OnyxErrorCode.NOT_FOUND,
+                        f"CRM attendee user not found: {attendee.user_id}",
+                    )
+            if attendee.contact_id:
+                if get_contact_by_id(attendee.contact_id, db_session) is None:
+                    raise OnyxError(
+                        OnyxErrorCode.NOT_FOUND,
+                        f"CRM attendee contact not found: {attendee.contact_id}",
+                    )
+            attendee_tuples.append(
+                (attendee.user_id, attendee.contact_id, attendee.role)
+            )
+
+    try:
+        update_interaction(
+            db_session=db_session,
+            interaction=interaction,
+            patches=patches,
+            commit=False,
+        )
+    except ValueError as e:
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
+
+    if "attendees" in fields_set:
+        replace_interaction_attendees(
+            db_session=db_session,
+            interaction_id=interaction.id,
+            attendees=attendee_tuples,
+            commit=False,
+        )
+
+    db_session.commit()
+    db_session.refresh(interaction)
+    return _serialize_interaction(interaction, db_session)
+
+
 @router.delete("/interactions/{interaction_id}")
 def delete_crm_interaction(
     interaction_id: UUID,
@@ -852,7 +957,10 @@ def add_contact_tag(
     _ = _load_tag_or_404(tag_id, db_session)
 
     add_tag_to_contact(db_session=db_session, contact_id=contact.id, tag_id=tag_id)
-    return [CrmTagSnapshot.from_model(tag) for tag in get_contact_tags(contact.id, db_session)]
+    return [
+        CrmTagSnapshot.from_model(tag)
+        for tag in get_contact_tags(contact.id, db_session)
+    ]
 
 
 @router.delete("/contacts/{contact_id}/tags/{tag_id}")
@@ -866,7 +974,10 @@ def delete_contact_tag(
     _ = _load_tag_or_404(tag_id, db_session)
 
     remove_tag_from_contact(db_session=db_session, contact_id=contact.id, tag_id=tag_id)
-    return [CrmTagSnapshot.from_model(tag) for tag in get_contact_tags(contact.id, db_session)]
+    return [
+        CrmTagSnapshot.from_model(tag)
+        for tag in get_contact_tags(contact.id, db_session)
+    ]
 
 
 @router.post("/organizations/{organization_id}/tags/{tag_id}")
@@ -1023,9 +1134,7 @@ async def import_organizations_csv(
                 if row_id:
                     org = db_session.get(CrmOrganization, UUID(row_id))
                     if not org:
-                        raise ValueError(
-                            f"Organization with id '{row_id}' not found"
-                        )
+                        raise ValueError(f"Organization with id '{row_id}' not found")
                     _, org_changed = update_organization(
                         db_session, organization=org, patches=patches, commit=False
                     )
@@ -1167,9 +1276,7 @@ async def import_contacts_csv(
                 if org_name:
                     organization_id = org_name_lookup.get(org_name.lower())
                     if organization_id is None:
-                        raise ValueError(
-                            f"Organization '{org_name}' not found"
-                        )
+                        raise ValueError(f"Organization '{org_name}' not found")
 
                 # Resolve owner emails
                 owner_email_strs = parse_pipe_delimited(row.get("owner_emails", ""))
@@ -1187,9 +1294,7 @@ async def import_contacts_csv(
                         owner_ids.append(uid)
 
                 # Validate source
-                source = parse_enum_or_none(
-                    row.get("source", ""), CrmContactSource
-                )
+                source = parse_enum_or_none(row.get("source", ""), CrmContactSource)
 
                 # Validate status
                 status_str = row.get("status", "").strip()
@@ -1232,9 +1337,7 @@ async def import_contacts_csv(
                 if row_id:
                     contact = db_session.get(CrmContact, UUID(row_id))
                     if not contact:
-                        raise ValueError(
-                            f"Contact with id '{row_id}' not found"
-                        )
+                        raise ValueError(f"Contact with id '{row_id}' not found")
                     _, contact_changed = update_contact(
                         db_session,
                         contact=contact,
@@ -1246,8 +1349,14 @@ async def import_contacts_csv(
                     anything_changed = contact_changed
                 else:
                     # Dedup by email
-                    existing_contact_id = contact_email_lookup.get(email.lower()) if email else None
-                    existing = db_session.get(CrmContact, existing_contact_id) if existing_contact_id else None
+                    existing_contact_id = (
+                        contact_email_lookup.get(email.lower()) if email else None
+                    )
+                    existing = (
+                        db_session.get(CrmContact, existing_contact_id)
+                        if existing_contact_id
+                        else None
+                    )
                     if existing:
                         _, contact_changed = update_contact(
                             db_session,
@@ -1394,9 +1503,7 @@ async def import_interactions_csv(
                 if org_name:
                     organization_id = org_name_lookup.get(org_name.lower())
                     if organization_id is None:
-                        raise ValueError(
-                            f"Organization '{org_name}' not found"
-                        )
+                        raise ValueError(f"Organization '{org_name}' not found")
 
                 # Parse occurred_at
                 occurred_at = parse_datetime_or_none(row.get("occurred_at", ""))

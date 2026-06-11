@@ -19,6 +19,8 @@ interface ActivityTimelineProps {
   attendeeContactNameById?: Map<string, string>;
   canDeleteInteractions?: boolean;
   onDeleteInteraction?: (interaction: CrmInteraction) => void;
+  canEditInteractions?: boolean;
+  onEditInteraction?: (interaction: CrmInteraction) => void;
 }
 
 export default function ActivityTimeline({
@@ -31,6 +33,8 @@ export default function ActivityTimeline({
   attendeeContactNameById,
   canDeleteInteractions = false,
   onDeleteInteraction,
+  canEditInteractions = false,
+  onEditInteraction,
 }: ActivityTimelineProps) {
   return (
     <div className="flex flex-col gap-0">
@@ -72,6 +76,12 @@ export default function ActivityTimeline({
               onDelete={
                 onDeleteInteraction
                   ? () => onDeleteInteraction(interaction)
+                  : undefined
+              }
+              canEdit={canEditInteractions}
+              onEdit={
+                onEditInteraction
+                  ? () => onEditInteraction(interaction)
                   : undefined
               }
             />

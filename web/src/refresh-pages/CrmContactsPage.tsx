@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ChangeEvent, useCallback, useMemo, useState } from "react";
 
 import { CrmContactStage, exportCrmContacts } from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
@@ -49,8 +50,9 @@ const PAGE_SIZE = 25;
 export default function CrmContactsPage() {
   const searchParams = useSearchParams();
   const organizationIdFilter = searchParams.get("organization_id") ?? undefined;
-  const { isAdmin } = useUser();
+  const { user, isAdmin } = useUser();
   const { crmSettings } = useCrmSettings();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const stageOptions = useMemo(
     () =>
       crmSettings?.contact_stage_options?.length
@@ -71,6 +73,7 @@ export default function CrmContactsPage() {
     "all"
   );
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [orgFilterText, setOrgFilterText] = useState("");
   const [orgFilterId, setOrgFilterId] = useState<string | undefined>(undefined);
   const [pageNum, setPageNum] = useState(0);
@@ -107,12 +110,30 @@ export default function CrmContactsPage() {
     [orgLookup]
   );
 
+  const ownerOptions = useMemo(
+    () =>
+      (usersData || [])
+        .filter((candidate) => candidate.id !== user?.id)
+        .map((candidate) => ({
+          value: candidate.id,
+          label: candidate.email,
+        })),
+    [usersData, user?.id]
+  );
+  const ownerFilterId =
+    ownerFilter === "all"
+      ? undefined
+      : ownerFilter === "me"
+        ? user?.id
+        : ownerFilter;
+
   const { contacts, totalItems, isLoading, error, refreshContacts } =
     useCrmContacts({
       q: searchText || undefined,
       status: statusFilter === "all" ? undefined : statusFilter,
       category: categoryFilter === "all" ? undefined : categoryFilter,
       organizationId: organizationIdFilter ?? orgFilterId,
+      ownerIds: ownerFilterId ? [ownerFilterId] : undefined,
       pageNum,
       pageSize: PAGE_SIZE,
     });
@@ -126,6 +147,7 @@ export default function CrmContactsPage() {
     searchText ||
     statusFilter !== "all" ||
     categoryFilter !== "all" ||
+    ownerFilter !== "all" ||
     orgFilterId ||
     organizationIdFilter
       ? "Try adjusting filters or search terms."
@@ -210,7 +232,7 @@ export default function CrmContactsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto] md:items-center">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_180px_180px_auto] md:items-center">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -252,6 +274,25 @@ export default function CrmContactsPage() {
                 {categoryOptions.map((category) => (
                   <InputSelect.Item key={category} value={category}>
                     {formatCrmLabel(category)}
+                  </InputSelect.Item>
+                ))}
+              </InputSelect.Content>
+            </InputSelect>
+
+            <InputSelect
+              value={ownerFilter}
+              onValueChange={(value) => {
+                setOwnerFilter(value);
+                setPageNum(0);
+              }}
+            >
+              <InputSelect.Trigger placeholder="Filter by owner" />
+              <InputSelect.Content>
+                <InputSelect.Item value="all">All owners</InputSelect.Item>
+                <InputSelect.Item value="me">Me</InputSelect.Item>
+                {ownerOptions.map((owner) => (
+                  <InputSelect.Item key={owner.value} value={owner.value}>
+                    {owner.label}
                   </InputSelect.Item>
                 ))}
               </InputSelect.Content>

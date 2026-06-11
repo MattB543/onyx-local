@@ -1,8 +1,5 @@
 from datetime import datetime
 from datetime import timezone
-from fastapi import FastAPI
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
 from types import SimpleNamespace
 from unittest.mock import call
 from unittest.mock import MagicMock
@@ -10,29 +7,35 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
+from onyx.configs.constants import FileOrigin
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
-from onyx.configs.constants import FileOrigin
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
-from onyx.server.features.crm.api import current_admin_user
-from onyx.server.features.crm.api import current_user
 from onyx.server.features.crm.api import _delete_file_best_effort
 from onyx.server.features.crm.api import _serialize_interaction
+from onyx.server.features.crm.api import current_admin_user
+from onyx.server.features.crm.api import current_user
 from onyx.server.features.crm.api import delete_contact_profile_picture
 from onyx.server.features.crm.api import delete_crm_contact
 from onyx.server.features.crm.api import delete_crm_interaction
 from onyx.server.features.crm.api import delete_crm_organization
 from onyx.server.features.crm.api import get_contacts
 from onyx.server.features.crm.api import get_session
+from onyx.server.features.crm.api import patch_interaction
 from onyx.server.features.crm.api import post_contact
 from onyx.server.features.crm.api import post_interaction
 from onyx.server.features.crm.api import router
 from onyx.server.features.crm.api import upload_contact_profile_picture
 from onyx.server.features.crm.models import CrmContactCreateRequest
 from onyx.server.features.crm.models import CrmContactSnapshot
+from onyx.server.features.crm.models import CrmInteractionAttendeeInput
 from onyx.server.features.crm.models import CrmInteractionCreateRequest
+from onyx.server.features.crm.models import CrmInteractionPatchRequest
 
 
 def _build_crm_test_client(
@@ -59,7 +62,9 @@ def test_post_contact_defaults_owner_and_uses_workspace_default_stage() -> None:
             "onyx.server.features.crm.api.get_allowed_contact_stages",
             return_value=["prospect", "active"],
         ),
-        patch("onyx.server.features.crm.api._ensure_user_exists") as mock_ensure_user_exists,
+        patch(
+            "onyx.server.features.crm.api._ensure_user_exists"
+        ) as mock_ensure_user_exists,
         patch(
             "onyx.server.features.crm.api.create_contact",
             return_value=(created_contact, True),
@@ -97,7 +102,9 @@ def test_post_contact_explicit_null_owner_ids_keeps_contact_unowned() -> None:
             "onyx.server.features.crm.api.get_allowed_contact_stages",
             return_value=["lead", "active"],
         ),
-        patch("onyx.server.features.crm.api._ensure_user_exists") as mock_ensure_user_exists,
+        patch(
+            "onyx.server.features.crm.api._ensure_user_exists"
+        ) as mock_ensure_user_exists,
         patch(
             "onyx.server.features.crm.api.create_contact",
             return_value=(created_contact, True),
@@ -624,7 +631,9 @@ def test_delete_crm_interaction_deletes_interaction() -> None:
             "onyx.server.features.crm.api._load_interaction_or_404",
             return_value=interaction,
         ),
-        patch("onyx.server.features.crm.api.delete_interaction") as mock_delete_interaction,
+        patch(
+            "onyx.server.features.crm.api.delete_interaction"
+        ) as mock_delete_interaction,
     ):
         response = delete_crm_interaction(
             interaction_id=interaction.id,
@@ -825,6 +834,189 @@ def test_post_interaction_explicit_null_attendees_adds_no_defaults() -> None:
         )
 
     mock_add_attendees.assert_not_called()
+
+
+def test_patch_interaction_updates_basic_fields() -> None:
+    interaction_id = uuid4()
+    occurred_at = datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc)
+    request = CrmInteractionPatchRequest(
+        title="Updated title",
+        summary="Updated summary",
+        occurred_at=occurred_at,
+    )
+    interaction = SimpleNamespace(id=interaction_id)
+    db_session = MagicMock()
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_interaction_or_404",
+            return_value=interaction,
+        ),
+        patch(
+            "onyx.server.features.crm.api.update_interaction"
+        ) as mock_update_interaction,
+        patch(
+            "onyx.server.features.crm.api.replace_interaction_attendees"
+        ) as mock_replace_attendees,
+        patch(
+            "onyx.server.features.crm.api._serialize_interaction",
+            return_value={"id": str(interaction_id)},
+        ),
+    ):
+        result = patch_interaction(
+            interaction_id=interaction_id,
+            interaction_patch_request=request,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert result == {"id": str(interaction_id)}
+    mock_update_interaction.assert_called_once()
+    patches = mock_update_interaction.call_args.kwargs["patches"]
+    assert patches == {
+        "title": "Updated title",
+        "summary": "Updated summary",
+        "occurred_at": occurred_at,
+    }
+    mock_replace_attendees.assert_not_called()
+
+
+def test_patch_interaction_clears_occurred_at() -> None:
+    interaction_id = uuid4()
+    request = CrmInteractionPatchRequest(occurred_at=None)
+    db_session = MagicMock()
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_interaction_or_404",
+            return_value=SimpleNamespace(id=interaction_id),
+        ),
+        patch(
+            "onyx.server.features.crm.api.update_interaction"
+        ) as mock_update_interaction,
+        patch(
+            "onyx.server.features.crm.api._serialize_interaction",
+            return_value={"id": str(interaction_id)},
+        ),
+    ):
+        patch_interaction(
+            interaction_id=interaction_id,
+            interaction_patch_request=request,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    patches = mock_update_interaction.call_args.kwargs["patches"]
+    assert "occurred_at" in patches
+    assert patches["occurred_at"] is None
+
+
+def test_patch_interaction_rejects_null_title() -> None:
+    request = CrmInteractionPatchRequest(title=None)
+
+    with patch(
+        "onyx.server.features.crm.api._load_interaction_or_404",
+        return_value=SimpleNamespace(id=uuid4()),
+    ):
+        with pytest.raises(OnyxError) as exc:
+            patch_interaction(
+                interaction_id=uuid4(),
+                interaction_patch_request=request,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+
+
+def test_patch_interaction_validates_contact_id() -> None:
+    contact_id = uuid4()
+    request = CrmInteractionPatchRequest(contact_id=contact_id)
+    not_found = OnyxError(OnyxErrorCode.NOT_FOUND, "CRM contact not found.")
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_interaction_or_404",
+            return_value=SimpleNamespace(id=uuid4()),
+        ),
+        patch(
+            "onyx.server.features.crm.api._load_contact_or_404",
+            side_effect=not_found,
+        ),
+    ):
+        with pytest.raises(OnyxError) as exc:
+            patch_interaction(
+                interaction_id=uuid4(),
+                interaction_patch_request=request,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.status_code == 404
+
+
+def test_patch_interaction_replaces_attendees() -> None:
+    interaction_id = uuid4()
+    attendee_contact_id = uuid4()
+    request = CrmInteractionPatchRequest(
+        attendees=[
+            CrmInteractionAttendeeInput(
+                contact_id=attendee_contact_id,
+                role=CrmAttendeeRole.ATTENDEE,
+            )
+        ]
+    )
+    db_session = MagicMock()
+
+    with (
+        patch(
+            "onyx.server.features.crm.api._load_interaction_or_404",
+            return_value=SimpleNamespace(id=interaction_id),
+        ),
+        patch("onyx.server.features.crm.api.update_interaction"),
+        patch(
+            "onyx.server.features.crm.api.get_contact_by_id",
+            return_value=SimpleNamespace(id=attendee_contact_id),
+        ),
+        patch(
+            "onyx.server.features.crm.api.replace_interaction_attendees"
+        ) as mock_replace_attendees,
+        patch(
+            "onyx.server.features.crm.api._serialize_interaction",
+            return_value={"id": str(interaction_id)},
+        ),
+    ):
+        patch_interaction(
+            interaction_id=interaction_id,
+            interaction_patch_request=request,
+            db_session=db_session,
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    mock_replace_attendees.assert_called_once()
+    kwargs = mock_replace_attendees.call_args.kwargs
+    assert kwargs["interaction_id"] == interaction_id
+    assert kwargs["attendees"] == [
+        (None, attendee_contact_id, CrmAttendeeRole.ATTENDEE)
+    ]
+
+
+def test_patch_interaction_not_found() -> None:
+    not_found = OnyxError(OnyxErrorCode.NOT_FOUND, "CRM interaction not found.")
+
+    with patch(
+        "onyx.server.features.crm.api._load_interaction_or_404",
+        side_effect=not_found,
+    ):
+        with pytest.raises(OnyxError) as exc:
+            patch_interaction(
+                interaction_id=uuid4(),
+                interaction_patch_request=CrmInteractionPatchRequest(title="x"),
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.status_code == 404
 
 
 def test_serialize_interaction_includes_attendee_display_names() -> None:

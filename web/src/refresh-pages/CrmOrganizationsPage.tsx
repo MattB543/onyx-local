@@ -7,6 +7,7 @@ import {
   CrmOrganizationType,
   exportCrmOrganizations,
 } from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
@@ -42,11 +43,13 @@ import { Popover } from "@opal/components";
 const PAGE_SIZE = 25;
 
 export default function CrmOrganizationsPage() {
-  const { isAdmin } = useUser();
+  const { user, isAdmin } = useUser();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState<CrmOrganizationType | "all">(
     "all"
   );
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [pageNum, setPageNum] = useState(0);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -64,10 +67,28 @@ export default function CrmOrganizationsPage() {
     }
   }, []);
 
+  const ownerOptions = useMemo(
+    () =>
+      (usersData || [])
+        .filter((candidate) => candidate.id !== user?.id)
+        .map((candidate) => ({
+          value: candidate.id,
+          label: candidate.email,
+        })),
+    [usersData, user?.id]
+  );
+  const ownerFilterId =
+    ownerFilter === "all"
+      ? undefined
+      : ownerFilter === "me"
+        ? user?.id
+        : ownerFilter;
+
   const { organizations, totalItems, isLoading, error, refreshOrganizations } =
     useCrmOrganizations({
       q: searchText || undefined,
       type: typeFilter === "all" ? undefined : typeFilter,
+      ownerId: ownerFilterId,
       pageNum,
       pageSize: PAGE_SIZE,
     });
@@ -78,7 +99,7 @@ export default function CrmOrganizationsPage() {
   );
 
   const emptyDescription =
-    searchText || typeFilter !== "all"
+    searchText || typeFilter !== "all" || ownerFilter !== "all"
       ? "Try adjusting filters or search terms."
       : "Create your first organization to get started.";
 
@@ -148,7 +169,7 @@ export default function CrmOrganizationsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -172,6 +193,25 @@ export default function CrmOrganizationsPage() {
                 {ORGANIZATION_TYPE_OPTIONS.map((type) => (
                   <InputSelect.Item key={type} value={type}>
                     {formatCrmLabel(type)}
+                  </InputSelect.Item>
+                ))}
+              </InputSelect.Content>
+            </InputSelect>
+
+            <InputSelect
+              value={ownerFilter}
+              onValueChange={(value) => {
+                setOwnerFilter(value);
+                setPageNum(0);
+              }}
+            >
+              <InputSelect.Trigger placeholder="Filter by owner" />
+              <InputSelect.Content>
+                <InputSelect.Item value="all">All owners</InputSelect.Item>
+                <InputSelect.Item value="me">Me</InputSelect.Item>
+                {ownerOptions.map((owner) => (
+                  <InputSelect.Item key={owner.value} value={owner.value}>
+                    {owner.label}
                   </InputSelect.Item>
                 ))}
               </InputSelect.Content>

@@ -4,8 +4,14 @@ import { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Tabs } from "@opal/components";
+import { useUser } from "@/providers/UserProvider";
 
-type CrmTab = "home" | "contacts" | "organizations" | "interactions";
+type CrmTab =
+  | "home"
+  | "contacts"
+  | "organizations"
+  | "interactions"
+  | "email-queue";
 
 interface CrmNavProps {
   rightContent?: React.ReactNode;
@@ -24,6 +30,10 @@ function getCurrentTab(pathname: string): CrmTab {
     return "interactions";
   }
 
+  if (pathname.startsWith("/app/crm/email-queue")) {
+    return "email-queue";
+  }
+
   return "home";
 }
 
@@ -31,6 +41,8 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const activeTab = getCurrentTab(pathname);
+  const { isAdmin, isCurator } = useUser();
+  const showEmailQueue = isAdmin || isCurator;
 
   return (
     <div
@@ -62,6 +74,11 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
             return;
           }
 
+          if (nextTab === "email-queue") {
+            router.push("/app/crm/email-queue" as Route);
+            return;
+          }
+
           router.push("/app/crm/organizations");
         }}
       >
@@ -70,6 +87,9 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
           <Tabs.Trigger value="contacts">Contacts</Tabs.Trigger>
           <Tabs.Trigger value="organizations">Organizations</Tabs.Trigger>
           <Tabs.Trigger value="interactions">Interactions</Tabs.Trigger>
+          {showEmailQueue && (
+            <Tabs.Trigger value="email-queue">Email Queue</Tabs.Trigger>
+          )}
         </Tabs.List>
       </Tabs>
     </div>

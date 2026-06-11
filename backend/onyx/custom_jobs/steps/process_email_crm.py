@@ -255,7 +255,6 @@ class ProcessEmailCrmStep(BaseStep):
             packets = handle_stream_message_objects(
                 new_msg_req=new_message_request,
                 user=user,
-                db_session=context.db_session,
                 bypass_acl=True,
                 external_state_container=state_container,
             )

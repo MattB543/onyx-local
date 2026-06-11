@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from onyx.chat.emitter import Emitter
 from onyx.configs.constants import FileOrigin
+from onyx.db.enums import CrmAttendeeRole
 from onyx.db.enums import CrmInteractionType
 from onyx.db.models import CrmContact
 from onyx.db.models import CrmInteraction
@@ -160,7 +161,9 @@ class TestCrmToolRun:
         "tool_cls",
         [CrmSearchTool, CrmCreateTool, CrmUpdateTool, CrmLogInteractionTool],
     )
-    def test_is_available_false_when_crm_tables_missing(self, db_session, tool_cls) -> None:
+    def test_is_available_false_when_crm_tables_missing(
+        self, db_session, tool_cls
+    ) -> None:
         assert tool_cls.is_available(db_session) is False
 
     def test_crm_search_run_emits_delta(
@@ -573,6 +576,197 @@ class TestCrmToolRun:
         assert packet.obj.payload["status"] == "created"
         assert "updated_at" in packet.obj.payload["interaction"]
         assert '"status": "created"' in result.llm_facing_response
+
+    def test_crm_update_interaction_run_emits_delta(
+        self, emitter: Emitter, db_session, placement: Placement
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+        interaction_id = uuid4()
+        interaction = CrmInteraction(
+            type=CrmInteractionType.NOTE,
+            title="Old title",
+        )
+        interaction.id = interaction_id
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_by_id",
+                return_value=interaction,
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.update_interaction",
+                return_value=(interaction, True),
+            ) as mock_update_interaction,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.replace_interaction_attendees"
+            ) as mock_replace_attendees,
+        ):
+            result = tool.run(
+                placement=placement,
+                entity_type="interaction",
+                entity_id=str(interaction_id),
+                updates={
+                    "title": "New title",
+                    "occurred_at": "2024-01-02T15:00:00Z",
+                },
+            )
+
+        packet = emitter.bus.get_nowait()
+        assert isinstance(packet.obj, CrmUpdateToolDelta)
+        assert packet.obj.payload["status"] == "updated"
+        assert packet.obj.payload["entity_type"] == "interaction"
+        assert '"status": "updated"' in result.llm_facing_response
+        # attendees not provided -> not replaced
+        mock_replace_attendees.assert_not_called()
+        patches = mock_update_interaction.call_args.kwargs["patches"]
+        assert patches["title"] == "New title"
+        assert "occurred_at" in patches
+        assert "attendees" not in patches
+
+    def test_crm_update_interaction_unknown_id_raises(
+        self, emitter: Emitter, db_session, placement: Placement
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with patch(
+            "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_by_id",
+            return_value=None,
+        ):
+            with pytest.raises(ToolCallException):
+                tool.run(
+                    placement=placement,
+                    entity_type="interaction",
+                    entity_id=str(uuid4()),
+                    updates={"title": "New title"},
+                )
+
+    def test_crm_update_interaction_replaces_attendees(
+        self, emitter: Emitter, db_session, placement: Placement
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+        interaction_id = uuid4()
+        interaction = CrmInteraction(
+            type=CrmInteractionType.NOTE,
+            title="Title",
+        )
+        interaction.id = interaction_id
+        contact_id = uuid4()
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_by_id",
+                return_value=interaction,
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.update_interaction",
+                return_value=(interaction, False),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.resolve_attendees",
+                return_value=(
+                    [
+                        {
+                            "user_id": None,
+                            "contact_id": contact_id,
+                            "role": CrmAttendeeRole.ATTENDEE,
+                        }
+                    ],
+                    [],
+                    [],
+                ),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.replace_interaction_attendees"
+            ) as mock_replace_attendees,
+        ):
+            tool.run(
+                placement=placement,
+                entity_type="interaction",
+                entity_id=str(interaction_id),
+                updates={"attendees": [{"contact_id": str(contact_id)}]},
+            )
+
+        mock_replace_attendees.assert_called_once()
+        kwargs = mock_replace_attendees.call_args.kwargs
+        assert kwargs["interaction_id"] == interaction_id
+        assert kwargs["attendees"] == [(None, contact_id, CrmAttendeeRole.ATTENDEE)]
+
+    def test_crm_update_interaction_unresolved_attendees_do_not_replace(
+        self, emitter: Emitter, db_session, placement: Placement
+    ) -> None:
+        """If any attendee fails to resolve, the update must abort without
+        replacing (and thus without wiping) the existing attendee rows."""
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+        interaction_id = uuid4()
+        interaction = CrmInteraction(
+            type=CrmInteractionType.NOTE,
+            title="Title",
+        )
+        interaction.id = interaction_id
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_by_id",
+                return_value=interaction,
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.update_interaction"
+            ) as mock_update_interaction,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.resolve_attendees",
+                return_value=(
+                    [],
+                    [
+                        {
+                            "input": "bogus person",
+                            "reason": "unresolved",
+                            "candidates": [],
+                        }
+                    ],
+                    [],
+                ),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_update_tool.replace_interaction_attendees"
+            ) as mock_replace_attendees,
+        ):
+            with pytest.raises(ToolCallException) as exc:
+                tool.run(
+                    placement=placement,
+                    entity_type="interaction",
+                    entity_id=str(interaction_id),
+                    updates={
+                        "title": "New title",
+                        "attendees": [{"name": "bogus person"}],
+                    },
+                )
+
+        # Neither the attendee replacement nor the column update ran.
+        mock_replace_attendees.assert_not_called()
+        mock_update_interaction.assert_not_called()
+        assert "bogus person" in exc.value.llm_facing_message
+        assert "NOT updated" in exc.value.llm_facing_message
+
+    def test_crm_update_invalid_entity_type(
+        self, emitter: Emitter, db_session, placement: Placement
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with pytest.raises(ToolCallException):
+            tool.run(
+                placement=placement,
+                entity_type="tag",
+                entity_id=str(uuid4()),
+                updates={"name": "x"},
+            )
 
 
 class TestCrmSessionReplayPacketBuilders:

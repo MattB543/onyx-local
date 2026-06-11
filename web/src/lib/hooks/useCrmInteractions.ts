@@ -13,6 +13,7 @@ interface UseCrmInteractionsParams {
   organizationId?: string;
   includeContactInteractions?: boolean;
   interactionType?: CrmInteractionType;
+  loggedBy?: string;
   pageNum: number;
   pageSize: number;
 }
@@ -22,6 +23,7 @@ export function useCrmInteractions({
   organizationId,
   includeContactInteractions,
   interactionType,
+  loggedBy,
   pageNum,
   pageSize,
 }: UseCrmInteractionsParams) {
@@ -34,6 +36,7 @@ export function useCrmInteractions({
       organizationId ?? "",
       includeContactInteractions ?? false,
       interactionType ?? "",
+      loggedBy ?? "",
       pageNum,
       pageSize,
     ],
@@ -43,6 +46,7 @@ export function useCrmInteractions({
         organization_id: organizationId,
         include_contact_interactions: includeContactInteractions,
         interaction_type: interactionType,
+        logged_by: loggedBy || undefined,
         page_num: pageNum,
         page_size: pageSize,
       }),

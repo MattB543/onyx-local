@@ -14,6 +14,7 @@ interface UseCrmContactsParams {
   status?: CrmContactStage;
   category?: string;
   organizationId?: string;
+  ownerIds?: string[];
   sortBy?: string;
   pageNum: number;
   pageSize: number;
@@ -24,6 +25,7 @@ export function useCrmContacts({
   status,
   category,
   organizationId,
+  ownerIds,
   sortBy,
   pageNum,
   pageSize,
@@ -37,6 +39,7 @@ export function useCrmContacts({
       status ?? "",
       category ?? "",
       organizationId ?? "",
+      ownerIds?.join(",") ?? "",
       sortBy ?? "",
       pageNum,
       pageSize,
@@ -47,6 +50,7 @@ export function useCrmContacts({
         status,
         category,
         organization_id: organizationId,
+        owner_ids: ownerIds?.length ? ownerIds : undefined,
         sort_by: sortBy,
         page_num: pageNum,
         page_size: pageSize,

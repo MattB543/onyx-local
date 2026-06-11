@@ -2,7 +2,7 @@ import { CrmInteraction } from "@/app/app/crm/crmService";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import Text from "@/refresh-components/texts/Text";
 
-import { SvgTrash } from "@opal/icons";
+import { SvgEdit, SvgTrash } from "@opal/icons";
 
 import { formatDateTime } from "./crmDateUtils";
 import InteractionTypeIcon from "./InteractionTypeIcon";
@@ -13,6 +13,8 @@ interface TimelineInteractionCardProps {
   attendeeContactNameById?: Map<string, string>;
   canDelete?: boolean;
   onDelete?: () => void;
+  canEdit?: boolean;
+  onEdit?: () => void;
 }
 
 export default function TimelineInteractionCard({
@@ -21,6 +23,8 @@ export default function TimelineInteractionCard({
   attendeeContactNameById,
   canDelete = false,
   onDelete,
+  canEdit = false,
+  onEdit,
 }: TimelineInteractionCardProps) {
   const dateTimeLabel = formatDateTime(
     interaction.occurred_at || interaction.created_at
@@ -85,18 +89,32 @@ export default function TimelineInteractionCard({
             </Text>
           )}
         </div>
-        {canDelete && onDelete && (
-          <div className="absolute right-0 top-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            <IconButton
-              main
-              tertiary
-              icon={SvgTrash}
-              tooltip="Delete interaction"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete();
-              }}
-            />
+        {((canEdit && onEdit) || (canDelete && onDelete)) && (
+          <div className="absolute right-0 top-0 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {canEdit && onEdit && (
+              <IconButton
+                main
+                tertiary
+                icon={SvgEdit}
+                tooltip="Edit interaction"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit();
+                }}
+              />
+            )}
+            {canDelete && onDelete && (
+              <IconButton
+                main
+                tertiary
+                icon={SvgTrash}
+                tooltip="Delete interaction"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete();
+                }}
+              />
+            )}
           </div>
         )}
       </div>

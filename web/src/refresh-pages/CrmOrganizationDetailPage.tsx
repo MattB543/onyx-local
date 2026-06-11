@@ -95,6 +95,8 @@ export default function CrmOrganizationDetailPage({
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [interactionToDelete, setInteractionToDelete] =
     useState<CrmInteraction | null>(null);
+  const [interactionToEdit, setInteractionToEdit] =
+    useState<CrmInteraction | null>(null);
   const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
     INTERACTION_PAGE_SIZE
@@ -620,6 +622,10 @@ export default function CrmOrganizationDetailPage({
                         onDeleteInteraction={(interaction) => {
                           setInteractionToDelete(interaction);
                         }}
+                        canEditInteractions={true}
+                        onEditInteraction={(interaction) => {
+                          setInteractionToEdit(interaction);
+                        }}
                         onLoadMore={() =>
                           setInteractionPageSize(
                             (value) => value + INTERACTION_PAGE_SIZE
@@ -641,6 +647,21 @@ export default function CrmOrganizationDetailPage({
       <LogInteractionModal
         open={logInteractionModalOpen}
         onOpenChange={setLogInteractionModalOpen}
+        organizationId={organizationId}
+        onSuccess={() => {
+          void refreshInteractions();
+          void refreshOrganization();
+        }}
+      />
+
+      <LogInteractionModal
+        open={interactionToEdit !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInteractionToEdit(null);
+          }
+        }}
+        interaction={interactionToEdit ?? undefined}
         organizationId={organizationId}
         onSuccess={() => {
           void refreshInteractions();

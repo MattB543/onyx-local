@@ -418,8 +418,12 @@ class TestCleanupCustomJobHistory:
             [job],
             [old_run],
         ]
-        # Simulate the scrub UPDATE affecting 1 row.
-        db_session.execute.return_value.rowcount = 1
+        # Simulate the full scrub UPDATE affecting 1 row and the FAILED
+        # partial scrub UPDATE affecting 0 rows.
+        db_session.execute.side_effect = [
+            SimpleNamespace(rowcount=1),
+            SimpleNamespace(rowcount=0),
+        ]
 
         deleted = cleanup_custom_job_history(db_session=db_session)
 
@@ -428,8 +432,9 @@ class TestCleanupCustomJobHistory:
         # Run is DELETE'd.
         assert db_session.delete.call_count == 1
         db_session.delete.assert_called_once_with(old_run)
-        # Event is UPDATE'd via db_session.execute(update(...)).
-        assert db_session.execute.call_count == 1
+        # Events are UPDATE'd via db_session.execute(update(...)) -- one full
+        # scrub for CONSUMED/DROPPED and one partial scrub for FAILED.
+        assert db_session.execute.call_count == 2
 
     def test_preserves_recent_runs_and_events(self) -> None:
         job = SimpleNamespace(id=uuid4(), retention_days=90)
@@ -477,8 +482,12 @@ class TestCleanupCustomJobHistory:
             [job],
             [],
         ]
-        # The scrub statement matches 1 row.
-        db_session.execute.return_value.rowcount = 1
+        # The full scrub statement matches 1 row; the FAILED partial scrub
+        # matches none.
+        db_session.execute.side_effect = [
+            SimpleNamespace(rowcount=1),
+            SimpleNamespace(rowcount=0),
+        ]
 
         deleted = cleanup_custom_job_history(db_session=db_session)
 
@@ -486,8 +495,8 @@ class TestCleanupCustomJobHistory:
         assert deleted == 1
         # No rows deleted -- scrub is an UPDATE, not a DELETE.
         db_session.delete.assert_not_called()
-        # Verify an UPDATE statement was executed.
-        assert db_session.execute.call_count == 1
+        # Verify UPDATE statements were executed (full + FAILED partial).
+        assert db_session.execute.call_count == 2
         executed_stmt = db_session.execute.call_args_list[0].args[0]
         # SQLAlchemy Update objects render with "UPDATE " at the start
         # when compiled to string.
@@ -510,14 +519,15 @@ class TestCleanupCustomJobHistory:
 
         assert deleted == 0
         db_session.delete.assert_not_called()
-        # The UPDATE still runs -- idempotency is enforced by the WHERE
-        # filter, not by skipping the UPDATE call.
-        assert db_session.execute.call_count == 1
+        # The UPDATEs still run -- idempotency is enforced by the WHERE
+        # filters, not by skipping the UPDATE calls.
+        assert db_session.execute.call_count == 2
 
     def test_does_not_scrub_non_terminal_statuses(self) -> None:
-        """The scrub's WHERE clause restricts to CONSUMED/DROPPED/FAILED.
-        RECEIVED and ENQUEUED rows are never scrubbed even if they are
-        older than retention_days."""
+        """The full scrub's WHERE clause restricts to CONSUMED/DROPPED.
+        FAILED rows get a separate bounded partial scrub. RECEIVED and
+        ENQUEUED rows are never scrubbed even if they are older than
+        retention_days."""
         job = SimpleNamespace(id=uuid4(), retention_days=7)
 
         db_session = MagicMock()
@@ -530,15 +540,16 @@ class TestCleanupCustomJobHistory:
         deleted = cleanup_custom_job_history(db_session=db_session)
 
         assert deleted == 0
-        # Verify the UPDATE statement was actually executed with the
-        # terminal-status filter baked in.
-        assert db_session.execute.call_count == 1
+        # Verify both UPDATE statements were actually executed: the full
+        # scrub with the terminal-status filter baked in and the FAILED
+        # partial scrub.
+        assert db_session.execute.call_count == 2
         executed_stmt = db_session.execute.call_args_list[0].args[0]
         # Pull the status IN(...) list out of the compiled statement's
         # bind params (SQLAlchemy stores the raw Python list under a
         # `status_N` key). We look at the enum members directly to
-        # confirm the filter contains the three terminal statuses and
-        # NOT the non-terminal ones.
+        # confirm the filter contains only the fully-scrubbed terminal
+        # statuses and NOT FAILED or the non-terminal ones.
         compiled_params = executed_stmt.compile().params
         status_values: list[CustomJobTriggerEventStatus] = []
         for key, value in compiled_params.items():
@@ -549,9 +560,44 @@ class TestCleanupCustomJobHistory:
                 break
         assert CustomJobTriggerEventStatus.CONSUMED in status_values
         assert CustomJobTriggerEventStatus.DROPPED in status_values
-        assert CustomJobTriggerEventStatus.FAILED in status_values
+        assert CustomJobTriggerEventStatus.FAILED not in status_values
         assert CustomJobTriggerEventStatus.RECEIVED not in status_values
         assert CustomJobTriggerEventStatus.ENQUEUED not in status_values
+
+    def test_failed_events_get_bounded_partial_scrub(self) -> None:
+        """FAILED trigger events older than retention_days have only the
+        bulky content keys ('text', 'body') removed from payload_json --
+        the metadata keys and error_message column are untouched so the
+        permanent failed list stays diagnosable."""
+        job = SimpleNamespace(id=uuid4(), retention_days=7)
+
+        db_session = MagicMock()
+        db_session.scalars.return_value.all.side_effect = [
+            [job],
+            [],
+        ]
+        # Full scrub matches nothing; the FAILED partial scrub matches 1 row.
+        db_session.execute.side_effect = [
+            SimpleNamespace(rowcount=0),
+            SimpleNamespace(rowcount=1),
+        ]
+
+        deleted = cleanup_custom_job_history(db_session=db_session)
+
+        assert deleted == 1
+        db_session.delete.assert_not_called()
+        assert db_session.execute.call_count == 2
+
+        failed_stmt = db_session.execute.call_args_list[1].args[0]
+        failed_stmt_str = str(failed_stmt)
+        assert "UPDATE" in failed_stmt_str.upper()
+        # Only the bulky content keys are stripped (jsonb `-` operator);
+        # nothing resets payload_json to '{}'.
+        assert "- 'text'" in failed_stmt_str
+        assert "- 'body'" in failed_stmt_str
+        # The statement is restricted to FAILED events.
+        compiled_params = failed_stmt.compile().params
+        assert CustomJobTriggerEventStatus.FAILED in compiled_params.values()
 
 
 class TestMarkRunTerminal:

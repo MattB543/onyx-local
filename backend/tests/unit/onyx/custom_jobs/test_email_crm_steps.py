@@ -332,7 +332,7 @@ def test_process_email_crm_success_uses_context_db_session_and_legacy_fallbacks(
     assert result.output_json["message_id"] == 321
 
     handle_kwargs = mock_handle.call_args.kwargs
-    assert handle_kwargs["db_session"] is context.db_session
+    assert "db_session" not in handle_kwargs
     assert handle_kwargs["user"] is fake_user
     assert handle_kwargs["bypass_acl"] is True
 

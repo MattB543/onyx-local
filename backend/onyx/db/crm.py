@@ -19,8 +19,8 @@ from onyx.db.enums import CrmContactSource
 from onyx.db.enums import CrmInteractionType
 from onyx.db.enums import CrmOrganizationType
 from onyx.db.models import CrmContact
-from onyx.db.models import CrmContactOwner
 from onyx.db.models import CrmContact__Tag
+from onyx.db.models import CrmContactOwner
 from onyx.db.models import CrmInteraction
 from onyx.db.models import CrmInteractionAttendee
 from onyx.db.models import CrmOrganization
@@ -29,7 +29,6 @@ from onyx.db.models import CrmSettings
 from onyx.db.models import CrmTag
 from onyx.db.models import User
 from onyx.file_store.utils import build_frontend_file_url
-
 
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 200
@@ -140,11 +139,7 @@ def _normalize_lookup_name(value: str | None) -> str | None:
 
 
 def _escape_like_query(value: str) -> str:
-    return (
-        value.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def get_or_create_crm_settings(
@@ -328,6 +323,7 @@ def list_contacts(
     category: str | None = None,
     organization_id: UUID | None = None,
     tag_ids: list[UUID] | None = None,
+    owner_ids: list[UUID] | None = None,
     sort_by: str | None = None,
 ) -> tuple[list[CrmContact], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
@@ -364,6 +360,16 @@ def list_contacts(
             .distinct()
         )
 
+    if owner_ids:
+        stmt = stmt.where(
+            select(CrmContactOwner.contact_id)
+            .where(
+                CrmContactOwner.contact_id == CrmContact.id,
+                CrmContactOwner.user_id.in_(owner_ids),
+            )
+            .exists()
+        )
+
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
     if sort_by == "created_at":
@@ -373,9 +379,7 @@ def list_contacts(
 
     items = list(
         db_session.scalars(
-            stmt.order_by(*order_clauses)
-            .offset(page_num * page_size)
-            .limit(page_size)
+            stmt.order_by(*order_clauses).offset(page_num * page_size).limit(page_size)
         )
     )
     return items, int(total)
@@ -605,6 +609,7 @@ def list_organizations(
     query: str | None = None,
     org_type: CrmOrganizationType | None = None,
     tag_ids: list[UUID] | None = None,
+    created_by: UUID | None = None,
     sort_by: str | None = None,
 ) -> tuple[list[CrmOrganization], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
@@ -636,6 +641,9 @@ def list_organizations(
             .distinct()
         )
 
+    if created_by is not None:
+        stmt = stmt.where(CrmOrganization.created_by == created_by)
+
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
     if sort_by == "created_at":
@@ -651,9 +659,7 @@ def list_organizations(
 
     items = list(
         db_session.scalars(
-            stmt.order_by(*order_clauses)
-            .offset(page_num * page_size)
-            .limit(page_size)
+            stmt.order_by(*order_clauses).offset(page_num * page_size).limit(page_size)
         )
     )
     return items, int(total)
@@ -788,6 +794,7 @@ def list_interactions(
     organization_id: UUID | None = None,
     include_contact_interactions: bool = False,
     interaction_type: CrmInteractionType | None = None,
+    logged_by: UUID | None = None,
 ) -> tuple[list[CrmInteraction], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
 
@@ -811,6 +818,8 @@ def list_interactions(
             stmt = stmt.where(CrmInteraction.organization_id == organization_id)
     if interaction_type is not None:
         stmt = stmt.where(CrmInteraction.type == interaction_type)
+    if logged_by is not None:
+        stmt = stmt.where(CrmInteraction.logged_by == logged_by)
 
     sort_expr = func.coalesce(CrmInteraction.occurred_at, CrmInteraction.created_at)
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
@@ -862,6 +871,111 @@ def create_interaction(
     db_session.refresh(interaction)
 
     return interaction
+
+
+def update_interaction(
+    db_session: Session,
+    *,
+    interaction: CrmInteraction,
+    patches: dict,
+    commit: bool = True,
+) -> tuple[CrmInteraction, bool]:
+    """Update a CrmInteraction with the given patches.
+
+    Mutable fields: title, summary, type, occurred_at, contact_id, organization_id.
+    Attendee replacement is handled separately (see replace_interaction_attendees).
+    Returns (interaction, changed) where changed indicates whether any field was
+    actually modified.
+    """
+    mutable_fields = {
+        "title",
+        "summary",
+        "type",
+        "occurred_at",
+        "contact_id",
+        "organization_id",
+    }
+
+    changed = False
+
+    for key, value in patches.items():
+        if key not in mutable_fields:
+            continue
+
+        if key == "title":
+            normalized_title = _strip_or_none(value)
+            if normalized_title is None:
+                raise ValueError("Interaction title cannot be empty")
+            if _strip_or_none(interaction.title) != normalized_title:
+                interaction.title = normalized_title
+                changed = True
+            continue
+
+        if key == "summary":
+            normalized = _normalize_text(value)
+            if _normalize_text(interaction.summary) != normalized:
+                interaction.summary = normalized
+                changed = True
+            continue
+
+        # type (CrmInteractionType), occurred_at (datetime|None),
+        # contact_id / organization_id (UUID|None): direct assignment.
+        if getattr(interaction, key) != value:
+            setattr(interaction, key, value)
+            changed = True
+
+    if changed:
+        db_session.flush()
+        if commit:
+            db_session.commit()
+        db_session.refresh(interaction)
+
+    return interaction, changed
+
+
+def replace_interaction_attendees(
+    db_session: Session,
+    *,
+    interaction_id: UUID,
+    attendees: list[tuple[UUID | None, UUID | None, CrmAttendeeRole]],
+    commit: bool = True,
+) -> list[CrmInteractionAttendee]:
+    """Replace ALL attendees of an interaction with the given tuples.
+
+    Each tuple is (user_id, contact_id, role). Deletes existing attendee rows
+    then inserts the provided set (deduped by (user_id, contact_id), preferring
+    ORGANIZER role on conflict). An empty list clears all attendees.
+    """
+    db_session.execute(
+        delete(CrmInteractionAttendee).where(
+            CrmInteractionAttendee.interaction_id == interaction_id
+        )
+    )
+
+    deduped: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
+    for user_id, contact_id, role in attendees:
+        key = (user_id, contact_id)
+        existing = deduped.get(key)
+        if existing is None or (
+            existing != CrmAttendeeRole.ORGANIZER and role == CrmAttendeeRole.ORGANIZER
+        ):
+            deduped[key] = role
+
+    for (user_id, contact_id), role in deduped.items():
+        db_session.add(
+            CrmInteractionAttendee(
+                interaction_id=interaction_id,
+                user_id=user_id,
+                contact_id=contact_id,
+                role=role,
+            )
+        )
+
+    db_session.flush()
+    if commit:
+        db_session.commit()
+
+    return get_interaction_attendees(interaction_id, db_session)
 
 
 def delete_interaction(
@@ -1034,9 +1148,7 @@ def get_contact_tags(contact_id: UUID, db_session: Session) -> list[CrmTag]:
     )
 
 
-def get_organization_tags(
-    organization_id: UUID, db_session: Session
-) -> list[CrmTag]:
+def get_organization_tags(organization_id: UUID, db_session: Session) -> list[CrmTag]:
     return list(
         db_session.scalars(
             select(CrmTag)
@@ -1056,7 +1168,10 @@ def add_tag_to_contact(
 ) -> None:
     existing = db_session.scalar(
         select(CrmContact__Tag).where(
-            and_(CrmContact__Tag.contact_id == contact_id, CrmContact__Tag.tag_id == tag_id)
+            and_(
+                CrmContact__Tag.contact_id == contact_id,
+                CrmContact__Tag.tag_id == tag_id,
+            )
         )
     )
     if existing:
@@ -1100,9 +1215,7 @@ def add_tag_to_organization(
     if existing:
         return
 
-    db_session.add(
-        CrmOrganization__Tag(organization_id=organization_id, tag_id=tag_id)
-    )
+    db_session.add(CrmOrganization__Tag(organization_id=organization_id, tag_id=tag_id))
     if commit:
         db_session.commit()
 
@@ -1136,7 +1249,9 @@ def search_crm_entities(
         return [], 0
     escaped_like_query = _escape_like_query(query)
 
-    requested_types = set(entity_types or ["contact", "organization", "interaction", "tag"])
+    requested_types = set(
+        entity_types or ["contact", "organization", "interaction", "tag"]
+    )
 
     union_parts: list[str] = []
     if "contact" in requested_types:
@@ -1237,7 +1352,9 @@ def search_crm_entities(
             entity_id=str(row["entity_id"]),
             primary_text=str(row["primary_text"] or ""),
             secondary_text=(
-                str(row["secondary_text"]) if row["secondary_text"] is not None else None
+                str(row["secondary_text"])
+                if row["secondary_text"] is not None
+                else None
             ),
             rank=float(row["rank"] or 0),
             sort_at=row["sort_at"],
@@ -1330,9 +1447,7 @@ def find_users_for_attendee_resolution(
 def export_all_organizations(db_session: Session) -> list[dict]:
     """Export all organizations with tags for CSV."""
     orgs = list(
-        db_session.scalars(
-            select(CrmOrganization).order_by(CrmOrganization.name.asc())
-        )
+        db_session.scalars(select(CrmOrganization).order_by(CrmOrganization.name.asc()))
     )
     if not orgs:
         return []
@@ -1480,17 +1595,13 @@ def export_all_interactions(db_session: Session) -> list[dict]:
     """Export all interactions with contact email and org name for CSV."""
     sort_expr = func.coalesce(CrmInteraction.occurred_at, CrmInteraction.created_at)
     interactions = list(
-        db_session.scalars(
-            select(CrmInteraction).order_by(sort_expr.desc())
-        )
+        db_session.scalars(select(CrmInteraction).order_by(sort_expr.desc()))
     )
     if not interactions:
         return []
 
     # Bulk-fetch contact emails
-    contact_ids = list(
-        {i.contact_id for i in interactions if i.contact_id is not None}
-    )
+    contact_ids = list({i.contact_id for i in interactions if i.contact_id is not None})
     contact_emails: dict[UUID, str] = {}
     if contact_ids:
         contact_rows = db_session.execute(
@@ -1514,9 +1625,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
         org_names = {oid: name for oid, name in org_rows}
 
     # Bulk-fetch logger emails
-    logger_ids = list(
-        {i.logged_by for i in interactions if i.logged_by is not None}
-    )
+    logger_ids = list({i.logged_by for i in interactions if i.logged_by is not None})
     logger_emails: dict[UUID, str] = {}
     if logger_ids:
         user_rows = db_session.execute(
@@ -1537,9 +1646,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
         )
 
     # Build user-email and contact-email maps for attendees
-    attendee_user_ids = list(
-        {a.user_id for a in attendees if a.user_id is not None}
-    )
+    attendee_user_ids = list({a.user_id for a in attendees if a.user_id is not None})
     attendee_user_emails: dict[UUID, str] = {}
     if attendee_user_ids:
         rows = db_session.execute(
@@ -1610,9 +1717,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
                 "organizer_contacts": "|".join(organizer_contacts),
                 "attendee_users": "|".join(attendee_users),
                 "attendee_contacts": "|".join(attendee_contacts),
-                "occurred_at": str(i.occurred_at)
-                if i.occurred_at is not None
-                else "",
+                "occurred_at": str(i.occurred_at) if i.occurred_at is not None else "",
                 "logged_by": logger_emails.get(i.logged_by, "")
                 if i.logged_by is not None
                 else "",
@@ -1625,9 +1730,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
 
 def build_org_name_lookup(db_session: Session) -> dict[str, UUID]:
     """Build {lowercase_name: org_id} lookup dict."""
-    rows = db_session.execute(
-        select(CrmOrganization.id, CrmOrganization.name)
-    ).all()
+    rows = db_session.execute(select(CrmOrganization.id, CrmOrganization.name)).all()
     result: dict[str, UUID] = {}
     for oid, name in rows:
         normalized_name = _normalize_lookup_name(name)
@@ -1639,9 +1742,7 @@ def build_org_name_lookup(db_session: Session) -> dict[str, UUID]:
 def build_contact_email_lookup(db_session: Session) -> dict[str, UUID]:
     """Build {lowercase_email: contact_id} lookup dict."""
     rows = db_session.execute(
-        select(CrmContact.id, CrmContact.email).where(
-            CrmContact.email.isnot(None)
-        )
+        select(CrmContact.id, CrmContact.email).where(CrmContact.email.isnot(None))
     ).all()
     result: dict[str, UUID] = {}
     for cid, email in rows:
@@ -1653,9 +1754,7 @@ def build_contact_email_lookup(db_session: Session) -> dict[str, UUID]:
 
 def build_user_email_lookup(db_session: Session) -> dict[str, UUID]:
     """Build {lowercase_email: user_id} lookup dict for resolving owner_emails."""
-    rows = db_session.execute(
-        select(User.id, User.email)
-    ).all()
+    rows = db_session.execute(select(User.id, User.email)).all()
     result: dict[str, UUID] = {}
     for uid, email in rows:
         normalized_email = _normalize_email(email)
@@ -1675,9 +1774,7 @@ def ensure_tags_exist(
         name = name.strip()
         if not name:
             continue
-        tag, _created = create_tag(
-            db_session, name=name, color=None, commit=False
-        )
+        tag, _created = create_tag(db_session, name=name, color=None, commit=False)
         result[name.lower()] = tag.id
     db_session.flush()
     if commit:

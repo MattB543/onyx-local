@@ -268,6 +268,7 @@ export async function listCrmContacts(args?: {
   category?: string;
   organization_id?: string;
   tag_ids?: string[];
+  owner_ids?: string[];
   sort_by?: string;
   page_num?: number;
   page_size?: number;
@@ -278,6 +279,7 @@ export async function listCrmContacts(args?: {
     category: args?.category,
     organization_id: args?.organization_id,
     tag_ids: args?.tag_ids,
+    owner_ids: args?.owner_ids,
     sort_by: args?.sort_by,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
@@ -347,6 +349,7 @@ export async function listCrmOrganizations(args?: {
   q?: string;
   type?: CrmOrganizationType;
   tag_ids?: string[];
+  owner_id?: string;
   sort_by?: string;
   page_num?: number;
   page_size?: number;
@@ -355,6 +358,7 @@ export async function listCrmOrganizations(args?: {
     q: args?.q,
     type: args?.type,
     tag_ids: args?.tag_ids,
+    owner_id: args?.owner_id,
     sort_by: args?.sort_by,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
@@ -407,6 +411,7 @@ export async function listCrmInteractions(args?: {
   organization_id?: string;
   include_contact_interactions?: boolean;
   interaction_type?: CrmInteractionType;
+  logged_by?: string;
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmInteraction>> {
@@ -415,6 +420,7 @@ export async function listCrmInteractions(args?: {
     organization_id: args?.organization_id,
     include_contact_interactions: args?.include_contact_interactions || undefined,
     interaction_type: args?.interaction_type,
+    logged_by: args?.logged_by,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -434,6 +440,34 @@ export async function createCrmInteraction(
     }
 ): Promise<CrmInteraction> {
   return postJson("/api/user/crm/interactions", body, "Create CRM interaction");
+}
+
+export interface CrmInteractionAttendeeInput {
+  user_id?: string | null;
+  contact_id?: string | null;
+  role?: CrmAttendeeRole;
+}
+
+export interface CrmInteractionPatchBody {
+  contact_id?: string | null;
+  organization_id?: string | null;
+  type?: CrmInteractionType;
+  title?: string;
+  summary?: string | null;
+  occurred_at?: string | null;
+  attendees?: CrmInteractionAttendeeInput[] | null;
+}
+
+export async function updateCrmInteraction(
+  interactionId: string,
+  patch: CrmInteractionPatchBody
+): Promise<CrmInteraction> {
+  return postJson(
+    `/api/user/crm/interactions/${interactionId}`,
+    patch,
+    "Update CRM interaction",
+    "PATCH"
+  );
 }
 
 export async function deleteCrmInteraction(

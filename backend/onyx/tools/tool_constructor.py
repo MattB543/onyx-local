@@ -30,11 +30,11 @@ from onyx.tools.built_in_tools import get_built_in_tool_by_id
 from onyx.tools.interface import Tool
 from onyx.tools.models import DynamicSchemaInfo
 from onyx.tools.models import SearchToolUsage
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.coding_agent.coding_agent_tool import (
     CodingAgentTool,
-)
-from onyx.tools.tool_implementations.custom.custom_tool import (
-    build_custom_tools_from_openapi_schema_and_headers,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
@@ -44,12 +44,12 @@ from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
 )
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
+from onyx.tools.tool_implementations.custom.custom_tool import (
+    build_custom_tools_from_openapi_schema_and_headers,
+)
 from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
-)
-from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
-    SearchCalendarTool,
 )
 from onyx.tools.tool_implementations.mcp.mcp_tool import MCPTool
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
@@ -356,6 +356,7 @@ def _construct_tools_impl(
                         tool_id=db_tool_model.id,
                         db_session=db_session,
                         emitter=emitter,
+                        user_id=str(user.id) if user.id else None,
                     )
                 ]
 

@@ -97,6 +97,8 @@ export default function CrmContactDetailPage({
   const [contactDeleteModalOpen, setContactDeleteModalOpen] = useState(false);
   const [interactionToDelete, setInteractionToDelete] =
     useState<CrmInteraction | null>(null);
+  const [interactionToEdit, setInteractionToEdit] =
+    useState<CrmInteraction | null>(null);
   const [isDeletingContact, setIsDeletingContact] = useState(false);
   const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
@@ -942,6 +944,10 @@ export default function CrmContactDetailPage({
                         onDeleteInteraction={(interaction) => {
                           setInteractionToDelete(interaction);
                         }}
+                        canEditInteractions={true}
+                        onEditInteraction={(interaction) => {
+                          setInteractionToEdit(interaction);
+                        }}
                         onLoadMore={() =>
                           setInteractionPageSize(
                             (value) => value + INTERACTION_PAGE_SIZE
@@ -963,6 +969,21 @@ export default function CrmContactDetailPage({
       <LogInteractionModal
         open={logInteractionModalOpen}
         onOpenChange={setLogInteractionModalOpen}
+        contactId={contactId}
+        onSuccess={() => {
+          void refreshInteractions();
+          void refreshContact();
+        }}
+      />
+
+      <LogInteractionModal
+        open={interactionToEdit !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInteractionToEdit(null);
+          }
+        }}
+        interaction={interactionToEdit ?? undefined}
         contactId={contactId}
         onSuccess={() => {
           void refreshInteractions();

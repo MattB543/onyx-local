@@ -8,6 +8,7 @@ import {
   CrmInteractionType,
   exportCrmInteractions,
 } from "@/app/app/crm/crmService";
+import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -44,10 +45,12 @@ const INTERACTION_TYPE_OPTIONS: CrmInteractionType[] = [
 ];
 
 export default function CrmInteractionsPage() {
-  const { isAdmin } = useUser();
+  const { user, isAdmin } = useUser();
+  const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [typeFilter, setTypeFilter] = useState<CrmInteractionType | "all">(
     "all"
   );
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [pageNum, setPageNum] = useState(0);
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -64,10 +67,28 @@ export default function CrmInteractionsPage() {
     }
   }, []);
 
+  const ownerOptions = useMemo(
+    () =>
+      (usersData || [])
+        .filter((candidate) => candidate.id !== user?.id)
+        .map((candidate) => ({
+          value: candidate.id,
+          label: candidate.email,
+        })),
+    [usersData, user?.id]
+  );
+  const ownerFilterId =
+    ownerFilter === "all"
+      ? undefined
+      : ownerFilter === "me"
+        ? user?.id
+        : ownerFilter;
+
   const { interactions, totalItems, isLoading, error } = useCrmInteractions({
     pageNum,
     pageSize: PAGE_SIZE,
     interactionType: typeFilter === "all" ? undefined : typeFilter,
+    loggedBy: ownerFilterId,
   });
 
   const totalPages = useMemo(
@@ -76,8 +97,8 @@ export default function CrmInteractionsPage() {
   );
 
   const emptyDescription =
-    typeFilter !== "all"
-      ? "Try adjusting the type filter."
+    typeFilter !== "all" || ownerFilter !== "all"
+      ? "Try adjusting filters."
       : "Log your first interaction to get started.";
 
   return (
@@ -138,7 +159,7 @@ export default function CrmInteractionsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
             <div />
 
             <InputSelect
@@ -154,6 +175,25 @@ export default function CrmInteractionsPage() {
                 {INTERACTION_TYPE_OPTIONS.map((type) => (
                   <InputSelect.Item key={type} value={type}>
                     {formatCrmLabel(type)}
+                  </InputSelect.Item>
+                ))}
+              </InputSelect.Content>
+            </InputSelect>
+
+            <InputSelect
+              value={ownerFilter}
+              onValueChange={(value) => {
+                setOwnerFilter(value);
+                setPageNum(0);
+              }}
+            >
+              <InputSelect.Trigger placeholder="Filter by owner" />
+              <InputSelect.Content>
+                <InputSelect.Item value="all">All owners</InputSelect.Item>
+                <InputSelect.Item value="me">Me</InputSelect.Item>
+                {ownerOptions.map((owner) => (
+                  <InputSelect.Item key={owner.value} value={owner.value}>
+                    {owner.label}
                   </InputSelect.Item>
                 ))}
               </InputSelect.Content>

@@ -11,6 +11,7 @@ import {
 interface UseCrmOrganizationsParams {
   q?: string;
   type?: CrmOrganizationType;
+  ownerId?: string;
   sortBy?: string;
   pageNum: number;
   pageSize: number;
@@ -19,6 +20,7 @@ interface UseCrmOrganizationsParams {
 export function useCrmOrganizations({
   q,
   type,
+  ownerId,
   sortBy,
   pageNum,
   pageSize,
@@ -26,11 +28,20 @@ export function useCrmOrganizations({
   const { data, error, isLoading, mutate } = useSWR<
     PaginatedReturn<CrmOrganization>
   >(
-    ["crm-organizations", q ?? "", type ?? "", sortBy ?? "", pageNum, pageSize],
+    [
+      "crm-organizations",
+      q ?? "",
+      type ?? "",
+      ownerId ?? "",
+      sortBy ?? "",
+      pageNum,
+      pageSize,
+    ],
     () =>
       listCrmOrganizations({
         q: q || undefined,
         type: type || undefined,
+        owner_id: ownerId || undefined,
         sort_by: sortBy,
         page_num: pageNum,
         page_size: pageSize,
