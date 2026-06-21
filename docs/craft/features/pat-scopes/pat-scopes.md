@@ -68,6 +68,18 @@ routes guarded by a permission, and `require_permission` then adjudicates covera
 sessions, and API-key auth (token scopes `None`) are untouched; websocket auth has its own path and is
 unaffected.
 
+**Identity endpoints are scope-exempt.** "Who am I" endpoints must be reachable by any valid token
+regardless of authority — the industry-standard treatment of OAuth `/userinfo`. A route marks itself
+with a `scope_exempt` dependency (a sibling `_is_scope_exempt` sentinel the gate honors alongside
+`_is_require_permission`), and `/me` carries it. Without it the fail-closed gate would deny a scoped
+PAT on `/me`, which a token has no business being locked out of.
+
+**Anonymous-capable routes (chat).** The core chat endpoints (send-message, create-session,
+view-session) admit anonymous users, so they are guarded with `require_permission(perm,
+allow_anonymous=True)`, which resolves the anonymous user (when the tenant allows it) instead of
+rejecting it, while still capping scoped PATs to `perm`. Anonymous, session, and unrestricted callers
+are unaffected; a scoped token is held to `read:chat` / `write:chat`.
+
 ## Delivery
 
 Sequenced so enforcement is complete before any scoped token exists:
@@ -80,10 +92,16 @@ Sequenced so enforcement is complete before any scoped token exists:
 3. **Fail-closed gate** — `optional_user` denies a scoped PAT on routes that declare no
    `require_permission`, so enforcement covers non-guarded routes too. *Shipped.*
 4. **Re-guard routes** with the fine permissions (search / chat read+write / admin read vs. write).
-   The `READ_ADMIN` split is a real audit, not a rename.
-5. **Scope the Craft PAT** — `ensure_sandbox_pat` mints `[READ_SEARCH]` (plus whatever onyx-cli needs)
-   instead of unrestricted, retiring the "CRAFT PAT grants full user access" caveat. This is the
-   acceptance test for the effort.
+   `POST /search` carries `READ_SEARCH` (the route the Craft sandbox's `onyx-cli search` hits).
+   *Shipped.* On the chat surface, `read:chat` guards listing/viewing one's own sessions and
+   chat-history search; `write:chat` guards create-session, send-message, and stop (it excludes delete
+   and session-config). The remaining chat endpoints (delete, rename, share, config toggles, feedback,
+   file download, token-count helpers) keep their existing guards and are not fine-scoped. *Shipped.*
+   The web-search / `/manage` search surface and the `READ_ADMIN` admin split remain.
+5. **Scope the Craft PAT** — `ensure_sandbox_pat` mints `[READ_SEARCH]` instead of unrestricted,
+   retiring the "CRAFT PAT grants full user access" caveat. *Shipped.* This is the acceptance test for
+   the effort: the search-scoped sandbox PAT reaches `POST /search` (via `onyx-cli search`) and `/me`,
+   and nothing else.
 
 Setting scopes when minting a PAT is currently internal (a `create_pat` argument); a user-facing
 API/UI and surfacing scopes on token listings are follow-ups.

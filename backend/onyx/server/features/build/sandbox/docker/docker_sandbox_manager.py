@@ -165,6 +165,7 @@ fi
 set -e
 cd {session_path}/outputs/web
 {install_check}
+export WEBAPP_ASSET_PREFIX="/api/build/sessions/$(basename {session_path})/webapp"
 echo "Starting Next.js dev server on port {nextjs_port}..."
 nohup bun run dev -- -H 0.0.0.0 -p {nextjs_port} > {session_path}/nextjs.log 2>&1 &
 NEXTJS_PID=$!
@@ -408,8 +409,13 @@ class DockerSandboxManager(SandboxManager):
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialize()
+                    # Publish to the cache only after _initialize() succeeds, so a
+                    # transient init failure (e.g. the Docker socket briefly
+                    # unavailable) can't leave a half-built singleton that every
+                    # later caller reuses; the next call retries instead.
+                    instance = super().__new__(cls)
+                    instance._initialize()
+                    cls._instance = instance
         return cls._instance
 
     def _initialize(self) -> None:

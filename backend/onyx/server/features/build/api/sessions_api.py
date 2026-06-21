@@ -47,8 +47,8 @@ from onyx.server.features.build.db.sandbox import get_sandbox_by_user_id
 from onyx.server.features.build.db.sandbox import update_sandbox_heartbeat
 from onyx.server.features.build.db.sandbox import update_sandbox_status__no_commit
 from onyx.server.features.build.sandbox.base import get_sandbox_manager
+from onyx.server.features.build.session.errors import UploadLimitExceededError
 from onyx.server.features.build.session.manager import SessionManager
-from onyx.server.features.build.session.manager import UploadLimitExceededError
 from onyx.server.features.build.utils import sanitize_filename
 from onyx.server.features.build.utils import validate_file
 from onyx.skills.push import build_user_skills_payload
@@ -381,8 +381,7 @@ def restore_session(
                 db_session.commit()
                 db_session.refresh(sandbox)
 
-        session_manager = SessionManager(db_session)
-        llm_config, all_llm_configs = session_manager.build_llm_configs(user)
+        llm_config, all_llm_configs = SessionManager(db_session).build_llm_configs(user)
 
         if sandbox.status in (SandboxStatus.SLEEPING, SandboxStatus.TERMINATED):
             # Mint the PAT before flipping to PROVISIONING so a failure is retriable.

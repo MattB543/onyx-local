@@ -5,9 +5,8 @@ import type { ProjectFile } from "@/app/app/projects/projectsService";
 import { UserFileStatus } from "@/app/app/projects/projectsService";
 import { isImageFile } from "@/lib/utils";
 import { cn } from "@opal/utils";
-import SimpleLoader from "@/refresh-components/loaders/SimpleLoader";
 import { Checkbox } from "@opal/components";
-import { SvgFileText, SvgX } from "@opal/icons";
+import { SvgFileText, SvgX, SvgSimpleLoader } from "@opal/icons";
 import { Interactive, Hoverable } from "@opal/core";
 import { AttachmentItemLayout } from "@/layouts/general-layouts";
 import { Spacer } from "@opal/components";
@@ -103,7 +102,7 @@ function ImageFileCard({
       >
         {!doneUploading || !imageUrl ? (
           <div className="h-full w-full flex items-center justify-center">
-            <SimpleLoader className={loaderSize} />
+            <SvgSimpleLoader className={loaderSize} />
           </div>
         ) : imgError ? (
           <div className="h-full w-full flex items-center justify-center">
@@ -188,7 +187,7 @@ export function FileCard({
       <div className="min-w-0 max-w-48">
         <Interactive.Container border size="fit" width="full">
           <AttachmentItemLayout
-            icon={isProcessing ? SimpleLoader : SvgFileText}
+            icon={isProcessing ? SvgSimpleLoader : SvgFileText}
             title={file.name}
             description={
               isProcessing
