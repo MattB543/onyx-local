@@ -859,10 +859,10 @@ def _cleanup_pool_workspace(
 ) -> None:
     """Wipe mutable trees on the pool pod before the next test runs.
 
-    ``managed/`` is read-only in the sandbox container but writable from the
-    sidecar (see ``kubernetes_sandbox_manager._build_pod_spec``), so we exec
-    via the sidecar for the skills + user_library subtrees. ``sessions/`` is
-    on a shared emptyDir, writable from either container.
+    ``managed/`` is read-only in the sandbox app container but writable from
+    the native init sidecar, so we exec via the sidecar for the skills +
+    user_library subtrees. ``sessions/`` is on a shared emptyDir, writable from
+    either container.
     """
     # managed/{skills,user_library} live under the RO mount — clean via sidecar.
     # ``find -mindepth 1 -delete`` removes only the directory's contents
@@ -1407,6 +1407,7 @@ def pod_exec_async(
     method: str = "POST",
     headers: dict[str, str] | None = None,
     body: str | None = None,
+    body_file: str | None = None,
     max_time_s: int = 240,
     container: str = "sandbox",
     proxy_session_id: str | None = None,
@@ -1419,11 +1420,22 @@ def pod_exec_async(
     tagging the request with the session id as ``Proxy-Authorization`` userinfo
     so the proxy can resolve the session. Omit it to exercise the untagged,
     fail-closed gate path.
+
+    ``body_file`` (mutually exclusive with ``body``) sends the body from an
+    in-pod path via ``--data-binary @path``; use this for payloads big enough to
+    trip the apiserver's exec URL size limit (e.g. > 1 MiB).
     """
+    if body is not None and body_file is not None:
+        raise ValueError("pass either body or body_file, not both")
     header_args = ""
     for key, value in (headers or {}).items():
         header_args += f" -H {json.dumps(f'{key}: {value}')}"
-    body_arg = f" --data {json.dumps(body)}" if body is not None else ""
+    if body is not None:
+        body_arg = f" --data {json.dumps(body)}"
+    elif body_file is not None:
+        body_arg = f" --data-binary @{body_file}"
+    else:
+        body_arg = ""
     # Override the ambient proxy with the session id as basic-auth userinfo.
     proxy_arg = (
         f" -x {json.dumps(f'http://{proxy_session_id}@sandbox-proxy:8080')}"

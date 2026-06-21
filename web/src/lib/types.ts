@@ -594,6 +594,7 @@ export enum ValidSources {
   Imap = "imap",
   Bitbucket = "bitbucket",
   TestRail = "testrail",
+  Braintrust = "braintrust",
 
   // Custom sources
   GoogleCalendar = "google_calendar",

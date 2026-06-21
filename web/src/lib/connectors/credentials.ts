@@ -260,6 +260,10 @@ export interface FirefliesCredentialJson {
   fireflies_api_key: string;
 }
 
+export interface BraintrustCredentialJson {
+  braintrust_api_key: string;
+}
+
 export type MediaWikiCredentialJson = Record<string, never>;
 export type WikipediaCredentialJson = MediaWikiCredentialJson;
 
@@ -458,6 +462,9 @@ export const credentialTemplates: Record<ValidSources, any> = {
   fireflies: {
     fireflies_api_key: "",
   } as FirefliesCredentialJson,
+  braintrust: {
+    braintrust_api_key: "",
+  } as BraintrustCredentialJson,
   egnyte: {
     domain: "",
     access_token: "",
@@ -653,6 +660,9 @@ export const credentialDisplayNames: Record<string, string> = {
 
   // Fireflies
   fireflies_api_key: "Fireflies API Key",
+
+  // Braintrust
+  braintrust_api_key: "Braintrust API Key",
 
   // GitBook
   gitbook_space_id: "GitBook Space ID",

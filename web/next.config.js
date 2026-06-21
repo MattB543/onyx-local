@@ -2,20 +2,6 @@
 const { withSentryConfig } = require("@sentry/nextjs");
 const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
 
-const cspHeader = `
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    ${
-      process.env.NEXT_PUBLIC_CLOUD_ENABLED === "true" &&
-      process.env.NODE_ENV !== "development"
-        ? "upgrade-insecure-requests;"
-        : ""
-    }
-`;
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   productionBrowserSourceMaps: false,
@@ -51,10 +37,6 @@ const nextConfig = {
         source: "/(.*)",
         headers: [
           {
-            key: "Content-Security-Policy",
-            value: cspHeader.replace(/\n/g, ""),
-          },
-          {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
@@ -77,6 +59,12 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      {
+        source: "/api/build/sessions/:sessionId/webapp/_next/webpack-hmr",
+        destination: `${
+          process.env.INTERNAL_URL || "http://localhost:8080"
+        }/build/sessions/:sessionId/webapp/_next/webpack-hmr`,
+      },
       {
         source: "/ph_ingest/static/:path*",
         destination: "https://us-assets.i.posthog.com/static/:path*",

@@ -3,6 +3,7 @@ import {
   S3Icon,
   GoogleStorageIcon,
   GoogleCalendarIcon,
+  BraintrustIcon,
 } from "@/components/icons/icons";
 import { ValidSources } from "@/lib/types";
 import { SourceCategory, SourceMetadata } from "@/lib/search/interfaces";
@@ -424,6 +425,11 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     category: SourceCategory.Other,
     docs: `${DOCS_BASE_URL}/overview/core_features/chat#projects`,
     isPopular: false, // Needs to be false to hide from the Add Connector page
+  },
+  braintrust: {
+    icon: BraintrustIcon,
+    displayName: "Braintrust",
+    category: SourceCategory.Other,
   },
 
   // Other

@@ -38,6 +38,7 @@ from onyx.server.documents.private_key_types import FILE_TYPE_TO_FILE_PROCESSOR
 from onyx.server.documents.private_key_types import PrivateKeyFileTypes
 from onyx.server.documents.private_key_types import ProcessPrivateKeyFileProtocol
 from onyx.server.models import StatusResponse
+from onyx.server.security.store import get_security_settings
 from onyx.utils.logger import setup_logger
 from onyx.utils.variable_functionality import fetch_ee_implementation_or_noop
 
@@ -65,8 +66,11 @@ def list_credentials_admin(
         user=user,
         get_editable=False,
     )
+    mask_credential_prefix = get_security_settings().mask_credential_prefix
     return [
-        CredentialSnapshot.from_credential_db_model(credential)
+        CredentialSnapshot.from_credential_db_model(
+            credential, mask_credential_prefix=mask_credential_prefix
+        )
         for credential in credentials
     ]
 
@@ -87,8 +91,11 @@ def get_cc_source_full_info(
         get_editable=get_editable,
     )
 
+    mask_credential_prefix = get_security_settings().mask_credential_prefix
     return [
-        CredentialSnapshot.from_credential_db_model(credential)
+        CredentialSnapshot.from_credential_db_model(
+            credential, mask_credential_prefix=mask_credential_prefix
+        )
         for credential in credentials
     ]
 
@@ -158,7 +165,10 @@ def create_credential_from_model(
     credential = create_credential(credential_info, user, db_session)
     return ObjectCreationIdResponse(
         id=credential.id,
-        credential=CredentialSnapshot.from_credential_db_model(credential),
+        credential=CredentialSnapshot.from_credential_db_model(
+            credential,
+            mask_credential_prefix=get_security_settings().mask_credential_prefix,
+        ),
     )
 
 
@@ -224,7 +234,10 @@ def create_credential_with_private_key(
     credential = create_credential(credential_info, user, db_session)
     return ObjectCreationIdResponse(
         id=credential.id,
-        credential=CredentialSnapshot.from_credential_db_model(credential),
+        credential=CredentialSnapshot.from_credential_db_model(
+            credential,
+            mask_credential_prefix=get_security_settings().mask_credential_prefix,
+        ),
     )
 
 
@@ -237,8 +250,11 @@ def list_credentials(
     db_session: Session = Depends(get_session),
 ) -> list[CredentialSnapshot]:
     credentials = fetch_credentials_for_user(db_session=db_session, user=user)
+    mask_credential_prefix = get_security_settings().mask_credential_prefix
     return [
-        CredentialSnapshot.from_credential_db_model(credential)
+        CredentialSnapshot.from_credential_db_model(
+            credential, mask_credential_prefix=mask_credential_prefix
+        )
         for credential in credentials
     ]
 
@@ -261,7 +277,10 @@ def get_credential_by_id(
             detail=f"Credential {credential_id} does not exist or does not belong to user",
         )
 
-    return CredentialSnapshot.from_credential_db_model(credential)
+    return CredentialSnapshot.from_credential_db_model(
+        credential,
+        mask_credential_prefix=get_security_settings().mask_credential_prefix,
+    )
 
 
 @router.put("/admin/credential/{credential_id}")
@@ -285,7 +304,10 @@ def update_credential_data(
             detail=f"Credential {credential_id} does not exist or does not belong to user",
         )
 
-    return CredentialSnapshot.from_credential_db_model(credential)
+    return CredentialSnapshot.from_credential_db_model(
+        credential,
+        mask_credential_prefix=get_security_settings().mask_credential_prefix,
+    )
 
 
 @router.put("/admin/credential/private-key/{credential_id}")
@@ -332,7 +354,10 @@ def update_credential_private_key(
             detail=f"Credential {credential_id} does not exist or does not belong to user",
         )
 
-    return CredentialSnapshot.from_credential_db_model(credential)
+    return CredentialSnapshot.from_credential_db_model(
+        credential,
+        mask_credential_prefix=get_security_settings().mask_credential_prefix,
+    )
 
 
 @router.patch("/credential/{credential_id}")
@@ -351,9 +376,9 @@ def update_credential_from_model(
             detail=f"Credential {credential_id} does not exist or does not belong to user",
         )
 
-    # Get credential_json value - use masking for API responses
+    mask_credential_prefix = get_security_settings().mask_credential_prefix
     credential_json_value = (
-        updated_credential.credential_json.get_value(apply_mask=True)
+        updated_credential.credential_json.get_value(apply_mask=mask_credential_prefix)
         if updated_credential.credential_json
         else {}
     )

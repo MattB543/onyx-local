@@ -295,6 +295,7 @@ export const AzureIcon = createLogoIcon(azureIcon);
 export const BitbucketIcon = createLogoIcon(bitbucketIcon);
 export const BookstackIcon = createIcon(SiBookstack);
 export const BoxIcon = createLogoIcon(boxIcon);
+export const BraintrustIcon = createLogoIcon("/Braintrust.svg");
 export const ClickupIcon = createLogoIcon(clickupIcon);
 export const CohereIcon = createLogoIcon(cohereIcon);
 export const ColorDiscordIcon = createLogoIcon(discordIcon);

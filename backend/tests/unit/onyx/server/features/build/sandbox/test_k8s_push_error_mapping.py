@@ -10,6 +10,8 @@ tar byte equality), not call lists.
 from __future__ import annotations
 
 import base64
+import hashlib
+import io
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
@@ -25,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.hazmat.primitives.serialization import NoEncryption
 from cryptography.hazmat.primitives.serialization import PrivateFormat
+from kubernetes import client
 from kubernetes.client.rest import ApiException
 
 from onyx.server.features.build.sandbox.kubernetes.kubernetes_sandbox_manager import (
@@ -291,6 +294,8 @@ def test_health_check_returns_false_when_sandbox_container_terminated() -> None:
                 running=None, terminated=SimpleNamespace(reason="OOMKilled")
             ),
         ),
+    ]
+    pod.status.init_container_statuses = [
         SimpleNamespace(
             name="sidecar",
             ready=True,
@@ -302,6 +307,99 @@ def test_health_check_returns_false_when_sandbox_container_terminated() -> None:
     with patch(_HTTPX_CLIENT_PATH, factory):
         assert mgr.health_check(_sandbox_id(), timeout=1.0) is False
     factory.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Pod readiness: restartable init sidecar failure semantics
+# ---------------------------------------------------------------------------
+
+
+def _pod_with_init_status(
+    *,
+    init_container: client.V1Container,
+    init_status: client.V1ContainerStatus,
+) -> client.V1Pod:
+    return client.V1Pod(
+        metadata=client.V1ObjectMeta(name="sandbox-test-pod"),
+        spec=client.V1PodSpec(
+            containers=[client.V1Container(name="sandbox")],
+            init_containers=[init_container],
+        ),
+        status=client.V1PodStatus(init_container_statuses=[init_status]),
+    )
+
+
+def test_init_container_nonzero_termination_is_fatal() -> None:
+    mgr = _make_manager()
+    pod = _pod_with_init_status(
+        init_container=client.V1Container(name="sandbox-init"),
+        init_status=client.V1ContainerStatus(
+            name="sandbox-init",
+            image="sandbox",
+            image_id="sandbox",
+            ready=False,
+            restart_count=0,
+            state=client.V1ContainerState(
+                terminated=client.V1ContainerStateTerminated(exit_code=1)
+            ),
+        ),
+    )
+
+    with patch.object(mgr, "_get_init_container_logs", return_value="iptables failed"):
+        error = mgr._check_init_container_status(pod)
+
+    assert error is not None
+    assert "sandbox-init" in error
+    assert "exit code 1" in error
+    assert "iptables failed" in error
+
+
+def test_restartable_init_container_transient_termination_is_not_fatal() -> None:
+    mgr = _make_manager()
+    pod = _pod_with_init_status(
+        init_container=client.V1Container(name="sidecar", restart_policy="Always"),
+        init_status=client.V1ContainerStatus(
+            name="sidecar",
+            image="sandbox",
+            image_id="sandbox",
+            ready=False,
+            restart_count=1,
+            state=client.V1ContainerState(
+                terminated=client.V1ContainerStateTerminated(exit_code=1)
+            ),
+        ),
+    )
+
+    with patch.object(mgr, "_get_init_container_logs") as get_logs:
+        assert mgr._check_init_container_status(pod) is None
+
+    get_logs.assert_not_called()
+
+
+def test_restartable_init_container_crashloop_waiting_is_fatal() -> None:
+    mgr = _make_manager()
+    pod = _pod_with_init_status(
+        init_container=client.V1Container(name="sidecar", restart_policy="Always"),
+        init_status=client.V1ContainerStatus(
+            name="sidecar",
+            image="sandbox",
+            image_id="sandbox",
+            ready=False,
+            restart_count=3,
+            state=client.V1ContainerState(
+                waiting=client.V1ContainerStateWaiting(
+                    reason="CrashLoopBackOff",
+                    message="back-off restarting failed container",
+                )
+            ),
+        ),
+    )
+
+    error = mgr._check_init_container_status(pod)
+
+    assert error is not None
+    assert "sidecar" in error
+    assert "CrashLoopBackOff" in error
 
 
 # ---------------------------------------------------------------------------
@@ -396,25 +494,34 @@ def test_push_maps_http_status_on_fallback_host() -> None:
             )
 
 
-def test_post_to_sidecar_falls_back_to_pod_ip() -> None:
+def test_snapshot_restore_falls_back_to_pod_ip() -> None:
     mgr = _make_manager()
-    factory = _mock_httpx_per_url(_fqdn_unreachable_then(lambda: _resp(200)))
+    archive_body = b"snapshot archive"
+    factory = _mock_httpx_per_url(_fqdn_unreachable_then(lambda: _resp(204)))
     with patch(_HTTPX_CLIENT_PATH, factory):
-        resp = mgr._post_to_sidecar(
-            _sandbox_id(), "/snapshot/create", b"{}", timeout=5.0
+        mgr._restore_snapshot_archive_via_sidecar(
+            sandbox_id=_sandbox_id(),
+            session_id=_sandbox_id(),
+            archive_file=io.BytesIO(archive_body),
+            sha256_hex=hashlib.sha256(archive_body).hexdigest(),
         )
-    assert resp.status_code == 200
 
 
-def test_post_to_sidecar_reraises_when_all_hosts_fail() -> None:
+def test_snapshot_restore_raises_when_all_hosts_fail() -> None:
     mgr = _make_manager()
 
     def handler(_url: str) -> MagicMock:
         raise httpx.ConnectError("unreachable")
 
+    archive_body = b"snapshot archive"
     with patch(_HTTPX_CLIENT_PATH, _mock_httpx_per_url(handler)):
-        with pytest.raises(httpx.TransportError):
-            mgr._post_to_sidecar(_sandbox_id(), "/snapshot/create", b"{}", timeout=5.0)
+        with pytest.raises(RuntimeError, match="Snapshot restore request failed"):
+            mgr._restore_snapshot_archive_via_sidecar(
+                sandbox_id=_sandbox_id(),
+                session_id=_sandbox_id(),
+                archive_file=io.BytesIO(archive_body),
+                sha256_hex=hashlib.sha256(archive_body).hexdigest(),
+            )
 
 
 def test_sandbox_pod_hosts_degrades_to_fqdn_when_pod_unreadable() -> None:
