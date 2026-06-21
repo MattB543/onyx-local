@@ -38,7 +38,7 @@ export interface CrmTag {
 
 export interface CrmContact {
   id: string;
-  first_name: string;
+  first_name: string | null;
   last_name: string | null;
   full_name: string;
   email: string | null;
@@ -62,7 +62,7 @@ export interface CrmContact {
 }
 
 export interface CrmContactCreateBody {
-  first_name: string;
+  first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -78,7 +78,7 @@ export interface CrmContactCreateBody {
 }
 
 export interface CrmContactPatchBody {
-  first_name?: string;
+  first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -269,7 +269,12 @@ export async function listCrmContacts(args?: {
   organization_id?: string;
   tag_ids?: string[];
   owner_ids?: string[];
-  sort_by?: string;
+  created_after?: string;
+  created_before?: string;
+  updated_after?: string;
+  updated_before?: string;
+  sort_by?: "created_at" | "updated_at";
+  sort_dir?: "asc" | "desc";
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmContact>> {
@@ -280,7 +285,12 @@ export async function listCrmContacts(args?: {
     organization_id: args?.organization_id,
     tag_ids: args?.tag_ids,
     owner_ids: args?.owner_ids,
+    created_after: args?.created_after,
+    created_before: args?.created_before,
+    updated_after: args?.updated_after,
+    updated_before: args?.updated_before,
     sort_by: args?.sort_by,
+    sort_dir: args?.sort_dir,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -350,7 +360,12 @@ export async function listCrmOrganizations(args?: {
   type?: CrmOrganizationType;
   tag_ids?: string[];
   owner_id?: string;
-  sort_by?: string;
+  created_after?: string;
+  created_before?: string;
+  updated_after?: string;
+  updated_before?: string;
+  sort_by?: "created_at" | "updated_at";
+  sort_dir?: "asc" | "desc";
   page_num?: number;
   page_size?: number;
 }): Promise<PaginatedReturn<CrmOrganization>> {
@@ -359,7 +374,12 @@ export async function listCrmOrganizations(args?: {
     type: args?.type,
     tag_ids: args?.tag_ids,
     owner_id: args?.owner_id,
+    created_after: args?.created_after,
+    created_before: args?.created_before,
+    updated_after: args?.updated_after,
+    updated_before: args?.updated_before,
     sort_by: args?.sort_by,
+    sort_dir: args?.sort_dir,
     page_num: args?.page_num ?? 0,
     page_size: args?.page_size ?? 25,
   });
@@ -418,7 +438,8 @@ export async function listCrmInteractions(args?: {
   const path = withQueryParams("/api/user/crm/interactions", {
     contact_id: args?.contact_id,
     organization_id: args?.organization_id,
-    include_contact_interactions: args?.include_contact_interactions || undefined,
+    include_contact_interactions:
+      args?.include_contact_interactions || undefined,
     interaction_type: args?.interaction_type,
     logged_by: args?.logged_by,
     page_num: args?.page_num ?? 0,

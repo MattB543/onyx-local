@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -82,6 +83,7 @@ from onyx.server.features.crm.csv_utils import ORGANIZATION_IMPORT_HEADERS
 from onyx.server.features.crm.csv_utils import parse_csv_upload
 from onyx.server.features.crm.csv_utils import parse_datetime_or_none
 from onyx.server.features.crm.csv_utils import parse_enum_or_none
+from onyx.server.features.crm.csv_utils import parse_filter_datetime
 from onyx.server.features.crm.csv_utils import parse_pipe_delimited
 from onyx.server.features.crm.models import CrmContactCreateRequest
 from onyx.server.features.crm.models import CrmContactPatchRequest
@@ -107,6 +109,42 @@ from onyx.utils.logger import setup_logger
 logger = setup_logger()
 
 router = APIRouter(prefix="/user/crm")
+
+
+def _parse_query_datetime(
+    value: str | None, field_name: str, *, upper_bound: bool = False
+) -> datetime | None:
+    try:
+        return parse_filter_datetime(value, upper_bound=upper_bound)
+    except ValueError as e:
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            f"'{field_name}' is invalid: {e}",
+        )
+
+
+def _validate_sort_dir(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized not in ("asc", "desc"):
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "'sort_dir' must be 'asc' or 'desc'.",
+        )
+    return normalized
+
+
+def _validate_sort_by(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized not in ("created_at", "updated_at"):
+        raise OnyxError(
+            OnyxErrorCode.VALIDATION_ERROR,
+            "'sort_by' must be 'created_at' or 'updated_at'.",
+        )
+    return normalized
 
 
 def _load_contact_or_404(contact_id: UUID, db_session: Session):
@@ -329,6 +367,26 @@ def get_contacts(
         None,
         description="Sort field: 'updated_at' (default) or 'created_at'.",
     ),
+    sort_dir: str | None = Query(
+        None,
+        description="Sort direction: 'desc' (default) or 'asc'.",
+    ),
+    created_after: str | None = Query(
+        None,
+        description="Only contacts created at/after this ISO 8601 datetime (inclusive).",
+    ),
+    created_before: str | None = Query(
+        None,
+        description="Only contacts created at/before this ISO 8601 datetime (inclusive).",
+    ),
+    updated_after: str | None = Query(
+        None,
+        description="Only contacts updated at/after this ISO 8601 datetime (inclusive).",
+    ),
+    updated_before: str | None = Query(
+        None,
+        description="Only contacts updated at/before this ISO 8601 datetime (inclusive).",
+    ),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
@@ -351,6 +409,17 @@ def get_contacts(
         if stripped:
             normalized_category = stripped
 
+    normalized_sort_by = _validate_sort_by(sort_by)
+    normalized_sort_dir = _validate_sort_dir(sort_dir)
+    created_after_dt = _parse_query_datetime(created_after, "created_after")
+    created_before_dt = _parse_query_datetime(
+        created_before, "created_before", upper_bound=True
+    )
+    updated_after_dt = _parse_query_datetime(updated_after, "updated_after")
+    updated_before_dt = _parse_query_datetime(
+        updated_before, "updated_before", upper_bound=True
+    )
+
     contacts, total_items = list_contacts(
         db_session=db_session,
         page_num=page_num,
@@ -361,7 +430,12 @@ def get_contacts(
         organization_id=organization_id,
         tag_ids=tag_ids,
         owner_ids=owner_ids,
-        sort_by=sort_by,
+        sort_by=normalized_sort_by,
+        sort_dir=normalized_sort_dir,
+        created_after=created_after_dt,
+        created_before=created_before_dt,
+        updated_after=updated_after_dt,
+        updated_before=updated_before_dt,
     )
     return PaginatedReturn(
         items=[_serialize_contact(contact, db_session) for contact in contacts],
@@ -403,23 +477,26 @@ def post_contact(
     except ValueError as e:
         raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
 
-    contact, created = create_contact(
-        db_session=db_session,
-        first_name=contact_create_request.first_name,
-        last_name=contact_create_request.last_name,
-        email=contact_create_request.email,
-        phone=contact_create_request.phone,
-        title=contact_create_request.title,
-        organization_id=contact_create_request.organization_id,
-        owner_ids=owner_ids,
-        source=contact_create_request.source,
-        status=normalized_stage,
-        category=contact_create_request.category,
-        notes=contact_create_request.notes,
-        linkedin_url=contact_create_request.linkedin_url,
-        location=contact_create_request.location,
-        created_by=user.id,
-    )
+    try:
+        contact, created = create_contact(
+            db_session=db_session,
+            first_name=contact_create_request.first_name,
+            last_name=contact_create_request.last_name,
+            email=contact_create_request.email,
+            phone=contact_create_request.phone,
+            title=contact_create_request.title,
+            organization_id=contact_create_request.organization_id,
+            owner_ids=owner_ids,
+            source=contact_create_request.source,
+            status=normalized_stage,
+            category=contact_create_request.category,
+            notes=contact_create_request.notes,
+            linkedin_url=contact_create_request.linkedin_url,
+            location=contact_create_request.location,
+            created_by=user.id,
+        )
+    except ValueError as e:
+        raise OnyxError(OnyxErrorCode.VALIDATION_ERROR, str(e))
     if not created:
         raise OnyxError(
             OnyxErrorCode.DUPLICATE_RESOURCE,
@@ -586,11 +663,42 @@ def get_organizations(
         None,
         description="Sort field: 'updated_at' (default) or 'created_at'.",
     ),
+    sort_dir: str | None = Query(
+        None,
+        description="Sort direction: 'desc' (default) or 'asc'.",
+    ),
+    created_after: str | None = Query(
+        None,
+        description="Only organizations created at/after this ISO 8601 datetime (inclusive).",
+    ),
+    created_before: str | None = Query(
+        None,
+        description="Only organizations created at/before this ISO 8601 datetime (inclusive).",
+    ),
+    updated_after: str | None = Query(
+        None,
+        description="Only organizations updated at/after this ISO 8601 datetime (inclusive).",
+    ),
+    updated_before: str | None = Query(
+        None,
+        description="Only organizations updated at/before this ISO 8601 datetime (inclusive).",
+    ),
     page_num: int = Query(0, ge=0, description="Page number (0-indexed)."),
     page_size: int = Query(25, ge=1, le=200, description="Items per page."),
     db_session: Session = Depends(get_session),
     _user: User = Depends(current_user),
 ) -> PaginatedReturn[CrmOrganizationSnapshot]:
+    normalized_sort_by = _validate_sort_by(sort_by)
+    normalized_sort_dir = _validate_sort_dir(sort_dir)
+    created_after_dt = _parse_query_datetime(created_after, "created_after")
+    created_before_dt = _parse_query_datetime(
+        created_before, "created_before", upper_bound=True
+    )
+    updated_after_dt = _parse_query_datetime(updated_after, "updated_after")
+    updated_before_dt = _parse_query_datetime(
+        updated_before, "updated_before", upper_bound=True
+    )
+
     organizations, total_items = list_organizations(
         db_session=db_session,
         page_num=page_num,
@@ -599,7 +707,12 @@ def get_organizations(
         org_type=type,
         tag_ids=tag_ids,
         created_by=owner_id,
-        sort_by=sort_by,
+        sort_by=normalized_sort_by,
+        sort_dir=normalized_sort_dir,
+        created_after=created_after_dt,
+        created_before=created_before_dt,
+        updated_after=updated_after_dt,
+        updated_before=updated_before_dt,
     )
     return PaginatedReturn(
         items=[
@@ -1257,11 +1370,13 @@ async def import_contacts_csv(
     for row_num, row in enumerate(rows, start=2):
         try:
             with db_session.begin_nested():
-                first_name = row.get("first_name", "").strip()
-                if not first_name:
-                    raise ValueError("Contact first_name is required")
-
+                first_name = row.get("first_name", "").strip() or None
                 last_name = row.get("last_name", "").strip() or None
+                if first_name is None and last_name is None:
+                    raise ValueError(
+                        "Contact requires at least a first_name or a last_name"
+                    )
+
                 email = row.get("email", "").strip() or None
                 phone = row.get("phone", "").strip() or None
                 title = row.get("title", "").strip() or None

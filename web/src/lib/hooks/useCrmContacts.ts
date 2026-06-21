@@ -15,7 +15,13 @@ interface UseCrmContactsParams {
   category?: string;
   organizationId?: string;
   ownerIds?: string[];
-  sortBy?: string;
+  tagIds?: string[];
+  createdAfter?: string;
+  createdBefore?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
+  sortBy?: "created_at" | "updated_at";
+  sortDir?: "asc" | "desc";
   pageNum: number;
   pageSize: number;
 }
@@ -26,7 +32,13 @@ export function useCrmContacts({
   category,
   organizationId,
   ownerIds,
+  tagIds,
+  createdAfter,
+  createdBefore,
+  updatedAfter,
+  updatedBefore,
   sortBy,
+  sortDir,
   pageNum,
   pageSize,
 }: UseCrmContactsParams) {
@@ -40,7 +52,13 @@ export function useCrmContacts({
       category ?? "",
       organizationId ?? "",
       ownerIds?.join(",") ?? "",
+      tagIds?.join(",") ?? "",
+      createdAfter ?? "",
+      createdBefore ?? "",
+      updatedAfter ?? "",
+      updatedBefore ?? "",
       sortBy ?? "",
+      sortDir ?? "",
       pageNum,
       pageSize,
     ],
@@ -51,7 +69,13 @@ export function useCrmContacts({
         category,
         organization_id: organizationId,
         owner_ids: ownerIds?.length ? ownerIds : undefined,
+        tag_ids: tagIds?.length ? tagIds : undefined,
+        created_after: createdAfter,
+        created_before: createdBefore,
+        updated_after: updatedAfter,
+        updated_before: updatedBefore,
         sort_by: sortBy,
+        sort_dir: sortDir,
         page_num: pageNum,
         page_size: pageSize,
       }),

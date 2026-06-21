@@ -89,7 +89,8 @@ log/
 scripts/check-prod-logs.sh
 scripts/reencrypt-credentials.sh
 
-private_docs/.claude/worktrees/
+# local-only private deploy/ops docs (machine- or prod-specific, may contain secrets)
+private_docs/
 .claude/worktrees/
 
 # Added context for LLMs

@@ -237,6 +237,75 @@ class TestCrmToolRun:
 
         assert "profile_picture_url" in contact_properties
 
+    def test_crm_create_tool_definition_does_not_require_first_name(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+
+        definition = tool.tool_definition()
+        contact_schema = definition["function"]["parameters"]["properties"][
+            "contact"
+        ]
+
+        assert "first_name" not in contact_schema.get("required", [])
+
+    def test_crm_create_contact_last_name_only_succeeds(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+        contact = CrmContact(first_name=None, last_name="Smith", status="lead")
+        contact.id = uuid4()
+        mocked_db_session = MagicMock()
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
+                return_value=(contact, True),
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                return_value=[],
+            ),
+        ):
+            payload = tool._create_contact(
+                db_session=mocked_db_session,
+                contact_data={"last_name": "Smith", "owner_ids": []},
+            )
+
+        assert payload["status"] == "created"
+
+    def test_crm_create_contact_rejects_no_names(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+
+        with pytest.raises(ToolCallException) as exc_info:
+            tool._create_contact(
+                db_session=MagicMock(),
+                contact_data={"owner_ids": []},
+            )
+
+        assert "at least one of" in exc_info.value.llm_facing_message
+
     def test_crm_create_contact_profile_picture_download_failure_is_non_fatal(
         self, emitter: Emitter, db_session
     ) -> None:

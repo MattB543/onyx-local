@@ -3,6 +3,8 @@ import {
   deleteCrmInteraction,
   deleteCrmOrganization,
   deleteContactProfilePicture,
+  listCrmContacts,
+  listCrmOrganizations,
   uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 
@@ -34,8 +36,10 @@ describe("CRM profile picture service", () => {
     );
 
     const request = fetchSpy.mock.calls[0][1];
-    expect(request?.body).toBeInstanceOf(FormData);
-    expect((request?.body as FormData).get("file")).toBe(file);
+    expect(request).toBeDefined();
+    const body = request!.body as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get("file")).toBe(file);
     expect(result).toEqual({ file_id: "file-123" });
   });
 
@@ -127,5 +131,89 @@ describe("CRM profile picture service", () => {
         method: "DELETE",
       }
     );
+  });
+});
+
+describe("CRM list filter query params", () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, "fetch");
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total_items: 0 }),
+    } as Response);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  function calledUrl(): string {
+    return fetchSpy.mock.calls[0][0] as string;
+  }
+
+  test("listCrmContacts emits tag_ids (repeated), date range, sort_by and sort_dir", async () => {
+    await listCrmContacts({
+      tag_ids: ["a", "b"],
+      created_after: "2026-01-01T00:00:00.000Z",
+      created_before: "2026-01-31T23:59:59.999Z",
+      sort_by: "created_at",
+      sort_dir: "asc",
+    });
+
+    const url = calledUrl();
+    expect(url).toContain("/api/user/crm/contacts?");
+    expect(url).toContain("tag_ids=a");
+    expect(url).toContain("tag_ids=b");
+    expect(url).toContain("created_after=2026-01-01T00%3A00%3A00.000Z");
+    expect(url).toContain("created_before=2026-01-31T23%3A59%3A59.999Z");
+    expect(url).toContain("sort_by=created_at");
+    expect(url).toContain("sort_dir=asc");
+  });
+
+  test("listCrmContacts emits updated_* date params when provided", async () => {
+    await listCrmContacts({
+      updated_after: "2026-02-01T00:00:00.000Z",
+      updated_before: "2026-02-28T23:59:59.999Z",
+      sort_by: "updated_at",
+      sort_dir: "desc",
+    });
+
+    const url = calledUrl();
+    expect(url).toContain("updated_after=2026-02-01T00%3A00%3A00.000Z");
+    expect(url).toContain("updated_before=2026-02-28T23%3A59%3A59.999Z");
+    expect(url).toContain("sort_by=updated_at");
+    expect(url).toContain("sort_dir=desc");
+    expect(url).not.toContain("created_after");
+  });
+
+  test("listCrmOrganizations emits tag_ids (repeated), date range, sort_by and sort_dir", async () => {
+    await listCrmOrganizations({
+      tag_ids: ["x", "y"],
+      updated_after: "2026-03-01T00:00:00.000Z",
+      updated_before: "2026-03-31T23:59:59.999Z",
+      sort_by: "updated_at",
+      sort_dir: "desc",
+    });
+
+    const url = calledUrl();
+    expect(url).toContain("/api/user/crm/organizations?");
+    expect(url).toContain("tag_ids=x");
+    expect(url).toContain("tag_ids=y");
+    expect(url).toContain("updated_after=2026-03-01T00%3A00%3A00.000Z");
+    expect(url).toContain("updated_before=2026-03-31T23%3A59%3A59.999Z");
+    expect(url).toContain("sort_by=updated_at");
+    expect(url).toContain("sort_dir=desc");
+  });
+
+  test("undefined filter params are omitted from the query string", async () => {
+    await listCrmContacts({ q: "alice" });
+
+    const url = calledUrl();
+    expect(url).toContain("q=alice");
+    expect(url).not.toContain("tag_ids");
+    expect(url).not.toContain("created_after");
+    expect(url).not.toContain("sort_dir");
   });
 });

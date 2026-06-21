@@ -56,6 +56,51 @@ def _normalize_page(page_num: int, page_size: int) -> tuple[int, int]:
     return max(0, page_num), min(max(1, page_size), MAX_PAGE_SIZE)
 
 
+def _apply_timestamp_filters(
+    stmt: Any,
+    *,
+    created_col: Any,
+    updated_col: Any,
+    created_after: datetime | None,
+    created_before: datetime | None,
+    updated_after: datetime | None,
+    updated_before: datetime | None,
+) -> Any:
+    # Bounds are inclusive. End-of-day extension for date-only *_before inputs is
+    # handled at the string-parsing boundary (REST / AI tool), so the datetimes
+    # received here are applied verbatim.
+    if created_after is not None:
+        stmt = stmt.where(created_col >= created_after)
+    if created_before is not None:
+        stmt = stmt.where(created_col <= created_before)
+    if updated_after is not None:
+        stmt = stmt.where(updated_col >= updated_after)
+    if updated_before is not None:
+        stmt = stmt.where(updated_col <= updated_before)
+    return stmt
+
+
+def _build_timestamp_order_clauses(
+    created_col: Any,
+    updated_col: Any,
+    id_col: Any,
+    sort_by: str | None,
+    sort_dir: str | None,
+) -> tuple[Any, Any, Any]:
+    """Return order_by clauses: primary = chosen field, secondary = the other
+    field, tertiary = primary key. The id tie-breaker keeps offset pagination
+    deterministic when rows share both timestamps (e.g. batch-created rows).
+    All clauses use the same direction. Defaults: updated_at desc."""
+    direction = "asc" if (sort_dir or "desc").strip().lower() == "asc" else "desc"
+    if (sort_by or "").strip().lower() == "created_at":
+        primary, secondary = created_col, updated_col
+    else:
+        primary, secondary = updated_col, created_col
+    if direction == "asc":
+        return (primary.asc(), secondary.asc(), id_col.asc())
+    return (primary.desc(), secondary.desc(), id_col.desc())
+
+
 def _normalize_email(email: str | None) -> str | None:
     if email is None:
         return None
@@ -75,6 +120,15 @@ def _normalize_text(value: str | None) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def _require_at_least_one_name(
+    first_name: str | None, last_name: str | None
+) -> None:
+    if _strip_or_none(first_name) is None and _strip_or_none(last_name) is None:
+        raise ValueError(
+            "A contact requires at least a first name or a last name."
+        )
 
 
 def _normalize_stage_options(values: list[str]) -> list[str]:
@@ -325,6 +379,11 @@ def list_contacts(
     tag_ids: list[UUID] | None = None,
     owner_ids: list[UUID] | None = None,
     sort_by: str | None = None,
+    sort_dir: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    updated_after: datetime | None = None,
+    updated_before: datetime | None = None,
 ) -> tuple[list[CrmContact], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
 
@@ -354,11 +413,16 @@ def list_contacts(
         stmt = stmt.where(CrmContact.organization_id == organization_id)
 
     if tag_ids:
-        stmt = (
-            stmt.join(CrmContact__Tag, CrmContact__Tag.contact_id == CrmContact.id)
-            .where(CrmContact__Tag.tag_id.in_(tag_ids))
-            .distinct()
-        )
+        # Require ALL selected tags (intersection): one EXISTS per distinct tag.
+        for tag_id in dict.fromkeys(tag_ids):
+            stmt = stmt.where(
+                select(CrmContact__Tag.contact_id)
+                .where(
+                    CrmContact__Tag.contact_id == CrmContact.id,
+                    CrmContact__Tag.tag_id == tag_id,
+                )
+                .exists()
+            )
 
     if owner_ids:
         stmt = stmt.where(
@@ -370,12 +434,21 @@ def list_contacts(
             .exists()
         )
 
+    stmt = _apply_timestamp_filters(
+        stmt,
+        created_col=CrmContact.created_at,
+        updated_col=CrmContact.updated_at,
+        created_after=created_after,
+        created_before=created_before,
+        updated_after=updated_after,
+        updated_before=updated_before,
+    )
+
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
-    if sort_by == "created_at":
-        order_clauses = (CrmContact.created_at.desc(), CrmContact.updated_at.desc())
-    else:
-        order_clauses = (CrmContact.updated_at.desc(), CrmContact.created_at.desc())
+    order_clauses = _build_timestamp_order_clauses(
+        CrmContact.created_at, CrmContact.updated_at, CrmContact.id, sort_by, sort_dir
+    )
 
     items = list(
         db_session.scalars(
@@ -388,7 +461,7 @@ def list_contacts(
 def create_contact(
     db_session: Session,
     *,
-    first_name: str,
+    first_name: str | None,
     last_name: str | None,
     email: str | None,
     phone: str | None,
@@ -405,8 +478,8 @@ def create_contact(
     commit: bool = True,
 ) -> tuple[CrmContact, bool]:
     normalized_first_name = _strip_or_none(first_name)
-    if normalized_first_name is None:
-        raise ValueError("Contact first name cannot be empty")
+    normalized_last_name = _strip_or_none(last_name)
+    _require_at_least_one_name(normalized_first_name, normalized_last_name)
 
     normalized_email = _normalize_email(email)
     if normalized_email:
@@ -419,7 +492,7 @@ def create_contact(
 
     contact = CrmContact(
         first_name=normalized_first_name,
-        last_name=_strip_or_none(last_name),
+        last_name=normalized_last_name,
         email=normalized_email,
         phone=_strip_or_none(phone),
         title=_strip_or_none(title),
@@ -480,14 +553,30 @@ def update_contact(
 
     changed = False
 
+    # Enforce the at-least-one-name invariant once, against the post-update
+    # state. We compute the effective first/last names the contact will have
+    # after applying this patch set (using patched values where present,
+    # otherwise the contact's current values). This is order-independent and
+    # covers clearing one or both names in a single patch.
+    if "first_name" in patches or "last_name" in patches:
+        effective_first_name = (
+            _strip_or_none(patches["first_name"])
+            if "first_name" in patches
+            else _strip_or_none(contact.first_name)
+        )
+        effective_last_name = (
+            _strip_or_none(patches["last_name"])
+            if "last_name" in patches
+            else _strip_or_none(contact.last_name)
+        )
+        _require_at_least_one_name(effective_first_name, effective_last_name)
+
     for key, value in patches.items():
         if key not in mutable_fields:
             continue
 
         if key == "first_name":
             normalized_first_name = _strip_or_none(value)
-            if normalized_first_name is None:
-                raise ValueError("Contact first name cannot be empty")
             if _strip_or_none(contact.first_name) != normalized_first_name:
                 contact.first_name = normalized_first_name
                 changed = True
@@ -611,6 +700,11 @@ def list_organizations(
     tag_ids: list[UUID] | None = None,
     created_by: UUID | None = None,
     sort_by: str | None = None,
+    sort_dir: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    updated_after: datetime | None = None,
+    updated_before: datetime | None = None,
 ) -> tuple[list[CrmOrganization], int]:
     page_num, page_size = _normalize_page(page_num, page_size)
 
@@ -632,30 +726,39 @@ def list_organizations(
         stmt = stmt.where(CrmOrganization.type == org_type)
 
     if tag_ids:
-        stmt = (
-            stmt.join(
-                CrmOrganization__Tag,
-                CrmOrganization__Tag.organization_id == CrmOrganization.id,
+        # Require ALL selected tags (intersection): one EXISTS per distinct tag.
+        for tag_id in dict.fromkeys(tag_ids):
+            stmt = stmt.where(
+                select(CrmOrganization__Tag.organization_id)
+                .where(
+                    CrmOrganization__Tag.organization_id == CrmOrganization.id,
+                    CrmOrganization__Tag.tag_id == tag_id,
+                )
+                .exists()
             )
-            .where(CrmOrganization__Tag.tag_id.in_(tag_ids))
-            .distinct()
-        )
 
     if created_by is not None:
         stmt = stmt.where(CrmOrganization.created_by == created_by)
 
+    stmt = _apply_timestamp_filters(
+        stmt,
+        created_col=CrmOrganization.created_at,
+        updated_col=CrmOrganization.updated_at,
+        created_after=created_after,
+        created_before=created_before,
+        updated_after=updated_after,
+        updated_before=updated_before,
+    )
+
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
-    if sort_by == "created_at":
-        order_clauses = (
-            CrmOrganization.created_at.desc(),
-            CrmOrganization.updated_at.desc(),
-        )
-    else:
-        order_clauses = (
-            CrmOrganization.updated_at.desc(),
-            CrmOrganization.created_at.desc(),
-        )
+    order_clauses = _build_timestamp_order_clauses(
+        CrmOrganization.created_at,
+        CrmOrganization.updated_at,
+        CrmOrganization.id,
+        sort_by,
+        sort_dir,
+    )
 
     items = list(
         db_session.scalars(

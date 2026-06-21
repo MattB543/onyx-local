@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useCallback, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   CrmOrganizationType,
+  CrmTag,
   exportCrmOrganizations,
+  listCrmTags,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
@@ -15,6 +17,7 @@ import { useUser } from "@/providers/UserProvider";
 import Button from "@/refresh-components/buttons/Button";
 import Card from "@/refresh-components/cards/Card";
 import { EmptyMessageCard } from "@opal/components";
+import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
@@ -22,12 +25,20 @@ import Text from "@/refresh-components/texts/Text";
 import CreateOrganizationModal from "@/refresh-pages/crm/components/CreateOrganizationModal";
 import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
+import CrmDateRangeFilter, {
+  CrmDateRangeValue,
+  dateRangeToParams,
+} from "@/refresh-pages/crm/components/CrmDateRangeFilter";
 import OrgAvatar from "@/refresh-pages/crm/components/OrgAvatar";
 import TypeBadge from "@/refresh-pages/crm/components/TypeBadge";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 import {
+  CRM_SORT_OPTIONS,
+  CrmSortValue,
+  DEFAULT_CRM_SORT_VALUE,
   formatCrmLabel,
   ORGANIZATION_TYPE_OPTIONS,
+  sortValueToParams,
 } from "@/refresh-pages/crm/crmOptions";
 
 import {
@@ -50,6 +61,16 @@ export default function CrmOrganizationsPage() {
     "all"
   );
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<CrmDateRangeValue>({
+    field: "created",
+    from: null,
+    to: null,
+  });
+  const [sortValue, setSortValue] = useState<CrmSortValue>(
+    DEFAULT_CRM_SORT_VALUE
+  );
+  const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -66,6 +87,17 @@ export default function CrmOrganizationsPage() {
       setExporting(false);
     }
   }, []);
+
+  useEffect(() => {
+    void listCrmTags({ page_size: 100 })
+      .then((r) => setAllTags(r.items))
+      .catch(() => {});
+  }, []);
+
+  const tagOptions = useMemo(
+    () => allTags.map((t) => ({ value: t.id, label: t.name })),
+    [allTags]
+  );
 
   const ownerOptions = useMemo(
     () =>
@@ -84,11 +116,21 @@ export default function CrmOrganizationsPage() {
         ? user?.id
         : ownerFilter;
 
+  const { sortBy, sortDir } = sortValueToParams(sortValue);
+  const dateParams = dateRangeToParams(dateRange);
+
   const { organizations, totalItems, isLoading, error, refreshOrganizations } =
     useCrmOrganizations({
       q: searchText || undefined,
       type: typeFilter === "all" ? undefined : typeFilter,
       ownerId: ownerFilterId,
+      tagIds: tagFilterIds.length ? tagFilterIds : undefined,
+      createdAfter: dateParams.created_after,
+      createdBefore: dateParams.created_before,
+      updatedAfter: dateParams.updated_after,
+      updatedBefore: dateParams.updated_before,
+      sortBy,
+      sortDir,
       pageNum,
       pageSize: PAGE_SIZE,
     });
@@ -98,10 +140,30 @@ export default function CrmOrganizationsPage() {
     [totalItems]
   );
 
-  const emptyDescription =
-    searchText || typeFilter !== "all" || ownerFilter !== "all"
-      ? "Try adjusting filters or search terms."
-      : "Create your first organization to get started.";
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(searchText) ||
+      typeFilter !== "all" ||
+      ownerFilter !== "all" ||
+      tagFilterIds.length > 0 ||
+      Boolean(dateRange.from) ||
+      Boolean(dateRange.to),
+    [searchText, typeFilter, ownerFilter, tagFilterIds, dateRange]
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setSearchText("");
+    setTypeFilter("all");
+    setOwnerFilter("all");
+    setTagFilterIds([]);
+    setDateRange({ field: "created", from: null, to: null });
+    setSortValue(DEFAULT_CRM_SORT_VALUE);
+    setPageNum(0);
+  }, []);
+
+  const emptyDescription = hasActiveFilters
+    ? "Try adjusting filters or search terms."
+    : "Create your first organization to get started.";
 
   return (
     <AppLayouts.Root>
@@ -169,7 +231,7 @@ export default function CrmOrganizationsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
+          <div className="grid grid-cols-1 gap-2">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -179,7 +241,9 @@ export default function CrmOrganizationsPage() {
               placeholder="Search organizations"
               searchIcon
             />
+          </div>
 
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
             <InputSelect
               value={typeFilter}
               onValueChange={(value) => {
@@ -217,12 +281,50 @@ export default function CrmOrganizationsPage() {
               </InputSelect.Content>
             </InputSelect>
 
-            <Text
-              as="p"
-              secondaryAction
-              text03
-              className="text-sm md:justify-self-end"
+            <div className="min-w-[200px]">
+              <InputMultiSelect
+                value={tagFilterIds}
+                onChange={(ids) => {
+                  setTagFilterIds(ids);
+                  setPageNum(0);
+                }}
+                options={tagOptions}
+                placeholder="Filter by tags"
+              />
+            </div>
+
+            <CrmDateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPageNum(0);
+              }}
+            />
+
+            <InputSelect
+              value={sortValue}
+              onValueChange={(value) => {
+                setSortValue(value as CrmSortValue);
+                setPageNum(0);
+              }}
             >
+              <InputSelect.Trigger placeholder="Sort" />
+              <InputSelect.Content>
+                {CRM_SORT_OPTIONS.map((option) => (
+                  <InputSelect.Item key={option.value} value={option.value}>
+                    {option.label}
+                  </InputSelect.Item>
+                ))}
+              </InputSelect.Content>
+            </InputSelect>
+
+            {hasActiveFilters && (
+              <Button action tertiary size="md" onClick={handleClearFilters}>
+                Clear filters
+              </Button>
+            )}
+
+            <Text as="p" secondaryAction text03 className="text-sm md:ml-auto">
               {totalItems} total
             </Text>
           </div>

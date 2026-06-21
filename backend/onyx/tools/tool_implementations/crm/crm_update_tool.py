@@ -124,6 +124,7 @@ class CrmUpdateTool(Tool[None]):
                                 "organization_id, owner_ids, source (manual|import|referral|inbound|other), "
                                 "status (workspace-defined contact stages), category, notes, linkedin_url, location, "
                                 "profile_picture_url (remote image URL or null to clear). "
+                                "A contact must always keep at least a first_name or a last_name. "
                                 "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
                                 "sector, location, size, notes. "
                                 "For interactions: title, summary, type (note|call|email|meeting|event), "

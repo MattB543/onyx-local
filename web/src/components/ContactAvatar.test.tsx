@@ -10,6 +10,20 @@ describe("ContactAvatar", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
+  test("renders the last-name initial when first name is null", () => {
+    render(<ContactAvatar firstName={null} lastName="Smith" />);
+
+    expect(screen.getByText("S")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  test("falls back to '?' when both names are null", () => {
+    render(<ContactAvatar firstName={null} lastName={null} />);
+
+    expect(screen.getByText("?")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
   test("falls back to initials when the profile picture fails to load and resets for a new url", () => {
     const { rerender } = render(
       <ContactAvatar

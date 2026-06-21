@@ -43,8 +43,12 @@ const RECENT_LIST_LIMIT = 5;
 
 export default function CrmHomePage() {
   const { isAdmin } = useUser();
-  const [contactsSortBy, setContactsSortBy] = useState("updated_at");
-  const [orgsSortBy, setOrgsSortBy] = useState("updated_at");
+  const [contactsSortBy, setContactsSortBy] = useState<
+    "created_at" | "updated_at"
+  >("updated_at");
+  const [orgsSortBy, setOrgsSortBy] = useState<"created_at" | "updated_at">(
+    "updated_at"
+  );
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -225,7 +229,9 @@ export default function CrmHomePage() {
                 <div className="w-[160px]">
                   <InputSelect
                     value={contactsSortBy}
-                    onValueChange={setContactsSortBy}
+                    onValueChange={(v) =>
+                      setContactsSortBy(v as "created_at" | "updated_at")
+                    }
                   >
                     <InputSelect.Trigger placeholder="Sort by" />
                     <InputSelect.Content>
@@ -283,7 +289,7 @@ export default function CrmHomePage() {
                           </div>
                           <div className="flex min-w-0 flex-1 flex-col gap-1">
                             <span className="text-base font-semibold text-text-05">
-                              {contact.full_name || contact.first_name}
+                              {contact.full_name || contact.email || "Contact"}
                             </span>
                             {contact.email ? (
                               <div className="flex items-center gap-1">
@@ -334,7 +340,12 @@ export default function CrmHomePage() {
               </Text>
               <div className="flex items-center gap-2">
                 <div className="w-[160px]">
-                  <InputSelect value={orgsSortBy} onValueChange={setOrgsSortBy}>
+                  <InputSelect
+                    value={orgsSortBy}
+                    onValueChange={(v) =>
+                      setOrgsSortBy(v as "created_at" | "updated_at")
+                    }
+                  >
                     <InputSelect.Trigger placeholder="Sort by" />
                     <InputSelect.Content>
                       <InputSelect.Item value="updated_at">

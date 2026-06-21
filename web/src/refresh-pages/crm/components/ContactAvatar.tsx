@@ -25,7 +25,7 @@ const sizeClasses = {
 };
 
 interface ContactAvatarProps {
-  firstName: string;
+  firstName: string | null;
   lastName: string | null;
   size?: "sm" | "md" | "lg";
   profilePictureUrl?: string | null;
@@ -65,7 +65,9 @@ export default function ContactAvatar({
       {showProfilePicture ? (
         <img
           src={profilePictureUrl || undefined}
-          alt={`${firstName} ${lastName || ""}`.trim() || "Contact avatar"}
+          alt={
+            `${firstName || ""} ${lastName || ""}`.trim() || "Contact avatar"
+          }
           className="absolute inset-0 h-full w-full object-cover"
           onError={() => setImageFailed(true)}
         />

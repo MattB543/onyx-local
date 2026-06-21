@@ -4874,7 +4874,7 @@ class CrmContact(Base):
     __tablename__ = "crm_contact"
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    first_name: Mapped[str] = mapped_column(String, nullable=False)
+    first_name: Mapped[str | None] = mapped_column(String, nullable=True)
     last_name: Mapped[str | None] = mapped_column(String, nullable=True)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -4935,6 +4935,11 @@ class CrmContact(Base):
     __table_args__ = (
         Index("ix_crm_contact_organization_id", "organization_id"),
         Index("ix_crm_contact_status", "status"),
+        CheckConstraint(
+            "NULLIF(btrim(first_name), '') IS NOT NULL "
+            "OR NULLIF(btrim(last_name), '') IS NOT NULL",
+            name="ck_crm_contact_has_name",
+        ),
     )
 
 

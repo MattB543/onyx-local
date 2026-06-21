@@ -92,7 +92,7 @@ class CrmTagCreateRequest(BaseModel):
 
 
 class CrmContactCreateRequest(BaseModel):
-    first_name: str
+    first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
     phone: str | None = None
@@ -105,6 +105,16 @@ class CrmContactCreateRequest(BaseModel):
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
+
+    @model_validator(mode="after")
+    def require_at_least_one_name(self) -> "CrmContactCreateRequest":
+        if not (self.first_name and self.first_name.strip()) and not (
+            self.last_name and self.last_name.strip()
+        ):
+            raise ValueError(
+                "A contact requires at least a first name or a last name."
+            )
+        return self
 
 
 class CrmContactPatchRequest(BaseModel):
@@ -125,7 +135,7 @@ class CrmContactPatchRequest(BaseModel):
 
 class CrmContactSnapshot(BaseModel):
     id: UUID
-    first_name: str
+    first_name: str | None
     last_name: str | None
     full_name: str
     email: str | None

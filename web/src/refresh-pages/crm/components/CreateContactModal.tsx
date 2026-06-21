@@ -164,7 +164,7 @@ export default function CreateContactModal({
 
             try {
               const createdContact = await createCrmContact({
-                first_name: values.first_name.trim(),
+                first_name: optionalText(values.first_name),
                 last_name: optionalText(values.last_name),
                 email: optionalText(values.email),
                 phone: optionalText(values.phone),
@@ -232,7 +232,7 @@ export default function CreateContactModal({
                   <div className="grid gap-3 md:grid-cols-2">
                     <InputTypeInField
                       name="first_name"
-                      placeholder="First name *"
+                      placeholder="First name"
                     />
                     <InputTypeInField
                       name="last_name"

@@ -2,10 +2,19 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import datetime
 from datetime import timezone
 from typing import Any
 from uuid import UUID
+
+# Matches a bare calendar date with no time component (e.g. "2026-01-31").
+_DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def is_date_only(value: str) -> bool:
+    """True if ``value`` is a bare ``YYYY-MM-DD`` date with no time component."""
+    return bool(_DATE_ONLY_RE.match(value.strip()))
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +243,22 @@ def parse_datetime_or_none(value: str) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def parse_filter_datetime(value: str | None, *, upper_bound: bool) -> datetime | None:
+    """Parse an ISO 8601 datetime string for a CRM filter bound.
+
+    A *bare date* (``YYYY-MM-DD``, no time) used as an inclusive ``upper_bound``
+    is extended to end-of-day (``23:59:59.999999``) so the whole day is covered.
+    An explicit datetime is honored verbatim, even at midnight -- so callers can
+    target ``...T00:00:00`` precisely. Naive datetimes are assumed UTC.
+    """
+    if value is None or not value.strip():
+        return None
+    parsed = parse_datetime_or_none(value)
+    if parsed is not None and upper_bound and is_date_only(value):
+        parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return parsed
 
 
 def parse_enum_or_none(value: str, enum_class: type) -> Any | None:

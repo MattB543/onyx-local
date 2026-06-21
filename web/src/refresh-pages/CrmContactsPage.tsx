@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChangeEvent, useCallback, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-import { CrmContactStage, exportCrmContacts } from "@/app/app/crm/crmService";
+import {
+  CrmContactStage,
+  CrmTag,
+  exportCrmContacts,
+  listCrmTags,
+} from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
@@ -18,6 +23,7 @@ import Card from "@/refresh-components/cards/Card";
 import { EmptyMessageCard } from "@opal/components";
 import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
+import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
@@ -27,11 +33,19 @@ import CreateContactModal from "@/refresh-pages/crm/components/CreateContactModa
 import ImportCsvModal from "@/refresh-pages/crm/components/ImportCsvModal";
 import { formatRelativeDate } from "@/refresh-pages/crm/components/crmDateUtils";
 import StatusBadge from "@/refresh-pages/crm/components/StatusBadge";
+import CrmDateRangeFilter, {
+  CrmDateRangeValue,
+  dateRangeToParams,
+} from "@/refresh-pages/crm/components/CrmDateRangeFilter";
 import CrmNav from "@/refresh-pages/crm/CrmNav";
 import {
+  CRM_SORT_OPTIONS,
+  CrmSortValue,
   DEFAULT_CRM_CATEGORY_SUGGESTIONS,
+  DEFAULT_CRM_SORT_VALUE,
   DEFAULT_CRM_STAGE_OPTIONS,
   formatCrmLabel,
+  sortValueToParams,
 } from "@/refresh-pages/crm/crmOptions";
 
 import {
@@ -76,6 +90,16 @@ export default function CrmContactsPage() {
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [orgFilterText, setOrgFilterText] = useState("");
   const [orgFilterId, setOrgFilterId] = useState<string | undefined>(undefined);
+  const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<CrmDateRangeValue>({
+    field: "created",
+    from: null,
+    to: null,
+  });
+  const [sortValue, setSortValue] = useState<CrmSortValue>(
+    DEFAULT_CRM_SORT_VALUE
+  );
+  const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -92,6 +116,17 @@ export default function CrmContactsPage() {
       setExporting(false);
     }
   }, []);
+
+  useEffect(() => {
+    void listCrmTags({ page_size: 100 })
+      .then((r) => setAllTags(r.items))
+      .catch(() => {});
+  }, []);
+
+  const tagOptions = useMemo(
+    () => allTags.map((t) => ({ value: t.id, label: t.name })),
+    [allTags]
+  );
 
   const { organizations: orgLookup } = useCrmOrganizations({
     pageNum: 0,
@@ -127,6 +162,9 @@ export default function CrmContactsPage() {
         ? user?.id
         : ownerFilter;
 
+  const { sortBy, sortDir } = sortValueToParams(sortValue);
+  const dateParams = dateRangeToParams(dateRange);
+
   const { contacts, totalItems, isLoading, error, refreshContacts } =
     useCrmContacts({
       q: searchText || undefined,
@@ -134,6 +172,13 @@ export default function CrmContactsPage() {
       category: categoryFilter === "all" ? undefined : categoryFilter,
       organizationId: organizationIdFilter ?? orgFilterId,
       ownerIds: ownerFilterId ? [ownerFilterId] : undefined,
+      tagIds: tagFilterIds.length ? tagFilterIds : undefined,
+      createdAfter: dateParams.created_after,
+      createdBefore: dateParams.created_before,
+      updatedAfter: dateParams.updated_after,
+      updatedBefore: dateParams.updated_before,
+      sortBy,
+      sortDir,
       pageNum,
       pageSize: PAGE_SIZE,
     });
@@ -143,15 +188,48 @@ export default function CrmContactsPage() {
     [totalItems]
   );
 
-  const emptyDescription =
-    searchText ||
-    statusFilter !== "all" ||
-    categoryFilter !== "all" ||
-    ownerFilter !== "all" ||
-    orgFilterId ||
-    organizationIdFilter
-      ? "Try adjusting filters or search terms."
-      : "Create your first contact to get started.";
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(searchText) ||
+      statusFilter !== "all" ||
+      categoryFilter !== "all" ||
+      ownerFilter !== "all" ||
+      Boolean(orgFilterId) ||
+      Boolean(organizationIdFilter) ||
+      tagFilterIds.length > 0 ||
+      Boolean(dateRange.from) ||
+      Boolean(dateRange.to),
+    [
+      searchText,
+      statusFilter,
+      categoryFilter,
+      ownerFilter,
+      orgFilterId,
+      organizationIdFilter,
+      tagFilterIds,
+      dateRange,
+    ]
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setSearchText("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setOwnerFilter("all");
+    // Do NOT clear organizationIdFilter (URL-driven, has its own banner link).
+    if (!organizationIdFilter) {
+      setOrgFilterId(undefined);
+      setOrgFilterText("");
+    }
+    setTagFilterIds([]);
+    setDateRange({ field: "created", from: null, to: null });
+    setSortValue(DEFAULT_CRM_SORT_VALUE);
+    setPageNum(0);
+  }, [organizationIdFilter]);
+
+  const emptyDescription = hasActiveFilters
+    ? "Try adjusting filters or search terms."
+    : "Create your first contact to get started.";
 
   return (
     <AppLayouts.Root>
@@ -232,7 +310,7 @@ export default function CrmContactsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_180px_180px_auto] md:items-center">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_280px]">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -243,6 +321,35 @@ export default function CrmContactsPage() {
               searchIcon
             />
 
+            <InputComboBox
+              value={orgFilterText}
+              onChange={(e) => {
+                setOrgFilterText(e.target.value);
+                if (!e.target.value) {
+                  setOrgFilterId(undefined);
+                  setPageNum(0);
+                }
+              }}
+              onValueChange={(value) => {
+                setOrgFilterId(value);
+                setOrgFilterText(orgNameById.get(value) ?? "");
+                setPageNum(0);
+              }}
+              onClear={() => {
+                setOrgFilterId(undefined);
+                setOrgFilterText("");
+                setPageNum(0);
+              }}
+              options={orgOptions}
+              placeholder="Filter by org"
+              strict
+              searchIcon
+              isError={false}
+              disabled={!!organizationIdFilter}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
             <InputSelect
               value={statusFilter}
               onValueChange={(value) => {
@@ -298,39 +405,50 @@ export default function CrmContactsPage() {
               </InputSelect.Content>
             </InputSelect>
 
-            <InputComboBox
-              value={orgFilterText}
-              onChange={(e) => {
-                setOrgFilterText(e.target.value);
-                if (!e.target.value) {
-                  setOrgFilterId(undefined);
+            <div className="min-w-[200px]">
+              <InputMultiSelect
+                value={tagFilterIds}
+                onChange={(ids) => {
+                  setTagFilterIds(ids);
                   setPageNum(0);
-                }
-              }}
-              onValueChange={(value) => {
-                setOrgFilterId(value);
-                setOrgFilterText(orgNameById.get(value) ?? "");
+                }}
+                options={tagOptions}
+                placeholder="Filter by tags"
+              />
+            </div>
+
+            <CrmDateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
                 setPageNum(0);
               }}
-              onClear={() => {
-                setOrgFilterId(undefined);
-                setOrgFilterText("");
-                setPageNum(0);
-              }}
-              options={orgOptions}
-              placeholder="Filter by org"
-              strict
-              searchIcon
-              isError={false}
-              disabled={!!organizationIdFilter}
             />
 
-            <Text
-              as="p"
-              secondaryAction
-              text03
-              className="text-sm md:justify-self-end"
+            <InputSelect
+              value={sortValue}
+              onValueChange={(value) => {
+                setSortValue(value as CrmSortValue);
+                setPageNum(0);
+              }}
             >
+              <InputSelect.Trigger placeholder="Sort" />
+              <InputSelect.Content>
+                {CRM_SORT_OPTIONS.map((option) => (
+                  <InputSelect.Item key={option.value} value={option.value}>
+                    {option.label}
+                  </InputSelect.Item>
+                ))}
+              </InputSelect.Content>
+            </InputSelect>
+
+            {hasActiveFilters && (
+              <Button action tertiary size="md" onClick={handleClearFilters}>
+                Clear filters
+              </Button>
+            )}
+
+            <Text as="p" secondaryAction text03 className="text-sm md:ml-auto">
               {totalItems} total
             </Text>
           </div>
@@ -381,7 +499,7 @@ export default function CrmContactsPage() {
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
                           <span className="text-base font-semibold text-text-05">
-                            {contact.full_name || contact.first_name}
+                            {contact.full_name || contact.email || "Contact"}
                           </span>
                           {contact.email ? (
                             <div className="flex items-center gap-1">

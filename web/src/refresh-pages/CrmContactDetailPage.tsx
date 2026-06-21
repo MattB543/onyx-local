@@ -197,7 +197,7 @@ export default function CrmContactDetailPage({
     if (contact) {
       const fullName =
         contact.full_name?.trim() ||
-        `${contact.first_name} ${contact.last_name || ""}`.trim() ||
+        `${contact.first_name || ""} ${contact.last_name || ""}`.trim() ||
         contact.email ||
         contact.id;
       labelById.set(contact.id, fullName);
@@ -361,7 +361,7 @@ export default function CrmContactDetailPage({
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="text-base font-semibold text-text-05">
-                      {contact.full_name || contact.first_name}
+                      {contact.full_name || contact.email || "Contact"}
                     </span>
                     <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-text-03">
                       <span>{contact.title || "No title"}</span>
@@ -417,7 +417,7 @@ export default function CrmContactDetailPage({
                       <Formik<ContactEditValues>
                         enableReinitialize
                         initialValues={{
-                          first_name: contact.first_name,
+                          first_name: contact.first_name || "",
                           last_name: contact.last_name || "",
                           email: contact.email || "",
                           phone: contact.phone || "",
@@ -452,8 +452,8 @@ export default function CrmContactDetailPage({
 
                           try {
                             await patchCrmContact(contact.id, {
-                              first_name: values.first_name.trim(),
-                              last_name: optionalText(values.last_name),
+                              first_name: values.first_name.trim() || null,
+                              last_name: values.last_name.trim() || null,
                               email: optionalText(values.email),
                               phone: optionalText(values.phone),
                               title: optionalText(values.title),
@@ -512,7 +512,7 @@ export default function CrmContactDetailPage({
                               <InputImage
                                 src={activeProfilePictureUrl || undefined}
                                 alt={`${
-                                  contact.full_name || contact.first_name
+                                  contact.full_name || contact.email || "Contact"
                                 } profile picture`}
                                 size={104}
                                 onDrop={(file) => {
@@ -559,7 +559,7 @@ export default function CrmContactDetailPage({
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <InputTypeInField
                                     name="first_name"
-                                    placeholder="First name *"
+                                    placeholder="First name"
                                   />
                                   <InputTypeInField
                                     name="last_name"
@@ -812,7 +812,7 @@ export default function CrmContactDetailPage({
                       <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:[&>*]:min-w-0">
                         <DetailField
                           label="Name"
-                          value={contact.full_name || contact.first_name}
+                          value={contact.full_name || contact.email || "Contact"}
                           layout="stacked"
                         />
                         <DetailField
@@ -1014,7 +1014,7 @@ export default function CrmContactDetailPage({
           <Text as="p" text03>
             Delete{" "}
             <Text as="span" text05>
-              {contact.full_name || contact.first_name}
+              {contact.full_name || contact.email || "Contact"}
             </Text>
             ? This action cannot be undone. Linked interactions will remain, but
             their primary contact link and attendee references to this contact

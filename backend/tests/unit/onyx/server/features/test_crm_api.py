@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from onyx.configs.constants import FileOrigin
 from onyx.db.enums import CrmAttendeeRole
@@ -25,6 +26,7 @@ from onyx.server.features.crm.api import delete_crm_contact
 from onyx.server.features.crm.api import delete_crm_interaction
 from onyx.server.features.crm.api import delete_crm_organization
 from onyx.server.features.crm.api import get_contacts
+from onyx.server.features.crm.api import get_organizations
 from onyx.server.features.crm.api import get_session
 from onyx.server.features.crm.api import patch_interaction
 from onyx.server.features.crm.api import post_contact
@@ -125,6 +127,47 @@ def test_post_contact_explicit_null_owner_ids_keeps_contact_unowned() -> None:
     create_kwargs = mock_create_contact.call_args.kwargs
     assert create_kwargs["owner_ids"] == []
     assert create_kwargs["status"] == "active"
+
+
+def test_contact_create_request_allows_last_name_only() -> None:
+    request = CrmContactCreateRequest(last_name="Smith")
+
+    assert request.first_name is None
+    assert request.last_name == "Smith"
+
+
+def test_contact_create_request_rejects_no_names() -> None:
+    with pytest.raises(ValidationError, match="first name or a last name"):
+        CrmContactCreateRequest()
+
+
+def test_contact_snapshot_last_name_only_builds_full_name() -> None:
+    now = datetime.now(timezone.utc)
+    contact = SimpleNamespace(
+        id=uuid4(),
+        first_name=None,
+        last_name="Smith",
+        email=None,
+        phone=None,
+        title=None,
+        organization_id=None,
+        source=None,
+        status="lead",
+        category=None,
+        notes=None,
+        linkedin_url=None,
+        location=None,
+        profile_picture_file_id=None,
+        created_by=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    snapshot = CrmContactSnapshot.from_model(contact=contact, owner_ids=[], tags=[])
+
+    assert snapshot.first_name is None
+    assert snapshot.last_name == "Smith"
+    assert snapshot.full_name == "Smith"
 
 
 def test_contact_snapshot_profile_picture_url_none_when_no_file_id() -> None:
@@ -1102,3 +1145,285 @@ def test_serialize_interaction_includes_attendee_display_names() -> None:
     assert [a.display_name for a in serialized.attendees] == ["Alex Smith", "Sam Lee"]
     assert serialized.contact_name == "Taylor Jones"
     assert serialized.organization_name == "Acme Corp"
+
+
+# ---------------------------------------------------------------------------
+# Date-range filters + sort direction (REST layer)
+# ---------------------------------------------------------------------------
+
+
+def test_get_contacts_passes_date_filters_through() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_contacts",
+            return_value=([], 0),
+        ) as mock_list_contacts,
+        patch(
+            "onyx.server.features.crm.api._serialize_contact",
+            return_value={},
+        ),
+    ):
+        get_contacts(
+            status=None,
+            category=None,
+            sort_by=None,
+            sort_dir=None,
+            created_after="2026-01-01T00:00:00Z",
+            created_before=None,
+            updated_after=None,
+            updated_before="2026-02-01T12:30:00Z",
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    kwargs = mock_list_contacts.call_args.kwargs
+    assert isinstance(kwargs["created_after"], datetime)
+    assert kwargs["created_after"].tzinfo is not None
+    assert kwargs["created_after"] == datetime(2026, 1, 1, tzinfo=timezone.utc)
+    assert kwargs["updated_before"] == datetime(
+        2026, 2, 1, 12, 30, tzinfo=timezone.utc
+    )
+    assert kwargs["created_before"] is None
+    assert kwargs["updated_after"] is None
+
+
+def test_get_contacts_rejects_malformed_date() -> None:
+    with patch(
+        "onyx.server.features.crm.api.list_contacts",
+        return_value=([], 0),
+    ) as mock_list_contacts:
+        with pytest.raises(OnyxError) as exc:
+            get_contacts(
+                status=None,
+                category=None,
+                sort_by=None,
+                sort_dir=None,
+                created_after="not-a-date",
+                created_before=None,
+                updated_after=None,
+                updated_before=None,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+    assert exc.value.status_code == 400
+    mock_list_contacts.assert_not_called()
+
+
+def test_get_contacts_rejects_invalid_sort_dir() -> None:
+    with patch(
+        "onyx.server.features.crm.api.list_contacts",
+        return_value=([], 0),
+    ) as mock_list_contacts:
+        with pytest.raises(OnyxError) as exc:
+            get_contacts(
+                status=None,
+                category=None,
+                sort_by=None,
+                sort_dir="sideways",
+                created_after=None,
+                created_before=None,
+                updated_after=None,
+                updated_before=None,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+    mock_list_contacts.assert_not_called()
+
+
+def test_get_contacts_accepts_sort_dir_asc() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_contacts",
+            return_value=([], 0),
+        ) as mock_list_contacts,
+        patch("onyx.server.features.crm.api._serialize_contact", return_value={}),
+    ):
+        get_contacts(
+            status=None,
+            category=None,
+            sort_by=None,
+            sort_dir="ASC",
+            created_after=None,
+            created_before=None,
+            updated_after=None,
+            updated_before=None,
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert mock_list_contacts.call_args.kwargs["sort_dir"] == "asc"
+
+
+def test_get_contacts_rejects_invalid_sort_by() -> None:
+    with patch(
+        "onyx.server.features.crm.api.list_contacts",
+        return_value=([], 0),
+    ) as mock_list_contacts:
+        with pytest.raises(OnyxError) as exc:
+            get_contacts(
+                status=None,
+                category=None,
+                sort_by="bogus",
+                sort_dir=None,
+                created_after=None,
+                created_before=None,
+                updated_after=None,
+                updated_before=None,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+    mock_list_contacts.assert_not_called()
+
+
+def test_get_contacts_bare_date_before_extends_to_end_of_day() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_contacts",
+            return_value=([], 0),
+        ) as mock_list_contacts,
+        patch("onyx.server.features.crm.api._serialize_contact", return_value={}),
+    ):
+        get_contacts(
+            status=None,
+            category=None,
+            sort_by=None,
+            sort_dir=None,
+            created_after=None,
+            created_before="2026-01-31",
+            updated_after=None,
+            updated_before=None,
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    kwargs = mock_list_contacts.call_args.kwargs
+    assert kwargs["created_before"] == datetime(
+        2026, 1, 31, 23, 59, 59, 999999, tzinfo=timezone.utc
+    )
+
+
+def test_get_contacts_explicit_midnight_before_not_extended() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_contacts",
+            return_value=([], 0),
+        ) as mock_list_contacts,
+        patch("onyx.server.features.crm.api._serialize_contact", return_value={}),
+    ):
+        get_contacts(
+            status=None,
+            category=None,
+            sort_by=None,
+            sort_dir=None,
+            created_after=None,
+            created_before="2026-01-31T00:00:00Z",
+            updated_after=None,
+            updated_before=None,
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    kwargs = mock_list_contacts.call_args.kwargs
+    assert kwargs["created_before"] == datetime(2026, 1, 31, 0, 0, 0, tzinfo=timezone.utc)
+
+
+def test_get_contacts_empty_when_after_greater_than_before() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_contacts",
+            return_value=([], 0),
+        ) as mock_list_contacts,
+        patch("onyx.server.features.crm.api._serialize_contact", return_value={}),
+    ):
+        get_contacts(
+            status=None,
+            category=None,
+            sort_by=None,
+            sort_dir=None,
+            created_after="2026-06-01T00:00:00Z",
+            created_before="2026-01-01T00:00:00Z",
+            updated_after=None,
+            updated_before=None,
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    # Inverted range is passed through without error (documents non-error contract).
+    kwargs = mock_list_contacts.call_args.kwargs
+    assert kwargs["created_after"] == datetime(2026, 6, 1, tzinfo=timezone.utc)
+    assert kwargs["created_before"] == datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def test_get_organizations_passes_date_filters_through() -> None:
+    with (
+        patch(
+            "onyx.server.features.crm.api.list_organizations",
+            return_value=([], 0),
+        ) as mock_list_organizations,
+        patch(
+            "onyx.server.features.crm.api._serialize_organization",
+            return_value={},
+        ),
+    ):
+        get_organizations(
+            sort_by=None,
+            sort_dir="asc",
+            created_after="2026-01-01T00:00:00Z",
+            created_before=None,
+            updated_after=None,
+            updated_before=None,
+            db_session=MagicMock(),
+            _user=SimpleNamespace(id=uuid4()),
+        )
+
+    kwargs = mock_list_organizations.call_args.kwargs
+    assert kwargs["created_after"] == datetime(2026, 1, 1, tzinfo=timezone.utc)
+    assert kwargs["sort_dir"] == "asc"
+
+
+def test_get_organizations_rejects_malformed_date() -> None:
+    with patch(
+        "onyx.server.features.crm.api.list_organizations",
+        return_value=([], 0),
+    ) as mock_list_organizations:
+        with pytest.raises(OnyxError) as exc:
+            get_organizations(
+                sort_by=None,
+                sort_dir=None,
+                created_after=None,
+                created_before=None,
+                updated_after="garbage",
+                updated_before=None,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+    mock_list_organizations.assert_not_called()
+
+
+def test_get_organizations_rejects_invalid_sort_dir() -> None:
+    with patch(
+        "onyx.server.features.crm.api.list_organizations",
+        return_value=([], 0),
+    ) as mock_list_organizations:
+        with pytest.raises(OnyxError) as exc:
+            get_organizations(
+                sort_by=None,
+                sort_dir="up",
+                created_after=None,
+                created_before=None,
+                updated_after=None,
+                updated_before=None,
+                db_session=MagicMock(),
+                _user=SimpleNamespace(id=uuid4()),
+            )
+
+    assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
+    mock_list_organizations.assert_not_called()

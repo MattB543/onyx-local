@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from onyx.db.crm import list_contacts
 from onyx.db.crm import list_interactions
 from onyx.db.crm import list_organizations
 from onyx.db.crm import list_tags
+from onyx.server.features.crm.csv_utils import is_date_only
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import CrmListToolDelta
 from onyx.server.query_and_chat.streaming_models import CrmListToolStart
@@ -27,13 +29,13 @@ from onyx.tools.models import ToolResponse
 from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
+from onyx.tools.tool_implementations.crm.models import parse_datetime_maybe
 from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
 from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
 from onyx.tools.tool_implementations.crm.models import serialize_contact
 from onyx.tools.tool_implementations.crm.models import serialize_interaction
 from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.tools.tool_implementations.crm.models import serialize_tag
-
 
 CRM_LIST_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 
@@ -123,6 +125,48 @@ class CrmListTool(Tool[None]):
                                 "Only applies when entity_type is 'contact' or 'organization'."
                             ),
                         },
+                        "sort_by": {
+                            "type": "string",
+                            "enum": ["created_at", "updated_at"],
+                            "description": (
+                                "Sort field for contacts/organizations. "
+                                "Defaults to 'updated_at'."
+                            ),
+                        },
+                        "sort_dir": {
+                            "type": "string",
+                            "enum": ["asc", "desc"],
+                            "description": "Sort direction. Defaults to 'desc' (newest first).",
+                        },
+                        "created_after": {
+                            "type": "string",
+                            "description": (
+                                "ISO 8601 datetime; only contacts/organizations created at or "
+                                "after this instant (inclusive). E.g. '2026-01-01' or "
+                                "'2026-01-01T00:00:00Z'."
+                            ),
+                        },
+                        "created_before": {
+                            "type": "string",
+                            "description": (
+                                "ISO 8601 datetime; only records created at or before this "
+                                "instant (inclusive). A bare date includes the whole day."
+                            ),
+                        },
+                        "updated_after": {
+                            "type": "string",
+                            "description": (
+                                "ISO 8601 datetime; records updated at/after this instant "
+                                "(inclusive)."
+                            ),
+                        },
+                        "updated_before": {
+                            "type": "string",
+                            "description": (
+                                "ISO 8601 datetime; records updated at/before this instant "
+                                "(inclusive)."
+                            ),
+                        },
                         "page_num": {
                             "type": "integer",
                             "minimum": 0,
@@ -199,6 +243,52 @@ class CrmListTool(Tool[None]):
             llm_facing_response=llm_response,
         )
 
+    def _parse_list_filters(self, llm_kwargs: dict[str, Any]) -> dict[str, Any]:
+        def _utc(dt: Any) -> Any:
+            if dt is not None and dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        def _lower(field: str) -> Any:
+            return _utc(parse_datetime_maybe(llm_kwargs.get(field), field))
+
+        def _upper(field: str) -> Any:
+            raw = llm_kwargs.get(field)
+            dt = _utc(parse_datetime_maybe(raw, field))
+            # A bare YYYY-MM-DD upper bound covers the whole day (inclusive).
+            if dt is not None and isinstance(raw, str) and is_date_only(raw):
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            return dt
+
+        sort_by = llm_kwargs.get("sort_by")
+        if sort_by is not None:
+            sb = str(sort_by).strip().lower()
+            if sb not in ("created_at", "updated_at"):
+                raise ToolCallException(
+                    message=f"Invalid sort_by in {self.name}: {sort_by}",
+                    llm_facing_message="'sort_by' must be 'created_at' or 'updated_at'.",
+                )
+            sort_by = sb
+
+        sort_dir = llm_kwargs.get("sort_dir")
+        if sort_dir is not None:
+            sd = str(sort_dir).strip().lower()
+            if sd not in ("asc", "desc"):
+                raise ToolCallException(
+                    message=f"Invalid sort_dir in {self.name}: {sort_dir}",
+                    llm_facing_message="'sort_dir' must be 'asc' or 'desc'.",
+                )
+            sort_dir = sd
+
+        return {
+            "sort_by": sort_by,
+            "sort_dir": sort_dir,
+            "created_after": _lower("created_after"),
+            "created_before": _upper("created_before"),
+            "updated_after": _lower("updated_after"),
+            "updated_before": _upper("updated_before"),
+        }
+
     def _list_contacts(
         self,
         db_session: Session,
@@ -231,6 +321,8 @@ class CrmListTool(Tool[None]):
             if not tag_ids:
                 tag_ids = None
 
+        filters = self._parse_list_filters(llm_kwargs)
+
         contacts, total = list_contacts(
             db_session=db_session,
             page_num=page_num,
@@ -238,6 +330,7 @@ class CrmListTool(Tool[None]):
             status=status,
             organization_id=organization_id,
             tag_ids=tag_ids,
+            **filters,
         )
 
         return {
@@ -274,11 +367,14 @@ class CrmListTool(Tool[None]):
             if not tag_ids:
                 tag_ids = None
 
+        filters = self._parse_list_filters(llm_kwargs)
+
         organizations, total = list_organizations(
             db_session=db_session,
             page_num=page_num,
             page_size=page_size,
             tag_ids=tag_ids,
+            **filters,
         )
 
         return {

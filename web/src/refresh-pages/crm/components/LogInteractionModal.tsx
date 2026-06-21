@@ -122,7 +122,7 @@ export default function LogInteractionModal({
 
           for (const contact of response.items) {
             const fullName = contact.full_name?.trim();
-            const composedName = `${contact.first_name} ${
+            const composedName = `${contact.first_name || ""} ${
               contact.last_name || ""
             }`.trim();
             allOptions.push({

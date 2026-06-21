@@ -36,10 +36,54 @@ export const CONTACT_SOURCES: CrmContactSource[] = [
   "other",
 ];
 
-export const contactValidationSchema = Yup.object().shape({
-  first_name: Yup.string().trim().required("First name is required."),
-  email: Yup.string().trim().email("Enter a valid email.").optional(),
-});
+export const contactValidationSchema = Yup.object().shape(
+  {
+    first_name: Yup.string()
+      .trim()
+      .when("last_name", {
+        is: (last_name?: string) => !last_name || !last_name.trim(),
+        then: (schema) =>
+          schema.required("Enter a first name or a last name."),
+        otherwise: (schema) => schema.optional(),
+      }),
+    last_name: Yup.string()
+      .trim()
+      .when("first_name", {
+        is: (first_name?: string) => !first_name || !first_name.trim(),
+        then: (schema) =>
+          schema.required("Enter a first name or a last name."),
+        otherwise: (schema) => schema.optional(),
+      }),
+    email: Yup.string().trim().email("Enter a valid email.").optional(),
+  },
+  [["first_name", "last_name"]] // declare the cyclic dependency
+);
+
+export type CrmSortValue =
+  | "created_asc"
+  | "created_desc"
+  | "updated_asc"
+  | "updated_desc";
+
+export const CRM_SORT_OPTIONS: { value: CrmSortValue; label: string }[] = [
+  { value: "created_asc", label: "Created asc" },
+  { value: "created_desc", label: "Created desc" },
+  { value: "updated_asc", label: "Updated asc" },
+  { value: "updated_desc", label: "Updated desc" },
+];
+
+export const DEFAULT_CRM_SORT_VALUE: CrmSortValue = "updated_desc";
+
+export function sortValueToParams(v: CrmSortValue): {
+  sortBy: "created_at" | "updated_at";
+  sortDir: "asc" | "desc";
+} {
+  const [field, dir] = v.split("_") as ["created" | "updated", "asc" | "desc"];
+  return {
+    sortBy: field === "created" ? "created_at" : "updated_at",
+    sortDir: dir,
+  };
+}
 
 export function formatCrmLabel(value: string): string {
   return value

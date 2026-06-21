@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from onyx.db.crm import _build_timestamp_order_clauses
 from onyx.db.crm import build_contact_email_lookup
 from onyx.db.crm import build_org_name_lookup
 from onyx.db.crm import create_contact
@@ -123,6 +124,132 @@ def test_create_contact_happy_path_creates_contact() -> None:
     db_session.add.assert_called_once_with(contact)
     db_session.commit.assert_called_once()
     db_session.refresh.assert_called_once_with(contact)
+
+
+def test_create_contact_last_name_only_succeeds() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+
+    contact, created = create_contact(
+        db_session=db_session,
+        first_name=None,
+        last_name=" Smith ",
+        email=None,
+        phone=None,
+        title=None,
+        organization_id=None,
+        source=None,
+        status="lead",
+        notes=None,
+        linkedin_url=None,
+        location=None,
+        created_by=uuid4(),
+    )
+
+    assert created is True
+    assert contact.first_name is None
+    assert contact.last_name == "Smith"
+
+
+def test_create_contact_rejects_no_names() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+
+    with pytest.raises(
+        ValueError, match="at least a first name or a last name"
+    ):
+        create_contact(
+            db_session=db_session,
+            first_name="   ",
+            last_name=None,
+            email="someone@example.com",
+            phone=None,
+            title=None,
+            organization_id=None,
+            source=None,
+            status="lead",
+            notes=None,
+            linkedin_url=None,
+            location=None,
+            created_by=uuid4(),
+        )
+
+
+def test_update_contact_can_clear_first_name_when_last_name_present() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name="Alice", last_name="Smith", status="lead")
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"first_name": ""},
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.first_name is None
+    assert contact.last_name == "Smith"
+
+
+def test_update_contact_rejects_clearing_only_first_name() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name="Alice", last_name=None, status="lead")
+    contact.id = uuid4()
+
+    with pytest.raises(
+        ValueError, match="at least a first name or a last name"
+    ):
+        update_contact(
+            db_session=db_session,
+            contact=contact,
+            patches={"first_name": "  "},
+        )
+
+
+@pytest.mark.parametrize(
+    "patches",
+    [
+        {"first_name": "", "last_name": ""},
+        {"last_name": "", "first_name": ""},
+    ],
+)
+def test_update_contact_rejects_clearing_both_names_in_one_patch(
+    patches: dict[str, str],
+) -> None:
+    # The invariant must hold regardless of dict iteration order, so both
+    # orderings of a single both-names-cleared patch are rejected.
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name="Alice", last_name="Smith", status="lead")
+    contact.id = uuid4()
+
+    with pytest.raises(
+        ValueError, match="at least a first name or a last name"
+    ):
+        update_contact(
+            db_session=db_session,
+            contact=contact,
+            patches=patches,
+        )
+
+
+def test_update_contact_rejects_clearing_last_when_no_first() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name=None, last_name="Smith", status="lead")
+    contact.id = uuid4()
+
+    with pytest.raises(
+        ValueError, match="at least a first name or a last name"
+    ):
+        update_contact(
+            db_session=db_session,
+            contact=contact,
+            patches={"last_name": ""},
+        )
 
 
 def test_get_contact_by_email_normalizes_case() -> None:
@@ -948,3 +1075,162 @@ def test_find_users_for_attendee_resolution_returns_matches() -> None:
     stmt = db_session.scalars.call_args.args[0]
     compiled = stmt.compile()
     assert expected_like in compiled.params.values()
+
+
+# ---------------------------------------------------------------------------
+# Date-range filtering + sort direction
+# ---------------------------------------------------------------------------
+
+
+def _compiled_contacts_stmt(**kwargs) -> object:
+    db_session = MagicMock()
+    db_session.scalar.return_value = 0
+    db_session.scalars.return_value = []
+    list_contacts(db_session=db_session, page_num=0, page_size=10, **kwargs)
+    stmt = db_session.scalars.call_args.args[0]
+    return stmt.compile()
+
+
+def _compiled_orgs_stmt(**kwargs) -> object:
+    db_session = MagicMock()
+    db_session.scalar.return_value = 0
+    db_session.scalars.return_value = []
+    list_organizations(db_session=db_session, page_num=0, page_size=10, **kwargs)
+    stmt = db_session.scalars.call_args.args[0]
+    return stmt.compile()
+
+
+def test_list_contacts_applies_created_after_filter() -> None:
+    value = datetime(2026, 1, 1, 12, 30, tzinfo=timezone.utc)
+    compiled = _compiled_contacts_stmt(created_after=value)
+    assert value in compiled.params.values()
+    assert ">=" in str(compiled)
+
+
+def test_list_contacts_applies_updated_after_filter() -> None:
+    value = datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
+    compiled = _compiled_contacts_stmt(updated_after=value)
+    assert value in compiled.params.values()
+    assert ">=" in str(compiled)
+
+
+def test_list_contacts_applies_updated_before_filter() -> None:
+    value = datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
+    compiled = _compiled_contacts_stmt(updated_before=value)
+    assert value in compiled.params.values()
+    assert "<=" in str(compiled)
+
+
+def test_list_contacts_before_filter_applied_verbatim_at_midnight() -> None:
+    # End-of-day extension for bare dates now happens at the string-parsing
+    # boundary (REST / AI tool). The DB layer applies whatever datetime it gets
+    # verbatim, so an explicit midnight is NOT silently widened to a full day.
+    value = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    compiled = _compiled_contacts_stmt(created_before=value)
+    assert value in compiled.params.values()
+
+
+def test_list_contacts_before_filter_with_time_is_used_as_is() -> None:
+    value = datetime(2026, 1, 1, 8, 15, 0, tzinfo=timezone.utc)
+    compiled = _compiled_contacts_stmt(created_before=value)
+    assert value in compiled.params.values()
+
+
+def test_list_contacts_combines_date_filters_with_existing_filters() -> None:
+    created_after = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    tag_id = uuid4()
+    compiled = _compiled_contacts_stmt(
+        status="lead",
+        created_after=created_after,
+        tag_ids=[tag_id],
+    )
+    values = list(compiled.params.values())
+    assert created_after in values
+    assert "lead" in values
+
+
+def test_list_contacts_tag_filter_requires_all_tags() -> None:
+    # AND/intersection semantics: one correlated EXISTS per distinct tag, so a
+    # contact must carry every selected tag to match (not just any one).
+    tag_a, tag_b = uuid4(), uuid4()
+    compiled = _compiled_contacts_stmt(tag_ids=[tag_a, tag_b])
+    sql = str(compiled)
+    assert sql.count("EXISTS (SELECT") == 2
+    values = list(compiled.params.values())
+    assert tag_a in values
+    assert tag_b in values
+
+
+def test_list_contacts_tag_filter_dedupes_repeated_tags() -> None:
+    tag_a = uuid4()
+    compiled = _compiled_contacts_stmt(tag_ids=[tag_a, tag_a])
+    assert str(compiled).count("EXISTS (SELECT") == 1
+
+
+def test_list_organizations_tag_filter_requires_all_tags() -> None:
+    tag_a, tag_b = uuid4(), uuid4()
+    compiled = _compiled_orgs_stmt(tag_ids=[tag_a, tag_b])
+    assert str(compiled).count("EXISTS (SELECT") == 2
+
+
+def test_list_organizations_applies_created_before_filter() -> None:
+    value = datetime(2026, 3, 1, 10, 0, tzinfo=timezone.utc)
+    compiled = _compiled_orgs_stmt(created_before=value)
+    assert value in compiled.params.values()
+    assert "<=" in str(compiled)
+
+
+def test_list_organizations_before_filter_applied_verbatim_at_midnight() -> None:
+    # See contacts equivalent: the DB layer no longer widens midnight bounds.
+    value = datetime(2026, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+    compiled = _compiled_orgs_stmt(updated_before=value)
+    assert value in compiled.params.values()
+
+
+def test_list_organizations_applies_updated_after_filter() -> None:
+    value = datetime(2026, 3, 1, 10, 0, tzinfo=timezone.utc)
+    compiled = _compiled_orgs_stmt(updated_after=value)
+    assert value in compiled.params.values()
+    assert ">=" in str(compiled)
+
+
+def test_build_timestamp_order_clauses_default_is_updated_desc() -> None:
+    clauses = _build_timestamp_order_clauses(
+        CrmContact.created_at, CrmContact.updated_at, CrmContact.id, None, None
+    )
+    text = " ".join(str(c) for c in clauses)
+    assert "updated_at DESC" in text
+    assert "created_at DESC" in text
+    # primary is updated_at
+    assert "updated_at" in str(clauses[0])
+    # deterministic id tie-breaker is appended last, same direction
+    assert len(clauses) == 3
+    assert "id DESC" in str(clauses[-1])
+
+
+def test_build_timestamp_order_clauses_created_at_asc() -> None:
+    clauses = _build_timestamp_order_clauses(
+        CrmContact.created_at, CrmContact.updated_at, CrmContact.id, "created_at", "asc"
+    )
+    text = " ".join(str(c) for c in clauses)
+    assert "created_at ASC" in text
+    assert "updated_at ASC" in text
+    assert "created_at" in str(clauses[0])
+    assert "id ASC" in str(clauses[-1])
+
+
+def test_build_timestamp_order_clauses_updated_at_asc() -> None:
+    clauses = _build_timestamp_order_clauses(
+        CrmContact.created_at, CrmContact.updated_at, CrmContact.id, "updated_at", "ASC"
+    )
+    text = " ".join(str(c) for c in clauses)
+    assert "updated_at ASC" in text
+    assert "created_at ASC" in text
+
+
+def test_build_timestamp_order_clauses_lenient_sort_by_falls_back() -> None:
+    clauses = _build_timestamp_order_clauses(
+        CrmContact.created_at, CrmContact.updated_at, CrmContact.id, "bogus", "desc"
+    )
+    # unknown sort_by -> updated_at primary
+    assert "updated_at" in str(clauses[0])

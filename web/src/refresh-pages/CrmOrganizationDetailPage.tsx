@@ -560,7 +560,7 @@ export default function CrmOrganizationDetailPage({
                                 className="flex w-full items-center justify-between rounded-lg px-2 py-1 transition-colors hover:bg-background-tint-02"
                               >
                                 <Text as="span" mainUiAction text02>
-                                  {contact.full_name || contact.first_name}
+                                  {contact.full_name || contact.email || "Contact"}
                                 </Text>
                                 <div className="flex items-center gap-3">
                                   <Text

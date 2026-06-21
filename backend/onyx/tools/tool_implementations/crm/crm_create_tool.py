@@ -110,15 +110,15 @@ class CrmCreateTool(Tool[None]):
                         },
                         "contact": {
                             "type": "object",
-                            "description": "Contact payload when entity_type is 'contact'. Required field: first_name.",
+                            "description": "Contact payload when entity_type is 'contact'. Provide at least one of first_name or last_name.",
                             "properties": {
                                 "first_name": {
                                     "type": "string",
-                                    "description": "First name (required).",
+                                    "description": "First name. Optional, but provide at least one of first_name or last_name.",
                                 },
                                 "last_name": {
                                     "type": "string",
-                                    "description": "Last name.",
+                                    "description": "Last name. Optional, but provide at least one of first_name or last_name.",
                                 },
                                 "email": {
                                     "type": "string",
@@ -181,7 +181,6 @@ class CrmCreateTool(Tool[None]):
                                     "description": "UUIDs of existing tags to apply to this contact.",
                                 },
                             },
-                            "required": ["first_name"],
                         },
                         "organization": {
                             "type": "object",
@@ -250,10 +249,16 @@ class CrmCreateTool(Tool[None]):
 
     def _create_contact(self, db_session: Session, contact_data: dict[str, Any]) -> dict[str, Any]:
         first_name = contact_data.get("first_name")
-        if not isinstance(first_name, str) or not first_name.strip():
+        last_name = contact_data.get("last_name")
+        has_first = isinstance(first_name, str) and bool(first_name.strip())
+        has_last = isinstance(last_name, str) and bool(last_name.strip())
+        if not has_first and not has_last:
             raise ToolCallException(
-                message="Missing first_name for CRM contact creation",
-                llm_facing_message="'contact.first_name' is required to create a contact.",
+                message="Missing name for CRM contact creation",
+                llm_facing_message=(
+                    "Provide at least one of 'contact.first_name' or "
+                    "'contact.last_name' to create a contact."
+                ),
             )
 
         organization_id = parse_uuid_maybe(contact_data.get("organization_id"), "contact.organization_id")
@@ -306,7 +311,7 @@ class CrmCreateTool(Tool[None]):
         contact, created = create_contact(
             db_session=db_session,
             first_name=first_name,
-            last_name=contact_data.get("last_name"),
+            last_name=last_name,
             email=contact_data.get("email"),
             phone=contact_data.get("phone"),
             title=contact_data.get("title"),
