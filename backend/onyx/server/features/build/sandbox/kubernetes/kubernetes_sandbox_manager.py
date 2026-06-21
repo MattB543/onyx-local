@@ -150,6 +150,7 @@ _PROXY_CA_SOURCE_VOLUME = "sandbox-ca-source"
 # Pinned to the proxy IP via pod hostAliases — the iptables lockdown blocks DNS,
 # so the sandbox can't resolve it on its own.
 _PROXY_ALIAS = "sandbox-proxy"
+_SANDBOX_CONTAINER_NAME = "sandbox"
 
 # Per-session egress tagging plugin, baked into the sandbox image (see
 # docker/Dockerfile). Path must match the COPY destination there.
@@ -572,8 +573,9 @@ class KubernetesSandboxManager(SandboxManager):
         """
         pod_name = self._get_pod_name(sandbox_id)
 
-        # Sandbox container — runs the agent. No IRSA (skip-containers annotation
-        # on the SA strips AWS env vars and the projected token from this container).
+        # Sandbox container — runs the agent. No IRSA: the pod's skip-containers
+        # annotation (set on the pod metadata, where the webhook reads it) keeps the
+        # AWS env vars and projected token out of this container.
         sandbox_ports = [
             client.V1ContainerPort(name="opencode", container_port=OPENCODE_SERVE_PORT),
         ]
@@ -583,7 +585,7 @@ class KubernetesSandboxManager(SandboxManager):
             )
 
         sandbox_container = client.V1Container(
-            name="sandbox",
+            name=_SANDBOX_CONTAINER_NAME,
             image=self._image,
             image_pull_policy="IfNotPresent",
             command=["/workspace/entrypoint.sh"],
@@ -593,6 +595,10 @@ class KubernetesSandboxManager(SandboxManager):
                     name="ONYX_PAT", value=SANDBOX_PROXY_INJECTED_PLACEHOLDER
                 ),
                 client.V1EnvVar(name="ONYX_SERVER_URL", value=SANDBOX_API_SERVER_URL),
+                client.V1EnvVar(
+                    name="GH_TOKEN", value=SANDBOX_PROXY_INJECTED_PLACEHOLDER
+                ),
+                client.V1EnvVar(name="GH_NO_UPDATE_NOTIFIER", value="1"),
                 client.V1EnvVar(
                     name=OPENCODE_SERVER_PASSWORD,
                     value_from=client.V1EnvVarSource(
@@ -804,6 +810,11 @@ class KubernetesSandboxManager(SandboxManager):
             metadata=client.V1ObjectMeta(
                 name=pod_name,
                 namespace=self._namespace,
+                # The pod-identity webhook reads skip-containers from the POD, not the
+                # SA — keep the IRSA token out of the untrusted agent container.
+                annotations={
+                    "eks.amazonaws.com/skip-containers": _SANDBOX_CONTAINER_NAME
+                },
                 labels={
                     LABEL_K8S_COMPONENT: LABEL_K8S_COMPONENT_SANDBOX,
                     LABEL_K8S_MANAGED_BY: LABEL_K8S_MANAGED_BY_ONYX,
@@ -932,7 +943,7 @@ class KubernetesSandboxManager(SandboxManager):
         self,
         sandbox_id: UUID,
         *,
-        container: str = "sandbox",
+        container: str = _SANDBOX_CONTAINER_NAME,
         tail_lines: int = 200,
     ) -> Iterator[str]:
         """Yield log lines from a sandbox pod's container as they arrive.
@@ -1066,6 +1077,18 @@ class KubernetesSandboxManager(SandboxManager):
                     return True
         return False
 
+    @staticmethod
+    def _sandbox_container_is_ready(pod: client.V1Pod) -> bool:
+        """Return True only when the agent container itself is running/ready."""
+        for status in pod.status.container_statuses or []:
+            if status.name != _SANDBOX_CONTAINER_NAME:
+                continue
+            state = status.state
+            return bool(
+                status.ready and state is not None and state.running is not None
+            )
+        return False
+
     def _wait_for_pod_ready(
         self,
         pod_name: str,
@@ -1171,7 +1194,11 @@ class KubernetesSandboxManager(SandboxManager):
             if phase == "Running":
                 conditions = pod.status.conditions or []
                 for condition in conditions:
-                    if condition.type == "Ready" and condition.status == "True":
+                    if (
+                        condition.type == "Ready"
+                        and condition.status == "True"
+                        and self._sandbox_container_is_ready(pod)
+                    ):
                         return True
 
             # Pending is OK too - pod is being created by another request
@@ -1649,7 +1676,7 @@ echo "Session workspace setup complete"
                 name=pod_name,
                 namespace=self._namespace,
                 command=["/bin/sh", "-c", setup_script],
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 stderr=True,
                 stdin=False,
                 stdout=True,
@@ -1718,7 +1745,7 @@ echo "Session cleanup complete"
                 name=pod_name,
                 namespace=self._namespace,
                 command=["/bin/sh", "-c", cleanup_script],
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 stderr=True,
                 stdin=False,
                 stdout=True,
@@ -1823,7 +1850,7 @@ echo "Session cleanup complete"
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
@@ -1866,7 +1893,7 @@ echo "Session cleanup complete"
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
@@ -1968,7 +1995,7 @@ echo "Session cleanup complete"
                     self._stream_core_api.connect_get_namespaced_pod_exec,
                     name=pod_name,
                     namespace=self._namespace,
-                    container="sandbox",
+                    container=_SANDBOX_CONTAINER_NAME,
                     command=["/bin/sh", "-c", start_script],
                     stderr=True,
                     stdin=False,
@@ -2023,7 +2050,7 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
             self._stream_core_api.connect_get_namespaced_pod_exec,
             name=pod_name,
             namespace=self._namespace,
-            container="sandbox",
+            container=_SANDBOX_CONTAINER_NAME,
             command=["/bin/sh", "-c", config_script],
             stderr=True,
             stdin=False,
@@ -2033,7 +2060,20 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
         logger.info("Session configuration files regenerated")
 
     def health_check(self, sandbox_id: UUID, timeout: float = 60.0) -> bool:
-        """Check whether the sidecar's /health endpoint responds."""
+        """Check whether the agent container and sidecar are both healthy."""
+        pod_name = self._get_pod_name(str(sandbox_id))
+        try:
+            pod = self._core_api.read_namespaced_pod(
+                name=pod_name,
+                namespace=self._namespace,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return False
+            raise
+        if not self._sandbox_container_is_ready(pod):
+            return False
+
         for host in self._sandbox_pod_hosts(sandbox_id):
             url = f"http://{host}:{PUSH_DAEMON_PORT}/health"
             try:
@@ -2113,7 +2153,7 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
@@ -2243,7 +2283,7 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
@@ -2321,7 +2361,7 @@ printf '%s' '{agent_instructions_escaped}' > {session_path}/AGENTS.md
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stderr=True,
                 stdin=False,
@@ -2409,7 +2449,7 @@ fi
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=["/bin/sh", "-c", script],
                 stderr=True,
                 stdin=False,
@@ -2507,7 +2547,7 @@ echo "$base"
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=["/bin/sh", "-c", script],
                 stdin=True,
                 stdout=True,
@@ -2612,7 +2652,7 @@ echo "$base"
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stdin=False,
                 stdout=True,
@@ -2660,7 +2700,7 @@ echo WRITE_OK"""
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=["/bin/sh", "-c", script],
                 stdin=False,
                 stdout=True,
@@ -2712,7 +2752,7 @@ fi
                 self._stream_core_api.connect_get_namespaced_pod_exec,
                 name=pod_name,
                 namespace=self._namespace,
-                container="sandbox",
+                container=_SANDBOX_CONTAINER_NAME,
                 command=exec_command,
                 stdin=False,
                 stdout=True,

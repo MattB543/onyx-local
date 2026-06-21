@@ -95,6 +95,17 @@
         "group": "1"
       },
       "stopAll": true
+    },
+    {
+      "name": "Web Server + Shared Watch",
+      "configurations": [
+        "Web Server",
+        "Shared Watch (rebuild dist)"
+      ],
+      "presentation": {
+        "group": "1"
+      },
+      "stopAll": true
     }
   ],
   "configurations": [
@@ -125,6 +136,22 @@
       "consoleTitle": "Web Server Console"
     },
     {
+      "name": "Shared Watch (rebuild dist)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceRoot}/web/lib/shared",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "presentation": {
+        "group": "2"
+      },
+      "console": "integratedTerminal",
+      "consoleTitle": "Shared Watch Console"
+    },
+    {
       "name": "Model Server",
       "consoleName": "Model Server",
       "type": "debugpy",
@@ -139,6 +166,8 @@
       "args": [
         "model_server.main:app",
         "--reload",
+        "--reload-exclude",
+        "${workspaceFolder}/backend/onyx/skills/builtin",
         "--port",
         "9000"
       ],
@@ -163,6 +192,8 @@
       "args": [
         "onyx.main:app",
         "--reload",
+        "--reload-exclude",
+        "${workspaceFolder}/backend/onyx/skills/builtin",
         "--port",
         "8080"
       ],
@@ -189,6 +220,8 @@
       "args": [
         "onyx.main:app",
         "--reload",
+        "--reload-exclude",
+        "${workspaceFolder}/backend/onyx/skills/builtin",
         "--port",
         "8080"
       ],
@@ -252,6 +285,8 @@
       "args": [
         "onyx.mcp_server.api:mcp_app",
         "--reload",
+        "--reload-exclude",
+        "${workspaceFolder}/backend/onyx/skills/builtin",
         "--port",
         "8090",
         "--timeout-graceful-shutdown",
