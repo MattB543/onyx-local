@@ -554,7 +554,6 @@ export enum ValidSources {
   Productboard = "productboard",
   Slab = "slab",
   Coda = "coda",
-  Canvas = "canvas",
   Notion = "notion",
   Guru = "guru",
   Gong = "gong",
@@ -627,7 +626,6 @@ export const validAutoSyncSources = [
   ValidSources.Sharepoint,
   ValidSources.Teams,
   ValidSources.GoogleCalendar,
-  ValidSources.Canvas,
 ] as const;
 
 // Create a type from the array elements

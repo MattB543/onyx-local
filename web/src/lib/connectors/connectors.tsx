@@ -1216,21 +1216,6 @@ For example, specifying .*-alerts as a "channel to exclude" will cause the conne
     ],
     advanced_values: [],
   },
-  canvas: {
-    description: "Configure Canvas connector",
-    values: [
-      {
-        type: "text",
-        query: "Enter the Canvas base URL",
-        label: "Canvas Base URL",
-        name: "canvas_base_url",
-        optional: false,
-        description:
-          "The base URL of your Canvas instance (e.g. https://your-school.instructure.com)",
-      },
-    ],
-    advanced_values: [],
-  },
   coda: {
     description: "Configure Coda connector",
     values: [],
@@ -2136,10 +2121,6 @@ export interface FileConfig {
 export interface ZulipConfig {
   realm_name: string;
   realm_url: string;
-}
-
-export interface CanvasConfig {
-  canvas_base_url: string;
 }
 
 export interface CodaConfig {
