@@ -46,7 +46,7 @@ import { useAppRouter } from "@/hooks/appNavigation";
 import { ChatFileType } from "@/app/app/interfaces";
 import { toast } from "@/hooks/useToast";
 import { useProjects } from "@/lib/hooks/useProjects";
-import { SettingsContext } from "@/providers/SettingsProvider";
+import { useSettings } from "@/lib/settings/hooks";
 
 export type { Project, ProjectFile } from "@/app/app/projects/projectsService";
 
@@ -167,7 +167,8 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
     new Map()
   );
   const route = useAppRouter();
-  const settingsContext = useContext(SettingsContext);
+  const settingsData = useSettings();
+  const userFileMaxUploadSizeMb = settingsData.user_file_max_upload_size_mb;
 
   // SWR-backed fetch for recent files. Deduplicates across all mounts and
   // handles React StrictMode double-invocation without firing duplicate requests.
@@ -370,7 +371,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       onSuccess?: (uploaded: CategorizedFiles) => void,
       onFailure?: (failedTempIds: string[]) => void
     ): Promise<ProjectFile[]> => {
-      const rawMax = settingsContext?.settings?.user_file_max_upload_size_mb;
+      const rawMax = userFileMaxUploadSizeMb;
 
       const oversizedFiles =
         rawMax && rawMax > 0
@@ -503,7 +504,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       refreshRecentFiles,
       getTempIdMap,
       removeOptimisticFilesByTempIds,
-      settingsContext,
+      userFileMaxUploadSizeMb,
       mergeUploadedFile,
     ]
   );
@@ -513,9 +514,9 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       files: File[],
       onFailure?: (failedTempIds: string[]) => void
     ): Promise<ProjectFile[]> => {
-      const rawMax = settingsContext?.settings?.user_file_max_upload_size_mb;
+      const rawMax = userFileMaxUploadSizeMb;
       const defaultMax =
-        settingsContext?.settings?.default_user_file_max_upload_size_mb;
+        settingsData?.default_user_file_max_upload_size_mb;
       const maxUploadSizeMb =
         rawMax && rawMax > 0
           ? rawMax
@@ -612,7 +613,8 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
       return optimisticFiles;
     },
     [
-      settingsContext,
+      userFileMaxUploadSizeMb,
+      settingsData,
       getTempIdMap,
       mergeUploadedFile,
       removeOptimisticFilesByTempIds,

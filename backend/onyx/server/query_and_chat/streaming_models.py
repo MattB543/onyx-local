@@ -586,3 +586,8 @@ class Packet(BaseModel):
     placement: Placement
 
     obj: Annotated[PacketObj, Field(discriminator="type")]
+
+
+def heartbeat_packet() -> Packet:
+    """Keepalive for silent stretches; carries no run state."""
+    return Packet(placement=Placement(turn_index=0), obj=ChatHeartbeat())

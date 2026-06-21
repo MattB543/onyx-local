@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from typing import Any
 from typing import cast
 
-import sentry_sdk
 import uvicorn
 from fastapi import APIRouter
 from fastapi import FastAPI
@@ -73,6 +72,7 @@ from onyx.server.api_key.api import router as api_key_router
 from onyx.server.auth.captcha_api import CaptchaCookieMiddleware
 from onyx.server.auth.captcha_api import LoginCaptchaMiddleware
 from onyx.server.auth.captcha_api import router as captcha_router
+from onyx.server.auth.mobile import get_mobile_auth_router
 from onyx.server.auth_check import check_router_auth
 from onyx.server.documents.cc_pair import router as cc_pair_router
 from onyx.server.documents.connector import router as connector_router
@@ -80,8 +80,8 @@ from onyx.server.documents.credential import router as credential_router
 from onyx.server.documents.document import router as document_router
 from onyx.server.documents.standard_oauth import router as standard_oauth_router
 from onyx.server.documents.targeted_reindex import router as targeted_reindex_router
-from onyx.server.features.build.api.api import public_build_router
-from onyx.server.features.build.api.api import router as build_router
+from onyx.server.features.build.api import router as build_router
+from onyx.server.features.build.webapp_proxy import public_build_router
 from onyx.server.features.crm.api import router as crm_router
 from onyx.server.features.crm.email_queue_api import (
     router as crm_email_queue_router,
@@ -492,16 +492,12 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
         lifespan=lifespan_override or lifespan,
     )
     if SENTRY_DSN:
-        from onyx.configs.sentry import _add_instance_tags
+        from onyx.configs.sentry import init_sentry
 
-        sentry_sdk.init(
-            dsn=SENTRY_DSN,
-            integrations=[StarletteIntegration(), FastApiIntegration()],
+        init_sentry(
             traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
-            release=__version__,
-            before_send=_add_instance_tags,
+            integrations=[StarletteIntegration(), FastApiIntegration()],
         )
-        logger.info("Sentry initialized")
     else:
         logger.debug("Sentry DSN not provided, skipping Sentry initialization")
 
@@ -622,6 +618,14 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
             application,
             fastapi_users.get_users_router(UserRead, UserUpdate),
             prefix="/users",
+        )
+
+        # Native mobile clients: same email/password auth, but the session
+        # token is issued/refreshed/revoked as a Bearer instead of a cookie.
+        include_auth_router_with_prefix(
+            application,
+            get_mobile_auth_router(),
+            prefix="/auth/mobile",
         )
 
     # Register Google OAuth when AUTH_TYPE is GOOGLE_OAUTH, or when
