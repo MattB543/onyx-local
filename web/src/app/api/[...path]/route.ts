@@ -1,6 +1,8 @@
+import {
+  INTERNAL_URL,
+  SERVER_SIDE_ONLY__AUTH_COOKIE_NAME,
+} from "@/lib/constants";
 import { NextRequest, NextResponse } from "next/server";
-
-import { INTERNAL_URL } from "@/lib/constants";
 
 /* NextJS is annoying and makes use use a separate function for
 each request type >:( */
@@ -95,9 +97,9 @@ async function handleRequest(request: NextRequest, path: string[]) {
       process.env.NODE_ENV === "development"
     ) {
       // Inject the debug auth cookie for local development against remote backend
-      // Get from cloud site: DevTools → Application → Cookies → fastapiusersauth
+      // Get from cloud site: DevTools → Application → Cookies → <AUTH_COOKIE_NAME, default: fastapiusersauth>
       const existingCookies = headers.get("cookie") || "";
-      const debugCookie = `fastapiusersauth=${process.env.DEBUG_AUTH_COOKIE}`;
+      const debugCookie = `${SERVER_SIDE_ONLY__AUTH_COOKIE_NAME}=${process.env.DEBUG_AUTH_COOKIE}`;
       headers.set(
         "cookie",
         existingCookies ? `${existingCookies}; ${debugCookie}` : debugCookie

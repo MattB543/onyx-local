@@ -333,14 +333,18 @@ export class RateLimitError extends Error {
 export async function sendMessageStream(
   sessionId: string,
   content: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  model?: { provider: string; modelName: string } | null
 ): Promise<Response> {
   const res = await fetch(
     `${BUILD_API_BASE}/sessions/${sessionId}/send-message`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content,
+        ...(model ? { provider: model.provider, model: model.modelName } : {}),
+      }),
       signal,
     }
   );
@@ -368,6 +372,26 @@ export async function interruptMessageStream(sessionId: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`Failed to interrupt message: ${res.status}`);
   }
+}
+
+export async function fetchScheduledRunEventStream(
+  sessionId: string,
+  signal?: AbortSignal
+): Promise<Response> {
+  const res = await fetch(
+    `${BUILD_API_BASE}/sessions/${sessionId}/scheduled-run-events`,
+    { signal }
+  );
+
+  if (res.status === 409) {
+    return new Response("");
+  }
+
+  if (!res.ok) {
+    throw new Error(`Failed to stream scheduled run: ${res.status}`);
+  }
+
+  return res;
 }
 
 // =============================================================================

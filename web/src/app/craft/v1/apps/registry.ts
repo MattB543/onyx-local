@@ -1,11 +1,19 @@
-import { SvgSlack, SvgLinear, SvgGmail, SvgGithub } from "@opal/logos";
-import { SvgCalendar, SvgPlug } from "@opal/icons";
+import {
+  SvgSlack,
+  SvgLinear,
+  SvgGmail,
+  SvgGithub,
+  SvgGoogleCalendar,
+  SvgGoogleDrive,
+} from "@opal/logos";
+import { SvgPlug } from "@opal/icons";
 import { IconFunctionComponent } from "@opal/types";
 
 // Mirrors `onyx.db.enums.ExternalAppType` on the backend.
 export type ExternalAppType =
   | "SLACK"
   | "GOOGLE_CALENDAR"
+  | "GOOGLE_DRIVE"
   | "GMAIL"
   | "LINEAR"
   | "GITHUB"
@@ -14,7 +22,8 @@ export type ExternalAppType =
 const _BUILT_IN_LOGOS: Partial<Record<ExternalAppType, IconFunctionComponent>> =
   {
     SLACK: SvgSlack,
-    GOOGLE_CALENDAR: SvgCalendar,
+    GOOGLE_CALENDAR: SvgGoogleCalendar,
+    GOOGLE_DRIVE: SvgGoogleDrive,
     GMAIL: SvgGmail,
     LINEAR: SvgLinear,
     GITHUB: SvgGithub,

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import {
   AuthType,
   NEXT_PUBLIC_CLOUD_ENABLED,
+  SERVER_SIDE_ONLY__AUTH_COOKIE_NAME,
   SERVER_SIDE_ONLY__AUTH_TYPE,
 } from "./constants";
 import { User } from "./types";
@@ -222,9 +223,9 @@ export const processCookies = (cookies: ReadonlyRequestCookies): string => {
   if (process.env.DEBUG_AUTH_COOKIE && process.env.NODE_ENV === "development") {
     const hasAuthCookie = cookieString
       .split(/;\s*/)
-      .some((c) => c.startsWith("fastapiusersauth="));
+      .some((c) => c.startsWith(`${SERVER_SIDE_ONLY__AUTH_COOKIE_NAME}=`));
     if (!hasAuthCookie) {
-      const debugCookie = `fastapiusersauth=${process.env.DEBUG_AUTH_COOKIE}`;
+      const debugCookie = `${SERVER_SIDE_ONLY__AUTH_COOKIE_NAME}=${process.env.DEBUG_AUTH_COOKIE}`;
       cookieString = cookieString
         ? `${cookieString}; ${debugCookie}`
         : debugCookie;

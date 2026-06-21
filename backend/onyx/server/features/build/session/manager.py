@@ -48,6 +48,7 @@ from onyx.server.features.build.db.build_session import get_empty_session_for_us
 from onyx.server.features.build.db.build_session import get_session_messages
 from onyx.server.features.build.db.build_session import get_user_build_sessions
 from onyx.server.features.build.db.build_session import update_session_activity
+from onyx.server.features.build.db.build_session import update_session_agent_selection
 from onyx.server.features.build.db.sandbox import get_sandbox_by_user_id
 from onyx.server.features.build.db.sandbox import get_snapshots_for_session
 from onyx.server.features.build.db.sandbox import update_sandbox_heartbeat
@@ -684,9 +685,30 @@ class SessionManager:
         session_id: UUID,
         user_id: UUID,
         content: str,
+        agent_provider: str | None = None,
+        agent_model: str | None = None,
     ) -> Generator[str, None, None]:
-        """Send a message to the CLI agent and stream its response as
-        SSE frames."""
+        """
+        Send a message to the CLI agent and stream the response as SSE events.
+
+        Validates session, saves user message, streams agent response,
+        and saves assistant response to database.
+
+        Args:
+            session_id: The session UUID
+            user_id: The user ID
+            content: The message content
+            agent_provider: Optional per-message model provider override
+            agent_model: Optional per-message model name override
+
+        Yields:
+            SSE formatted event strings
+        """
+        # Persist the per-message model override; the turn reads it off the session row.
+        if agent_provider and agent_model:
+            update_session_agent_selection(
+                session_id, agent_provider, agent_model, self._db_session
+            )
         yield from _streaming.stream_cli_agent_turn(
             self._db_session,
             self._sandbox_manager,
@@ -730,6 +752,46 @@ class SessionManager:
 
         request_interrupt(session_id, get_cache_backend())
         return True
+
+    def subscribe_to_existing_session_events(
+        self,
+        session_id: UUID,
+        user_id: UUID,
+        *,
+        keepalive_seconds: float = 15.0,
+    ) -> Generator[str, None, None]:
+        """Attach to an existing opencode session and stream translated ACP SSE.
+
+        Used by scheduled-run viewers: the Celery executor is already driving
+        the prompt, so this path only subscribes to the pod-wide event stream and
+        filters by the session's persisted opencode session id. It deliberately
+        does not persist events because the executor remains the durable writer.
+        """
+        session = get_build_session(session_id, user_id, self._db_session)
+        if session is None:
+            raise OnyxError(OnyxErrorCode.NOT_FOUND, "Session not found")
+
+        sandbox = get_sandbox_by_user_id(self._db_session, user_id)
+        if sandbox is None or sandbox.status != SandboxStatus.RUNNING:
+            raise OnyxError(
+                OnyxErrorCode.SERVICE_UNAVAILABLE,
+                "Sandbox is not running. Please wait for it to start.",
+            )
+
+        opencode_session_id = session.opencode_session_id
+        if not opencode_session_id:
+            raise OnyxError(
+                OnyxErrorCode.CONFLICT,
+                "Session live stream is not ready yet.",
+            )
+
+        for acp_event in self._sandbox_manager.subscribe_to_opencode_session(
+            sandbox.id,
+            opencode_session_id,
+            directory=f"/workspace/sessions/{session_id}",
+            keepalive_seconds=keepalive_seconds,
+        ):
+            yield _streaming.event_to_sse(acp_event)
 
     # ----- Persistence helpers (shared with the headless scheduled-tasks executor) -----
     #

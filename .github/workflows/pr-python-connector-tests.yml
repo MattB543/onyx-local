@@ -116,6 +116,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      # paths-filter needs pull-requests:read to list PR files on private repos (no-op on public).
+      pull-requests: read
     # See https://runs-on.com/runners/linux/
     runs-on:
       [
@@ -143,7 +145,7 @@ jobs:
 
       - name: Detect Connector changes
         id: changes
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # ratchet:dorny/paths-filter@v3
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
         with:
           filters: |
             hubspot:

@@ -38,6 +38,13 @@ export const GOOGLE_DRIVE_AUTH_IS_ADMIN_COOKIE_NAME =
 export const GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME =
   "google_calendar_auth_is_admin";
 
+// Name of the FastAPI-Users auth cookie. Configurable via env (shared with the
+// backend's AUTH_COOKIE_NAME) so deployments sharing a hostname — e.g. parallel
+// local worktrees on different ports of localhost — keep separate auth cookies.
+// Server-side only: read in middleware, route handlers, and server components.
+export const SERVER_SIDE_ONLY__AUTH_COOKIE_NAME =
+  process.env.AUTH_COOKIE_NAME || "fastapiusersauth";
+
 export const SEARCH_TYPE_COOKIE_NAME = "search_type";
 export const AGENTIC_SEARCH_TYPE_COOKIE_NAME = "agentic_type";
 

@@ -113,6 +113,7 @@ from onyx.db.enums import UserFileStatus
 from onyx.db.index_attempt_metrics_models import IndexAttemptStage
 from onyx.db.pydantic_type import PydanticListType
 from onyx.db.pydantic_type import PydanticType
+from onyx.external_apps.url_glob import UrlGlob
 from onyx.file_store.models import FileDescriptor
 from onyx.kg.models import KGEntityTypeAttributes
 from onyx.kg.models import KGStage
@@ -4211,7 +4212,7 @@ class Skill(Base):
     built_in_skill_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Bundle bytes for custom skills. NULL for built-ins (their source
-    # files live on disk under SKILLS_TEMPLATE_PATH).
+    # files live on disk under BUILTIN_SKILLS_PATH).
     bundle_file_id: Mapped[str | None] = mapped_column(String, nullable=True)
     bundle_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
@@ -6195,7 +6196,7 @@ class BuildMessage(Base):
 class ActionApproval(Base):
     """One agent-initiated gated request and its decision.
 
-    ``actions`` is a non-empty JSONB list of :class:`ActionMatch`-shaped
+    ``actions`` is a non-empty JSONB list of :class:`MatchedAction`-shaped
     dicts, sorted strictest-policy-first; ``actions[0]`` drove the gating
     decision. ``decision IS NULL`` is pending (or a proxy-crash orphan).
     """
@@ -6684,6 +6685,7 @@ class ExternalApp(Base):
         default=ExternalAppType.CUSTOM,
         server_default=ExternalAppType.CUSTOM.value,
     )
+    # CUSTOM apps store URL globs here (translated to regexes at match time).
     upstream_url_patterns: Mapped[list[str]] = mapped_column(
         postgresql.ARRAY(String), nullable=False, default=list, server_default="{}"
     )
@@ -6721,6 +6723,17 @@ class ExternalApp(Base):
         back_populates="external_app",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def upstream_url_regexes(self) -> list[str]:
+        """``upstream_url_patterns`` as match-ready regexes: CUSTOM apps author
+        globs (translated here), built-in providers author regexes used as-is."""
+        if self.app_type == ExternalAppType.CUSTOM:
+            return [
+                UrlGlob(value=pattern).to_regex()
+                for pattern in self.upstream_url_patterns
+            ]
+        return list(self.upstream_url_patterns)
 
 
 class ExternalAppUserCredential(Base):
