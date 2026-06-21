@@ -14,7 +14,6 @@ import {
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
 import { toast } from "@/hooks/useToast";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
@@ -99,7 +98,7 @@ export default function CrmOrganizationDetailPage({
     useState<CrmInteraction | null>(null);
   const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
-    INTERACTION_PAGE_SIZE
+    INTERACTION_PAGE_SIZE,
   );
 
   const { organization, isLoading, error, refreshOrganization } =
@@ -131,7 +130,7 @@ export default function CrmOrganizationDetailPage({
       { label: "Organizations", href: "/app/crm/organizations" },
       { label: organization?.name || "Organization" },
     ],
-    [organization?.name]
+    [organization?.name],
   );
 
   async function handleDeleteOrganization() {
@@ -176,7 +175,7 @@ export default function CrmOrganizationDetailPage({
   }
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgOrganization}
@@ -560,7 +559,9 @@ export default function CrmOrganizationDetailPage({
                                 className="flex w-full items-center justify-between rounded-lg px-2 py-1 transition-colors hover:bg-background-tint-02"
                               >
                                 <Text as="span" mainUiAction text02>
-                                  {contact.full_name || contact.email || "Contact"}
+                                  {contact.full_name ||
+                                    contact.email ||
+                                    "Contact"}
                                 </Text>
                                 <div className="flex items-center gap-3">
                                   <Text
@@ -628,7 +629,7 @@ export default function CrmOrganizationDetailPage({
                         }}
                         onLoadMore={() =>
                           setInteractionPageSize(
-                            (value) => value + INTERACTION_PAGE_SIZE
+                            (value) => value + INTERACTION_PAGE_SIZE,
                           )
                         }
                         onLogInteraction={() =>
@@ -703,7 +704,9 @@ export default function CrmOrganizationDetailPage({
           icon={SvgTrash}
           title="Delete Interaction"
           onClose={
-            isDeletingInteraction ? undefined : () => setInteractionToDelete(null)
+            isDeletingInteraction
+              ? undefined
+              : () => setInteractionToDelete(null)
           }
           submit={
             <Disabled disabled={isDeletingInteraction}>
@@ -725,6 +728,6 @@ export default function CrmOrganizationDetailPage({
           </Text>
         </ConfirmationModalLayout>
       )}
-    </AppLayouts.Root>
+    </>
   );
 }

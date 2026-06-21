@@ -9,7 +9,6 @@ import {
   exportCrmInteractions,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
@@ -48,7 +47,7 @@ export default function CrmInteractionsPage() {
   const { user, isAdmin } = useUser();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [typeFilter, setTypeFilter] = useState<CrmInteractionType | "all">(
-    "all"
+    "all",
   );
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [pageNum, setPageNum] = useState(0);
@@ -75,7 +74,7 @@ export default function CrmInteractionsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id]
+    [usersData, user?.id],
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -93,7 +92,7 @@ export default function CrmInteractionsPage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems]
+    [totalItems],
   );
 
   const emptyDescription =
@@ -102,7 +101,7 @@ export default function CrmInteractionsPage() {
       : "Log your first interaction to get started.";
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgActivity}
@@ -274,7 +273,7 @@ export default function CrmInteractionsPage() {
                         <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
                           <span>
                             {formatRelativeDate(
-                              interaction.occurred_at || interaction.created_at
+                              interaction.occurred_at || interaction.created_at,
                             )}
                           </span>
                         </div>
@@ -316,6 +315,6 @@ export default function CrmInteractionsPage() {
           setPageNum(0);
         }}
       />
-    </AppLayouts.Root>
+    </>
   );
 }

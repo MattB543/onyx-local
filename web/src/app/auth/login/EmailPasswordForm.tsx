@@ -57,7 +57,7 @@ export default function EmailPasswordForm({
         : "Signed in successfully.",
       error: errorMessage,
     }),
-    [isSignup, isJoin, errorMessage]
+    [isSignup, isJoin, errorMessage],
   );
 
   return (
@@ -79,7 +79,7 @@ export default function EmailPasswordForm({
           password: Yup.string()
             .min(
               passwordMinLength,
-              `Password must be at least ${passwordMinLength} characters`
+              `Password must be at least ${passwordMinLength} characters`,
             )
             .required(),
         })}
@@ -101,7 +101,7 @@ export default function EmailPasswordForm({
               email,
               values.password,
               referralSource,
-              captchaToken
+              captchaToken,
             );
 
             if (!response.ok) {
@@ -134,7 +134,7 @@ export default function EmailPasswordForm({
           const loginResponse = await basicLogin(
             email,
             values.password,
-            loginCaptchaToken
+            loginCaptchaToken,
           );
           if (loginResponse.ok) {
             setApiStatus("success");
@@ -197,7 +197,6 @@ export default function EmailPasswordForm({
                         }}
                         placeholder="email@yourcompany.com"
                         data-testid="email"
-                        autoComplete="username"
                         variant={apiStatus === "error" ? "error" : undefined}
                       />
                     </FormField.Control>
@@ -227,9 +226,6 @@ export default function EmailPasswordForm({
                         placeholder="●●●●●●●●●●●●●●"
                         shrinkPlaceholder
                         data-testid="password"
-                        autoComplete={
-                          isSignup ? "new-password" : "current-password"
-                        }
                         error={apiStatus === "error"}
                       />
                     </FormField.Control>

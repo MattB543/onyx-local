@@ -7,7 +7,6 @@ import {
   CrmEmailQueueItem,
   CrmEmailQueueStatusFilter,
 } from "@/app/app/crm/emailQueueService";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import {
   useCrmEmailQueue,
@@ -28,12 +27,14 @@ const PAGE_SIZE = 25;
 
 type DisplayStatus = "pending" | "processing" | "processed" | "failed";
 
-const STATUS_FILTER_OPTIONS: { value: CrmEmailQueueStatusFilter; label: string }[] =
-  [
-    { value: "pending", label: "Pending" },
-    { value: "failed", label: "Failed" },
-    { value: "processed", label: "Processed" },
-  ];
+const STATUS_FILTER_OPTIONS: {
+  value: CrmEmailQueueStatusFilter;
+  label: string;
+}[] = [
+  { value: "pending", label: "Pending" },
+  { value: "failed", label: "Failed" },
+  { value: "processed", label: "Processed" },
+];
 
 function getDisplayStatus(status: CrmEmailQueueEventStatus): DisplayStatus {
   switch (status) {
@@ -74,7 +75,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        STATUS_BADGE_CLASSES[displayStatus]
+        STATUS_BADGE_CLASSES[displayStatus],
       )}
     >
       {STATUS_BADGE_LABELS[displayStatus]}
@@ -113,7 +114,7 @@ function EmailQueueRow({ event }: EmailQueueRowProps) {
               <span
                 className={cn(
                   "block text-sm text-status-error-04",
-                  !errorExpanded && "truncate"
+                  !errorExpanded && "truncate",
                 )}
               >
                 {event.error_message}
@@ -156,7 +157,7 @@ export default function CrmEmailQueuePage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems]
+    [totalItems],
   );
 
   const emptyDescription =
@@ -165,7 +166,7 @@ export default function CrmEmailQueuePage() {
       : "Indexed emails will appear here as they enter the CRM pipeline.";
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgMail}
@@ -223,10 +224,7 @@ export default function CrmEmailQueuePage() {
                       All statuses
                     </InputSelect.Item>
                     {STATUS_FILTER_OPTIONS.map((option) => (
-                      <InputSelect.Item
-                        key={option.value}
-                        value={option.value}
-                      >
+                      <InputSelect.Item key={option.value} value={option.value}>
                         {option.label}
                       </InputSelect.Item>
                     ))}
@@ -283,6 +281,6 @@ export default function CrmEmailQueuePage() {
           )}
         </SettingsLayouts.Body>
       </SettingsLayouts.Root>
-    </AppLayouts.Root>
+    </>
   );
 }

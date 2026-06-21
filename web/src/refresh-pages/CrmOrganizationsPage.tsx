@@ -10,7 +10,6 @@ import {
   listCrmTags,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useUser } from "@/providers/UserProvider";
@@ -58,7 +57,7 @@ export default function CrmOrganizationsPage() {
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState<CrmOrganizationType | "all">(
-    "all"
+    "all",
   );
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
@@ -68,7 +67,7 @@ export default function CrmOrganizationsPage() {
     to: null,
   });
   const [sortValue, setSortValue] = useState<CrmSortValue>(
-    DEFAULT_CRM_SORT_VALUE
+    DEFAULT_CRM_SORT_VALUE,
   );
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
@@ -96,7 +95,7 @@ export default function CrmOrganizationsPage() {
 
   const tagOptions = useMemo(
     () => allTags.map((t) => ({ value: t.id, label: t.name })),
-    [allTags]
+    [allTags],
   );
 
   const ownerOptions = useMemo(
@@ -107,7 +106,7 @@ export default function CrmOrganizationsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id]
+    [usersData, user?.id],
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -137,7 +136,7 @@ export default function CrmOrganizationsPage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems]
+    [totalItems],
   );
 
   const hasActiveFilters = useMemo(
@@ -148,7 +147,7 @@ export default function CrmOrganizationsPage() {
       tagFilterIds.length > 0 ||
       Boolean(dateRange.from) ||
       Boolean(dateRange.to),
-    [searchText, typeFilter, ownerFilter, tagFilterIds, dateRange]
+    [searchText, typeFilter, ownerFilter, tagFilterIds, dateRange],
   );
 
   const handleClearFilters = useCallback(() => {
@@ -166,7 +165,7 @@ export default function CrmOrganizationsPage() {
     : "Create your first organization to get started.";
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgOrganization}
@@ -380,14 +379,14 @@ export default function CrmOrganizationsPage() {
                                 event.preventDefault();
                                 event.stopPropagation();
                                 const href = organization.website!.startsWith(
-                                  "http"
+                                  "http",
                                 )
                                   ? organization.website!
                                   : `https://${organization.website!}`;
                                 window.open(
                                   href,
                                   "_blank",
-                                  "noopener,noreferrer"
+                                  "noopener,noreferrer",
                                 );
                               }}
                               className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
@@ -449,6 +448,6 @@ export default function CrmOrganizationsPage() {
           void refreshOrganizations();
         }}
       />
-    </AppLayouts.Root>
+    </>
   );
 }

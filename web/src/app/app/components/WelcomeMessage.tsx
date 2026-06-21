@@ -37,7 +37,7 @@ export default function WelcomeMessage({
 
   let content: React.ReactNode = null;
 
-  const whitelabelName = settings?.settings?.whitelabel_name;
+  const whitelabelName = settings.whitelabel_name;
 
   if (isDefaultAgent) {
     content = (

@@ -11,7 +11,6 @@ import {
   listCrmTags,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
@@ -72,19 +71,19 @@ export default function CrmContactsPage() {
       crmSettings?.contact_stage_options?.length
         ? crmSettings.contact_stage_options
         : DEFAULT_CRM_STAGE_OPTIONS,
-    [crmSettings?.contact_stage_options]
+    [crmSettings?.contact_stage_options],
   );
   const categoryOptions = useMemo(
     () =>
       crmSettings?.contact_category_suggestions?.length
         ? crmSettings.contact_category_suggestions
         : DEFAULT_CRM_CATEGORY_SUGGESTIONS,
-    [crmSettings?.contact_category_suggestions]
+    [crmSettings?.contact_category_suggestions],
   );
 
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrmContactStage | "all">(
-    "all"
+    "all",
   );
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -97,7 +96,7 @@ export default function CrmContactsPage() {
     to: null,
   });
   const [sortValue, setSortValue] = useState<CrmSortValue>(
-    DEFAULT_CRM_SORT_VALUE
+    DEFAULT_CRM_SORT_VALUE,
   );
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
@@ -125,7 +124,7 @@ export default function CrmContactsPage() {
 
   const tagOptions = useMemo(
     () => allTags.map((t) => ({ value: t.id, label: t.name })),
-    [allTags]
+    [allTags],
   );
 
   const { organizations: orgLookup } = useCrmOrganizations({
@@ -134,15 +133,15 @@ export default function CrmContactsPage() {
   });
   const selectedOrganizationId = organizationIdFilter ?? orgFilterId;
   const { organization: selectedOrganization } = useCrmOrganization(
-    selectedOrganizationId ?? null
+    selectedOrganizationId ?? null,
   );
   const orgNameById = useMemo(
     () => new Map(orgLookup.map((o) => [o.id, o.name])),
-    [orgLookup]
+    [orgLookup],
   );
   const orgOptions = useMemo<ComboBoxOption[]>(
     () => orgLookup.map((o) => ({ value: o.id, label: o.name })),
-    [orgLookup]
+    [orgLookup],
   );
 
   const ownerOptions = useMemo(
@@ -153,7 +152,7 @@ export default function CrmContactsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id]
+    [usersData, user?.id],
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -185,7 +184,7 @@ export default function CrmContactsPage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems]
+    [totalItems],
   );
 
   const hasActiveFilters = useMemo(
@@ -208,7 +207,7 @@ export default function CrmContactsPage() {
       organizationIdFilter,
       tagFilterIds,
       dateRange,
-    ]
+    ],
   );
 
   const handleClearFilters = useCallback(() => {
@@ -232,7 +231,7 @@ export default function CrmContactsPage() {
     : "Create your first contact to get started.";
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgUser}
@@ -577,6 +576,6 @@ export default function CrmContactsPage() {
           void refreshContacts();
         }}
       />
-    </AppLayouts.Root>
+    </>
   );
 }

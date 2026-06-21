@@ -282,6 +282,10 @@ class SearchDoc(BaseModel):
     # run through `populate_file_ids_on_sections`.
     file_id: str | None = None
 
+    # Optional image URL associated with the doc (e.g. web search result thumbnails),
+    # extracted from chunk metadata via `extract_image_url_from_metadata`.
+    image: str | None = None
+
     @classmethod
     def from_chunks_or_sections(
         cls,
@@ -315,6 +319,7 @@ class SearchDoc(BaseModel):
                 secondary_owners=chunk.secondary_owners,
                 is_internet=False,
                 file_id=chunk.file_id,
+                image=extract_image_url_from_metadata(chunk.metadata),
             )
             for item in items
         ]

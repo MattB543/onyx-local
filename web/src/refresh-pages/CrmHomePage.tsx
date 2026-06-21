@@ -9,7 +9,6 @@ import {
   exportCrmInteractions,
   exportCrmOrganizations,
 } from "@/app/app/crm/crmService";
-import * as AppLayouts from "@/layouts/app-layouts";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -47,7 +46,7 @@ export default function CrmHomePage() {
     "created_at" | "updated_at"
   >("updated_at");
   const [orgsSortBy, setOrgsSortBy] = useState<"created_at" | "updated_at">(
-    "updated_at"
+    "updated_at",
   );
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
@@ -93,7 +92,7 @@ export default function CrmHomePage() {
   });
 
   return (
-    <AppLayouts.Root>
+    <>
       <SettingsLayouts.Root width="lg">
         <SettingsLayouts.Header
           icon={SvgUser}
@@ -413,14 +412,14 @@ export default function CrmHomePage() {
                                   event.preventDefault();
                                   event.stopPropagation();
                                   const href = organization.website!.startsWith(
-                                    "http"
+                                    "http",
                                   )
                                     ? organization.website!
                                     : `https://${organization.website!}`;
                                   window.open(
                                     href,
                                     "_blank",
-                                    "noopener,noreferrer"
+                                    "noopener,noreferrer",
                                   );
                                 }}
                                 className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
@@ -522,7 +521,7 @@ export default function CrmHomePage() {
                             <span>
                               {formatRelativeDate(
                                 interaction.occurred_at ||
-                                  interaction.created_at
+                                  interaction.created_at,
                               )}
                             </span>
                           </div>
@@ -552,6 +551,6 @@ export default function CrmHomePage() {
           // SWR cache is invalidated inside the modal
         }}
       />
-    </AppLayouts.Root>
+    </>
   );
 }
