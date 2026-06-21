@@ -102,6 +102,10 @@ export interface Settings {
   // True when the backend runs inside a container (Docker/Podman).
   // Used to default local-service URLs to host.docker.internal.
   is_containerized?: boolean;
+
+  // PostHog client key + host for the web app; null = analytics off.
+  posthog_key?: string | null;
+  posthog_host?: string | null;
 }
 
 export interface NavigationItem {
@@ -180,6 +184,13 @@ export interface AppSettings extends Settings {
   enterprise: EnterpriseSettings | null;
   /** Resolved display name: enterprise.application_name || "Onyx". */
   appName: string;
+  /**
+   * URL of the logo image to render, or `null` to use the default Onyx SVG.
+   * Includes a cache-buster that updates whenever enterprise settings are
+   * revalidated, forcing the browser to re-fetch after an admin uploads a
+   * new logo.
+   */
+  logoUrl: string | null;
   /** False when DISABLE_VECTOR_DB is set server-side. */
   vectorDbEnabled: boolean;
   isLoading: boolean;
