@@ -131,6 +131,11 @@ class MCPAuthenticationType(str, PyEnum):
     PT_OAUTH = "PT_OAUTH"  # Pass-Through OAuth
 
 
+class MCPOAuthProviderMode(str, PyEnum):
+    AUTO_DISCOVERY = "AUTO_DISCOVERY"
+    KNOWN_PROVIDER = "KNOWN_PROVIDER"
+
+
 class MCPTransport(str, PyEnum):
     """MCP transport types"""
 
@@ -380,6 +385,7 @@ class ExternalAppType(str, PyEnum):
     GMAIL = "GMAIL"
     SLACK = "SLACK"
     LINEAR = "LINEAR"
+    GITHUB = "GITHUB"
     CUSTOM = "CUSTOM"
 
 
@@ -546,9 +552,15 @@ class HookFailStrategy(str, PyEnum):
 
 class Permission(str, PyEnum):
     """
-    Permission tokens for group-based authorization.
-    19 tokens total. full_admin_panel_access is an override —
-    if present, any permission check passes.
+    Permission tokens for group-based authorization and PAT scoping.
+    full_admin_panel_access is an override — if present, any permission
+    check passes.
+
+    The read:*/write:* "API-surface scopes" are coarser than the capability
+    tokens: they name request surfaces (search, chat, admin-read) rather than
+    admin capabilities. They are implied by basic / admin (so they're never
+    granted directly to a group) and exist primarily to scope Personal Access
+    Tokens.
     """
 
     # Basic (auto-granted to every new group)
@@ -559,6 +571,12 @@ class Permission(str, PyEnum):
     READ_DOCUMENT_SETS = "read:document_sets"
     READ_AGENTS = "read:agents"
     READ_USERS = "read:users"
+
+    # API-surface scopes — coarse, implied by basic/admin, used to scope PATs.
+    READ_SEARCH = "read:search"
+    READ_CHAT = "read:chat"
+    WRITE_CHAT = "write:chat"
+    READ_ADMIN = "read:admin"
 
     # Add / Manage pairs
     ADD_AGENTS = "add:agents"
@@ -591,5 +609,9 @@ Permission.IMPLIED = frozenset(
         Permission.READ_DOCUMENT_SETS,
         Permission.READ_AGENTS,
         Permission.READ_USERS,
+        Permission.READ_SEARCH,
+        Permission.READ_CHAT,
+        Permission.WRITE_CHAT,
+        Permission.READ_ADMIN,
     }
 )
