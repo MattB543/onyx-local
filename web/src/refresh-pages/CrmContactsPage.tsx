@@ -297,11 +297,11 @@ export default function CrmContactsPage() {
 
         <SettingsLayouts.Body>
           {organizationIdFilter && (
-            <Card variant="secondary" className="gap-2">
-              <Text as="p" secondaryBody text03 className="text-sm">
-                Showing contacts linked to the selected organization.
-              </Text>
-              <div className="flex justify-end">
+            <Card variant="secondary">
+              <div className="flex items-center justify-between gap-2">
+                <Text as="p" secondaryBody text03 className="text-sm">
+                  Showing contacts linked to the selected organization.
+                </Text>
                 <Button action tertiary size="md" href="/app/crm/contacts">
                   Clear Filter
                 </Button>
@@ -349,62 +349,70 @@ export default function CrmContactsPage() {
           </div>
 
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-            <InputSelect
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value as CrmContactStage | "all");
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by status" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All statuses</InputSelect.Item>
-                {stageOptions.map((status) => (
-                  <InputSelect.Item key={status} value={status}>
-                    {formatCrmLabel(status)}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value as CrmContactStage | "all");
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by status" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All statuses</InputSelect.Item>
+                  {stageOptions.map((status) => (
+                    <InputSelect.Item key={status} value={status}>
+                      {formatCrmLabel(status)}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
-            <InputSelect
-              value={categoryFilter}
-              onValueChange={(value) => {
-                setCategoryFilter(value);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by category" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All categories</InputSelect.Item>
-                {categoryOptions.map((category) => (
-                  <InputSelect.Item key={category} value={category}>
-                    {formatCrmLabel(category)}
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={categoryFilter}
+                onValueChange={(value) => {
+                  setCategoryFilter(value);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by category" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">
+                    All categories
                   </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+                  {categoryOptions.map((category) => (
+                    <InputSelect.Item key={category} value={category}>
+                      {formatCrmLabel(category)}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
-            <InputSelect
-              value={ownerFilter}
-              onValueChange={(value) => {
-                setOwnerFilter(value);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by owner" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All owners</InputSelect.Item>
-                <InputSelect.Item value="me">Me</InputSelect.Item>
-                {ownerOptions.map((owner) => (
-                  <InputSelect.Item key={owner.value} value={owner.value}>
-                    {owner.label}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={ownerFilter}
+                onValueChange={(value) => {
+                  setOwnerFilter(value);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by owner" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All owners</InputSelect.Item>
+                  <InputSelect.Item value="me">Me</InputSelect.Item>
+                  {ownerOptions.map((owner) => (
+                    <InputSelect.Item key={owner.value} value={owner.value}>
+                      {owner.label}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
-            <div className="min-w-[200px]">
+            <div className="w-full md:w-[200px]">
               <InputMultiSelect
                 value={tagFilterIds}
                 onChange={(ids) => {
@@ -424,22 +432,24 @@ export default function CrmContactsPage() {
               }}
             />
 
-            <InputSelect
-              value={sortValue}
-              onValueChange={(value) => {
-                setSortValue(value as CrmSortValue);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Sort" />
-              <InputSelect.Content>
-                {CRM_SORT_OPTIONS.map((option) => (
-                  <InputSelect.Item key={option.value} value={option.value}>
-                    {option.label}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={sortValue}
+                onValueChange={(value) => {
+                  setSortValue(value as CrmSortValue);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Sort" />
+                <InputSelect.Content>
+                  {CRM_SORT_OPTIONS.map((option) => (
+                    <InputSelect.Item key={option.value} value={option.value}>
+                      {option.label}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
             {hasActiveFilters && (
               <Button action tertiary size="md" onClick={handleClearFilters}>

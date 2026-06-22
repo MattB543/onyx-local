@@ -151,7 +151,11 @@ export default function InputMultiSelect({
         </div>
       )}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <div
+        className={
+          allowCustom ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : "w-full"
+        }
+      >
         <InputComboBox
           value={draft}
           onChange={(event) => {
@@ -165,17 +169,22 @@ export default function InputMultiSelect({
           placeholder={placeholder}
           disabled={disabled}
         />
-        <Button
-          action
-          secondary
-          type="button"
-          disabled={!canAdd}
-          onClick={() => {
-            appendValue(draft);
-          }}
-        >
-          Add
-        </Button>
+        {/* The "Add" button only commits free-text entries. When selecting
+            from the dropdown (strict mode), choosing an option adds it
+            immediately, so the button is only needed for custom values. */}
+        {allowCustom && (
+          <Button
+            action
+            secondary
+            type="button"
+            disabled={!canAdd}
+            onClick={() => {
+              appendValue(draft);
+            }}
+          >
+            Add
+          </Button>
+        )}
       </div>
     </div>
   );

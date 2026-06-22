@@ -243,44 +243,48 @@ export default function CrmOrganizationsPage() {
           </div>
 
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-            <InputSelect
-              value={typeFilter}
-              onValueChange={(value) => {
-                setTypeFilter(value as CrmOrganizationType | "all");
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by type" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All types</InputSelect.Item>
-                {ORGANIZATION_TYPE_OPTIONS.map((type) => (
-                  <InputSelect.Item key={type} value={type}>
-                    {formatCrmLabel(type)}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={typeFilter}
+                onValueChange={(value) => {
+                  setTypeFilter(value as CrmOrganizationType | "all");
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by type" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All types</InputSelect.Item>
+                  {ORGANIZATION_TYPE_OPTIONS.map((type) => (
+                    <InputSelect.Item key={type} value={type}>
+                      {formatCrmLabel(type)}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
-            <InputSelect
-              value={ownerFilter}
-              onValueChange={(value) => {
-                setOwnerFilter(value);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by owner" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All owners</InputSelect.Item>
-                <InputSelect.Item value="me">Me</InputSelect.Item>
-                {ownerOptions.map((owner) => (
-                  <InputSelect.Item key={owner.value} value={owner.value}>
-                    {owner.label}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={ownerFilter}
+                onValueChange={(value) => {
+                  setOwnerFilter(value);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by owner" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All owners</InputSelect.Item>
+                  <InputSelect.Item value="me">Me</InputSelect.Item>
+                  {ownerOptions.map((owner) => (
+                    <InputSelect.Item key={owner.value} value={owner.value}>
+                      {owner.label}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
-            <div className="min-w-[200px]">
+            <div className="w-full md:w-[200px]">
               <InputMultiSelect
                 value={tagFilterIds}
                 onChange={(ids) => {
@@ -300,22 +304,24 @@ export default function CrmOrganizationsPage() {
               }}
             />
 
-            <InputSelect
-              value={sortValue}
-              onValueChange={(value) => {
-                setSortValue(value as CrmSortValue);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Sort" />
-              <InputSelect.Content>
-                {CRM_SORT_OPTIONS.map((option) => (
-                  <InputSelect.Item key={option.value} value={option.value}>
-                    {option.label}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+            <div className="w-full md:w-[180px]">
+              <InputSelect
+                value={sortValue}
+                onValueChange={(value) => {
+                  setSortValue(value as CrmSortValue);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Sort" />
+                <InputSelect.Content>
+                  {CRM_SORT_OPTIONS.map((option) => (
+                    <InputSelect.Item key={option.value} value={option.value}>
+                      {option.label}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
+            </div>
 
             {hasActiveFilters && (
               <Button action tertiary size="md" onClick={handleClearFilters}>
