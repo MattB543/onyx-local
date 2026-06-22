@@ -1900,10 +1900,27 @@ def llm_loop_completion_handle(
     assistant_message_id: int = assistant_message.id
     if completed_normally:
         if answer_tokens is None:
-            raise RuntimeError(
-                "LLM run completed normally but did not return an answer."
+            # A normally-completed run with no accumulated answer means the
+            # final answer text never reached the state container (e.g. it was
+            # stripped by content/XML-tool-call filtering on a search-heavy
+            # turn). Previously this raised, and the exception was swallowed by
+            # the caller *after* persisted[model_idx] was claimed, permanently
+            # stranding the pre-generation placeholder ("Response was terminated
+            # prior to completion...") with null tool_calls/reasoning. That row
+            # then poisons every later turn's rebuilt LLM context. Instead,
+            # persist whatever real content we captured (tool calls, reasoning,
+            # search docs) so save_chat_turn runs and overwrites the placeholder.
+            logger.error(
+                "LLM run completed normally but answer_tokens is None "
+                "(chat_session=%s, message=%s, tool_calls=%d); persisting "
+                "recovered content instead of leaving the placeholder.",
+                chat_session_id,
+                assistant_message_id,
+                len(tool_calls),
             )
-        final_answer = answer_tokens
+            final_answer = ""
+        else:
+            final_answer = answer_tokens
     else:
         logger.debug("Chat session %s stopped by user", chat_session_id)
         if answer_tokens:
