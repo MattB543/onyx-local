@@ -13,6 +13,7 @@ from onyx.chat.emitter import Emitter
 from onyx.configs.constants import FileOrigin
 from onyx.db.crm import get_allowed_contact_stages
 from onyx.db.crm import get_contact_by_id
+from onyx.db.crm import get_contact_category_options
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_interaction_attendees
@@ -76,6 +77,7 @@ class CrmUpdateTool(Tool[None]):
         self._user_id = user_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
         self._stage_options = get_allowed_contact_stages(db_session)
+        self._category_options = get_contact_category_options(db_session)
 
     @property
     def id(self) -> int:
@@ -122,7 +124,11 @@ class CrmUpdateTool(Tool[None]):
                                 "Fields to update. Only include fields you want to change. "
                                 "For contacts: first_name, last_name, email, phone, title (job title), "
                                 "organization_id, owner_ids, source (manual|import|referral|inbound|other), "
-                                "status (workspace-defined contact stages), category, notes, linkedin_url, location, "
+                                "status (workspace-defined contact stages), "
+                                "category (must be one of the workspace-defined category options), "
+                                "party_affiliation, us_state (2-letter US state abbreviation), "
+                                "principal (for staffers, the name of the principal they work for), "
+                                "notes, linkedin_url, location, "
                                 "profile_picture_url (remote image URL or null to clear). "
                                 "A contact must always keep at least a first_name or a last_name. "
                                 "For organizations: name, website, type (customer|prospect|partner|vendor|other), "
@@ -196,6 +202,22 @@ class CrmUpdateTool(Tool[None]):
                 allowed_stages=self._stage_options,
                 field_name="updates.status",
             )
+        if "category" in normalized_updates and self._category_options:
+            category_value = normalized_updates.get("category")
+            if isinstance(category_value, str):
+                category_value = category_value.strip()
+                normalized_updates["category"] = category_value
+            if (
+                category_value is not None
+                and category_value not in self._category_options
+            ):
+                raise ToolCallException(
+                    message=f"Invalid category value in crm_update: {category_value}",
+                    llm_facing_message=(
+                        "'updates.category' must be one of: "
+                        f"{', '.join(self._category_options)}."
+                    ),
+                )
         if "organization_id" in normalized_updates:
             normalized_updates["organization_id"] = parse_uuid_maybe(
                 normalized_updates.get("organization_id"),

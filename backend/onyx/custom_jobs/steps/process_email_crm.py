@@ -60,6 +60,19 @@ Perform the following workflow using the available CRM tools:
    - Do not overwrite strong existing data with weak guesses.
 6. If no matching contact exists, create one with the best clearly supported
    information available.
+   - When creating or updating a contact, set its `category` if you can
+     confidently infer it from the email (sender's organization, signature,
+     or email domain). Use one of: Journalist, Academic, Non-profit/NGO,
+     Private Sector, US Federal Policy Maker, US State Policy Maker,
+     EU Policy Maker, EU Member State Policy Maker, Other International Policy
+     Maker. Never use a generic "Policy Maker" label — pick the specific
+     variant. If you cannot confidently infer the category, leave it unset
+     rather than guess.
+   - Also set the optional fields when the email clearly supports them:
+     `party_affiliation` (political party), `us_state` (2-letter abbreviation,
+     for US House/Senate members and state-level policy makers), and
+     `principal` (for staffers, the name of the Senator/Representative or other
+     official they work for). Leave any of these unset if unclear.
 7. Search for the relevant external organization(s). An abbreviation or short
    name alone may not match; try multiple search terms:
    - The full company name and any abbreviations or acronyms.

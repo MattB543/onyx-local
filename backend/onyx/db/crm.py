@@ -122,6 +122,17 @@ def _normalize_text(value: str | None) -> str | None:
     return value or None
 
 
+def _normalize_us_state(value: str | None) -> str | None:
+    # 2-letter US state code is guidance, not a constraint: uppercase a bare
+    # 2-letter alphabetic value, otherwise keep the (stripped) text as-is.
+    normalized = _strip_or_none(value)
+    if normalized is None:
+        return None
+    if len(normalized) == 2 and normalized.isalpha():
+        return normalized.upper()
+    return normalized
+
+
 def _require_at_least_one_name(
     first_name: str | None, last_name: str | None
 ) -> None:
@@ -281,6 +292,14 @@ def get_allowed_contact_stages(db_session: Session) -> list[str]:
     if not settings.contact_stage_options:
         return list(DEFAULT_CONTACT_STAGE_OPTIONS)
     return _normalize_stage_options(settings.contact_stage_options)
+
+
+def get_contact_category_options(db_session: Session) -> list[str]:
+    settings = get_or_create_crm_settings(db_session)
+
+    if not settings.contact_category_suggestions:
+        return list(DEFAULT_CONTACT_CATEGORY_SUGGESTIONS)
+    return _normalize_category_suggestions(settings.contact_category_suggestions)
 
 
 def validate_stage_string(
@@ -475,6 +494,9 @@ def create_contact(
     created_by: UUID | None,
     owner_ids: list[UUID] | None = None,
     category: str | None = None,
+    party_affiliation: str | None = None,
+    us_state: str | None = None,
+    principal: str | None = None,
     commit: bool = True,
 ) -> tuple[CrmContact, bool]:
     normalized_first_name = _strip_or_none(first_name)
@@ -500,6 +522,9 @@ def create_contact(
         source=source,
         status=normalized_status,
         category=_strip_or_none(category),
+        party_affiliation=_strip_or_none(party_affiliation),
+        us_state=_normalize_us_state(us_state),
+        principal=_strip_or_none(principal),
         notes=_normalize_text(notes),
         linkedin_url=_strip_or_none(linkedin_url),
         location=_strip_or_none(location),
@@ -545,6 +570,9 @@ def update_contact(
         "source",
         "status",
         "category",
+        "party_affiliation",
+        "us_state",
+        "principal",
         "notes",
         "linkedin_url",
         "location",
@@ -582,10 +610,25 @@ def update_contact(
                 changed = True
             continue
 
-        if key in {"last_name", "phone", "title", "linkedin_url", "location"}:
+        if key in {
+            "last_name",
+            "phone",
+            "title",
+            "linkedin_url",
+            "location",
+            "party_affiliation",
+            "principal",
+        }:
             normalized = _strip_or_none(value)
             if _strip_or_none(getattr(contact, key)) != normalized:
                 setattr(contact, key, normalized)
+                changed = True
+            continue
+
+        if key == "us_state":
+            normalized = _normalize_us_state(value)
+            if _normalize_us_state(contact.us_state) != normalized:
+                contact.us_state = normalized
                 changed = True
             continue
 
@@ -1675,6 +1718,9 @@ def export_all_contacts(db_session: Session) -> list[dict]:
                 "source": c.source.value if c.source is not None else "",
                 "status": _normalize_existing_status(c.status) or "",
                 "category": _strip_or_none(c.category) or "",
+                "party_affiliation": _strip_or_none(c.party_affiliation) or "",
+                "us_state": _normalize_us_state(c.us_state) or "",
+                "principal": _strip_or_none(c.principal) or "",
                 "notes": _normalize_text(c.notes) or "",
                 "linkedin_url": _strip_or_none(c.linkedin_url) or "",
                 "location": _strip_or_none(c.location) or "",

@@ -87,6 +87,13 @@ This CRM is used by a small team to track relationships and conversations.
 ### Data Model
 - **Contacts** represent people. They can optionally belong to an **Organization** and have a lifecycle status \
 (lead → active → inactive → archived) and a source tracking how they entered the system.
+- Contacts have a free-text **category**. Use one of this taxonomy when it applies: Journalist, Academic, \
+Non-profit/NGO, Private Sector, US Federal Policy Maker, US State Policy Maker, EU Policy Maker, \
+EU Member State Policy Maker, Other International Policy Maker. Never use a generic "Policy Maker" label — \
+always pick the specific policy-maker variant.
+- Contacts also have three optional fields: **party_affiliation** (political party, e.g. Democrat, Republican, \
+Social Democrat), **us_state** (2-letter state abbreviation, for US House/Senate members and state-level policy \
+makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for).
 - **Organizations** represent companies or entities. Multiple contacts can belong to one organization.
 - **Interactions** are logged events (calls, meetings, emails, notes, events) linked to a contact and/or organization. \
 They can have **attendees** (team members or external contacts).
@@ -104,6 +111,9 @@ ask which one they mean.
 "Inactive" for gone cold. "Archived" for no longer relevant.
 - **Choose interaction types carefully.** Use "meeting" for scheduled calls or video chats, "call" for quick phone calls, \
 "email" for email threads worth tracking, "note" for internal observations, "event" for conferences or group events.
+- **Categorize and enrich contacts.** When creating or updating a contact, set the `category` from the taxonomy \
+when it can be inferred. For US congressional contacts capture `us_state` and `party_affiliation`; for staffers set \
+`principal` to the elected official's name.
 
 ### Common Workflows
 

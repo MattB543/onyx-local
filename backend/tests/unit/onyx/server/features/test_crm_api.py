@@ -1,6 +1,8 @@
+import asyncio
 from datetime import datetime
 from datetime import timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from unittest.mock import call
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -28,6 +30,7 @@ from onyx.server.features.crm.api import delete_crm_organization
 from onyx.server.features.crm.api import get_contacts
 from onyx.server.features.crm.api import get_organizations
 from onyx.server.features.crm.api import get_session
+from onyx.server.features.crm.api import import_contacts_csv
 from onyx.server.features.crm.api import patch_interaction
 from onyx.server.features.crm.api import post_contact
 from onyx.server.features.crm.api import post_interaction
@@ -154,6 +157,9 @@ def test_contact_snapshot_last_name_only_builds_full_name() -> None:
         source=None,
         status="lead",
         category=None,
+        party_affiliation=None,
+        us_state=None,
+        principal=None,
         notes=None,
         linkedin_url=None,
         location=None,
@@ -183,6 +189,9 @@ def test_contact_snapshot_profile_picture_url_none_when_no_file_id() -> None:
         source=None,
         status="lead",
         category=None,
+        party_affiliation=None,
+        us_state=None,
+        principal=None,
         notes=None,
         linkedin_url=None,
         location=None,
@@ -211,6 +220,9 @@ def test_contact_snapshot_includes_profile_picture_fields() -> None:
         source=None,
         status="lead",
         category=None,
+        party_affiliation=None,
+        us_state=None,
+        principal=None,
         notes=None,
         linkedin_url=None,
         location=None,
@@ -239,6 +251,9 @@ def test_contact_snapshot_includes_organization_name() -> None:
         source=None,
         status="lead",
         category=None,
+        party_affiliation=None,
+        us_state=None,
+        principal=None,
         notes=None,
         linkedin_url=None,
         location=None,
@@ -1427,3 +1442,171 @@ def test_get_organizations_rejects_invalid_sort_dir() -> None:
 
     assert exc.value.error_code == OnyxErrorCode.VALIDATION_ERROR
     mock_list_organizations.assert_not_called()
+
+
+_CONTACT_IMPORT_BASE_HEADERS = [
+    "first_name",
+    "last_name",
+    "email",
+    "phone",
+    "title",
+    "organization_name",
+    "owner_emails",
+    "source",
+    "status",
+    "category",
+    "notes",
+    "linkedin_url",
+    "location",
+    "tags",
+]
+
+
+def _run_contact_import(
+    csv_text: str,
+    contact_email_lookup: dict[str, object] | None = None,
+) -> tuple[object, MagicMock, MagicMock]:
+    file = MagicMock()
+    file.read = AsyncMock(return_value=csv_text.encode("utf-8"))
+    db_session = MagicMock()
+    created_contact = SimpleNamespace(id=uuid4())
+    existing_contact = SimpleNamespace(id=uuid4())
+
+    with (
+        patch("onyx.server.features.crm.api.build_org_name_lookup", return_value={}),
+        patch(
+            "onyx.server.features.crm.api.build_contact_email_lookup",
+            return_value=contact_email_lookup or {},
+        ),
+        patch(
+            "onyx.server.features.crm.api.build_user_email_lookup", return_value={}
+        ),
+        patch(
+            "onyx.server.features.crm.api.get_allowed_contact_stages",
+            return_value=["lead"],
+        ),
+        patch(
+            "onyx.server.features.crm.api.create_contact",
+            return_value=(created_contact, True),
+        ) as mock_create_contact,
+        patch(
+            "onyx.server.features.crm.api.update_contact",
+            return_value=(existing_contact, True),
+        ) as mock_update_contact,
+        patch("onyx.server.features.crm.api.get_contact_tags", return_value=[]),
+    ):
+        result = asyncio.run(
+            import_contacts_csv(
+                file=file,
+                dry_run=False,
+                user=SimpleNamespace(id=uuid4()),
+                db_session=db_session,
+            )
+        )
+
+    return result, mock_create_contact, mock_update_contact
+
+
+def test_import_contacts_parses_policy_fields() -> None:
+    headers = _CONTACT_IMPORT_BASE_HEADERS + [
+        "party_affiliation",
+        "us_state",
+        "principal",
+    ]
+    csv_text = (
+        ",".join(headers)
+        + "\n"
+        + "Alice,Smith,,,,,,,,,,,,,Democrat,ca,Senator Doe\n"
+    )
+
+    result, mock_create_contact, _ = _run_contact_import(csv_text)
+
+    assert result.created == 1
+    assert result.errors == []
+    kwargs = mock_create_contact.call_args.kwargs
+    assert kwargs["party_affiliation"] == "Democrat"
+    assert kwargs["us_state"] == "ca"
+    assert kwargs["principal"] == "Senator Doe"
+
+
+def test_import_contacts_without_policy_columns_still_succeeds() -> None:
+    csv_text = (
+        ",".join(_CONTACT_IMPORT_BASE_HEADERS)
+        + "\n"
+        + "Alice,Smith,,,,,,,,,,,,\n"
+    )
+
+    result, mock_create_contact, _ = _run_contact_import(csv_text)
+
+    assert result.created == 1
+    assert result.errors == []
+    kwargs = mock_create_contact.call_args.kwargs
+    assert kwargs["party_affiliation"] is None
+    assert kwargs["us_state"] is None
+    assert kwargs["principal"] is None
+
+
+def _contact_import_row(headers: list[str], **values: str) -> str:
+    row = {h: "" for h in headers}
+    row.update(values)
+    return ",".join(row[h] for h in headers)
+
+
+def test_import_contacts_old_format_preserves_policy_fields_on_update() -> None:
+    existing_id = uuid4()
+    headers = _CONTACT_IMPORT_BASE_HEADERS
+    csv_text = (
+        ",".join(headers)
+        + "\n"
+        + _contact_import_row(
+            headers,
+            first_name="Alice",
+            last_name="Smith",
+            email="alice@example.com",
+        )
+        + "\n"
+    )
+
+    result, _, mock_update_contact = _run_contact_import(
+        csv_text,
+        contact_email_lookup={"alice@example.com": existing_id},
+    )
+
+    assert result.updated == 1
+    assert result.errors == []
+    patches = mock_update_contact.call_args.kwargs["patches"]
+    assert "party_affiliation" not in patches
+    assert "us_state" not in patches
+    assert "principal" not in patches
+
+
+def test_import_contacts_with_empty_policy_columns_clears_on_update() -> None:
+    existing_id = uuid4()
+    headers = _CONTACT_IMPORT_BASE_HEADERS + [
+        "party_affiliation",
+        "us_state",
+        "principal",
+    ]
+    csv_text = (
+        ",".join(headers)
+        + "\n"
+        + _contact_import_row(
+            headers,
+            first_name="Alice",
+            last_name="Smith",
+            email="alice@example.com",
+        )
+        + "\n"
+    )
+
+    result, _, mock_update_contact = _run_contact_import(
+        csv_text,
+        contact_email_lookup={"alice@example.com": existing_id},
+    )
+
+    assert result.updated == 1
+    assert result.errors == []
+    patches = mock_update_contact.call_args.kwargs["patches"]
+    assert patches["party_affiliation"] is None
+    assert patches["us_state"] is None
+    assert patches["principal"] is None

@@ -5032,6 +5032,9 @@ class CrmContact(Base):
         server_default="lead",
     )
     category: Mapped[str | None] = mapped_column(String, nullable=True)
+    party_affiliation: Mapped[str | None] = mapped_column(String, nullable=True)
+    us_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    principal: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)

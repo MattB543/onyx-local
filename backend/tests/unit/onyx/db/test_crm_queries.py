@@ -175,6 +175,98 @@ def test_create_contact_rejects_no_names() -> None:
         )
 
 
+def test_create_contact_sets_policy_fields_and_normalizes_us_state() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+
+    contact, created = create_contact(
+        db_session=db_session,
+        first_name="Alice",
+        last_name="Smith",
+        email=None,
+        phone=None,
+        title=None,
+        organization_id=None,
+        source=None,
+        status="lead",
+        notes=None,
+        linkedin_url=None,
+        location=None,
+        created_by=uuid4(),
+        party_affiliation="  Democrat  ",
+        us_state=" ca ",
+        principal="  Senator Doe ",
+    )
+
+    assert created is True
+    assert contact.party_affiliation == "Democrat"
+    assert contact.us_state == "CA"
+    assert contact.principal == "Senator Doe"
+
+
+def test_create_contact_us_state_non_two_letter_passes_through() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+
+    contact, _ = create_contact(
+        db_session=db_session,
+        first_name="Bob",
+        last_name="Jones",
+        email=None,
+        phone=None,
+        title=None,
+        organization_id=None,
+        source=None,
+        status="lead",
+        notes=None,
+        linkedin_url=None,
+        location=None,
+        created_by=uuid4(),
+        us_state="  California  ",
+    )
+
+    assert contact.us_state == "California"
+
+
+def test_update_contact_updates_policy_fields_and_normalizes_us_state() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name="Alice", last_name="Smith", status="lead")
+    contact.id = uuid4()
+
+    updated, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={
+            "party_affiliation": " Republican ",
+            "us_state": "tx",
+            "principal": " Rep. Roe ",
+        },
+    )
+
+    assert updated is contact
+    assert changed is True
+    assert contact.party_affiliation == "Republican"
+    assert contact.us_state == "TX"
+    assert contact.principal == "Rep. Roe"
+
+
+def test_update_contact_us_state_full_name_passes_through() -> None:
+    db_session = MagicMock()
+    db_session.scalar.return_value = None
+    contact = CrmContact(first_name="Bob", last_name="Jones", status="lead")
+    contact.id = uuid4()
+
+    _, changed = update_contact(
+        db_session=db_session,
+        contact=contact,
+        patches={"us_state": "California"},
+    )
+
+    assert changed is True
+    assert contact.us_state == "California"
+
+
 def test_update_contact_can_clear_first_name_when_last_name_present() -> None:
     db_session = MagicMock()
     db_session.scalar.return_value = None
@@ -521,6 +613,31 @@ def test_export_all_contacts_includes_profile_picture_url() -> None:
     rows = export_all_contacts(db_session)
 
     assert rows[0]["profile_picture_url"] == "/api/chat/file/file-123"
+
+
+def test_export_all_contacts_includes_policy_fields() -> None:
+    db_session = MagicMock()
+    contact = CrmContact(
+        first_name="Alice",
+        status="lead",
+        party_affiliation="Democrat",
+        us_state="ca",
+        principal="Senator Doe",
+    )
+    contact.id = uuid4()
+    db_session.scalars.return_value = [contact]
+
+    owner_rows = MagicMock()
+    owner_rows.all.return_value = []
+    tag_rows = MagicMock()
+    tag_rows.all.return_value = []
+    db_session.execute.side_effect = [owner_rows, tag_rows]
+
+    rows = export_all_contacts(db_session)
+
+    assert rows[0]["party_affiliation"] == "Democrat"
+    assert rows[0]["us_state"] == "CA"
+    assert rows[0]["principal"] == "Senator Doe"
 
 
 def test_create_organization_rejects_empty_name() -> None:

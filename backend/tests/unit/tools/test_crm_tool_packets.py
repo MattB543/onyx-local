@@ -82,6 +82,9 @@ def db_session():
         session.close()
 
 
+DEFAULT_CATEGORY_OPTIONS = ["Donor", "Staffer", "Policymaker", "Press"]
+
+
 @pytest.fixture(autouse=True)
 def patch_stage_options(monkeypatch: pytest.MonkeyPatch) -> None:
     default_stages = ["lead", "active", "inactive", "archived"]
@@ -92,6 +95,14 @@ def patch_stage_options(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "onyx.tools.tool_implementations.crm.crm_update_tool.get_allowed_contact_stages",
         lambda _db_session: default_stages,
+    )
+    monkeypatch.setattr(
+        "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_category_options",
+        lambda _db_session: list(DEFAULT_CATEGORY_OPTIONS),
+    )
+    monkeypatch.setattr(
+        "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_category_options",
+        lambda _db_session: list(DEFAULT_CATEGORY_OPTIONS),
     )
 
 
@@ -236,6 +247,120 @@ class TestCrmToolRun:
         ]["properties"]
 
         assert "profile_picture_url" in contact_properties
+
+    def test_crm_create_tool_definition_exposes_category_enum_and_new_fields(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+
+        contact_properties = tool.tool_definition()["function"]["parameters"][
+            "properties"
+        ]["contact"]["properties"]
+
+        assert contact_properties["category"]["enum"] == DEFAULT_CATEGORY_OPTIONS
+        assert "party_affiliation" in contact_properties
+        assert "us_state" in contact_properties
+        assert "principal" in contact_properties
+
+    def test_crm_create_tool_definition_category_falls_back_to_string_when_empty(
+        self, emitter: Emitter, db_session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_category_options",
+            lambda _db_session: [],
+        )
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+
+        category_schema = tool.tool_definition()["function"]["parameters"][
+            "properties"
+        ]["contact"]["properties"]["category"]
+
+        assert "enum" not in category_schema
+        assert category_schema["type"] == "string"
+
+    def test_crm_create_contact_passes_new_fields_through(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmCreateTool(
+            tool_id=2,
+            db_session=db_session,
+            emitter=emitter,
+            user_id=str(uuid4()),
+        )
+        contact = CrmContact(first_name="Alice", status="lead")
+        contact.id = uuid4()
+
+        with (
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
+                return_value=(contact, True),
+            ) as mock_create_contact,
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                return_value=[],
+            ),
+            patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                return_value=[],
+            ),
+        ):
+            tool._create_contact(
+                db_session=MagicMock(),
+                contact_data={
+                    "first_name": "Alice",
+                    "owner_ids": [],
+                    "category": "Donor",
+                    "party_affiliation": "Democrat",
+                    "us_state": "CA",
+                    "principal": "Sen. Smith",
+                },
+            )
+
+        kwargs = mock_create_contact.call_args.kwargs
+        assert kwargs["category"] == "Donor"
+        assert kwargs["party_affiliation"] == "Democrat"
+        assert kwargs["us_state"] == "CA"
+        assert kwargs["principal"] == "Sen. Smith"
+
+    def test_crm_update_rejects_invalid_category(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        with pytest.raises(ToolCallException) as exc:
+            tool._normalize_contact_updates({"category": "NotACategory"})
+
+        for option in DEFAULT_CATEGORY_OPTIONS:
+            assert option in exc.value.llm_facing_message
+
+    def test_crm_update_accepts_valid_category_and_new_fields(
+        self, emitter: Emitter, db_session
+    ) -> None:
+        tool = CrmUpdateTool(tool_id=3, db_session=db_session, emitter=emitter)
+
+        updates = tool._normalize_contact_updates(
+            {
+                "category": " Staffer ",
+                "party_affiliation": "Republican",
+                "us_state": "TX",
+                "principal": "Rep. Doe",
+            }
+        )
+
+        assert updates["category"] == "Staffer"
+        assert updates["party_affiliation"] == "Republican"
+        assert updates["us_state"] == "TX"
+        assert updates["principal"] == "Rep. Doe"
 
     def test_crm_create_tool_definition_does_not_require_first_name(
         self, emitter: Emitter, db_session
@@ -603,6 +728,24 @@ class TestCrmToolRun:
 
         assert payload["profile_picture_file_id"] == "file-123"
         assert payload["profile_picture_url"] == "/api/chat/file/file-123"
+
+    def test_serialize_contact_includes_new_fields(self) -> None:
+        contact = CrmContact(
+            first_name="Alice",
+            status="lead",
+            category="Staffer",
+            party_affiliation="Democrat",
+            us_state="CA",
+            principal="Sen. Smith",
+        )
+        contact.id = uuid4()
+
+        payload = serialize_contact(contact, owner_ids=[], tags=[])
+
+        assert payload["category"] == "Staffer"
+        assert payload["party_affiliation"] == "Democrat"
+        assert payload["us_state"] == "CA"
+        assert payload["principal"] == "Sen. Smith"
 
     def test_crm_log_interaction_run_emits_delta(
         self, emitter: Emitter, db_session, placement: Placement

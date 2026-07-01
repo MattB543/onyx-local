@@ -48,6 +48,9 @@ CONTACT_CSV_HEADERS = [
     "source",
     "status",
     "category",
+    "party_affiliation",
+    "us_state",
+    "principal",
     "notes",
     "linkedin_url",
     "location",
@@ -98,10 +101,21 @@ CONTACT_IMPORT_HEADERS = [
     "source",
     "status",
     "category",
+    "party_affiliation",
+    "us_state",
+    "principal",
     "notes",
     "linkedin_url",
     "location",
     "tags",
+]
+
+# New CRM policy fields are optional on import so older exports (which lack these
+# columns) still validate. Absent column => field simply not set.
+CONTACT_OPTIONAL_IMPORT_HEADERS = [
+    "party_affiliation",
+    "us_state",
+    "principal",
 ]
 
 INTERACTION_IMPORT_HEADERS = [

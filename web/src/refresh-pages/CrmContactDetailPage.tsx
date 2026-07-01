@@ -74,6 +74,9 @@ interface ContactEditValues {
   linkedin_url: string;
   status: CrmContactStage;
   category: string;
+  party_affiliation: string;
+  us_state: string;
+  principal: string;
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
@@ -424,6 +427,9 @@ export default function CrmContactDetailPage({
                           linkedin_url: contact.linkedin_url || "",
                           status: contact.status,
                           category: contact.category || "",
+                          party_affiliation: contact.party_affiliation || "",
+                          us_state: contact.us_state || "",
+                          principal: contact.principal || "",
                           owner_ids: visibleOwnerIds.filter((id) =>
                             ownerLabelById.has(id),
                           ),
@@ -459,6 +465,11 @@ export default function CrmContactDetailPage({
                               linkedin_url: optionalText(values.linkedin_url),
                               status: values.status,
                               category: optionalText(values.category),
+                              party_affiliation: optionalText(
+                                values.party_affiliation,
+                              ),
+                              us_state: optionalText(values.us_state),
+                              principal: optionalText(values.principal),
                               owner_ids: Array.from(
                                 new Set([
                                   ...values.owner_ids,
@@ -708,6 +719,48 @@ export default function CrmContactDetailPage({
                                   text03
                                   className="text-sm"
                                 >
+                                  Party Affiliation
+                                </Text>
+                                <InputTypeInField
+                                  name="party_affiliation"
+                                  placeholder="Party Affiliation"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  US State
+                                </Text>
+                                <InputTypeInField
+                                  name="us_state"
+                                  placeholder="e.g. CA"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
+                                  Principal
+                                </Text>
+                                <InputTypeInField
+                                  name="principal"
+                                  placeholder="e.g. Sen. Jane Smith"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Text
+                                  as="p"
+                                  secondaryBody
+                                  text03
+                                  className="text-sm"
+                                >
                                   LinkedIn
                                 </Text>
                                 <InputTypeInField
@@ -868,6 +921,21 @@ export default function CrmContactDetailPage({
                         <DetailField
                           label="Category"
                           value={contact.category}
+                          layout="stacked"
+                        />
+                        <DetailField
+                          label="Party Affiliation"
+                          value={contact.party_affiliation}
+                          layout="stacked"
+                        />
+                        <DetailField
+                          label="US State"
+                          value={contact.us_state}
+                          layout="stacked"
+                        />
+                        <DetailField
+                          label="Principal"
+                          value={contact.principal}
                           layout="stacked"
                         />
                         <DetailField

@@ -60,6 +60,10 @@ def patch_stage_options(monkeypatch: pytest.MonkeyPatch) -> None:
         "onyx.tools.tool_implementations.crm.crm_list_tool.get_allowed_contact_stages",
         lambda _db_session: ["lead", "active", "inactive", "archived"],
     )
+    monkeypatch.setattr(
+        "onyx.tools.tool_implementations.crm.crm_list_tool.get_contact_category_options",
+        lambda _db_session: ["Donor", "Staffer", "Policymaker", "Press"],
+    )
 
 
 def _make_tool(db_session, emitter: Emitter) -> CrmListTool:
@@ -83,6 +87,33 @@ def test_crm_list_tool_definition_exposes_date_and_sort_params(
     assert tool.tool_definition()["function"]["parameters"]["required"] == [
         "entity_type"
     ]
+
+
+def test_crm_list_tool_definition_exposes_category_filter_enum(
+    db_session, emitter: Emitter
+) -> None:
+    tool = _make_tool(db_session, emitter)
+    props = tool.tool_definition()["function"]["parameters"]["properties"]
+    assert "category" in props
+    assert props["category"]["enum"] == ["Donor", "Staffer", "Policymaker", "Press"]
+
+
+def test_crm_list_contacts_passes_category_filter(
+    db_session, emitter: Emitter, placement: Placement
+) -> None:
+    tool = _make_tool(db_session, emitter)
+
+    with patch(
+        "onyx.tools.tool_implementations.crm.crm_list_tool.list_contacts",
+        return_value=([], 0),
+    ) as mock_list_contacts:
+        tool.run(
+            placement=placement,
+            entity_type="contact",
+            category="Donor",
+        )
+
+    assert mock_list_contacts.call_args.kwargs["category"] == "Donor"
 
 
 def test_crm_list_contacts_passes_parsed_filters(

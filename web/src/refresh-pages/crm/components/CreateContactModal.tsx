@@ -46,6 +46,9 @@ interface ContactCreateValues {
   title: string;
   status: CrmContactStage;
   category: string;
+  party_affiliation: string;
+  us_state: string;
+  principal: string;
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
@@ -145,6 +148,9 @@ export default function CreateContactModal({
             title: "",
             status: stageOptions[0] ?? "lead",
             category: "",
+            party_affiliation: "",
+            us_state: "",
+            principal: "",
             owner_ids: initialOwnerIds,
             source: "",
             notes: "",
@@ -171,6 +177,9 @@ export default function CreateContactModal({
                 title: optionalText(values.title),
                 status: values.status,
                 category: optionalText(values.category),
+                party_affiliation: optionalText(values.party_affiliation),
+                us_state: optionalText(values.us_state),
+                principal: optionalText(values.principal),
                 owner_ids: values.owner_ids,
                 source: values.source || undefined,
                 notes: optionalText(values.notes),
@@ -298,6 +307,18 @@ export default function CreateContactModal({
                       options={categoryOptions}
                       strict={false}
                       placeholder="Category"
+                    />
+                    <InputTypeInField
+                      name="party_affiliation"
+                      placeholder="Party Affiliation"
+                    />
+                    <InputTypeInField
+                      name="us_state"
+                      placeholder="US State (e.g. CA)"
+                    />
+                    <InputTypeInField
+                      name="principal"
+                      placeholder="Principal (e.g. Sen. Jane Smith)"
                     />
                   </div>
                   <div className="flex w-full flex-col gap-1">

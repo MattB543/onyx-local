@@ -17,6 +17,7 @@ from onyx.db.crm import create_contact
 from onyx.db.crm import create_organization
 from onyx.db.crm import create_tag
 from onyx.db.crm import get_allowed_contact_stages
+from onyx.db.crm import get_contact_category_options
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_organization_by_id
@@ -72,6 +73,7 @@ class CrmCreateTool(Tool[None]):
         self._user_id = user_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
         self._stage_options = get_allowed_contact_stages(db_session)
+        self._category_options = get_contact_category_options(db_session)
 
     @property
     def id(self) -> int:
@@ -95,6 +97,20 @@ class CrmCreateTool(Tool[None]):
         return is_crm_schema_available(db_session)
 
     def tool_definition(self) -> dict:
+        category_schema: dict[str, Any] = (
+            {
+                "type": "string",
+                "enum": self._category_options,
+                "description": (
+                    "Contact category. Choose the most specific applicable option."
+                ),
+            }
+            if self._category_options
+            else {
+                "type": "string",
+                "description": "Optional contact category label.",
+            }
+        )
         return {
             "type": "function",
             "function": {
@@ -155,9 +171,28 @@ class CrmCreateTool(Tool[None]):
                                     "enum": self._stage_options,
                                     "description": "Contact lifecycle stage.",
                                 },
-                                "category": {
+                                "category": category_schema,
+                                "party_affiliation": {
                                     "type": "string",
-                                    "description": "Optional contact category label.",
+                                    "description": (
+                                        "Political party affiliation, e.g. 'Democrat', "
+                                        "'Republican', 'Social Democrat'."
+                                    ),
+                                },
+                                "us_state": {
+                                    "type": "string",
+                                    "description": (
+                                        "2-letter US state abbreviation (e.g. 'CA'). "
+                                        "Use for members of the US House/Senate and "
+                                        "state-level policy makers."
+                                    ),
+                                },
+                                "principal": {
+                                    "type": "string",
+                                    "description": (
+                                        "For staffers: the name of the principal they "
+                                        "work for, e.g. the Senator or Representative."
+                                    ),
                                 },
                                 "notes": {
                                     "type": "string",
@@ -320,6 +355,9 @@ class CrmCreateTool(Tool[None]):
             source=source,
             status=status,
             category=contact_data.get("category"),
+            party_affiliation=contact_data.get("party_affiliation"),
+            us_state=contact_data.get("us_state"),
+            principal=contact_data.get("principal"),
             notes=contact_data.get("notes"),
             linkedin_url=contact_data.get("linkedin_url"),
             location=contact_data.get("location"),

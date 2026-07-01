@@ -102,6 +102,9 @@ class CrmContactCreateRequest(BaseModel):
     source: CrmContactSource | None = None
     status: str = "lead"
     category: str | None = None
+    party_affiliation: str | None = None
+    us_state: str | None = None
+    principal: str | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -128,6 +131,9 @@ class CrmContactPatchRequest(BaseModel):
     source: CrmContactSource | None = None
     status: str | None = None
     category: str | None = None
+    party_affiliation: str | None = None
+    us_state: str | None = None
+    principal: str | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -147,6 +153,9 @@ class CrmContactSnapshot(BaseModel):
     source: CrmContactSource | None
     status: str
     category: str | None
+    party_affiliation: str | None
+    us_state: str | None
+    principal: str | None
     notes: str | None
     linkedin_url: str | None
     location: str | None
@@ -181,6 +190,9 @@ class CrmContactSnapshot(BaseModel):
             source=contact.source,
             status=contact.status,
             category=contact.category,
+            party_affiliation=contact.party_affiliation,
+            us_state=contact.us_state,
+            principal=contact.principal,
             notes=contact.notes,
             linkedin_url=contact.linkedin_url,
             location=contact.location,

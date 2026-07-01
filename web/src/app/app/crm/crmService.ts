@@ -50,6 +50,9 @@ export interface CrmContact {
   source: CrmContactSource | null;
   status: CrmContactStage;
   category: string | null;
+  party_affiliation: string | null;
+  us_state: string | null;
+  principal: string | null;
   notes: string | null;
   linkedin_url: string | null;
   location: string | null;
@@ -72,6 +75,9 @@ export interface CrmContactCreateBody {
   source?: CrmContactSource | null;
   status?: CrmContactStage;
   category?: string | null;
+  party_affiliation?: string | null;
+  us_state?: string | null;
+  principal?: string | null;
   notes?: string | null;
   linkedin_url?: string | null;
   location?: string | null;
@@ -88,6 +94,9 @@ export interface CrmContactPatchBody {
   source?: CrmContactSource | null;
   status?: CrmContactStage;
   category?: string | null;
+  party_affiliation?: string | null;
+  us_state?: string | null;
+  principal?: string | null;
   notes?: string | null;
   linkedin_url?: string | null;
   location?: string | null;

@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import get_allowed_contact_stages
+from onyx.db.crm import get_contact_category_options
 from onyx.db.crm import get_contact_owner_ids
 from onyx.db.crm import get_contact_tags
 from onyx.db.crm import get_interaction_attendees
@@ -60,6 +61,7 @@ class CrmListTool(Tool[None]):
         self._id = tool_id
         self._session_factory = sessionmaker(bind=db_session.get_bind())
         self._stage_options = get_allowed_contact_stages(db_session)
+        self._category_options = get_contact_category_options(db_session)
 
     @property
     def id(self) -> int:
@@ -83,6 +85,14 @@ class CrmListTool(Tool[None]):
         return is_crm_schema_available(db_session)
 
     def tool_definition(self) -> dict:
+        category_filter_schema: dict[str, Any] = {
+            "type": "string",
+            "description": (
+                "Filter contacts by category. Only applies when entity_type is 'contact'."
+            ),
+        }
+        if self._category_options:
+            category_filter_schema["enum"] = self._category_options
         return {
             "type": "function",
             "function": {
@@ -103,6 +113,7 @@ class CrmListTool(Tool[None]):
                                 "Filter contacts by status. Only applies when entity_type is 'contact'."
                             ),
                         },
+                        "category": category_filter_schema,
                         "organization_id": {
                             "type": "string",
                             "description": (
@@ -306,6 +317,13 @@ class CrmListTool(Tool[None]):
             else None
         )
 
+        category_raw = llm_kwargs.get("category")
+        category = (
+            category_raw.strip()
+            if isinstance(category_raw, str) and category_raw.strip()
+            else None
+        )
+
         organization_id = parse_uuid_maybe(
             llm_kwargs.get("organization_id"), "organization_id"
         )
@@ -328,6 +346,7 @@ class CrmListTool(Tool[None]):
             page_num=page_num,
             page_size=page_size,
             status=status,
+            category=category,
             organization_id=organization_id,
             tag_ids=tag_ids,
             **filters,

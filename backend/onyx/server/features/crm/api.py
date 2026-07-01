@@ -74,6 +74,7 @@ from onyx.server.documents.models import PaginatedReturn
 from onyx.server.features.crm.csv_utils import build_csv_bytes
 from onyx.server.features.crm.csv_utils import CONTACT_CSV_HEADERS
 from onyx.server.features.crm.csv_utils import CONTACT_IMPORT_HEADERS
+from onyx.server.features.crm.csv_utils import CONTACT_OPTIONAL_IMPORT_HEADERS
 from onyx.server.features.crm.csv_utils import INTERACTION_CSV_HEADERS
 from onyx.server.features.crm.csv_utils import INTERACTION_IMPORT_HEADERS
 from onyx.server.features.crm.csv_utils import MAX_IMPORT_FILE_SIZE
@@ -490,6 +491,9 @@ def post_contact(
             source=contact_create_request.source,
             status=normalized_stage,
             category=contact_create_request.category,
+            party_affiliation=contact_create_request.party_affiliation,
+            us_state=contact_create_request.us_state,
+            principal=contact_create_request.principal,
             notes=contact_create_request.notes,
             linkedin_url=contact_create_request.linkedin_url,
             location=contact_create_request.location,
@@ -1350,10 +1354,21 @@ async def import_contacts_csv(
         )
 
     try:
+        required_headers = [
+            h
+            for h in CONTACT_IMPORT_HEADERS
+            if h not in CONTACT_OPTIONAL_IMPORT_HEADERS
+        ]
         rows = parse_csv_upload(
             contents,
-            CONTACT_IMPORT_HEADERS,
-            optional_headers=["id", "created_by", "created_at", "updated_at"],
+            required_headers,
+            optional_headers=[
+                "id",
+                "created_by",
+                "created_at",
+                "updated_at",
+                *CONTACT_OPTIONAL_IMPORT_HEADERS,
+            ],
             max_rows=MAX_IMPORT_ROWS,
         )
     except ValueError as e:
@@ -1384,6 +1399,9 @@ async def import_contacts_csv(
                 linkedin_url = row.get("linkedin_url", "").strip() or None
                 location = row.get("location", "").strip() or None
                 category = row.get("category", "").strip() or None
+                party_affiliation = row.get("party_affiliation", "").strip() or None
+                us_state = row.get("us_state", "").strip() or None
+                principal = row.get("principal", "").strip() or None
 
                 # Resolve organization
                 org_name = row.get("organization_name", "").strip()
@@ -1443,6 +1461,14 @@ async def import_contacts_csv(
                     "linkedin_url": linkedin_url,
                     "location": location,
                 }
+                # Optional columns: patch only when present in the uploaded CSV
+                # so older exports without them don't clear existing values.
+                if "party_affiliation" in row:
+                    patches["party_affiliation"] = party_affiliation
+                if "us_state" in row:
+                    patches["us_state"] = us_state
+                if "principal" in row:
+                    patches["principal"] = principal
 
                 row_id = row.get("id", "").strip()
                 contact_id: UUID | None = None
@@ -1495,6 +1521,9 @@ async def import_contacts_csv(
                             source=source,
                             status=status,
                             category=category,
+                            party_affiliation=party_affiliation,
+                            us_state=us_state,
+                            principal=principal,
                             notes=notes,
                             linkedin_url=linkedin_url,
                             location=location,
