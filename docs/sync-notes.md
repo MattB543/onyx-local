@@ -189,3 +189,14 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   storage), ruff clean; main sync-verify --batch all 7 PASS.
 - Codex sanity check: pending (batch qualifies as security-sensitive; per user
   policy Codex now runs ONLY on risky batches — mechanical batches skip it).
+- Codex batch 5 verdict: BLOCKER (existing Unstructured API keys not migrated).
+  Adjudication: partially right. Our fork's encrypt=True write path was broken
+  post-KMS (TypeError), so no KMS-era row exists — but a PRE-KMS row (bare string,
+  legacy Fernet/AES-CBC ciphertext readable via our decrypt fallback chain) could
+  exist and would have been silently orphaned. Fixed on main: lazy read-repair in
+  get_unstructured_api_key() (fallback to legacy kv row, migrate forward on first
+  read, tolerate str or dict shapes). Codex's suggested pure-SQL ciphertext copy
+  would have been WRONG — the legacy plaintext is a bare JSON string, not
+  {"value": ...}; a byte copy would produce unwrap_str failures. All other
+  security invariants independently verified by Codex: KMS files byte-unchanged,
+  no secret writer on the cached path, handshake hardening + Calendar intact.
