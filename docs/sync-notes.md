@@ -309,3 +309,8 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
     48.0.1 (Docker uses requirements → inert; reconcile later).
 - Verification: worktree pytest 616/617 (1 known Windows env failure), ruff clean,
   all compose files parse + build blocks verified, rev-list vs upstream = 0.
+- Codex batch 9 (final) verdict: PASS — all 9 resolutions verified, chat_utils
+  token_count fallback flows correctly into ChatLoadedFile.lazy_loaded, compose
+  scoping validated (default + embedded copies byte-identical), svcSS produces
+  every required AuthTypeMetadata field on both paths, migration parents correct,
+  all fork-feature spot-checks present.
