@@ -107,4 +107,5 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   - Alembic DOES run from a worktree using the main checkout's venv python.
 - Verification on main: sync-verify --batch all 7 PASS (tsc 0 after bun install +
   lib/shared rebuild + .next clear; CRM jest 34/34; backend custom suites green).
-- Codex sanity check: pending.
+- Codex sanity check: PASS (models.py blend verified, chat retention AST-equivalent,
+  auth fallback faithful, email triggers intact, alembic parents correct).
