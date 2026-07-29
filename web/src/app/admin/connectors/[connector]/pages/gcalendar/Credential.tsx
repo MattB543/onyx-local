@@ -1,611 +1,229 @@
 import { toast } from "@/hooks/useToast";
-import React, { useState, useEffect } from "react";
-import { useSWRConfig } from "swr";
+import React, { useState } from "react";
 import * as Yup from "yup";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { adminDeleteCredential } from "@/lib/credential";
 import { setupGoogleCalendarOAuth } from "@/lib/googleCalendar";
-import {
-  DOCS_ADMINS_PATH,
-  GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME,
-} from "@/lib/constants";
-import Cookies from "js-cookie";
-import { TextFormField, SectionHeader } from "@/components/Field";
+import { DOCS_ADMINS_PATH } from "@/lib/constants";
 import { Form, Formik } from "formik";
 import { User } from "@/lib/types";
-import Button from "@/refresh-components/buttons/Button";
-import {
-  Credential,
-  GoogleCalendarCredentialJson,
-  GoogleCalendarServiceAccountCredentialJson,
-} from "@/lib/connectors/credentials";
-import { refreshAllGoogleData } from "@/lib/googleConnector";
-import { ValidSources } from "@/lib/types";
-import { buildSimilarCredentialInfoURL } from "@/app/admin/connector/[ccPairId]/lib";
-import { FiFile, FiCheck, FiLink, FiAlertTriangle } from "react-icons/fi";
-import { cn, truncateString } from "@/lib/utils";
+import { Button, Text } from "@opal/components";
+import { Section } from "@opal/layouts";
+import InputFile from "@/refresh-components/inputs/InputFile";
+import InputTypeInField from "@/refresh-components/form/InputTypeInField";
+import { parseOauthAppCredentialJson } from "@/lib/googleConnector";
+import { markdown } from "@opal/utils";
 
-type GoogleCalendarCredentialJsonTypes = "authorized_user" | "service_account";
-
-export const GoogleCalendarJsonUpload = ({
-  onSuccess,
-}: {
-  onSuccess?: () => void;
-}) => {
-  const { mutate } = useSWRConfig();
-  const [isUploading, setIsUploading] = useState(false);
-  const [fileName, setFileName] = useState<string | undefined>();
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleFileUpload = async (file: File) => {
-    setIsUploading(true);
-    setFileName(file.name);
-
-    const reader = new FileReader();
-    reader.onload = async (loadEvent) => {
-      if (!loadEvent?.target?.result) {
-        setIsUploading(false);
-        return;
-      }
-
-      const credentialJsonStr = loadEvent.target.result as string;
-
-      let credentialFileType: GoogleCalendarCredentialJsonTypes;
-      try {
-        const appCredentialJson = JSON.parse(credentialJsonStr);
-        if (appCredentialJson.web) {
-          credentialFileType = "authorized_user";
-        } else if (appCredentialJson.type === "service_account") {
-          credentialFileType = "service_account";
-        } else {
-          throw new Error(
-            "Unknown credential type, expected one of 'OAuth Web application' or 'Service Account'"
-          );
-        }
-      } catch (e) {
-        toast.error(`Invalid file provided - ${e}`);
-        setIsUploading(false);
-        return;
-      }
-
-      if (credentialFileType === "authorized_user") {
-        const response = await fetch(
-          "/api/manage/admin/connector/google-calendar/app-credential",
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: credentialJsonStr,
-          }
-        );
-        if (response.ok) {
-          toast.success("Successfully uploaded app credentials");
-          mutate("/api/manage/admin/connector/google-calendar/app-credential");
-          onSuccess?.();
-        } else {
-          const errorMsg = await response.text();
-          toast.error(`Failed to upload app credentials - ${errorMsg}`);
-        }
-      }
-
-      if (credentialFileType === "service_account") {
-        const response = await fetch(
-          "/api/manage/admin/connector/google-calendar/service-account-key",
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: credentialJsonStr,
-          }
-        );
-        if (response.ok) {
-          toast.success("Successfully uploaded service account key");
-          mutate(
-            "/api/manage/admin/connector/google-calendar/service-account-key"
-          );
-          onSuccess?.();
-        } else {
-          const errorMsg = await response.text();
-          toast.error(`Failed to upload service account key - ${errorMsg}`);
-        }
-      }
-      setIsUploading(false);
-    };
-
-    reader.readAsText(file);
-  };
-
-  const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isUploading) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (isUploading) return;
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      if (
-        file !== undefined &&
-        (file.type === "application/json" || file.name.endsWith(".json"))
-      ) {
-        handleFileUpload(file);
-      } else {
-        toast.error("Please upload a JSON file");
-      }
-    }
-  };
-
-  return (
-    <div className="flex flex-col mt-4">
-      <div className="flex items-center">
-        <div className="relative flex flex-1 items-center">
-          <label
-            className={cn(
-              "flex h-10 items-center justify-center w-full px-4 py-2 border border-dashed rounded-md transition-colors",
-              isUploading
-                ? "opacity-70 cursor-not-allowed border-background-400 bg-background-50/30"
-                : isDragging
-                  ? "bg-background-50/50 border-primary dark:border-primary"
-                  : "cursor-pointer hover:bg-background-50/30 hover:border-primary dark:hover:border-primary border-background-300 dark:border-background-600"
-            )}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <div className="flex items-center space-x-2">
-              {isUploading ? (
-                <div className="h-4 w-4 border-t-2 border-b-2 border-primary rounded-full animate-spin"></div>
-              ) : (
-                <FiFile className="h-4 w-4 text-text-500" />
-              )}
-              <span className="text-sm text-text-500">
-                {isUploading
-                  ? `Uploading ${truncateString(fileName || "file", 50)}...`
-                  : isDragging
-                    ? "Drop JSON file here"
-                    : truncateString(
-                        fileName || "Select or drag JSON credentials file...",
-                        50
-                      )}
-              </span>
-            </div>
-            <input
-              className="sr-only"
-              type="file"
-              accept=".json"
-              disabled={isUploading}
-              onChange={(event) => {
-                if (!event.target.files?.length) {
-                  return;
-                }
-                const file = event.target.files[0];
-                if (file === undefined) {
-                  return;
-                }
-                handleFileUpload(file);
-              }}
-            />
-          </label>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-interface GoogleCalendarJsonUploadSectionProps {
-  appCredentialData?: { client_id: string };
-  serviceAccountCredentialData?: { service_account_email: string };
-  isAdmin: boolean;
-  onSuccess?: () => void;
-  existingAuthCredential?: boolean;
-}
-
-export const GoogleCalendarJsonUploadSection = ({
-  appCredentialData,
-  serviceAccountCredentialData,
-  isAdmin,
-  onSuccess,
-  existingAuthCredential,
-}: GoogleCalendarJsonUploadSectionProps) => {
-  const { mutate } = useSWRConfig();
-  const [localServiceAccountData, setLocalServiceAccountData] = useState(
-    serviceAccountCredentialData
-  );
-  const [localAppCredentialData, setLocalAppCredentialData] =
-    useState(appCredentialData);
-
-  useEffect(() => {
-    setLocalServiceAccountData(serviceAccountCredentialData);
-    setLocalAppCredentialData(appCredentialData);
-  }, [serviceAccountCredentialData, appCredentialData]);
-
-  const handleSuccess = () => {
-    if (onSuccess) {
-      onSuccess();
-    } else {
-      refreshAllGoogleData(ValidSources.GoogleCalendar);
-    }
-  };
-
-  if (!isAdmin) {
-    return (
-      <div>
-        <div className="flex items-start py-3 px-4 bg-yellow-50/30 dark:bg-yellow-900/5 rounded">
-          <FiAlertTriangle className="text-yellow-500 h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-          <p className="text-sm">
-            Curators are unable to set up the Google Calendar credentials. To
-            add a Google Calendar connector, please contact an administrator.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <p className="text-sm mb-3">
-        To connect your Google Calendar, create credentials (either OAuth App
-        or Service Account), download the JSON file, and upload it below.
-      </p>
-      <div className="mb-4">
-        <a
-          className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
-          target="_blank"
-          href={`${DOCS_ADMINS_PATH}/connectors/official/google_calendar/overview`}
-          rel="noreferrer"
-        >
-          <FiLink className="h-3 w-3" />
-          View detailed setup instructions
-        </a>
-      </div>
-
-      {(localServiceAccountData?.service_account_email ||
-        localAppCredentialData?.client_id) && (
-        <div className="mb-4">
-          <div className="relative flex flex-1 items-center">
-            <label
-              className={cn(
-                "flex h-10 items-center justify-center w-full px-4 py-2 border border-dashed rounded-md transition-colors",
-                "cursor-pointer hover:bg-background-50/30 hover:border-primary dark:hover:border-primary border-background-300 dark:border-background-600"
-              )}
-            >
-              <div className="flex items-center space-x-2">
-                <FiFile className="h-4 w-4 text-text-500" />
-                <span className="text-sm text-text-500">
-                  {truncateString(
-                    localServiceAccountData?.service_account_email ||
-                      localAppCredentialData?.client_id ||
-                      "",
-                    50
-                  )}
-                </span>
-              </div>
-            </label>
-          </div>
-          {isAdmin && !existingAuthCredential && (
-            <div className="mt-2">
-              <Button
-                danger
-                onClick={async () => {
-                  const endpoint =
-                    localServiceAccountData?.service_account_email
-                      ? "/api/manage/admin/connector/google-calendar/service-account-key"
-                      : "/api/manage/admin/connector/google-calendar/app-credential";
-
-                  const response = await fetch(endpoint, {
-                    method: "DELETE",
-                  });
-
-                  if (response.ok) {
-                    mutate(endpoint);
-                    mutate(
-                      buildSimilarCredentialInfoURL(ValidSources.GoogleCalendar)
-                    );
-                    mutate(
-                      "/api/manage/admin/connector/google-calendar/credentials"
-                    );
-                    mutate(
-                      "/api/manage/admin/connector/google-calendar/public-credential"
-                    );
-                    mutate(
-                      "/api/manage/admin/connector/google-calendar/service-account-credential"
-                    );
-
-                    toast.success(
-                      `Successfully deleted ${
-                        localServiceAccountData
-                          ? "service account key"
-                          : "app credentials"
-                      }`
-                    );
-                    if (localServiceAccountData) {
-                      setLocalServiceAccountData(undefined);
-                    } else {
-                      setLocalAppCredentialData(undefined);
-                    }
-                    handleSuccess();
-                  } else {
-                    const errorMsg = await response.text();
-                    toast.error(`Failed to delete credentials - ${errorMsg}`);
-                  }
-                }}
-              >
-                Delete Credentials
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!(
-        localServiceAccountData?.service_account_email ||
-        localAppCredentialData?.client_id
-      ) && <GoogleCalendarJsonUpload onSuccess={handleSuccess} />}
-    </div>
-  );
-};
-
-interface GoogleCalendarCredentialSectionProps {
-  googleCalendarPublicUploadedCredential?: Credential<GoogleCalendarCredentialJson>;
-  googleCalendarServiceAccountCredential?: Credential<GoogleCalendarServiceAccountCredentialJson>;
-  serviceAccountKeyData?: { service_account_email: string };
-  appCredentialData?: { client_id: string };
+interface CalendarCredentialSectionProps {
   refreshCredentials: () => void;
-  connectorAssociated: boolean;
   user: User | null;
 }
 
-async function handleRevokeAccess(
-  connectorAssociated: boolean,
-  existingCredential:
-    | Credential<GoogleCalendarCredentialJson>
-    | Credential<GoogleCalendarServiceAccountCredentialJson>,
-  refreshCredentials: () => void
-) {
-  if (connectorAssociated) {
-    const message =
-      "Cannot revoke the Google Calendar credential while any connector is still associated with the credential. " +
-      "Please delete all associated connectors, then try again.";
-    toast.error(message);
-    return;
-  }
-
-  await adminDeleteCredential(existingCredential.id);
-  toast.success("Successfully revoked the Google Calendar credential!");
-
-  refreshCredentials();
-}
-
-export const GoogleCalendarAuthSection = ({
-  googleCalendarPublicUploadedCredential,
-  googleCalendarServiceAccountCredential,
-  serviceAccountKeyData,
-  appCredentialData,
+export const CalendarAuthSection = ({
   refreshCredentials,
-  connectorAssociated,
   user,
-}: GoogleCalendarCredentialSectionProps) => {
+}: CalendarCredentialSectionProps) => {
   const router = useRouter();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [localServiceAccountData, setLocalServiceAccountData] = useState(
-    serviceAccountKeyData
-  );
-  const [localAppCredentialData, setLocalAppCredentialData] =
-    useState(appCredentialData);
-  const [
-    localGoogleCalendarPublicCredential,
-    setLocalGoogleCalendarPublicCredential,
-  ] = useState(googleCalendarPublicUploadedCredential);
-  const [
-    localGoogleCalendarServiceAccountCredential,
-    setLocalGoogleCalendarServiceAccountCredential,
-  ] = useState(googleCalendarServiceAccountCredential);
-
-  useEffect(() => {
-    setLocalServiceAccountData(serviceAccountKeyData);
-    setLocalAppCredentialData(appCredentialData);
-    setLocalGoogleCalendarPublicCredential(googleCalendarPublicUploadedCredential);
-    setLocalGoogleCalendarServiceAccountCredential(
-      googleCalendarServiceAccountCredential
-    );
-  }, [
-    serviceAccountKeyData,
-    appCredentialData,
-    googleCalendarPublicUploadedCredential,
-    googleCalendarServiceAccountCredential,
-  ]);
-
-  const existingCredential =
-    localGoogleCalendarPublicCredential ||
-    localGoogleCalendarServiceAccountCredential;
-  if (existingCredential) {
+  const [justCreated, setJustCreated] = useState(false);
+  const [serviceAccountKey, setServiceAccountKey] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [oauthAppCredential, setOauthAppCredential] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  // Confirm only a credential created in this session. A pre-existing one must
+  // not gate the form, or a second could never be created. Revoke is in the list.
+  if (justCreated) {
     return (
-      <div>
-        <div className="mt-4">
-          <div className="py-3 px-4 bg-blue-50/30 dark:bg-blue-900/5 rounded mb-4 flex items-start">
-            <FiCheck className="text-blue-500 h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <span className="font-medium block">Authentication Complete</span>
-              <p className="text-sm mt-1 text-text-500 dark:text-text-400 break-words">
-                Your Google Calendar credentials have been successfully uploaded
-                and authenticated.
-              </p>
-            </div>
-          </div>
+      <Section
+        alignItems="start"
+        justifyContent="start"
+        gap={0.25}
+        className="mt-4 rounded-sm border border-border-02 bg-background-tint-02 px-4 py-3"
+      >
+        <Text as="p" font="main-ui-action">
+          Authentication Complete
+        </Text>
+        <Text as="p" font="secondary-body" color="text-03">
+          Your Google Calendar credential was created. Manage or revoke it from
+          the credential list.
+        </Text>
+      </Section>
+    );
+  }
+
+  return (
+    <Section alignItems="start" justifyContent="start" gap={1}>
+      <Text as="h3" font="heading-h2">
+        Google Calendar Authentication
+      </Text>
+      <Section alignItems="start" justifyContent="start" gap={1}>
+        <Text as="p" font="main-ui-action">
+          Option 1: OAuth app
+        </Text>
+        <Text as="p" font="secondary-body" color="text-03">
+          {markdown(
+            `Upload the OAuth app JSON from Google Cloud Console ([setup instructions](${DOCS_ADMINS_PATH}/connectors/official/google_calendar/overview)), then authenticate with the Google account whose Calendar you want to index.`
+          )}
+        </Text>
+        <InputFile
+          accept="application/json"
+          placeholder="Upload or paste your OAuth app JSON"
+          setValue={(value) => {
+            setOauthAppCredential(
+              value ? parseOauthAppCredentialJson(value) : null
+            );
+          }}
+        />
+        <Section flexDirection="row" justifyContent="end">
           <Button
-            danger
+            disabled={!oauthAppCredential || isAuthenticating}
             onClick={async () => {
-              handleRevokeAccess(
-                connectorAssociated,
-                existingCredential,
-                refreshCredentials
-              );
-            }}
-          >
-            Revoke Access
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (
-    !localServiceAccountData?.service_account_email &&
-    !localAppCredentialData?.client_id
-  ) {
-    return (
-      <div>
-        <SectionHeader>Google Calendar Authentication</SectionHeader>
-        <div className="mt-4">
-          <div className="flex items-start py-3 px-4 bg-yellow-50/30 dark:bg-yellow-900/5 rounded">
-            <FiAlertTriangle className="text-yellow-500 h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-            <p className="text-sm">
-              Please complete Step 1 by uploading either OAuth credentials or a
-              Service Account key before proceeding with authentication.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (localServiceAccountData?.service_account_email) {
-    return (
-      <div>
-        <div className="mt-4">
-          <Formik
-            initialValues={{
-              google_primary_admin: user?.email || "",
-            }}
-            validationSchema={Yup.object().shape({
-              google_primary_admin: Yup.string()
-                .email("Must be a valid email")
-                .required("Required"),
-            })}
-            onSubmit={async (values, formikHelpers) => {
-              formikHelpers.setSubmitting(true);
+              if (!oauthAppCredential) {
+                return;
+              }
+              setIsAuthenticating(true);
               try {
-                const response = await fetch(
-                  "/api/manage/admin/connector/google-calendar/service-account-credential",
-                  {
-                    method: "PUT",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      google_primary_admin: values.google_primary_admin,
-                    }),
-                  }
-                );
-
-                if (response.ok) {
-                  toast.success(
-                    "Successfully created service account credential"
-                  );
-                  refreshCredentials();
+                const [authUrl, errorMsg] = await setupGoogleCalendarOAuth({
+                  isAdmin: true,
+                  name: "OAuth (uploaded)",
+                  appCredential: oauthAppCredential,
+                });
+                if (authUrl) {
+                  router.push(authUrl as Route);
                 } else {
-                  const errorMsg = await response.text();
-                  toast.error(
-                    `Failed to create service account credential - ${errorMsg}`
-                  );
+                  toast.error(errorMsg);
+                  setIsAuthenticating(false);
                 }
               } catch (error) {
                 toast.error(
-                  `Failed to create service account credential - ${error}`
+                  `Failed to authenticate with Google Calendar - ${error}`
                 );
-              } finally {
-                formikHelpers.setSubmitting(false);
+                setIsAuthenticating(false);
               }
             }}
           >
-            {({ isSubmitting }) => (
-              <Form>
-                <TextFormField
-                  name="google_primary_admin"
-                  label="Primary Admin Email:"
-                  subtext="Enter the email of an admin/owner of the Google Organization that owns the calendar(s) you want to index."
-                />
-                <div className="flex">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Create Credential"}
-                  </Button>
-                </div>
-              </Form>
-            )}
-          </Formik>
-        </div>
-      </div>
-    );
-  }
-
-  if (localAppCredentialData?.client_id) {
-    return (
-      <div>
-        <div className="bg-background-50/30 dark:bg-background-900/20 rounded mb-4">
-          <p className="text-sm">
-            Next, you need to authenticate with Google Calendar via OAuth. This
-            gives us read access to the calendar events you have access to.
-          </p>
-        </div>
-        <Button
-          disabled={isAuthenticating}
-          onClick={async () => {
-            setIsAuthenticating(true);
+            {isAuthenticating
+              ? "Authenticating..."
+              : "Authenticate with Google Calendar"}
+          </Button>
+        </Section>
+        <Text as="p" font="main-ui-action">
+          Option 2: Service account
+        </Text>
+        <InputFile
+          accept="application/json"
+          placeholder="Upload or paste your service account JSON key"
+          setValue={(value) => {
+            if (!value) {
+              setServiceAccountKey(null);
+              return;
+            }
             try {
-              Cookies.set(GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME, "true", {
-                path: "/",
-              });
+              const parsed = JSON.parse(value) as Record<string, unknown>;
+              if (parsed.type !== "service_account") {
+                toast.error(
+                  "Invalid file provided - expected a Service Account JSON key"
+                );
+                setServiceAccountKey(null);
+                return;
+              }
+              setServiceAccountKey(parsed);
+            } catch (error) {
+              toast.error(`Invalid file provided - ${error}`);
+              setServiceAccountKey(null);
+            }
+          }}
+        />
 
-              const [authUrl, errorMsg] = await setupGoogleCalendarOAuth({
-                isAdmin: true,
-                name: "OAuth (uploaded)",
-              });
+        <Formik
+          initialValues={{
+            google_primary_admin: user?.email || "",
+          }}
+          validationSchema={Yup.object().shape({
+            google_primary_admin: Yup.string()
+              .email("Must be a valid email")
+              .required("Required"),
+          })}
+          onSubmit={async (values, formikHelpers) => {
+            formikHelpers.setSubmitting(true);
 
-              if (authUrl) {
-                router.push(authUrl as Route);
+            if (!serviceAccountKey) {
+              toast.error(
+                "Please upload a service account key before creating a credential"
+              );
+              formikHelpers.setSubmitting(false);
+              return;
+            }
+
+            try {
+              const response = await fetch(
+                "/api/manage/admin/connector/google-calendar/service-account-credential",
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    google_primary_admin: values.google_primary_admin,
+                    service_account_key: serviceAccountKey,
+                  }),
+                }
+              );
+
+              if (response.ok) {
+                toast.success(
+                  "Successfully created service account credential"
+                );
+                setJustCreated(true);
+                refreshCredentials();
               } else {
-                toast.error(errorMsg);
-                setIsAuthenticating(false);
+                const errorMsg = await response.text();
+                toast.error(
+                  `Failed to create service account credential - ${errorMsg}`
+                );
               }
             } catch (error) {
               toast.error(
-                `Failed to authenticate with Google Calendar - ${error}`
+                `Failed to create service account credential - ${error}`
               );
-              setIsAuthenticating(false);
+            } finally {
+              formikHelpers.setSubmitting(false);
             }
           }}
         >
-          {isAuthenticating
-            ? "Authenticating..."
-            : "Authenticate with Google Calendar"}
-        </Button>
-      </div>
-    );
-  }
-
-  return null;
+          {({ isSubmitting }) => (
+            <Form className="w-full">
+              <Section alignItems="start" justifyContent="start" gap={0.25}>
+                <Text font="main-ui-body" color="text-03">
+                  Primary Admin Email
+                </Text>
+                <InputTypeInField
+                  name="google_primary_admin"
+                  placeholder="admin@yourcompany.com"
+                />
+                <Text font="secondary-body" color="text-03">
+                  Enter the email of an admin or owner of the Google
+                  Organization that owns the Google Calendar(s) you want to
+                  index.
+                </Text>
+              </Section>
+              <Section
+                flexDirection="row"
+                justifyContent="end"
+                className="pt-2"
+              >
+                <Button disabled={isSubmitting} type="submit">
+                  {isSubmitting ? "Creating..." : "Create Credential"}
+                </Button>
+              </Section>
+            </Form>
+          )}
+        </Formik>
+      </Section>
+    </Section>
+  );
 };

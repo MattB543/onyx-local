@@ -1,4 +1,5 @@
 import useSWR, { mutate } from "swr";
+import { toast } from "@/hooks/useToast";
 import { FetchError, errorHandlingFetcher } from "@/lib/fetcher";
 import { Credential } from "@/lib/connectors/credentials";
 import { ConnectorSnapshot } from "@/lib/connectors/connectors";
@@ -13,40 +14,28 @@ export const GOOGLE_SERVICES = {
   GOOGLE_CALENDAR: "google-calendar",
 } as const;
 
-type GoogleConnectorService = "gmail" | "google_drive" | "google_calendar";
-
-const mapServiceToEndpoint = (
-  service: GoogleConnectorService
-): "gmail" | "google-drive" | "google-calendar" => {
-  if (service === "gmail") {
-    return GOOGLE_SERVICES.GMAIL;
+// Parse an uploaded OAuth app JSON; toasts and returns null when invalid.
+export const parseOauthAppCredentialJson = (
+  value: string
+): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const web = parsed.web as Record<string, unknown> | undefined;
+    if (
+      !web ||
+      typeof web.client_id !== "string" ||
+      typeof web.client_secret !== "string"
+    ) {
+      toast.error(
+        "Invalid file provided - expected an OAuth app JSON key with web.client_id and web.client_secret"
+      );
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    toast.error(`Invalid file provided - ${error}`);
+    return null;
   }
-  if (service === "google_drive") {
-    return GOOGLE_SERVICES.GOOGLE_DRIVE;
-  }
-  return GOOGLE_SERVICES.GOOGLE_CALENDAR;
-};
-
-export const useGoogleAppCredential = (service: GoogleConnectorService) => {
-  const endpoint = `/api/manage/admin/connector/${mapServiceToEndpoint(
-    service
-  )}/app-credential`;
-
-  return useSWR<{ client_id: string }, FetchError>(
-    endpoint,
-    errorHandlingFetcher
-  );
-};
-
-export const useGoogleServiceAccountKey = (service: GoogleConnectorService) => {
-  const endpoint = `/api/manage/admin/connector/${mapServiceToEndpoint(
-    service
-  )}/service-account-key`;
-
-  return useSWR<{ service_account_email: string }, FetchError>(
-    endpoint,
-    errorHandlingFetcher
-  );
 };
 
 export const useGoogleCredentials = (
@@ -72,26 +61,6 @@ export const useConnectorsByCredentialId = (credential_id: number | null) => {
   return {
     ...swrResponse,
     refreshConnectorsByCredentialId: () => mutate(url),
-  };
-};
-
-export const checkCredentialsFetched = (
-  appCredentialData: any,
-  appCredentialError: FetchError | undefined,
-  serviceAccountKeyData: any,
-  serviceAccountKeyError: FetchError | undefined
-) => {
-  const appCredentialSuccessfullyFetched =
-    appCredentialData ||
-    (appCredentialError && appCredentialError.status === 404);
-
-  const serviceAccountKeySuccessfullyFetched =
-    serviceAccountKeyData ||
-    (serviceAccountKeyError && serviceAccountKeyError.status === 404);
-
-  return {
-    appCredentialSuccessfullyFetched,
-    serviceAccountKeySuccessfullyFetched,
   };
 };
 
@@ -130,13 +99,4 @@ export const refreshAllGoogleData = (
     | ValidSources.GoogleCalendar
 ) => {
   mutate(buildSimilarCredentialInfoURL(source));
-
-  const service =
-    source === ValidSources.Gmail
-      ? GOOGLE_SERVICES.GMAIL
-      : source === ValidSources.GoogleDrive
-        ? GOOGLE_SERVICES.GOOGLE_DRIVE
-        : GOOGLE_SERVICES.GOOGLE_CALENDAR;
-  mutate(SWR_KEYS.googleConnectorAppCredential(service));
-  mutate(SWR_KEYS.googleConnectorServiceAccountKey(service));
 };

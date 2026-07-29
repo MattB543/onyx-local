@@ -771,6 +771,7 @@ class GoogleServiceAccountKey(BaseModel):
 
 class GoogleServiceAccountCredentialRequest(BaseModel):
     google_primary_admin: str | None = None  # email of user to impersonate
+    service_account_key: GoogleServiceAccountKey
 
 
 class FileUploadResponse(BaseModel):
