@@ -10,7 +10,7 @@ import {
   uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import { toast } from "@/hooks/useToast";
+import { toast } from "@opal/layouts";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";

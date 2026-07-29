@@ -14,6 +14,7 @@ from onyx.auth.schemas import UserRole
 from onyx.configs.constants import AuthType
 from onyx.context.search.models import SavedSearchSettings
 from onyx.db.enums import DefaultAppMode
+from onyx.db.enums import SSOProviderType
 from onyx.db.enums import SupportedLanguage
 from onyx.db.enums import ThemePreference
 from onyx.db.memory import MAX_MEMORIES_PER_USER
@@ -50,6 +51,15 @@ class VersionResponse(BaseModel):
     backend_version: str
 
 
+class SSOProviderOption(BaseModel):
+    # No sensitive config. Allowed domains stay server-side so the public login
+    # page does not enumerate the participating companies' domains.
+    name: str
+    display_name: str
+    provider_type: SSOProviderType
+    authorize_url: str
+
+
 class AuthTypeResponse(BaseModel):
     auth_type: AuthType
     # specifies whether the current auth setup requires
@@ -57,9 +67,17 @@ class AuthTypeResponse(BaseModel):
     requires_verification: bool
     anonymous_user_enabled: bool | None = None
     password_min_length: int
+    password_max_length: int
+    password_require_uppercase: bool = False
+    password_require_lowercase: bool = False
+    password_require_digit: bool = False
+    password_require_special_char: bool = False
     # whether there are any users in the system
     has_users: bool = True
     oauth_enabled: bool = False
+    # Enabled DB-backed SSO providers, one login button each. Empty on cloud and
+    # on instances with no provider rows, so the page falls back to auth_type.
+    sso_providers: list[SSOProviderOption] = []
 
 
 class UserSpecificAssistantPreference(BaseModel):

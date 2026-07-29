@@ -1086,6 +1086,11 @@ class Document(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Source creation time. Null for docs indexed before this column.
+    doc_created_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Number of chunks in the document (in Vespa)
     # Only null for documents indexed prior to this change
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -5678,6 +5683,12 @@ class MCPServer(Base):
         nullable=True,
     )
 
+    # When True, any user may add this server's tools to their agents.
+    # When False, access is limited to the linked users / user_groups.
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -6488,8 +6499,8 @@ class BuildSession(Base):
         default=SharingScope.PRIVATE,
         server_default="private",
     )
-    # Distinguishes user-initiated sessions from sessions created by the
-    # scheduled-tasks executor (or any future non-interactive caller). The
+    # Distinguishes user-initiated sessions from sessions created by
+    # non-interactive callers (scheduled-tasks executor, Slack bot). The
     # Craft sidebar filters on origin == INTERACTIVE.
     origin: Mapped[SessionOrigin] = mapped_column(
         Enum(SessionOrigin, native_enum=False, name="sessionorigin"),

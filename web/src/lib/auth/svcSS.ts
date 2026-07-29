@@ -1,12 +1,19 @@
+import "server-only";
+
 import { buildUrl, UrlBuilder } from "@/lib/utilsSS";
+import { getDomain } from "@/lib/redirectSS";
 import {
-  AuthType,
   NEXT_PUBLIC_CLOUD_ENABLED,
   SERVER_SIDE_ONLY__AUTH_TYPE,
 } from "@/lib/constants";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  AuthType,
+  AuthTypeMetadata,
+  type SSOProviderType,
+} from "@/lib/auth/types";
 import { User, UserRole } from "@/lib/types";
 import { getCurrentUserSS } from "@/lib/users/svcSS";
-import { AuthTypeMetadata } from "@/lib/auth/types";
 
 const AUTH_TYPE_VALUES = new Set<string>(Object.values(AuthType));
 
@@ -31,8 +38,14 @@ function buildFallbackAuthTypeMetadata(): AuthTypeMetadata {
     requiresVerification: false,
     anonymousUserEnabled: null,
     passwordMinLength: 8,
+    passwordMaxLength: 128,
+    passwordRequireUppercase: false,
+    passwordRequireLowercase: false,
+    passwordRequireDigit: false,
+    passwordRequireSpecialChar: false,
     hasUsers: true,
     oauthEnabled: false,
+    ssoProviders: [],
   };
 }
 
@@ -51,8 +64,19 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       requires_verification?: boolean;
       anonymous_user_enabled?: boolean | null;
       password_min_length?: number;
+      password_max_length?: number;
+      password_require_uppercase?: boolean;
+      password_require_lowercase?: boolean;
+      password_require_digit?: boolean;
+      password_require_special_char?: boolean;
       has_users?: boolean;
       oauth_enabled?: boolean;
+      sso_providers?: {
+        name: string;
+        display_name: string;
+        provider_type: SSOProviderType;
+        authorize_url: string;
+      }[];
     };
 
     const authType = resolveAuthType(data.auth_type);
@@ -68,6 +92,26 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       typeof data.password_min_length === "number"
         ? data.password_min_length
         : 8;
+    const passwordMaxLength =
+      typeof data.password_max_length === "number"
+        ? data.password_max_length
+        : 128;
+    const passwordRequireUppercase =
+      typeof data.password_require_uppercase === "boolean"
+        ? data.password_require_uppercase
+        : false;
+    const passwordRequireLowercase =
+      typeof data.password_require_lowercase === "boolean"
+        ? data.password_require_lowercase
+        : false;
+    const passwordRequireDigit =
+      typeof data.password_require_digit === "boolean"
+        ? data.password_require_digit
+        : false;
+    const passwordRequireSpecialChar =
+      typeof data.password_require_special_char === "boolean"
+        ? data.password_require_special_char
+        : false;
     const hasUsers =
       typeof data.has_users === "boolean" ? data.has_users : true;
     const oauthEnabled =
@@ -81,8 +125,19 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       requiresVerification,
       anonymousUserEnabled,
       passwordMinLength,
+      passwordMaxLength,
+      passwordRequireUppercase,
+      passwordRequireLowercase,
+      passwordRequireDigit,
+      passwordRequireSpecialChar,
       hasUsers,
       oauthEnabled,
+      ssoProviders: (data.sso_providers ?? []).map((provider) => ({
+        name: provider.name,
+        displayName: provider.display_name,
+        providerType: provider.provider_type,
+        authorizeUrl: provider.authorize_url,
+      })),
     };
   } catch (error) {
     console.warn("getAuthTypeMetadataSS exception; using fallback.", error);
@@ -150,6 +205,24 @@ export async function logoutSS(
     default:
       return logoutStandardSS(headers);
   }
+}
+
+export async function authErrorRedirect(
+  request: NextRequest,
+  response: Response,
+  redirectStatus?: number
+): Promise<NextResponse> {
+  const errorUrl = new URL("/auth/error", getDomain(request));
+  try {
+    const body = await response.json();
+    const detail = body?.detail;
+    if (typeof detail === "string" && detail) {
+      errorUrl.searchParams.set("error", detail);
+    }
+  } catch {
+    // response may not be JSON
+  }
+  return NextResponse.redirect(errorUrl, redirectStatus);
 }
 
 // ---------------------------------------------------------------------------

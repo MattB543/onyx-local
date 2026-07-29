@@ -245,7 +245,6 @@ export const RenderField: FC<RenderFieldProps> = ({
             label={label}
             name={field.name}
             isTextArea={false}
-            defaultHeight={"h-15"}
             disabled={disabled}
             onChange={(e) => setFieldValue(field.name, e.target.value)}
           />

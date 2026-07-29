@@ -173,6 +173,7 @@ export type ValidStatuses =
   | "success"
   | "completed_with_errors"
   | "canceled"
+  | "interrupted"
   | "failed"
   | "in_progress"
   | "not_started";
@@ -599,6 +600,8 @@ export enum ValidSources {
   Bitbucket = "bitbucket",
   TestRail = "testrail",
   Braintrust = "braintrust",
+  Lumapps = "lumapps",
+  Canvas = "canvas",
 
   // Custom sources
   GoogleCalendar = "google_calendar",
@@ -630,6 +633,7 @@ export const validAutoSyncSources = [
   ValidSources.Sharepoint,
   ValidSources.Teams,
   ValidSources.GoogleCalendar,
+  ValidSources.Canvas,
 ] as const;
 
 // Create a type from the array elements

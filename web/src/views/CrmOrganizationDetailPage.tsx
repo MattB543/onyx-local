@@ -13,8 +13,7 @@ import {
   deleteCrmOrganization,
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
-import { toast } from "@/hooks/useToast";
-import { SettingsLayouts } from "@opal/layouts";
+import { SettingsLayouts, toast } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";

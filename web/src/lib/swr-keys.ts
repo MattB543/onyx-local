@@ -20,6 +20,7 @@ export const SWR_KEYS = {
   customAnalyticsScript: "/api/enterprise-settings/custom-analytics-script",
   authType: "/api/auth/type",
   adminSecuritySettings: "/api/admin/security",
+  adminSsoProviders: "/api/admin/sso/provider",
 
   // ── Agents / Personas ─────────────────────────────────────────────────────
   personas: "/api/persona",
@@ -120,6 +121,8 @@ export const SWR_KEYS = {
   // ── MCP Servers ───────────────────────────────────────────────────────────
   adminMcpServers: "/api/admin/mcp/servers",
   mcpServers: "/api/mcp/servers",
+  personaMcpServers: (personaId: number) =>
+    `/api/mcp/servers/persona/${personaId}`,
 
   // ── Skills ────────────────────────────────────────────────────────────────
   userSkills: "/api/skills",
@@ -130,6 +133,7 @@ export const SWR_KEYS = {
   tools: "/api/tool",
   openApiTools: "/api/tool/openapi",
   oauthTokenStatus: "/api/user-oauth-token/status",
+  adminOAuthTestClaims: "/api/admin/oauth-test/claims",
 
   // ── Voice ─────────────────────────────────────────────────────────────────
   voiceProviders: "/api/admin/voice/providers",
@@ -152,6 +156,7 @@ export const SWR_KEYS = {
   buildExternalApps: "/api/build/apps",
   buildExternalAppsAdmin: "/api/build/admin/apps",
   buildExternalAppsBuiltInOptions: "/api/build/admin/apps/built-in/options",
+  buildBaseInstructions: "/api/build/admin/base-instructions",
   buildSessionLiveApprovals: (sessionId: string) =>
     `/api/build/approvals/sessions/${sessionId}/live`,
 
@@ -174,6 +179,9 @@ export const SWR_KEYS = {
 
   // ── Prompt shortcuts ──────────────────────────────────────────────────────
   promptShortcuts: "/api/input_prompt",
+
+  // ── Admin Banner ──────────────────────────────────────────────────────────
+  adminBanner: "/api/admin/banner",
 
   // ── License & Billing ─────────────────────────────────────────────────────
   license: "/api/license",
