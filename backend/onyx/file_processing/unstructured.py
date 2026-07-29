@@ -1,11 +1,13 @@
 from typing import Any
-from typing import cast
 from typing import IO
 from typing import TYPE_CHECKING
 
 from onyx.configs.constants import KV_UNSTRUCTURED_API_KEY
-from onyx.key_value_store.factory import get_kv_store
+from onyx.db.encrypted_kv_store import delete_encrypted_kv
+from onyx.db.encrypted_kv_store import load_encrypted_kv
+from onyx.db.encrypted_kv_store import upsert_encrypted_kv
 from onyx.key_value_store.interface import KvKeyNotFoundError
+from onyx.key_value_store.interface import unwrap_str
 from onyx.utils.logger import setup_logger
 
 if TYPE_CHECKING:
@@ -16,21 +18,21 @@ logger = setup_logger()
 
 
 def get_unstructured_api_key() -> str | None:
-    kv_store = get_kv_store()
     try:
-        return cast(str, kv_store.load(KV_UNSTRUCTURED_API_KEY))
+        return unwrap_str(load_encrypted_kv(KV_UNSTRUCTURED_API_KEY))
     except KvKeyNotFoundError:
         return None
 
 
 def update_unstructured_api_key(api_key: str) -> None:
-    kv_store = get_kv_store()
-    kv_store.store(KV_UNSTRUCTURED_API_KEY, api_key, encrypt=True)
+    # EncryptedJson only accepts dicts, so the raw key is wrapped under "value".
+    upsert_encrypted_kv(KV_UNSTRUCTURED_API_KEY, {"value": api_key})
 
 
 def delete_unstructured_api_key() -> None:
-    kv_store = get_kv_store()
-    kv_store.delete(KV_UNSTRUCTURED_API_KEY)
+    # Propagates KvKeyNotFoundError when unset, matching the previous KV-store
+    # backed behavior that callers rely on.
+    delete_encrypted_kv(KV_UNSTRUCTURED_API_KEY)
 
 
 def _sdk_partition_request(

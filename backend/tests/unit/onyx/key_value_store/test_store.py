@@ -13,26 +13,6 @@ def _yield_session(session: MagicMock):
     yield session
 
 
-def test_store_encrypted_value_never_writes_plaintext_to_redis(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    redis_client = MagicMock()
-    db_session = MagicMock()
-    db_session.query.return_value.filter_by.return_value.first.return_value = None
-    monkeypatch.setattr(
-        "onyx.key_value_store.store.get_session_with_current_tenant",
-        lambda: _yield_session(db_session),
-    )
-
-    kv_store = PgRedisKVStore(cache=redis_client)
-    # encrypted_value is an EncryptedJson column (dict-only since upstream #9177),
-    # so the stored payload must be a dict — this still exercises the cache guard.
-    kv_store.store("secret-key", {"value": "sensitive"}, encrypt=True)
-
-    redis_client.set.assert_not_called()
-    redis_client.delete.assert_called_once()
-
-
 def test_load_encrypted_value_does_not_cache_plaintext_in_redis(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

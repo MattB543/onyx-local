@@ -1,10 +1,15 @@
-"""Regression tests locking in the KMS feature's encryption-aware cache guard.
+"""Regression tests locking in the encryption-aware cache guard on load().
 
-The custom fork NEVER caches encrypted KV values in the cache backend
-(Redis), because the cache is not encrypted at rest. A regression that
-re-enabled caching on the encrypted path would leak plaintext secrets into
-Redis. These tests assert the guard holds on both the store() and load()
-paths, and that the non-encrypted path still caches normally.
+Secrets must never reach the cache backend (Redis), which is not encrypted at
+rest. Since upstream dropped the ``encrypt=`` flag on ``store()``, that
+invariant is upheld in two places:
+
+1. Here, by the ``load()`` fallback guard: rows that still carry a legacy
+   ``encrypted_value`` (written before the flag removal) are decrypted for the
+   caller but never mirrored into the cache — any stale cached entry is evicted.
+2. Structurally, in ``onyx/db/encrypted_kv_store.py``, which is the new home for
+   instance secrets and has no cache path at all. See
+   ``test_encrypted_kv_no_cache.py`` for the test that locks that down.
 
 These are pure unit tests: the cache backend is mocked, the DB session is
 mocked, and the ``KVStore`` ORM model is patched out so the test does not
@@ -67,29 +72,14 @@ def patched_store(
     yield store, cache, db_session
 
 
-def test_store_encrypted_value_never_calls_cache_set(
-    patched_store: tuple[PgRedisKVStore, MagicMock, MagicMock],
-) -> None:
-    """Storing an encrypted value must NOT write to the cache backend; instead
-    it deletes any stale cached entry for that key."""
-    store, cache, _ = patched_store
-
-    store.store("api-token", {"secret": "swordfish"}, encrypt=True)
-
-    # The guard: encrypted values are never written to the (unencrypted) cache.
-    cache.set.assert_not_called()
-    # Defensive invalidation of any pre-existing cached plaintext for this key.
-    cache.delete.assert_called_once_with(REDIS_KEY_PREFIX + "api-token")
-
-
 def test_store_plain_value_is_cached(
     patched_store: tuple[PgRedisKVStore, MagicMock, MagicMock],
 ) -> None:
-    """A non-encrypted value SHOULD be cached, proving the test distinguishes
-    the two paths (and isn't trivially passing by never caching anything)."""
+    """Non-secret values stored through the plain KV store ARE cached, proving
+    the load()-path guard below isn't trivially passing by never caching."""
     store, cache, _ = patched_store
 
-    store.store("feature-flag", {"enabled": True}, encrypt=False)
+    store.store("feature-flag", {"enabled": True})
 
     cache.set.assert_called_once()
     cached_key = cache.set.call_args.args[0]
