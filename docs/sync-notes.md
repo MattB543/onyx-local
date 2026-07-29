@@ -44,4 +44,14 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
     batch 1.
   - Broken pyenv shim: bare `python` fails on this box; use `.venv/Scripts/python.exe`
     (sync-verify.sh does this via `$REPO_ROOT/.venv`).
-- Codex sanity check: pending (running concurrently with batch 2 analysis).
+- Codex sanity check: FAIL → fixed on main (ae5470d65f). Two findings:
+  1. (blocker) The resources.py blend dropped upstream's `# ty: ignore[invalid-return-type]`
+     comments on the five service getters — would fail upstream's `ty check` CI.
+     Restored on all five (incl. our `get_calendar_service`). Lesson: when blending,
+     preserve upstream's type-suppression comments even if the code reformats.
+  2. (minor) GOOGLE_CALENDAR icon mapped to `Google.png`, but the Slack icon base URL
+     serves from upstream's repo (raw.githubusercontent.com/onyx-dot-app/onyx/main),
+     which has no Google.png → 404 in Slack. Remapped to upstream-hosted
+     `GoogleDrive.png`. Fork-only sources must map to upstream-hosted filenames.
+  Also from Codex: focused backend tests 125/125 pass; no leftover markers; alembic
+  merge migration verified pure.
