@@ -230,3 +230,25 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
 - Codex batch 6 (focused review of 4 hand-blends): PASS — restore_masked_credentials
   composes with fork masking (no MASK_PREFIX dependency), svcSS mapping verified,
   Dockerfile venv coherent, tsc passed.
+
+## Batch 7 — 4fe09b28d7 (2026-07-29, 64 commits, 301→237 behind)
+
+- Conflicts: 5. Big theme: upstream REMOVED the AuthType enum + legacy
+  single-provider SSO (9a9ad1e101, 577342f5cc, fa0287e2d2). svcSS.ts became a
+  shape migration (AuthTypeMetadata: multiTenant replaces authType/autoRedirect);
+  fork keeps only the never-throw fallback wrapper — file should be quieter now.
+  AUTH_TYPE in docker-compose.prod-tunnel.yml is now inert/harmless.
+- prompt-placeholder consolidation: handle_onyx_date_awareness deleted upstream;
+  apply_prompt_placeholders gained our timezone kwarg (two-file fix:
+  chat/prompt_utils.py + prompts/prompt_utils.py). Optional fork follow-up:
+  thread timezone through process_prompt_template (4 llm_loop call sites) —
+  NOT a regression, deferred.
+- Out-of-marker trap: refresh-components/Modal + ConfirmationModalLayout moved
+  into @opal/components / @opal/layouts — 6 fork CRM files silently broken;
+  pure import swaps (APIs byte-identical).
+- Known environmental failure: test_save_chat.py csv/TABULAR (Windows mimetypes
+  registry) — already in the playbook's known-failures list; passes on Linux.
+- Alembic merge migration f1a6d0c93b27 (parents e4f7a2b91c08 + 9cc89a7b96de).
+- Verification: worktree pytest 514/515 (1 known env), ruff clean; main:
+  sync-verify --batch 7/7 PASS, tsc 0 after bun install (45 new packages).
+- Codex: skipped rename/format-class items; batch 6 focused review was PASS.
