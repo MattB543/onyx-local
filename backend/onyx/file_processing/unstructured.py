@@ -6,6 +6,7 @@ from onyx.configs.constants import KV_UNSTRUCTURED_API_KEY
 from onyx.db.encrypted_kv_store import delete_encrypted_kv
 from onyx.db.encrypted_kv_store import load_encrypted_kv
 from onyx.db.encrypted_kv_store import upsert_encrypted_kv
+from onyx.key_value_store.factory import get_kv_store
 from onyx.key_value_store.interface import KvKeyNotFoundError
 from onyx.key_value_store.interface import unwrap_str
 from onyx.utils.logger import setup_logger
@@ -21,7 +22,21 @@ def get_unstructured_api_key() -> str | None:
     try:
         return unwrap_str(load_encrypted_kv(KV_UNSTRUCTURED_API_KEY))
     except KvKeyNotFoundError:
+        pass
+
+    # Legacy read-repair: before the encrypted_key_value_store table existed, the
+    # key lived in key_value_store (as a bare string on pre-KMS deployments).
+    # Migrate it forward on first read so the legacy row is no longer load-bearing
+    # by the time upstream drops KVStore.encrypted_value.
+    try:
+        legacy = get_kv_store().load(KV_UNSTRUCTURED_API_KEY)
+    except KvKeyNotFoundError:
         return None
+    api_key = legacy.get("value") if isinstance(legacy, dict) else legacy
+    if not isinstance(api_key, str) or not api_key:
+        return None
+    upsert_encrypted_kv(KV_UNSTRUCTURED_API_KEY, {"value": api_key})
+    return api_key
 
 
 def update_unstructured_api_key(api_key: str) -> None:

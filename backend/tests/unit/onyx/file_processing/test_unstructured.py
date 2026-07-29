@@ -51,8 +51,62 @@ def test_get_unstructured_api_key_returns_none_when_unset(
         "onyx.file_processing.unstructured.load_encrypted_kv",
         MagicMock(side_effect=KvKeyNotFoundError),
     )
+    legacy_store = MagicMock()
+    legacy_store.load.side_effect = KvKeyNotFoundError
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.get_kv_store",
+        MagicMock(return_value=legacy_store),
+    )
 
     assert get_unstructured_api_key() is None
+
+
+def test_get_unstructured_api_key_read_repairs_legacy_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pre-KMS deployment may hold the key as a bare string in the plain KV
+    store. get() must return it AND migrate it forward to the encrypted table."""
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.load_encrypted_kv",
+        MagicMock(side_effect=KvKeyNotFoundError),
+    )
+    legacy_store = MagicMock()
+    legacy_store.load.return_value = "legacy-api-key"
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.get_kv_store",
+        MagicMock(return_value=legacy_store),
+    )
+    upsert = MagicMock()
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.upsert_encrypted_kv", upsert
+    )
+
+    assert get_unstructured_api_key() == "legacy-api-key"
+    upsert.assert_called_once_with(
+        KV_UNSTRUCTURED_API_KEY, {"value": "legacy-api-key"}
+    )
+
+
+def test_get_unstructured_api_key_ignores_malformed_legacy_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.load_encrypted_kv",
+        MagicMock(side_effect=KvKeyNotFoundError),
+    )
+    legacy_store = MagicMock()
+    legacy_store.load.return_value = {"unexpected": "shape"}
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.get_kv_store",
+        MagicMock(return_value=legacy_store),
+    )
+    upsert = MagicMock()
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.upsert_encrypted_kv", upsert
+    )
+
+    assert get_unstructured_api_key() is None
+    upsert.assert_not_called()
 
 
 def test_update_then_get_round_trips_through_encrypted_kv(
@@ -75,6 +129,12 @@ def test_update_then_get_round_trips_through_encrypted_kv(
         "onyx.file_processing.unstructured.upsert_encrypted_kv", _upsert
     )
     monkeypatch.setattr("onyx.file_processing.unstructured.load_encrypted_kv", _load)
+    legacy_store = MagicMock()
+    legacy_store.load.side_effect = KvKeyNotFoundError
+    monkeypatch.setattr(
+        "onyx.file_processing.unstructured.get_kv_store",
+        MagicMock(return_value=legacy_store),
+    )
 
     assert get_unstructured_api_key() is None
     update_unstructured_api_key("test-api-key")
