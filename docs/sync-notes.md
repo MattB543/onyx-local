@@ -252,3 +252,23 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
 - Verification: worktree pytest 514/515 (1 known env), ruff clean; main:
   sync-verify --batch 7/7 PASS, tsc 0 after bun install (45 new packages).
 - Codex: skipped rename/format-class items; batch 6 focused review was PASS.
+
+## Batch 8 — 46af76e98a + 9881c03822 (2026-07-29, 2 fmt commits isolated, 237→235 behind)
+
+- Conflicts: 26, ALL pure import-block conflicts. Mechanical recipe worked:
+  checkout --ours (semantic superset) → ruff --select I --fix + ruff format on
+  the conflicted set, with upstream's new isort config (force-single-line and
+  order-by-type removed) from the auto-merged pyproject.toml.
+- Repo-wide fallout: the config change flagged 71 FORK-ONLY files (crm, custom
+  jobs, calendar, ee encryption + tests) with I001 — import-sorted them too
+  (--select I --fix only, NO repo-wide ruff format). New import style is
+  multi-line-combined everywhere; future fork code should follow it.
+- ruff format dirty-set shrank 70→63 files (strict subset — nothing newly
+  dirtied). Pre-existing baseline issues noted: F811 duplicate
+  TestGetBedrockAvailableModels in test_fetch_models_api.py (~line 1657) +
+  12 F401s in alembic merge migrations — separate cleanup, not sync scope.
+- embed_and_save.py will never be byte-identical to upstream (first-party
+  resolution of `scripts` differs); ours is what repo-root ruff wants. Fine.
+- No new migrations; single head f1a6d0c93b27 unchanged. Codex: skipped
+  (mechanical batch, per policy).
+- Verification: worktree pytest 181/181; main sync-verify --batch 7/7 PASS.
