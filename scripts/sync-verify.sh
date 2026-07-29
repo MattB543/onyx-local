@@ -63,7 +63,7 @@ have_python() { "$PYTHON" --version >/dev/null 2>&1; }
 
 # run_check <name> <function>
 #   The function runs the check and returns:
-#     0 = pass, 2 = skip (echo the reason first), anything else = fail.
+#     0 = pass, 77 = skip (echo the reason first; 77 avoids colliding with tsc/pytest rc 2), anything else = fail.
 #   All output is captured and only shown on failure.
 run_check() {
   local name="$1"
@@ -78,7 +78,7 @@ run_check() {
     PASS_COUNT=$((PASS_COUNT + 1))
     # Surface NOTE: lines (e.g. playbook paths missing from the tree) even on pass.
     grep '^NOTE:' "$log" | sed 's/^/        /'
-  elif [ "$rc" -eq 2 ]; then
+  elif [ "$rc" -eq 77 ]; then
     echo "SKIP  $name — $(tail -n 1 "$log")"
     SKIP_COUNT=$((SKIP_COUNT + 1))
     SKIPPED_CHECKS+=("$name")
@@ -112,7 +112,7 @@ check_commits_behind() {
   cd "$REPO_ROOT" || return 1
   if ! git rev-parse --verify --quiet upstream/main >/dev/null; then
     echo "upstream/main not found (git fetch upstream)"
-    return 2
+    return 77
   fi
   local behind
   behind=$(git rev-list --count HEAD..upstream/main)
@@ -122,21 +122,21 @@ check_commits_behind() {
 
 # npx tsc --noEmit → 0 errors (or only upstream errors)
 check_tsc() {
-  if ! have npx; then echo "npx not available"; return 2; fi
+  if ! have npx; then echo "npx not available"; return 77; fi
   cd "$WEB_DIR" || return 1
   npx tsc --noEmit
 }
 
 # npx next build → compiles
 check_next_build() {
-  if ! have npx; then echo "npx not available"; return 2; fi
+  if ! have npx; then echo "npx not available"; return 77; fi
   cd "$WEB_DIR" || return 1
   npx next build
 }
 
 # "$PYTHON" -m pytest backend/tests/unit/ → all pass
 check_unit_tests() {
-  if ! have_python; then echo "python not available"; return 2; fi
+  if ! have_python; then echo "python not available"; return 77; fi
   cd "$BACKEND_DIR" || return 1
   "$PYTHON" -m pytest tests/unit/ -q
 }
@@ -146,21 +146,21 @@ check_unit_tests() {
 # rooted there (backend/alembic/**, backend/tests/**, ...) and silently stop
 # matching if ruff runs from inside backend/.
 check_ruff() {
-  if ! have_python; then echo "python not available"; return 2; fi
+  if ! have_python; then echo "python not available"; return 77; fi
   cd "$REPO_ROOT" || return 1
   "$PYTHON" -m ruff check backend/
 }
 
 # npx prettier --check "src/**" → clean on custom files
 check_prettier() {
-  if ! have npx; then echo "npx not available"; return 2; fi
+  if ! have npx; then echo "npx not available"; return 77; fi
   cd "$WEB_DIR" || return 1
   npx prettier --check "src/**"
 }
 
 # python -m alembic heads → single head
 check_alembic_single_head() {
-  if ! have_python; then echo "python not available"; return 2; fi
+  if ! have_python; then echo "python not available"; return 77; fi
   cd "$BACKEND_DIR" || return 1
   local out heads
   out=$("$PYTHON" -m alembic heads 2>&1) || { echo "$out"; return 1; }
@@ -175,7 +175,7 @@ check_secrets() {
   cd "$REPO_ROOT" || return 1
   if ! git rev-parse --verify --quiet origin/main >/dev/null; then
     echo "origin/main not found (git fetch origin)"
-    return 2
+    return 77
   fi
   local hits
   hits=$(git diff origin/main..HEAD | grep -iE "AKIA|aws_secret|password=")
@@ -190,7 +190,7 @@ check_secrets() {
 # Custom-feature pytest suites, from the "Custom Fork Features" table.
 # Paths are repo-relative in the playbook; pytest runs from backend/.
 run_feature_pytest() {
-  if ! have_python; then echo "python not available"; return 2; fi
+  if ! have_python; then echo "python not available"; return 77; fi
   cd "$BACKEND_DIR" || return 1
 
   local existing=()
@@ -210,7 +210,7 @@ run_feature_pytest() {
 
   if [ "${#existing[@]}" -eq 0 ]; then
     echo "no test paths from the playbook exist here: $*"
-    return 2
+    return 77
   fi
 
   "$PYTHON" -m pytest "${existing[@]}" -q
