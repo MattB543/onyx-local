@@ -1,7 +1,7 @@
+from ee.onyx.server.query_and_chat.models import SearchDocWithContent
 from onyx.configs.constants import DocumentSource
 from onyx.context.search.models import InferenceChunk
 from onyx.context.search.models import InferenceSection
-from ee.onyx.server.query_and_chat.models import SearchDocWithContent
 
 
 def test_search_doc_with_content_copies_image_from_metadata() -> None:

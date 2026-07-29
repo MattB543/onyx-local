@@ -46,7 +46,6 @@ from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.tools.tool_implementations.crm.models import serialize_tag
 from onyx.utils.logger import setup_logger
 
-
 CRM_CREATE_ENTITY_TYPES = {"contact", "organization", "tag"}
 logger = setup_logger()
 

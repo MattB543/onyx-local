@@ -64,12 +64,11 @@ from onyx.server.query_and_chat.streaming_models import SearchToolQueriesDelta
 from onyx.server.query_and_chat.streaming_models import SearchToolStart
 from onyx.server.query_and_chat.streaming_models import SectionEnd
 from onyx.server.query_and_chat.streaming_models import TopLevelBranching
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
 from onyx.tools.tool_implementations.coding_agent.coding_agent_tool import (
     CodingAgentTool,
-)
-from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
-from onyx.tools.tool_implementations.images.image_generation_tool import (
-    ImageGenerationTool,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
@@ -77,13 +76,14 @@ from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
 )
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
+from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
+from onyx.tools.tool_implementations.images.image_generation_tool import (
+    ImageGenerationTool,
+)
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
-from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
-    SearchCalendarTool,
-)
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
 from onyx.utils.logger import setup_logger
 

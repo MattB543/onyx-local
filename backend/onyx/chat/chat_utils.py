@@ -483,7 +483,9 @@ def load_chat_file(
                 )
             except Exception as e:
                 logger.warning(
-                    f"Failed to estimate token count for raw file {file_descriptor['id']}: {e}"
+                    "Failed to estimate token count for raw file %s: %s",
+                    file_descriptor["id"],
+                    e,
                 )
 
     def _load_content() -> bytes:

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
-from onyx.file_processing.unstructured import update_unstructured_api_key
 from onyx.configs.constants import KV_UNSTRUCTURED_API_KEY
+from onyx.file_processing.unstructured import update_unstructured_api_key
 
 
 def test_update_unstructured_api_key_uses_encrypted_kv_store(

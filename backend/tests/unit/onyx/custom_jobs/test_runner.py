@@ -3,10 +3,10 @@ from __future__ import annotations
 import itertools
 from types import SimpleNamespace
 from typing import Any
-from uuid import uuid4
-from unittest.mock import MagicMock
 from unittest.mock import call
+from unittest.mock import MagicMock
 from unittest.mock import patch
+from uuid import uuid4
 
 from onyx.custom_jobs.runner import execute_custom_job_run
 from onyx.custom_jobs.types import BaseStep
@@ -474,7 +474,7 @@ def test_execute_custom_job_run_restart_skips_completed_step() -> None:
             "onyx.custom_jobs.runner.get_step_class",
             side_effect=_dispatch_step_class,
         ),
-        patch("onyx.custom_jobs.runner.upsert_run_step") as mock_upsert,
+        patch("onyx.custom_jobs.runner.upsert_run_step"),
         patch("onyx.custom_jobs.runner.mark_run_terminal") as mock_mark_terminal,
         patch("onyx.custom_jobs.runner.record_run_terminal"),
         patch("onyx.custom_jobs.runner.record_run_duration"),

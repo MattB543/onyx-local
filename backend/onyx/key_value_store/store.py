@@ -95,7 +95,7 @@ class PgRedisKVStore(KeyValueStore):
                 self._get_cache().delete(REDIS_KEY_PREFIX + key)
             except Exception as e:
                 logger.error(
-                    f"Failed to delete cache value for encrypted key '{key}': {str(e)}"
+                    "Failed to delete cache value for encrypted key '%s': %s", key, e
                 )
         else:
             try:
@@ -105,7 +105,7 @@ class PgRedisKVStore(KeyValueStore):
             except Exception as e:
                 # Fallback gracefully to Postgres if Cache backend fails
                 logger.error(
-                    f"Failed to set value in Cache backend for key '{key}': {str(e)}"
+                    "Failed to set value in Cache backend for key '%s': %s", key, e
                 )
 
     def load(self, key: str, refresh_cache: bool = False) -> JSON_ro:
@@ -144,14 +144,14 @@ class PgRedisKVStore(KeyValueStore):
                     )
                 except Exception as e:
                     logger.error(
-                        f"Failed to set value in cache for key '{key}': {str(e)}"
+                        "Failed to set value in cache for key '%s': %s", key, e
                     )
             else:
                 try:
                     self._get_cache().delete(REDIS_KEY_PREFIX + key)
                 except Exception as e:
                     logger.error(
-                        f"Failed to delete cache value for encrypted key '{key}': {str(e)}"
+                        "Failed to delete cache value for encrypted key '%s': %s", key, e
                     )
 
             return cast(JSON_ro, value)

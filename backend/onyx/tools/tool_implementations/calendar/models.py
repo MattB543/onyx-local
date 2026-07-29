@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 from onyx.db.calendar import CalendarEventSearchResult
 from onyx.tools.models import ToolCallException
-from onyx.tools.tool_implementations.payload_utils import as_llm_json
-from onyx.tools.tool_implementations.payload_utils import compact_tool_payload_for_model
+from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_json
+from onyx.tools.tool_implementations.payload_utils import (
+    compact_tool_payload_for_model as compact_tool_payload_for_model,
+)
 from onyx.utils.datetime_utils import parse_iso_datetime_to_utc
 
 REQUIRED_CALENDAR_TABLES = {

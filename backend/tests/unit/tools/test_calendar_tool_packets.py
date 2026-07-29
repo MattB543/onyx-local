@@ -12,9 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from onyx.chat.emitter import Emitter
 from onyx.db.calendar import CalendarEventSearchResult
 from onyx.server.query_and_chat.placement import Placement
-from onyx.server.query_and_chat.session_loading import (
-    create_calendar_search_packets,
-)
+from onyx.server.query_and_chat.session_loading import create_calendar_search_packets
 from onyx.server.query_and_chat.streaming_models import CalendarSearchToolDelta
 from onyx.server.query_and_chat.streaming_models import CalendarSearchToolStart
 from onyx.server.query_and_chat.streaming_models import SectionEnd

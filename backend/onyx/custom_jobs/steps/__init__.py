@@ -1,4 +1,6 @@
-from onyx.custom_jobs.steps.fetch_email_trigger_payload import FetchEmailTriggerPayloadStep
+from onyx.custom_jobs.steps.fetch_email_trigger_payload import (
+    FetchEmailTriggerPayloadStep,
+)
 from onyx.custom_jobs.steps.fetch_weekly_chat_content import FetchWeeklyChatContentStep
 from onyx.custom_jobs.steps.google_doc_output import GoogleDocOutputStep
 from onyx.custom_jobs.steps.post_slack_digest import PostSlackDigestStep

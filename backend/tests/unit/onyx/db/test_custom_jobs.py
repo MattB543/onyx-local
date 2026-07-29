@@ -4,13 +4,12 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-from unittest.mock import MagicMock
-from unittest.mock import call
-from unittest.mock import patch
 
 from onyx.db.custom_jobs import claim_due_scheduled_jobs
 from onyx.db.custom_jobs import claim_trigger_events_for_runs

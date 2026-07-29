@@ -37,7 +37,6 @@ from onyx.tools.tool_implementations.calendar.models import serialize_calendar_e
 from onyx.utils.datetime_utils import parse_iso_datetime_in_tz
 from onyx.utils.logger import setup_logger
 
-
 CALENDAR_EVENT_STATUSES = {"confirmed", "tentative", "cancelled"}
 SORT_BY_OPTIONS = {"start_time", "updated_at"}
 SORT_ORDER_OPTIONS = {"asc", "desc"}

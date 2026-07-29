@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-
 MAX_COMPACT_STRING_LENGTH = 1200
 MAX_COMPACT_ARRAY_ITEMS = 25
 MAX_COMPACT_OBJECT_KEYS = 40

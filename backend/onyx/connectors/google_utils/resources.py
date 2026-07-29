@@ -113,7 +113,7 @@ class RefreshableDriveObject:
                 return self.call_stack(self.creds).execute(*args, **kwargs)
             except RefreshError as e:
                 logger.warning(
-                    f"RefreshError, going to attempt a creds refresh and retry: {e}"
+                    "RefreshError, going to attempt a creds refresh and retry: %s", e
                 )
                 # Refresh the access token
                 self.creds = self.creds_getter()

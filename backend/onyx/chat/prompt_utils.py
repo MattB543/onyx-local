@@ -35,16 +35,16 @@ from onyx.prompts.user_info import USER_MEMORIES_PROMPT
 from onyx.prompts.user_info import USER_PREFERENCES_PROMPT
 from onyx.prompts.user_info import USER_ROLE_PROMPT
 from onyx.tools.interface import Tool
+from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
+    SearchCalendarTool,
+)
+from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
 )
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool
-from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
-    SearchCalendarTool,
-)
-from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
 from onyx.utils.timing import log_function_time

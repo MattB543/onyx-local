@@ -8,10 +8,10 @@ from typing import Any
 from onyx.configs.app_configs import ONYX_QUERY_HISTORY_TYPE
 from onyx.configs.constants import MessageType
 from onyx.configs.constants import QueryHistoryType
-from onyx.db.chat import get_chat_messages_in_time_range
 from onyx.custom_jobs.types import BaseStep
 from onyx.custom_jobs.types import StepContext
 from onyx.custom_jobs.types import StepResult
+from onyx.db.chat import get_chat_messages_in_time_range
 
 
 class FetchWeeklyChatContentStep(BaseStep):

@@ -20,7 +20,6 @@ from onyx.tools.tool_implementations.crm.models import as_llm_json
 from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
 from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
 
-
 CRM_SEARCH_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 
 

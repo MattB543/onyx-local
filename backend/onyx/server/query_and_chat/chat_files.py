@@ -142,7 +142,7 @@ def upload_chat_files(
         raise
     except Exception as e:
         db_session.rollback()
-        logger.exception(f"Error uploading chat files - {type(e).__name__}: {e}")
+        logger.exception("Error uploading chat files - %s: %s", type(e).__name__, e)
         raise HTTPException(
             status_code=500,
             detail="Failed to upload files. Please try again or contact support if the issue persists.",

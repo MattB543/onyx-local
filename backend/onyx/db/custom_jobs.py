@@ -6,15 +6,15 @@ from datetime import timedelta
 from datetime import timezone
 from typing import Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func
 from sqlalchemy import select
 from sqlalchemy import text
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 from sqlalchemy.orm import selectinload
-from zoneinfo import ZoneInfo
+from sqlalchemy.orm import Session
 
 from onyx.db.enums import CustomJobRunStatus
 from onyx.db.enums import CustomJobStepStatus

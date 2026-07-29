@@ -34,7 +34,6 @@ from onyx.tools.tool_implementations.crm.models import serialize_interaction
 from onyx.tools.tool_implementations.crm.models import serialize_organization
 from onyx.tools.tool_implementations.crm.models import serialize_tag
 
-
 CRM_GET_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 CRM_GET_INCLUDE_OPTIONS = {"tags", "interactions", "organization", "attendees", "contacts"}
 

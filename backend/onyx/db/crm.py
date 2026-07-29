@@ -1469,7 +1469,7 @@ def search_crm_entities(
 
     union_sql = " UNION ALL ".join(union_parts)
 
-    count_query = text(f"SELECT COUNT(*) FROM ({union_sql}) AS crm_search")
+    count_query = text(f"SELECT COUNT(*) FROM ({union_sql}) AS crm_search")  # noqa: S608 -- union_sql built from static fragments; values are bound params
     total = db_session.execute(
         count_query, {"query": query, "escaped_like_query": escaped_like_query}
     ).scalar_one()
@@ -1482,7 +1482,7 @@ def search_crm_entities(
             ORDER BY rank DESC, sort_at DESC NULLS LAST, primary_text ASC
             OFFSET :offset
             LIMIT :limit
-            """
+            """  # noqa: S608 -- union_sql built from static fragments; values are bound params
         ),
         {
             "query": query,

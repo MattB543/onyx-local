@@ -102,7 +102,7 @@ def load_all_tests() -> list[tuple[str, TestSchema]]:
 
     Each tuple contains (test_id, test_data) where test_id is "{category}_{name}".
     """
-    with open(TEST_DATA_FILE_PATH, "r") as file:
+    with open(TEST_DATA_FILE_PATH, "r", encoding="utf-8") as file:
         data = json.load(file)
 
     # Validate the entire file structure using Pydantic

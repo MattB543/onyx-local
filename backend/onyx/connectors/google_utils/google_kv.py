@@ -85,7 +85,7 @@ def _get_oauth_user_via_userinfo(creds: OAuthCredentials) -> str | None:
         headers={"Authorization": f"Bearer {creds.token}"},
     )
     try:
-        with urllib.request.urlopen(request) as response:
+        with urllib.request.urlopen(request) as response:  # noqa: S310 -- fixed https googleapis URL
             user_info = json.loads(response.read().decode("utf-8"))
             email = user_info.get("email")
             if isinstance(email, str):

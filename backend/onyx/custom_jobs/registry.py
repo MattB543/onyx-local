@@ -6,12 +6,12 @@ from typing import Callable
 from onyx.custom_jobs.steps import STEP_CLASS_MAP
 from onyx.custom_jobs.steps import STEP_DESCRIPTION_MAP
 from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.workflows import DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY
-from onyx.custom_jobs.workflows import EMAIL_CRM_PROCESSOR_WORKFLOW_KEY
-from onyx.custom_jobs.workflows import WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY
 from onyx.custom_jobs.workflows import build_daily_slack_web_drive_brief_workflow
 from onyx.custom_jobs.workflows import build_email_crm_processor_workflow
 from onyx.custom_jobs.workflows import build_weekly_content_summary_workflow
+from onyx.custom_jobs.workflows import DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY
+from onyx.custom_jobs.workflows import EMAIL_CRM_PROCESSOR_WORKFLOW_KEY
+from onyx.custom_jobs.workflows import WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY
 
 WorkflowBuilder = Callable[..., WorkflowDefinition]
 

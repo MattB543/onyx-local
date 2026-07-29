@@ -15,8 +15,10 @@ from onyx.db.models import CrmOrganization
 from onyx.db.models import CrmTag
 from onyx.file_store.utils import build_frontend_file_url
 from onyx.tools.models import ToolCallException
-from onyx.tools.tool_implementations.payload_utils import as_llm_json
-from onyx.tools.tool_implementations.payload_utils import compact_tool_payload_for_model
+from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_json
+from onyx.tools.tool_implementations.payload_utils import (
+    compact_tool_payload_for_model as compact_tool_payload_for_model,
+)
 
 REQUIRED_CRM_TABLES = {
     "crm_settings",

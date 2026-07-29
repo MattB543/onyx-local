@@ -23,7 +23,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from onyx.cache.factory import get_cache_backend
-from onyx.cache.interface import CacheBackend
 from onyx.chat.chat_file_utils import enqueue_promoted_user_file_indexing
 from onyx.chat.chat_file_utils import promote_chat_uploads_to_user_files
 from onyx.chat.chat_processing_checker import set_processing_status

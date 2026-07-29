@@ -224,7 +224,8 @@ def enqueue_promoted_user_file_indexing(
         run_in_background(drain_processing_loop, tenant_id)
         for user_file_id in user_file_ids:
             logger.info(
-                f"Queued in-process processing for promoted user_file_id={user_file_id}"
+                "Queued in-process processing for promoted user_file_id=%s",
+                user_file_id,
             )
         return
 
@@ -239,6 +240,7 @@ def enqueue_promoted_user_file_indexing(
             expires=CELERY_USER_FILE_PROCESSING_TASK_EXPIRES,
         )
         logger.info(
-            f"Triggered indexing for promoted user_file_id={user_file_id} "
-            f"with task_id={task.id}"
+            "Triggered indexing for promoted user_file_id=%s with task_id=%s",
+            user_file_id,
+            task.id,
         )

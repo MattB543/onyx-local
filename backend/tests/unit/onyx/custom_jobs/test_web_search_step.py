@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import MagicMock
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 

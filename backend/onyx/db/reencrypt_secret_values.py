@@ -122,7 +122,7 @@ def _build_select_query(target: EncryptedColumnTarget) -> str:
     table_name = _quote_identifier(target.table_name)
     column_name = _quote_identifier(target.column_name)
     return (
-        f"SELECT {pk_cols}, CAST({column_name} AS bytea) AS secret_blob "
+        f"SELECT {pk_cols}, CAST({column_name} AS bytea) AS secret_blob "  # noqa: S608 -- identifiers quoted via _quote_identifier; values are bound params
         f"FROM {table_name} "
         f"WHERE {column_name} IS NOT NULL "
         f"ORDER BY {pk_cols} "
@@ -138,7 +138,7 @@ def _build_update_query(target: EncryptedColumnTarget) -> str:
     where_clause = " AND ".join(where_clause_parts)
 
     return (
-        f"UPDATE {table_name} "
+        f"UPDATE {table_name} "  # noqa: S608 -- identifiers quoted via _quote_identifier; values are bound params
         f"SET {column_name} = :new_blob "
         f"WHERE {where_clause}"
     )

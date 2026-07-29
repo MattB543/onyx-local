@@ -18,9 +18,9 @@ from onyx.file_store.models import InMemoryChatFile
 from onyx.server.query_and_chat.chat_utils import mime_type_to_chat_file_type
 from onyx.utils.b64 import get_image_type
 from onyx.utils.logger import setup_logger
-from onyx.utils.url import ssrf_safe_get
 from onyx.utils.threadpool_concurrency import run_functions_tuples_in_parallel
 from onyx.utils.timing import log_function_time
+from onyx.utils.url import ssrf_safe_get
 
 logger = setup_logger()
 

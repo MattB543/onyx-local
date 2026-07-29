@@ -216,7 +216,7 @@ class ImapConnector(
             for email_id in current_todos:
                 email_msg = _fetch_email(mail_client=mail_client, email_id=email_id)
                 if not email_msg:
-                    logger.warning(f"Failed to fetch message {email_id=}; skipping")
+                    logger.warning("Failed to fetch message email_id=%s; skipping", email_id)
                     continue
 
                 email_headers = EmailHeaders.from_email_msg(email_msg=email_msg)
@@ -352,7 +352,7 @@ def _fetch_email_ids_in_mailbox(
     try:
         _select_mailbox(mail_client=mail_client, mailbox=mailbox)
     except RuntimeError:
-        logger.warning(f"Skipping non-selectable mailbox: {mailbox}")
+        logger.warning("Skipping non-selectable mailbox: %s", mailbox)
         return []
 
     # Retention clamp: when lookback_days is set and positive, emails older

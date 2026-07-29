@@ -4,10 +4,10 @@ from onyx.custom_jobs.registry import STEP_CONFIG_SCHEMAS
 from onyx.custom_jobs.registry import WORKFLOW_REGISTRY
 from onyx.custom_jobs.steps import STEP_CLASS_MAP
 from onyx.custom_jobs.workflows.email_crm_processor import (
-    EMAIL_CRM_PROCESSOR_WORKFLOW_KEY,
+    build_email_crm_processor_workflow,
 )
 from onyx.custom_jobs.workflows.email_crm_processor import (
-    build_email_crm_processor_workflow,
+    EMAIL_CRM_PROCESSOR_WORKFLOW_KEY,
 )
 
 

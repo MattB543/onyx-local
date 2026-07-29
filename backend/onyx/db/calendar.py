@@ -9,8 +9,8 @@ from sqlalchemy import and_
 from sqlalchemy import func
 from sqlalchemy import or_
 from sqlalchemy import select
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from onyx.configs.constants import DocumentSource
 from onyx.db.models import Connector
@@ -19,7 +19,6 @@ from onyx.db.models import Document as DbDocument
 from onyx.db.models import DocumentByConnectorCredentialPair
 from onyx.utils.datetime_utils import parse_iso_datetime_to_utc
 from onyx.utils.logger import setup_logger
-
 
 logger = setup_logger()
 

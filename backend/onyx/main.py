@@ -84,9 +84,7 @@ from onyx.server.documents.targeted_reindex import router as targeted_reindex_ro
 from onyx.server.features.build.api import router as build_router
 from onyx.server.features.build.webapp_proxy import public_build_router
 from onyx.server.features.crm.api import router as crm_router
-from onyx.server.features.crm.email_queue_api import (
-    router as crm_email_queue_router,
-)
+from onyx.server.features.crm.email_queue_api import router as crm_email_queue_router
 from onyx.server.features.default_assistant.api import (
     router as default_assistant_router,
 )

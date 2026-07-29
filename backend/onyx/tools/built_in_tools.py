@@ -1,18 +1,11 @@
 from typing import Type
 from typing import Union
 
-from onyx.tools.tool_implementations.coding_agent.coding_agent_tool import (
-    CodingAgentTool,
-)
-from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
-from onyx.tools.tool_implementations.images.image_generation_tool import (
-    ImageGenerationTool,
-)
-from onyx.tools.tool_implementations.knowledge_graph.knowledge_graph_tool import (
-    KnowledgeGraphTool,
-)
 from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
     SearchCalendarTool,
+)
+from onyx.tools.tool_implementations.coding_agent.coding_agent_tool import (
+    CodingAgentTool,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
 from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
@@ -22,6 +15,13 @@ from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
 )
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
+from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
+from onyx.tools.tool_implementations.images.image_generation_tool import (
+    ImageGenerationTool,
+)
+from onyx.tools.tool_implementations.knowledge_graph.knowledge_graph_tool import (
+    KnowledgeGraphTool,
+)
 from onyx.tools.tool_implementations.memory.memory_tool import MemoryTool
 from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool

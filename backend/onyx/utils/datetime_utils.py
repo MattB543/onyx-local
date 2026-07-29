@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from datetime import timezone
 from zoneinfo import ZoneInfo
-from zoneinfo import ZoneInfoNotFoundError
 
 
 def parse_iso_datetime_to_utc(value: object) -> datetime | None:

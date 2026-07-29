@@ -3,14 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from datetime import timezone
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import MagicMock
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 from fastapi import Response
 
+from onyx.custom_jobs.types import WorkflowDefinition
 from onyx.db.custom_jobs import ManualRunRequestResult
 from onyx.db.enums import CustomJobRunStatus
 from onyx.db.enums import CustomJobStepStatus
@@ -30,8 +31,6 @@ from onyx.server.manage.custom_jobs.api import manual_trigger_custom_job_endpoin
 from onyx.server.manage.custom_jobs.api import update_custom_job_endpoint
 from onyx.server.manage.custom_jobs.models import CustomJobCreateRequest
 from onyx.server.manage.custom_jobs.models import CustomJobUpdateRequest
-from onyx.custom_jobs.types import WorkflowDefinition
-
 
 # ---------------------------------------------------------------------------
 # Helper to build a fake CustomJob-like object (SimpleNamespace) with all
@@ -408,7 +407,7 @@ def test_create_job_weekly_with_valid_config() -> None:
         captured_job["obj"] = obj
 
     db_session.add.side_effect = fake_add
-    db_session.refresh.side_effect = lambda obj: None
+    db_session.refresh.side_effect = lambda _obj: None
 
     with (
         patch("onyx.server.manage.custom_jobs.api._ensure_custom_jobs_enabled"),
@@ -464,7 +463,7 @@ def test_create_job_triggered_clears_schedule_fields() -> None:
         captured_job["obj"] = obj
 
     db_session.add.side_effect = fake_add
-    db_session.refresh.side_effect = lambda obj: None
+    db_session.refresh.side_effect = lambda _obj: None
 
     with (
         patch("onyx.server.manage.custom_jobs.api._ensure_custom_jobs_enabled"),
@@ -553,7 +552,7 @@ def test_update_job_schedule_triggers_next_run_recompute() -> None:
 
     request = CustomJobUpdateRequest(hour=15)
 
-    db_session.refresh.side_effect = lambda obj: None
+    db_session.refresh.side_effect = lambda _obj: None
 
     with (
         patch("onyx.server.manage.custom_jobs.api._ensure_custom_jobs_enabled"),
@@ -572,7 +571,7 @@ def test_update_job_schedule_triggers_next_run_recompute() -> None:
         patch("onyx.server.manage.custom_jobs.api.add_custom_job_audit_log"),
         patch("onyx.server.manage.custom_jobs.api.get_current_tenant_id", return_value="public"),
     ):
-        result = update_custom_job_endpoint(
+        update_custom_job_endpoint(
             job_id=job.id,
             request=request,
             user=user,
