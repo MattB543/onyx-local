@@ -165,32 +165,32 @@ def get_google_docs_service(
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
 ) -> GoogleDocsService:
-    return _get_google_service("docs", "v1", creds, user_email)
+    return _get_google_service("docs", "v1", creds, user_email)  # ty: ignore[invalid-return-type]
 
 
 def get_drive_service(
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
 ) -> GoogleDriveService:
-    return _get_google_service("drive", "v3", creds, user_email)
+    return _get_google_service("drive", "v3", creds, user_email)  # ty: ignore[invalid-return-type]
 
 
 def get_admin_service(
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
 ) -> AdminService:
-    return _get_google_service("admin", "directory_v1", creds, user_email)
+    return _get_google_service("admin", "directory_v1", creds, user_email)  # ty: ignore[invalid-return-type]
 
 
 def get_gmail_service(
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
 ) -> GmailService:
-    return _get_google_service("gmail", "v1", creds, user_email)
+    return _get_google_service("gmail", "v1", creds, user_email)  # ty: ignore[invalid-return-type]
 
 
 def get_calendar_service(
     creds: ServiceAccountCredentials | OAuthCredentials,
     user_email: str | None = None,
 ) -> GoogleCalendarService:
-    return _get_google_service("calendar", "v3", creds, user_email)
+    return _get_google_service("calendar", "v3", creds, user_email)  # ty: ignore[invalid-return-type]

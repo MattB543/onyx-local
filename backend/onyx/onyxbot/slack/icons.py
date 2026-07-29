@@ -11,7 +11,9 @@ _SOURCE_IMAGE_FILENAMES: Mapping[DocumentSource, str] = {
     DocumentSource.WEB: "Web.png",
     DocumentSource.GOOGLE_DRIVE: "GoogleDrive.png",
     DocumentSource.GMAIL: "Gmail.png",
-    DocumentSource.GOOGLE_CALENDAR: "Google.png",
+    # Fork-only source; must use an icon that exists in upstream's repo because
+    # _PUBLIC_SOURCE_IMAGE_BASE_URL serves from onyx-dot-app/onyx main.
+    DocumentSource.GOOGLE_CALENDAR: "GoogleDrive.png",
     DocumentSource.GITHUB: "Github.png",
     DocumentSource.GITBOOK: "Gitbook.png",
     DocumentSource.GITLAB: "Gitlab.png",
