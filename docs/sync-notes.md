@@ -155,3 +155,37 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   accept upstream parity, no fork-only fix (3-line patch possible later if the
   admin redirect is missed). Everything else PASS: payloads/scopes/API paths
   consistent, fork features intact, alembic verified.
+
+## Batch 5 — 2ffae2fe02 (2026-07-29, 1 commit isolated: encrypted-KV table, 452→451 behind)
+
+- Conflicts: only 2 (google_kv.py imports; store.py store()). The feared KMS collision
+  was a NON-EVENT: upstream's new `encrypted_key_value_store.value` is an
+  EncryptedJson column, which already routes through our KMS envelope primitives —
+  zero changes to utils/encryption.py. Upstream's migration f6b0949ea33d is a pure
+  SQL ciphertext copy (NO crypto at migration time, no KMS/SSM needed for alembic).
+- Fork work: PgRedisKVStore.store() encrypt flag dropped (upstream shape taken);
+  Unstructured API key relocated to encrypted_kv_store ({"value":...} wrap +
+  unwrap_str) — ATOMIC with the store() change; ~10 fork regression tests
+  retired/reframed; new structural test (test_encrypted_kv_no_cache.py, AST-based)
+  locks "encrypted store has no cache path". load()'s encrypted_value fallback KEPT
+  for pre-migration rows.
+- LATENT FORK BUG FOUND: old encrypt=True write path for the Unstructured key
+  raised TypeError (EncryptedJson requires dict, we passed str) — masked by an
+  over-mocked test. Fixed by the relocation; no data migration needed (no valid
+  row can exist). Deliberate contract call: delete_unstructured_api_key still
+  PROPAGATES KvKeyNotFoundError (matches pre-existing endpoint behavior).
+- Upstream bonus: 1h TTL + one-time-use on Google OAuth handshake state fixes the
+  unbounded-CSRF-state regression our KMS commit had introduced. In-flight OAuth
+  handshakes break across the deploy (restart flow; release note).
+- DEPLOY FLAGS: (1) post-deploy, re-enter Unstructured API key in admin if used;
+  (2) run reencrypt_secret_values.py dry-run post-deploy (auto-covers new table);
+  (3) telemetry customer_uuid may regenerate if prod row was plaintext-only —
+  precheck: SELECT key, value IS NOT NULL, encrypted_value IS NOT NULL FROM
+  key_value_store WHERE key IN ('customer_uuid','instance_domain');
+  (4) future upstream DROP COLUMN encrypted_value must remove our load() fallback
+  + its test in the same change.
+- Alembic merge migration c3b81de70f45 (parents a1c7d4e90b62 + f6b0949ea33d).
+- Verification: worktree pytest 27/27 (KV + unstructured + google credential
+  storage), ruff clean; main sync-verify --batch all 7 PASS.
+- Codex sanity check: pending (batch qualifies as security-sensitive; per user
+  policy Codex now runs ONLY on risky batches — mechanical batches skip it).
