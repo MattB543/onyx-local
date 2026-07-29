@@ -4,26 +4,24 @@ from dataclasses import dataclass
 from functools import lru_cache
 from os import urandom
 from types import MappingProxyType
-from typing import Any
-from typing import Mapping
-from urllib.parse import urlparse
-from urllib.parse import urlunparse
+from typing import Any, Mapping
+from urllib.parse import urlparse, urlunparse
 
 import boto3
-from botocore.exceptions import BotoCoreError
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from onyx.configs.app_configs import AWS_ENCRYPTED_DEK_PARAM
-from onyx.configs.app_configs import AWS_KMS_KEY_ID
-from onyx.configs.app_configs import AWS_REGION_NAME
-from onyx.configs.app_configs import ENCRYPTION_KEY_SECRET
-from onyx.configs.app_configs import SECRET_ENCRYPTION_MODE
-from onyx.configs.app_configs import SECRET_ENCRYPTION_REQUIRED
-from onyx.configs.app_configs import SECRET_KEY_VERSION
-from onyx.configs.app_configs import SECRET_OLD_KEY_VERSIONS
-from onyx.configs.constants import MASK_CREDENTIAL_CHAR
-from onyx.configs.constants import MASK_CREDENTIAL_LONG_RE
+from onyx.configs.app_configs import (
+    AWS_ENCRYPTED_DEK_PARAM,
+    AWS_KMS_KEY_ID,
+    AWS_REGION_NAME,
+    ENCRYPTION_KEY_SECRET,
+    SECRET_ENCRYPTION_MODE,
+    SECRET_ENCRYPTION_REQUIRED,
+    SECRET_KEY_VERSION,
+    SECRET_OLD_KEY_VERSIONS,
+)
+from onyx.configs.constants import MASK_CREDENTIAL_CHAR, MASK_CREDENTIAL_LONG_RE
 from onyx.connectors.google_utils.shared_constants import (
     DB_CREDENTIALS_AUTHENTICATION_METHOD,
 )
@@ -61,10 +59,7 @@ class _EnvelopeKeyring:
         active_key = self.key_by_version[self.active_version]
         ciphertext = AESGCM(active_key).encrypt(nonce, plaintext, _ENCRYPTION_AAD)
         return (
-            _ENCRYPTION_MAGIC_PREFIX
-            + bytes([self.active_version])
-            + nonce
-            + ciphertext
+            _ENCRYPTION_MAGIC_PREFIX + bytes([self.active_version]) + nonce + ciphertext
         )
 
     def decrypt(self, payload: bytes) -> bytes:
@@ -249,9 +244,7 @@ def _decrypt_legacy_aes_cbc(input_bytes: bytes) -> str:
     Used as a fallback during migration from the legacy EE encryption to KMS."""
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import padding
-    from cryptography.hazmat.primitives.ciphers import algorithms
-    from cryptography.hazmat.primitives.ciphers import Cipher
-    from cryptography.hazmat.primitives.ciphers import modes
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
     if not ENCRYPTION_KEY_SECRET:
         raise RuntimeError(

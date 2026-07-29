@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from onyx.custom_jobs.steps.fetch_email_trigger_payload import (
     FetchEmailTriggerPayloadStep,
 )
-from onyx.custom_jobs.steps.process_email_crm import _build_prompt
-from onyx.custom_jobs.steps.process_email_crm import ProcessEmailCrmStep
+from onyx.custom_jobs.steps.process_email_crm import ProcessEmailCrmStep, _build_prompt
 from onyx.custom_jobs.types import StepContext
 from onyx.db.enums import CustomJobStepStatus
 

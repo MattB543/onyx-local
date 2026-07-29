@@ -6,21 +6,21 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from onyx.custom_jobs.metrics import record_external_api_error
-from onyx.custom_jobs.metrics import record_run_duration
-from onyx.custom_jobs.metrics import record_run_terminal
-from onyx.custom_jobs.metrics import record_step_failure
-from onyx.custom_jobs.registry import build_workflow_definition
-from onyx.custom_jobs.registry import get_step_class
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
-from onyx.db.custom_jobs import get_completed_step_outputs
-from onyx.db.custom_jobs import mark_run_terminal
-from onyx.db.custom_jobs import transition_run_to_started
-from onyx.db.custom_jobs import upsert_run_step
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
+from onyx.custom_jobs.metrics import (
+    record_external_api_error,
+    record_run_duration,
+    record_run_terminal,
+    record_step_failure,
+)
+from onyx.custom_jobs.registry import build_workflow_definition, get_step_class
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
+from onyx.db.custom_jobs import (
+    get_completed_step_outputs,
+    mark_run_terminal,
+    transition_run_to_started,
+    upsert_run_step,
+)
+from onyx.db.enums import CustomJobRunStatus, CustomJobStepStatus
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()

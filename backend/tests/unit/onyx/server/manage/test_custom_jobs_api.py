@@ -1,36 +1,35 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
-from fastapi import Response
+from fastapi import HTTPException, Response
 
 from onyx.custom_jobs.types import WorkflowDefinition
 from onyx.db.custom_jobs import ManualRunRequestResult
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
-from onyx.db.enums import CustomJobTriggerType
-from onyx.server.manage.custom_jobs.api import _ensure_custom_jobs_enabled
-from onyx.server.manage.custom_jobs.api import _validate_schedule_fields
-from onyx.server.manage.custom_jobs.api import _validate_trigger_source_config
-from onyx.server.manage.custom_jobs.api import create_custom_job_endpoint
-from onyx.server.manage.custom_jobs.api import delete_custom_job_endpoint
-from onyx.server.manage.custom_jobs.api import dry_run_custom_job_endpoint
-from onyx.server.manage.custom_jobs.api import get_custom_job_endpoint
-from onyx.server.manage.custom_jobs.api import get_custom_job_step_catalog
-from onyx.server.manage.custom_jobs.api import list_custom_job_run_steps_endpoint
-from onyx.server.manage.custom_jobs.api import list_custom_job_runs_endpoint
-from onyx.server.manage.custom_jobs.api import list_custom_jobs_endpoint
-from onyx.server.manage.custom_jobs.api import manual_trigger_custom_job_endpoint
-from onyx.server.manage.custom_jobs.api import update_custom_job_endpoint
-from onyx.server.manage.custom_jobs.models import CustomJobCreateRequest
-from onyx.server.manage.custom_jobs.models import CustomJobUpdateRequest
+from onyx.db.enums import CustomJobRunStatus, CustomJobStepStatus, CustomJobTriggerType
+from onyx.server.manage.custom_jobs.api import (
+    _ensure_custom_jobs_enabled,
+    _validate_schedule_fields,
+    _validate_trigger_source_config,
+    create_custom_job_endpoint,
+    delete_custom_job_endpoint,
+    dry_run_custom_job_endpoint,
+    get_custom_job_endpoint,
+    get_custom_job_step_catalog,
+    list_custom_job_run_steps_endpoint,
+    list_custom_job_runs_endpoint,
+    list_custom_jobs_endpoint,
+    manual_trigger_custom_job_endpoint,
+    update_custom_job_endpoint,
+)
+from onyx.server.manage.custom_jobs.models import (
+    CustomJobCreateRequest,
+    CustomJobUpdateRequest,
+)
 
 # ---------------------------------------------------------------------------
 # Helper to build a fake CustomJob-like object (SimpleNamespace) with all

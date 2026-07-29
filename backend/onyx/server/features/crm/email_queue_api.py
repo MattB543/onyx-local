@@ -4,22 +4,20 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from onyx.auth.users import current_curator_or_admin_user
 from onyx.configs.app_configs import EMAIL_CRM_CUSTOM_JOB_ID
-from onyx.db.custom_jobs import count_trigger_events_by_status
-from onyx.db.custom_jobs import get_custom_job_enabled
-from onyx.db.custom_jobs import list_trigger_events_with_runs
+from onyx.db.custom_jobs import (
+    count_trigger_events_by_status,
+    get_custom_job_enabled,
+    list_trigger_events_with_runs,
+)
 from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import CustomJobTriggerEventStatus
-from onyx.db.models import CustomJobRun
-from onyx.db.models import CustomJobTriggerEvent
-from onyx.db.models import User
+from onyx.db.models import CustomJobRun, CustomJobTriggerEvent, User
 from onyx.server.documents.models import PaginatedReturn
 from onyx.utils.logger import setup_logger
 

@@ -8,11 +8,13 @@ from uuid import UUID
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmInteraction
-from onyx.db.models import CrmInteractionAttendee
-from onyx.db.models import CrmOrganization
-from onyx.db.models import CrmTag
+from onyx.db.models import (
+    CrmContact,
+    CrmInteraction,
+    CrmInteractionAttendee,
+    CrmOrganization,
+    CrmTag,
+)
 from onyx.file_store.utils import build_frontend_file_url
 from onyx.tools.models import ToolCallException
 from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_json

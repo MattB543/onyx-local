@@ -4,14 +4,13 @@ from typing import Any
 
 from onyx.auth.users import get_anonymous_user
 from onyx.chat.chat_state import ChatStateContainer
-from onyx.chat.process_message import gather_stream_full
-from onyx.chat.process_message import handle_stream_message_objects
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
-from onyx.server.query_and_chat.models import ChatSessionCreationRequest
-from onyx.server.query_and_chat.models import MessageOrigin
-from onyx.server.query_and_chat.models import SendMessageRequest
+from onyx.chat.process_message import gather_stream_full, handle_stream_message_objects
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
+from onyx.server.query_and_chat.models import (
+    ChatSessionCreationRequest,
+    MessageOrigin,
+    SendMessageRequest,
+)
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
-from typing import Callable
+from typing import Any, Callable
 
-from onyx.custom_jobs.steps import STEP_CLASS_MAP
-from onyx.custom_jobs.steps import STEP_DESCRIPTION_MAP
+from onyx.custom_jobs.steps import STEP_CLASS_MAP, STEP_DESCRIPTION_MAP
 from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.workflows import build_daily_slack_web_drive_brief_workflow
-from onyx.custom_jobs.workflows import build_email_crm_processor_workflow
-from onyx.custom_jobs.workflows import build_weekly_content_summary_workflow
-from onyx.custom_jobs.workflows import DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY
-from onyx.custom_jobs.workflows import EMAIL_CRM_PROCESSOR_WORKFLOW_KEY
-from onyx.custom_jobs.workflows import WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY
+from onyx.custom_jobs.workflows import (
+    DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY,
+    EMAIL_CRM_PROCESSOR_WORKFLOW_KEY,
+    WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY,
+    build_daily_slack_web_drive_brief_workflow,
+    build_email_crm_processor_workflow,
+    build_weekly_content_summary_workflow,
+)
 
 WorkflowBuilder = Callable[..., WorkflowDefinition]
 

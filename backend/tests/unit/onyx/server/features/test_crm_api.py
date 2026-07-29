@@ -1,46 +1,44 @@
 import asyncio
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
-from unittest.mock import call
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from onyx.configs.constants import FileOrigin
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmInteractionType
+from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
-from onyx.server.features.crm.api import _delete_file_best_effort
-from onyx.server.features.crm.api import _serialize_interaction
-from onyx.server.features.crm.api import current_admin_user
-from onyx.server.features.crm.api import current_user
-from onyx.server.features.crm.api import delete_contact_profile_picture
-from onyx.server.features.crm.api import delete_crm_contact
-from onyx.server.features.crm.api import delete_crm_interaction
-from onyx.server.features.crm.api import delete_crm_organization
-from onyx.server.features.crm.api import get_contacts
-from onyx.server.features.crm.api import get_organizations
-from onyx.server.features.crm.api import get_session
-from onyx.server.features.crm.api import import_contacts_csv
-from onyx.server.features.crm.api import patch_interaction
-from onyx.server.features.crm.api import post_contact
-from onyx.server.features.crm.api import post_interaction
-from onyx.server.features.crm.api import router
-from onyx.server.features.crm.api import upload_contact_profile_picture
-from onyx.server.features.crm.models import CrmContactCreateRequest
-from onyx.server.features.crm.models import CrmContactSnapshot
-from onyx.server.features.crm.models import CrmInteractionAttendeeInput
-from onyx.server.features.crm.models import CrmInteractionCreateRequest
-from onyx.server.features.crm.models import CrmInteractionPatchRequest
+from onyx.server.features.crm.api import (
+    _delete_file_best_effort,
+    _serialize_interaction,
+    current_admin_user,
+    current_user,
+    delete_contact_profile_picture,
+    delete_crm_contact,
+    delete_crm_interaction,
+    delete_crm_organization,
+    get_contacts,
+    get_organizations,
+    get_session,
+    import_contacts_csv,
+    patch_interaction,
+    post_contact,
+    post_interaction,
+    router,
+    upload_contact_profile_picture,
+)
+from onyx.server.features.crm.models import (
+    CrmContactCreateRequest,
+    CrmContactSnapshot,
+    CrmInteractionAttendeeInput,
+    CrmInteractionCreateRequest,
+    CrmInteractionPatchRequest,
+)
 
 
 def _build_crm_test_client(

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.types import WorkflowStepDefinition
+from onyx.custom_jobs.types import WorkflowDefinition, WorkflowStepDefinition
 
 DAILY_SLACK_WEB_DRIVE_BRIEF_WORKFLOW_KEY = "daily_slack_web_drive_brief"
 

@@ -1,12 +1,10 @@
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.google_calendar.connector import GoogleCalendarConnector
 from onyx.connectors.google_calendar.models import GoogleCalendarCheckpoint
-from onyx.connectors.models import Document
-from onyx.connectors.models import TextSection
+from onyx.connectors.models import Document, TextSection
 from tests.unit.onyx.connectors.utils import (
     load_everything_from_checkpoint_connector_from_checkpoint,
 )

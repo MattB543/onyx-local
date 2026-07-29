@@ -1,45 +1,37 @@
 from collections.abc import Sequence
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from typing import Tuple
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import delete
-from sqlalchemy import desc
-from sqlalchemy import func
-from sqlalchemy import nullsfirst
-from sqlalchemy import or_
-from sqlalchemy import Row
-from sqlalchemy import select
-from sqlalchemy import update
+from sqlalchemy import Row, delete, desc, func, nullsfirst, or_, select, update
 from sqlalchemy.exc import MultipleResultsFound
-from sqlalchemy.orm import joinedload
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from onyx.configs.chat_configs import HARD_DELETE_CHATS
 from onyx.configs.constants import MessageType
-from onyx.context.search.models import extract_image_url_from_metadata
-from onyx.context.search.models import InferenceSection
-from onyx.context.search.models import SavedSearchDoc
+from onyx.context.search.models import (
+    InferenceSection,
+    SavedSearchDoc,
+    extract_image_url_from_metadata,
+)
 from onyx.context.search.models import SearchDoc as ServerSearchDoc
-from onyx.db.models import ChatMessage
-from onyx.db.models import ChatMessage__SearchDoc
-from onyx.db.models import ChatSession
-from onyx.db.models import ChatSessionSharedStatus
-from onyx.db.models import Persona
+from onyx.db.models import (
+    ChatMessage,
+    ChatMessage__SearchDoc,
+    ChatSession,
+    ChatSessionSharedStatus,
+    Persona,
+    ToolCall,
+    User,
+    UserFile,
+)
 from onyx.db.models import SearchDoc as DBSearchDoc
-from onyx.db.models import ToolCall
-from onyx.db.models import User
-from onyx.db.models import UserFile
 from onyx.db.persona import get_best_persona_id_for_user
 from onyx.file_store.file_store import get_default_file_store
 from onyx.file_store.models import FileDescriptor
 from onyx.file_store.utils import plaintext_file_name_for_id
-from onyx.llm.override_models import LLMOverride
-from onyx.llm.override_models import PromptOverride
+from onyx.llm.override_models import LLMOverride, PromptOverride
 from onyx.server.query_and_chat.models import ChatMessageDetail
 from onyx.utils.logger import setup_logger
 from onyx.utils.postgres_sanitization import sanitize_string
@@ -78,7 +70,9 @@ def get_chat_session_by_id(
         # if user_id is None, assume this is an admin who should be able
         # to view all chat sessions
         if user_id is not None:
-            stmt = stmt.where(or_(ChatSession.user_id == user_id, ChatSession.user_id.is_(None)))
+            stmt = stmt.where(
+                or_(ChatSession.user_id == user_id, ChatSession.user_id.is_(None))
+            )
 
     result = db_session.execute(stmt)
     chat_session = result.scalar_one_or_none()
@@ -99,7 +93,9 @@ def get_chat_sessions_by_slack_thread_id(
 ) -> Sequence[ChatSession]:
     stmt = select(ChatSession).where(ChatSession.slack_thread_id == slack_thread_id)
     if user_id is not None:
-        stmt = stmt.where(or_(ChatSession.user_id == user_id, ChatSession.user_id.is_(None)))
+        stmt = stmt.where(
+            or_(ChatSession.user_id == user_id, ChatSession.user_id.is_(None))
+        )
     return db_session.scalars(stmt).all()
 
 
@@ -221,7 +217,9 @@ def delete_orphaned_search_docs(db_session: Session) -> None:
     db_session.commit()
 
 
-def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_session: Session) -> None:
+def delete_messages_and_files_from_chat_session(
+    chat_session_id: UUID, db_session: Session
+) -> None:
     # Select messages older than cutoff_time with files
     messages_with_files = (
         db_session.execute(
@@ -245,7 +243,9 @@ def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_sessio
 
     protected_raw_file_ids = set(
         db_session.scalars(
-            select(UserFile.file_id).where(UserFile.file_id.in_(raw_file_ids_to_consider))
+            select(UserFile.file_id).where(
+                UserFile.file_id.in_(raw_file_ids_to_consider)
+            )
         ).all()
     )
 
@@ -258,7 +258,9 @@ def delete_messages_and_files_from_chat_session(chat_session_id: UUID, db_sessio
 
     # Delete ChatMessage records - CASCADE constraints will automatically handle:
     # - ChatMessage__StandardAnswer relationship records
-    db_session.execute(delete(ChatMessage).where(ChatMessage.chat_session_id == chat_session_id))
+    db_session.execute(
+        delete(ChatMessage).where(ChatMessage.chat_session_id == chat_session_id)
+    )
     db_session.commit()
 
     delete_orphaned_search_docs(db_session)
@@ -341,7 +343,9 @@ def update_chat_session(
     description: str | None = None,
     sharing_status: ChatSessionSharedStatus | None = None,
 ) -> ChatSession:
-    chat_session = get_chat_session_by_id(chat_session_id=chat_session_id, user_id=user_id, db_session=db_session)
+    chat_session = get_chat_session_by_id(
+        chat_session_id=chat_session_id, user_id=user_id, db_session=db_session
+    )
 
     if chat_session.deleted:
         raise ValueError("Trying to rename a deleted chat session")
@@ -356,20 +360,30 @@ def update_chat_session(
     return chat_session
 
 
-def delete_all_chat_sessions_for_user(user: User, db_session: Session, hard_delete: bool = HARD_DELETE_CHATS) -> None:
+def delete_all_chat_sessions_for_user(
+    user: User, db_session: Session, hard_delete: bool = HARD_DELETE_CHATS
+) -> None:
     user_id = user.id
 
     chat_sessions = (
-        db_session.query(ChatSession).filter(ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False)).all()
+        db_session.query(ChatSession)
+        .filter(ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False))
+        .all()
     )
 
     if hard_delete:
         for chat_session in chat_sessions:
             delete_messages_and_files_from_chat_session(chat_session.id, db_session)
-        db_session.execute(delete(ChatSession).where(ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False)))
+        db_session.execute(
+            delete(ChatSession).where(
+                ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False)
+            )
+        )
     else:
         db_session.execute(
-            update(ChatSession).where(ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False)).values(deleted=True)
+            update(ChatSession)
+            .where(ChatSession.user_id == user_id, ChatSession.onyxbot_flow.is_(False))
+            .values(deleted=True)
         )
 
     db_session.commit()
@@ -396,7 +410,9 @@ def delete_chat_session(
         delete_messages_and_files_from_chat_session(chat_session_id, db_session)
         db_session.execute(delete(ChatSession).where(ChatSession.id == chat_session_id))
     else:
-        chat_session = get_chat_session_by_id(chat_session_id=chat_session_id, user_id=user_id, db_session=db_session)
+        chat_session = get_chat_session_by_id(
+            chat_session_id=chat_session_id, user_id=user_id, db_session=db_session
+        )
         chat_session.deleted = True
 
     db_session.commit()
@@ -440,7 +456,9 @@ def get_chat_sessions_older_than(
     ).fetchall()
 
     # convert old_sessions to a conventional list of tuples
-    returned_sessions: list[tuple[UUID | None, UUID]] = [(user_id, session_id) for user_id, session_id in old_sessions]
+    returned_sessions: list[tuple[UUID | None, UUID]] = [
+        (user_id, session_id) for user_id, session_id in old_sessions
+    ]
 
     return returned_sessions
 
@@ -486,7 +504,9 @@ def get_chat_session_by_message_id(
     chat_message = result.scalar_one_or_none()
 
     if chat_message is None:
-        raise ValueError(f"Unable to find chat session associated with message ID: {message_id}")
+        raise ValueError(
+            f"Unable to find chat session associated with message ID: {message_id}"
+        )
 
     return chat_message.chat_session
 
@@ -499,7 +519,9 @@ def get_chat_messages_by_sessions(
 ) -> Sequence[ChatMessage]:
     if not skip_permission_check:
         for chat_session_id in chat_session_ids:
-            get_chat_session_by_id(chat_session_id=chat_session_id, user_id=user_id, db_session=db_session)
+            get_chat_session_by_id(
+                chat_session_id=chat_session_id, user_id=user_id, db_session=db_session
+            )
     stmt = (
         select(ChatMessage)
         .where(ChatMessage.chat_session_id.in_(chat_session_ids))
@@ -540,7 +562,9 @@ def add_chats_to_session_from_slack_thread(
         )
 
 
-def add_search_docs_to_chat_message(chat_message_id: int, search_doc_ids: list[int], db_session: Session) -> None:
+def add_search_docs_to_chat_message(
+    chat_message_id: int, search_doc_ids: list[int], db_session: Session
+) -> None:
     """
     Link SearchDocs to a ChatMessage by creating entries in the chat_message__search_doc junction table.
 
@@ -550,11 +574,15 @@ def add_search_docs_to_chat_message(chat_message_id: int, search_doc_ids: list[i
         db_session: The database session
     """
     for search_doc_id in search_doc_ids:
-        chat_message_search_doc = ChatMessage__SearchDoc(chat_message_id=chat_message_id, search_doc_id=search_doc_id)
+        chat_message_search_doc = ChatMessage__SearchDoc(
+            chat_message_id=chat_message_id, search_doc_id=search_doc_id
+        )
         db_session.add(chat_message_search_doc)
 
 
-def add_search_docs_to_tool_call(tool_call_id: int, search_doc_ids: list[int], db_session: Session) -> None:
+def add_search_docs_to_tool_call(
+    tool_call_id: int, search_doc_ids: list[int], db_session: Session
+) -> None:
     """
     Link SearchDocs to a ToolCall by creating entries in the tool_call__search_doc junction table.
 
@@ -566,7 +594,9 @@ def add_search_docs_to_tool_call(tool_call_id: int, search_doc_ids: list[int], d
     from onyx.db.models import ToolCall__SearchDoc
 
     for search_doc_id in search_doc_ids:
-        tool_call_search_doc = ToolCall__SearchDoc(tool_call_id=tool_call_id, search_doc_id=search_doc_id)
+        tool_call_search_doc = ToolCall__SearchDoc(
+            tool_call_id=tool_call_id, search_doc_id=search_doc_id
+        )
         db_session.add(tool_call_search_doc)
 
 
@@ -580,7 +610,9 @@ def get_chat_messages_by_session(
 ) -> list[ChatMessage]:
     if not skip_permission_check:
         # bug if we ever call this expecting the permission check to not be skipped
-        get_chat_session_by_id(chat_session_id=chat_session_id, user_id=user_id, db_session=db_session)
+        get_chat_session_by_id(
+            chat_session_id=chat_session_id, user_id=user_id, db_session=db_session
+        )
 
     stmt = (
         select(ChatMessage)
@@ -598,7 +630,11 @@ def get_chat_messages_by_session(
     # If there are future nested agents, this can be extended.
     if prefetch_top_two_level_tool_calls:
         # Load tool_calls and their direct children (one level deep)
-        stmt = stmt.options(selectinload(ChatMessage.tool_calls).selectinload(ToolCall.tool_call_children))
+        stmt = stmt.options(
+            selectinload(ChatMessage.tool_calls).selectinload(
+                ToolCall.tool_call_children
+            )
+        )
         result = db_session.scalars(stmt).unique().all()
     else:
         result = db_session.scalars(stmt).all()
@@ -620,7 +656,9 @@ def get_or_create_root_message(
             .one_or_none()
         )
     except MultipleResultsFound:
-        raise Exception("Multiple root messages found for chat session. Data inconsistency detected.")
+        raise Exception(
+            "Multiple root messages found for chat session. Data inconsistency detected."
+        )
 
     if root_message is not None:
         return root_message
@@ -661,7 +699,9 @@ def reserve_message_id(
     db_session.flush()
 
     # Get the parent message and set its child pointer to the current message
-    parent_chat_message = db_session.query(ChatMessage).filter(ChatMessage.id == parent_message).first()
+    parent_chat_message = (
+        db_session.query(ChatMessage).filter(ChatMessage.id == parent_message).first()
+    )
     if parent_chat_message:
         parent_chat_message.latest_child_message_id = empty_message.id
 
@@ -818,9 +858,13 @@ def set_as_latest_chat_message(
     parent_message_id = chat_message.parent_message_id
 
     if parent_message_id is None:
-        raise RuntimeError(f"Trying to set a latest message without parent, message id: {chat_message.id}")
+        raise RuntimeError(
+            f"Trying to set a latest message without parent, message id: {chat_message.id}"
+        )
 
-    parent_message = get_chat_message(chat_message_id=parent_message_id, user_id=user_id, db_session=db_session)
+    parent_message = get_chat_message(
+        chat_message_id=parent_message_id, user_id=user_id, db_session=db_session
+    )
 
     parent_message.latest_child_message_id = chat_message.id
 
@@ -836,7 +880,11 @@ def create_db_search_doc(
         document_id=sanitize_string(server_search_doc.document_id),
         chunk_ind=server_search_doc.chunk_ind,
         semantic_id=sanitize_string(server_search_doc.semantic_identifier),
-        link=(sanitize_string(server_search_doc.link) if server_search_doc.link is not None else None),
+        link=(
+            sanitize_string(server_search_doc.link)
+            if server_search_doc.link is not None
+            else None
+        ),
         blurb=sanitize_string(server_search_doc.blurb),
         source_type=server_search_doc.source_type,
         boost=server_search_doc.boost,
@@ -849,7 +897,9 @@ def create_db_search_doc(
             else None
         ),
         score=server_search_doc.score or 0.0,
-        match_highlights=[sanitize_string(h) for h in server_search_doc.match_highlights],
+        match_highlights=[
+            sanitize_string(h) for h in server_search_doc.match_highlights
+        ],
         updated_at=server_search_doc.updated_at,
         primary_owners=(
             [sanitize_string(o) for o in server_search_doc.primary_owners]
@@ -862,7 +912,11 @@ def create_db_search_doc(
             else None
         ),
         is_internet=server_search_doc.is_internet,
-        image=(sanitize_string(server_search_doc.image) if server_search_doc.image is not None else None),
+        image=(
+            sanitize_string(server_search_doc.image)
+            if server_search_doc.image is not None
+            else None
+        ),
     )
 
     db_session.add(db_search_doc)
@@ -879,9 +933,15 @@ def get_db_search_doc_by_id(doc_id: int, db_session: Session) -> DBSearchDoc | N
     return search_doc
 
 
-def get_db_search_doc_by_document_id(document_id: str, db_session: Session) -> DBSearchDoc | None:
+def get_db_search_doc_by_document_id(
+    document_id: str, db_session: Session
+) -> DBSearchDoc | None:
     """Get SearchDoc by document_id field. There are no safety checks here like user permission etc., use with caution"""
-    search_doc = db_session.query(DBSearchDoc).filter(DBSearchDoc.document_id == document_id).first()
+    search_doc = (
+        db_session.query(DBSearchDoc)
+        .filter(DBSearchDoc.document_id == document_id)
+        .first()
+    )
     return search_doc
 
 
@@ -901,12 +961,16 @@ def translate_db_search_doc_to_saved_search_doc(
         boost=db_search_doc.boost,
         hidden=db_search_doc.hidden,
         metadata=db_search_doc.doc_metadata if not remove_doc_content else {},
-        match_highlights=(db_search_doc.match_highlights if not remove_doc_content else []),
+        match_highlights=(
+            db_search_doc.match_highlights if not remove_doc_content else []
+        ),
         relevance_explanation=db_search_doc.relevance_explanation,
         is_relevant=db_search_doc.is_relevant,
         updated_at=db_search_doc.updated_at if not remove_doc_content else None,
         primary_owners=db_search_doc.primary_owners if not remove_doc_content else [],
-        secondary_owners=(db_search_doc.secondary_owners if not remove_doc_content else []),
+        secondary_owners=(
+            db_search_doc.secondary_owners if not remove_doc_content else []
+        ),
         is_internet=db_search_doc.is_internet,
         image=db_search_doc.image,
     )
@@ -927,7 +991,9 @@ def translate_db_message_to_chat_message_detail(
     converted_citations = None
     if chat_message.citations and chat_message.search_docs:
         # Build lookup map: db_doc_id -> document_id
-        db_doc_id_to_document_id = {doc.id: doc.document_id for doc in chat_message.search_docs}
+        db_doc_id_to_document_id = {
+            doc.id: doc.document_id for doc in chat_message.search_docs
+        }
 
         converted_citations = {}
         for citation_num, db_doc_id in chat_message.citations.items():
@@ -936,10 +1002,14 @@ def translate_db_message_to_chat_message_detail(
                 converted_citations[citation_num] = document_id
 
     top_documents = [
-        translate_db_search_doc_to_saved_search_doc(db_doc, remove_doc_content=remove_doc_content)
+        translate_db_search_doc_to_saved_search_doc(
+            db_doc, remove_doc_content=remove_doc_content
+        )
         for db_doc in chat_message.search_docs
     ]
-    top_documents = sorted(top_documents, key=lambda doc: doc.score or 0.0, reverse=True)
+    top_documents = sorted(
+        top_documents, key=lambda doc: doc.score or 0.0, reverse=True
+    )
     chat_msg_detail = ChatMessageDetail(
         chat_session_id=chat_message.chat_session_id,
         message_id=chat_message.id,
@@ -962,14 +1032,20 @@ def translate_db_message_to_chat_message_detail(
     return chat_msg_detail
 
 
-def update_chat_session_updated_at_timestamp(chat_session_id: UUID, db_session: Session) -> None:
+def update_chat_session_updated_at_timestamp(
+    chat_session_id: UUID, db_session: Session
+) -> None:
     """
     Explicitly update the timestamp on a chat session without modifying other fields.
     This is useful when adding messages to a chat session to reflect recent activity.
     """
 
     # Direct SQL update to avoid loading the entire object if it's not already loaded
-    db_session.execute(update(ChatSession).where(ChatSession.id == chat_session_id).values(time_updated=func.now()))
+    db_session.execute(
+        update(ChatSession)
+        .where(ChatSession.id == chat_session_id)
+        .values(time_updated=func.now())
+    )
     # No commit - the caller is responsible for committing the transaction
 
 
@@ -988,7 +1064,11 @@ def create_search_doc_from_inference_section(
         document_id=inference_section.center_chunk.document_id,
         chunk_ind=inference_section.center_chunk.chunk_id,
         semantic_id=inference_section.center_chunk.semantic_identifier,
-        link=(inference_section.center_chunk.source_links.get(0) if inference_section.center_chunk.source_links else None),
+        link=(
+            inference_section.center_chunk.source_links.get(0)
+            if inference_section.center_chunk.source_links
+            else None
+        ),
         blurb=inference_section.center_chunk.blurb,
         source_type=inference_section.center_chunk.source_type,
         boost=inference_section.center_chunk.boost,
@@ -1081,7 +1161,11 @@ def update_db_session_with_messages(
         chat_message.reasoning_tokens = reasoning_tokens
 
     if update_parent_message:
-        parent_chat_message = db_session.query(ChatMessage).filter(ChatMessage.id == chat_message.parent_message_id).first()
+        parent_chat_message = (
+            db_session.query(ChatMessage)
+            .filter(ChatMessage.id == chat_message.parent_message_id)
+            .first()
+        )
         if parent_chat_message:
             parent_chat_message.latest_child_message_id = chat_message.id
 

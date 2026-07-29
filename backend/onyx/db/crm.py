@@ -5,29 +5,28 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_
-from sqlalchemy import case
-from sqlalchemy import func
-from sqlalchemy import or_
-from sqlalchemy import select
-from sqlalchemy import text
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import delete
 
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmInteractionType
-from onyx.db.enums import CrmOrganizationType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmContact__Tag
-from onyx.db.models import CrmContactOwner
-from onyx.db.models import CrmInteraction
-from onyx.db.models import CrmInteractionAttendee
-from onyx.db.models import CrmOrganization
-from onyx.db.models import CrmOrganization__Tag
-from onyx.db.models import CrmSettings
-from onyx.db.models import CrmTag
-from onyx.db.models import User
+from onyx.db.enums import (
+    CrmAttendeeRole,
+    CrmContactSource,
+    CrmInteractionType,
+    CrmOrganizationType,
+)
+from onyx.db.models import (
+    CrmContact,
+    CrmContact__Tag,
+    CrmContactOwner,
+    CrmInteraction,
+    CrmInteractionAttendee,
+    CrmOrganization,
+    CrmOrganization__Tag,
+    CrmSettings,
+    CrmTag,
+    User,
+)
 from onyx.file_store.utils import build_frontend_file_url
 
 DEFAULT_PAGE_SIZE = 25

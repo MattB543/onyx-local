@@ -5,8 +5,6 @@ from onyx.tools.tool_implementations.open_url.models import WebContent
 from onyx.tools.tool_implementations.web_search.models import WebSearchResult
 from onyx.tools.tool_implementations.web_search.utils import (
     inference_section_from_internet_page_scrape,
-)
-from onyx.tools.tool_implementations.web_search.utils import (
     inference_section_from_internet_search_result,
 )
 

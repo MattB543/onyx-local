@@ -1,28 +1,29 @@
 import time
 from uuid import UUID
 
-from celery import shared_task
-from celery import Task
+from celery import Task, shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from redis.lock import Lock as RedisLock
 
 from onyx.background.celery.apps.app_base import task_logger
-from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
-from onyx.configs.app_configs import JOB_TIMEOUT
-from onyx.configs.constants import CELERY_GENERIC_BEAT_LOCK_TIMEOUT
-from onyx.configs.constants import OnyxCeleryPriority
-from onyx.configs.constants import OnyxCeleryQueues
-from onyx.configs.constants import OnyxCeleryTask
-from onyx.configs.constants import OnyxRedisLocks
+from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS, JOB_TIMEOUT
+from onyx.configs.constants import (
+    CELERY_GENERIC_BEAT_LOCK_TIMEOUT,
+    OnyxCeleryPriority,
+    OnyxCeleryQueues,
+    OnyxCeleryTask,
+    OnyxRedisLocks,
+)
 from onyx.custom_jobs.runner import execute_custom_job_run
-from onyx.db.custom_jobs import claim_due_scheduled_jobs
-from onyx.db.custom_jobs import claim_trigger_events_for_runs
-from onyx.db.custom_jobs import cleanup_custom_job_history
-from onyx.db.custom_jobs import fetch_pending_triggered_jobs
-from onyx.db.custom_jobs import mark_stale_started_runs_failed
+from onyx.db.custom_jobs import (
+    claim_due_scheduled_jobs,
+    claim_trigger_events_for_runs,
+    cleanup_custom_job_history,
+    fetch_pending_triggered_jobs,
+    mark_stale_started_runs_failed,
+)
 from onyx.db.engine.sql_engine import get_session_with_current_tenant
-from onyx.redis.redis_pool import get_redis_client
-from onyx.redis.redis_pool import redis_lock_dump
+from onyx.redis.redis_pool import get_redis_client, redis_lock_dump
 
 # Drop an enqueued custom-job run if a dead/backed-up consumer hasn't picked it up
 # within 15 min; the beat-driven check_for_custom_jobs + stale-run sweeper re-claims

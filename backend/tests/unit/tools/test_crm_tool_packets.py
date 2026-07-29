@@ -2,8 +2,7 @@
 
 from queue import Queue
 from typing import Any
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -12,26 +11,26 @@ from sqlalchemy.orm import sessionmaker
 
 from onyx.chat.emitter import Emitter
 from onyx.configs.constants import FileOrigin
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmInteractionType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmInteraction
+from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
+from onyx.db.models import CrmContact, CrmInteraction
 from onyx.server.query_and_chat.placement import Placement
-from onyx.server.query_and_chat.session_loading import create_crm_create_packets
 from onyx.server.query_and_chat.session_loading import (
+    create_crm_create_packets,
     create_crm_log_interaction_packets,
+    create_crm_search_packets,
+    create_crm_update_packets,
 )
-from onyx.server.query_and_chat.session_loading import create_crm_search_packets
-from onyx.server.query_and_chat.session_loading import create_crm_update_packets
-from onyx.server.query_and_chat.streaming_models import CrmCreateToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmCreateToolStart
-from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolStart
-from onyx.server.query_and_chat.streaming_models import CrmSearchToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmSearchToolStart
-from onyx.server.query_and_chat.streaming_models import CrmUpdateToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmUpdateToolStart
-from onyx.server.query_and_chat.streaming_models import SectionEnd
+from onyx.server.query_and_chat.streaming_models import (
+    CrmCreateToolDelta,
+    CrmCreateToolStart,
+    CrmLogInteractionToolDelta,
+    CrmLogInteractionToolStart,
+    CrmSearchToolDelta,
+    CrmSearchToolStart,
+    CrmUpdateToolDelta,
+    CrmUpdateToolStart,
+    SectionEnd,
+)
 from onyx.tools.built_in_tools import CITEABLE_TOOLS_NAMES
 from onyx.tools.models import ToolCallException
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool

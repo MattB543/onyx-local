@@ -4,13 +4,9 @@ import re
 from typing import Any
 
 from onyx.configs.model_configs import GEN_AI_NUM_RESERVED_OUTPUT_TOKENS
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
-from onyx.llm.factory import get_default_llm
-from onyx.llm.factory import get_llm_token_counter
-from onyx.llm.models import SystemMessage
-from onyx.llm.models import UserMessage
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
+from onyx.llm.factory import get_default_llm, get_llm_token_counter
+from onyx.llm.models import SystemMessage, UserMessage
 
 SUMMARY_SYSTEM_PROMPT = """
 You are a weekly digest summarizer for team conversations.

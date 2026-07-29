@@ -1,60 +1,59 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
-from zoneinfo import ZoneInfo
-from zoneinfo import ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import Query
-from fastapi import Response
-from jsonschema import validate as jsonschema_validate
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from jsonschema import ValidationError as JsonSchemaValidationError
+from jsonschema import validate as jsonschema_validate
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from onyx.auth.users import current_admin_user
 from onyx.background.celery.versioned_apps.client import app as client_app
 from onyx.configs.app_configs import ENABLE_CUSTOM_JOBS
-from onyx.configs.constants import DocumentSource
-from onyx.configs.constants import OnyxCeleryPriority
-from onyx.configs.constants import OnyxCeleryQueues
-from onyx.configs.constants import OnyxCeleryTask
-from onyx.custom_jobs.registry import build_workflow_definition
-from onyx.custom_jobs.registry import get_step_catalog
-from onyx.custom_jobs.registry import list_workflow_keys
-from onyx.custom_jobs.registry import STEP_CONFIG_SCHEMAS
+from onyx.configs.constants import (
+    DocumentSource,
+    OnyxCeleryPriority,
+    OnyxCeleryQueues,
+    OnyxCeleryTask,
+)
+from onyx.custom_jobs.registry import (
+    STEP_CONFIG_SCHEMAS,
+    build_workflow_definition,
+    get_step_catalog,
+    list_workflow_keys,
+)
 from onyx.custom_jobs.types import WorkflowDefinition
 from onyx.db.credentials import fetch_credential_by_id
-from onyx.db.custom_jobs import add_custom_job_audit_log
-from onyx.db.custom_jobs import compute_next_run_at
-from onyx.db.custom_jobs import create_manual_run_if_allowed
-from onyx.db.custom_jobs import fetch_custom_job
-from onyx.db.custom_jobs import list_custom_job_run_steps
-from onyx.db.custom_jobs import list_custom_job_runs
-from onyx.db.custom_jobs import list_custom_jobs
-from onyx.db.custom_jobs import RunListFilters
+from onyx.db.custom_jobs import (
+    RunListFilters,
+    add_custom_job_audit_log,
+    compute_next_run_at,
+    create_manual_run_if_allowed,
+    fetch_custom_job,
+    list_custom_job_run_steps,
+    list_custom_job_runs,
+    list_custom_jobs,
+)
 from onyx.db.engine.sql_engine import get_session
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobTriggerType
-from onyx.db.models import CustomJob
-from onyx.db.models import CustomJobRun
-from onyx.db.models import User
+from onyx.db.enums import CustomJobRunStatus, CustomJobTriggerType
+from onyx.db.models import CustomJob, CustomJobRun, User
 from onyx.db.slack_bot import fetch_slack_bot
-from onyx.server.manage.custom_jobs.models import CustomJobCreateRequest
-from onyx.server.manage.custom_jobs.models import CustomJobDryRunResponse
-from onyx.server.manage.custom_jobs.models import CustomJobManualTriggerResponse
-from onyx.server.manage.custom_jobs.models import CustomJobRunStepView
-from onyx.server.manage.custom_jobs.models import CustomJobRunView
-from onyx.server.manage.custom_jobs.models import CustomJobStepCatalogItem
-from onyx.server.manage.custom_jobs.models import CustomJobUpdateRequest
-from onyx.server.manage.custom_jobs.models import CustomJobView
-from onyx.server.manage.custom_jobs.models import PaginatedCustomJobRuns
-from onyx.server.manage.custom_jobs.models import PaginatedCustomJobRunSteps
+from onyx.server.manage.custom_jobs.models import (
+    CustomJobCreateRequest,
+    CustomJobDryRunResponse,
+    CustomJobManualTriggerResponse,
+    CustomJobRunStepView,
+    CustomJobRunView,
+    CustomJobStepCatalogItem,
+    CustomJobUpdateRequest,
+    CustomJobView,
+    PaginatedCustomJobRuns,
+    PaginatedCustomJobRunSteps,
+)
 from onyx.utils.logger import setup_logger
 from shared_configs.contextvars import get_current_tenant_id
 

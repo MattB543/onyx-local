@@ -1,14 +1,18 @@
 from unittest.mock import MagicMock
 
 from onyx.configs.constants import DocumentSource
-from onyx.context.search.models import InferenceChunk
-from onyx.context.search.models import InferenceSection
-from onyx.context.search.models import SavedSearchDoc
-from onyx.context.search.models import SearchDoc
-from onyx.db.chat import create_db_search_doc
-from onyx.db.chat import create_search_doc_from_inference_section
-from onyx.db.chat import create_search_doc_from_saved_search_doc
-from onyx.db.chat import translate_db_search_doc_to_saved_search_doc
+from onyx.context.search.models import (
+    InferenceChunk,
+    InferenceSection,
+    SavedSearchDoc,
+    SearchDoc,
+)
+from onyx.db.chat import (
+    create_db_search_doc,
+    create_search_doc_from_inference_section,
+    create_search_doc_from_saved_search_doc,
+    translate_db_search_doc_to_saved_search_doc,
+)
 from onyx.db.models import SearchDoc as DBSearchDoc
 
 

@@ -1,40 +1,41 @@
-from datetime import datetime
-from datetime import timezone
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
-from onyx.db.crm import _build_timestamp_order_clauses
-from onyx.db.crm import build_contact_email_lookup
-from onyx.db.crm import build_org_name_lookup
-from onyx.db.crm import create_contact
-from onyx.db.crm import create_interaction
-from onyx.db.crm import create_organization
-from onyx.db.crm import create_tag
-from onyx.db.crm import delete_contact
-from onyx.db.crm import delete_interaction
-from onyx.db.crm import delete_organization
-from onyx.db.crm import export_all_contacts
-from onyx.db.crm import find_contacts_for_attendee_resolution
-from onyx.db.crm import find_users_for_attendee_resolution
-from onyx.db.crm import get_contact_by_email
-from onyx.db.crm import get_organization_by_name
-from onyx.db.crm import list_contacts
-from onyx.db.crm import list_organizations
-from onyx.db.crm import list_tags
-from onyx.db.crm import replace_interaction_attendees
-from onyx.db.crm import search_crm_entities
-from onyx.db.crm import update_contact
-from onyx.db.crm import update_interaction
-from onyx.db.crm import update_organization
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmInteractionType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmInteraction
-from onyx.db.models import CrmInteractionAttendee
-from onyx.db.models import CrmOrganization
+from onyx.db.crm import (
+    _build_timestamp_order_clauses,
+    build_contact_email_lookup,
+    build_org_name_lookup,
+    create_contact,
+    create_interaction,
+    create_organization,
+    create_tag,
+    delete_contact,
+    delete_interaction,
+    delete_organization,
+    export_all_contacts,
+    find_contacts_for_attendee_resolution,
+    find_users_for_attendee_resolution,
+    get_contact_by_email,
+    get_organization_by_name,
+    list_contacts,
+    list_organizations,
+    list_tags,
+    replace_interaction_attendees,
+    search_crm_entities,
+    update_contact,
+    update_interaction,
+    update_organization,
+)
+from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
+from onyx.db.models import (
+    CrmContact,
+    CrmInteraction,
+    CrmInteractionAttendee,
+    CrmOrganization,
+)
 
 
 def test_search_crm_entities_returns_empty_for_blank_query() -> None:

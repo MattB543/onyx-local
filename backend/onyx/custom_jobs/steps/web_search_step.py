@@ -3,9 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
 from onyx.db.web_search import fetch_active_web_search_provider
 from onyx.tools.tool_implementations.web_search.providers import (
     build_search_provider_from_config,

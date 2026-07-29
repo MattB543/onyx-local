@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timezone
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 from onyx.connectors.imap.connector import _fetch_email_ids_in_mailbox
 

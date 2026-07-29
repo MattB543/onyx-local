@@ -17,14 +17,12 @@ depend on real AWS KMS / Fernet encryption or a live database.
 """
 
 from contextlib import contextmanager
-from typing import Any
-from typing import Iterator
+from typing import Any, Iterator
 from unittest.mock import MagicMock
 
 import pytest
 
-from onyx.key_value_store.store import PgRedisKVStore
-from onyx.key_value_store.store import REDIS_KEY_PREFIX
+from onyx.key_value_store.store import REDIS_KEY_PREFIX, PgRedisKVStore
 
 
 @contextmanager

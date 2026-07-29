@@ -1,26 +1,24 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import File
-from fastapi import Form
-from fastapi import HTTPException
-from fastapi import UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from onyx.auth.users import current_user
-from onyx.chat.chat_file_utils import build_chat_upload_metadata
-from onyx.chat.chat_file_utils import update_chat_upload_file_metadata
-from onyx.configs.constants import FileOrigin
-from onyx.configs.constants import PUBLIC_API_TAGS
+from onyx.chat.chat_file_utils import (
+    build_chat_upload_metadata,
+    update_chat_upload_file_metadata,
+)
+from onyx.configs.constants import PUBLIC_API_TAGS, FileOrigin
 from onyx.db.engine.sql_engine import get_session
 from onyx.db.enums import UserFileStatus
 from onyx.db.models import User
 from onyx.server.documents.connector import upload_files
-from onyx.server.features.projects.projects_file_utils import categorize_uploaded_files
-from onyx.server.features.projects.projects_file_utils import get_upload_size_bytes
+from onyx.server.features.projects.projects_file_utils import (
+    categorize_uploaded_files,
+    get_upload_size_bytes,
+)
 from onyx.server.query_and_chat.chat_utils import mime_type_to_chat_file_type
 from onyx.utils.logger import setup_logger
 

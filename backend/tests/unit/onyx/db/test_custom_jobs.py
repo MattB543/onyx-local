@@ -1,31 +1,32 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from onyx.db.custom_jobs import claim_due_scheduled_jobs
-from onyx.db.custom_jobs import claim_trigger_events_for_runs
-from onyx.db.custom_jobs import cleanup_custom_job_history
-from onyx.db.custom_jobs import compute_next_run_at
-from onyx.db.custom_jobs import create_manual_run_if_allowed
-from onyx.db.custom_jobs import create_trigger_event
-from onyx.db.custom_jobs import fetch_or_create_trigger_state
-from onyx.db.custom_jobs import mark_run_terminal
-from onyx.db.custom_jobs import mark_stale_started_runs_failed
-from onyx.db.custom_jobs import transition_run_to_started
-from onyx.db.custom_jobs import upsert_run_step
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
-from onyx.db.enums import CustomJobTriggerEventStatus
-from onyx.db.enums import CustomJobTriggerType
+from onyx.db.custom_jobs import (
+    claim_due_scheduled_jobs,
+    claim_trigger_events_for_runs,
+    cleanup_custom_job_history,
+    compute_next_run_at,
+    create_manual_run_if_allowed,
+    create_trigger_event,
+    fetch_or_create_trigger_state,
+    mark_run_terminal,
+    mark_stale_started_runs_failed,
+    transition_run_to_started,
+    upsert_run_step,
+)
+from onyx.db.enums import (
+    CustomJobRunStatus,
+    CustomJobStepStatus,
+    CustomJobTriggerEventStatus,
+    CustomJobTriggerType,
+)
 
 
 class _NoopContextManager:

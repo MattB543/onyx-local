@@ -4,39 +4,43 @@ import json
 from datetime import timezone
 from typing import Any
 
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
-from onyx.db.crm import get_allowed_contact_stages
-from onyx.db.crm import get_contact_category_options
-from onyx.db.crm import get_contact_owner_ids
-from onyx.db.crm import get_contact_tags
-from onyx.db.crm import get_interaction_attendees
-from onyx.db.crm import get_organization_tags
-from onyx.db.crm import list_contacts
-from onyx.db.crm import list_interactions
-from onyx.db.crm import list_organizations
-from onyx.db.crm import list_tags
+from onyx.db.crm import (
+    get_allowed_contact_stages,
+    get_contact_category_options,
+    get_contact_owner_ids,
+    get_contact_tags,
+    get_interaction_attendees,
+    get_organization_tags,
+    list_contacts,
+    list_interactions,
+    list_organizations,
+    list_tags,
+)
 from onyx.server.features.crm.csv_utils import is_date_only
 from onyx.server.query_and_chat.placement import Placement
-from onyx.server.query_and_chat.streaming_models import CrmListToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmListToolStart
-from onyx.server.query_and_chat.streaming_models import Packet
+from onyx.server.query_and_chat.streaming_models import (
+    CrmListToolDelta,
+    CrmListToolStart,
+    Packet,
+)
 from onyx.tools.interface import Tool
-from onyx.tools.models import ToolCallException
-from onyx.tools.models import ToolResponse
-from onyx.tools.tool_implementations.crm.models import as_llm_json
-from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
-from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
-from onyx.tools.tool_implementations.crm.models import parse_datetime_maybe
-from onyx.tools.tool_implementations.crm.models import parse_stage_maybe
-from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
-from onyx.tools.tool_implementations.crm.models import serialize_contact
-from onyx.tools.tool_implementations.crm.models import serialize_interaction
-from onyx.tools.tool_implementations.crm.models import serialize_organization
-from onyx.tools.tool_implementations.crm.models import serialize_tag
+from onyx.tools.models import ToolCallException, ToolResponse
+from onyx.tools.tool_implementations.crm.models import (
+    as_llm_json,
+    compact_tool_payload_for_model,
+    is_crm_schema_available,
+    parse_datetime_maybe,
+    parse_stage_maybe,
+    parse_uuid_maybe,
+    serialize_contact,
+    serialize_interaction,
+    serialize_organization,
+    serialize_tag,
+)
 
 CRM_LIST_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 

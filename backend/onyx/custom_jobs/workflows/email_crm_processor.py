@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.types import WorkflowStepDefinition
+from onyx.custom_jobs.types import WorkflowDefinition, WorkflowStepDefinition
 
 EMAIL_CRM_PROCESSOR_WORKFLOW_KEY = "email_crm_processor"
 

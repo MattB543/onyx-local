@@ -1,109 +1,112 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Query
-from fastapi import UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from onyx.auth.users import current_admin_user
-from onyx.auth.users import current_user
-from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
-from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_MB
+from onyx.auth.users import current_admin_user, current_user
+from onyx.configs.app_configs import (
+    USER_FILE_MAX_UPLOAD_SIZE_BYTES,
+    USER_FILE_MAX_UPLOAD_SIZE_MB,
+)
 from onyx.configs.constants import FileOrigin
-from onyx.db.crm import add_interaction_attendees
-from onyx.db.crm import add_tag_to_contact
-from onyx.db.crm import add_tag_to_organization
-from onyx.db.crm import build_contact_email_lookup
-from onyx.db.crm import build_org_name_lookup
-from onyx.db.crm import build_user_email_lookup
-from onyx.db.crm import create_contact
-from onyx.db.crm import create_interaction
-from onyx.db.crm import create_organization
-from onyx.db.crm import create_tag
-from onyx.db.crm import delete_contact
-from onyx.db.crm import delete_interaction
-from onyx.db.crm import delete_organization
-from onyx.db.crm import ensure_tags_exist
-from onyx.db.crm import export_all_contacts
-from onyx.db.crm import export_all_interactions
-from onyx.db.crm import export_all_organizations
-from onyx.db.crm import get_allowed_contact_stages
-from onyx.db.crm import get_contact_by_id
-from onyx.db.crm import get_contact_owner_ids
-from onyx.db.crm import get_contact_tags
-from onyx.db.crm import get_interaction_attendees
-from onyx.db.crm import get_interaction_by_id
-from onyx.db.crm import get_or_create_crm_settings
-from onyx.db.crm import get_organization_by_id
-from onyx.db.crm import get_organization_by_name
-from onyx.db.crm import get_organization_tags
-from onyx.db.crm import get_tag_by_id
-from onyx.db.crm import list_contacts
-from onyx.db.crm import list_interactions
-from onyx.db.crm import list_organizations
-from onyx.db.crm import list_tags
-from onyx.db.crm import remove_tag_from_contact
-from onyx.db.crm import remove_tag_from_organization
-from onyx.db.crm import replace_interaction_attendees
-from onyx.db.crm import search_crm_entities
-from onyx.db.crm import update_contact
-from onyx.db.crm import update_crm_settings
-from onyx.db.crm import update_interaction
-from onyx.db.crm import update_organization
-from onyx.db.crm import validate_stage_string
+from onyx.db.crm import (
+    add_interaction_attendees,
+    add_tag_to_contact,
+    add_tag_to_organization,
+    build_contact_email_lookup,
+    build_org_name_lookup,
+    build_user_email_lookup,
+    create_contact,
+    create_interaction,
+    create_organization,
+    create_tag,
+    delete_contact,
+    delete_interaction,
+    delete_organization,
+    ensure_tags_exist,
+    export_all_contacts,
+    export_all_interactions,
+    export_all_organizations,
+    get_allowed_contact_stages,
+    get_contact_by_id,
+    get_contact_owner_ids,
+    get_contact_tags,
+    get_interaction_attendees,
+    get_interaction_by_id,
+    get_or_create_crm_settings,
+    get_organization_by_id,
+    get_organization_by_name,
+    get_organization_tags,
+    get_tag_by_id,
+    list_contacts,
+    list_interactions,
+    list_organizations,
+    list_tags,
+    remove_tag_from_contact,
+    remove_tag_from_organization,
+    replace_interaction_attendees,
+    search_crm_entities,
+    update_contact,
+    update_crm_settings,
+    update_interaction,
+    update_organization,
+    validate_stage_string,
+)
 from onyx.db.engine.sql_engine import get_session
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmInteractionType
-from onyx.db.enums import CrmOrganizationType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmOrganization
-from onyx.db.models import User
+from onyx.db.enums import (
+    CrmAttendeeRole,
+    CrmContactSource,
+    CrmInteractionType,
+    CrmOrganizationType,
+)
+from onyx.db.models import CrmContact, CrmOrganization, User
 from onyx.error_handling.error_codes import OnyxErrorCode
 from onyx.error_handling.exceptions import OnyxError
 from onyx.file_store.file_store import get_default_file_store
 from onyx.server.documents.models import PaginatedReturn
-from onyx.server.features.crm.csv_utils import build_csv_bytes
-from onyx.server.features.crm.csv_utils import CONTACT_CSV_HEADERS
-from onyx.server.features.crm.csv_utils import CONTACT_IMPORT_HEADERS
-from onyx.server.features.crm.csv_utils import CONTACT_OPTIONAL_IMPORT_HEADERS
-from onyx.server.features.crm.csv_utils import INTERACTION_CSV_HEADERS
-from onyx.server.features.crm.csv_utils import INTERACTION_IMPORT_HEADERS
-from onyx.server.features.crm.csv_utils import MAX_IMPORT_FILE_SIZE
-from onyx.server.features.crm.csv_utils import MAX_IMPORT_ROWS
-from onyx.server.features.crm.csv_utils import ORGANIZATION_CSV_HEADERS
-from onyx.server.features.crm.csv_utils import ORGANIZATION_IMPORT_HEADERS
-from onyx.server.features.crm.csv_utils import parse_csv_upload
-from onyx.server.features.crm.csv_utils import parse_datetime_or_none
-from onyx.server.features.crm.csv_utils import parse_enum_or_none
-from onyx.server.features.crm.csv_utils import parse_filter_datetime
-from onyx.server.features.crm.csv_utils import parse_pipe_delimited
-from onyx.server.features.crm.models import CrmContactCreateRequest
-from onyx.server.features.crm.models import CrmContactPatchRequest
-from onyx.server.features.crm.models import CrmContactSnapshot
-from onyx.server.features.crm.models import CrmEntityType
-from onyx.server.features.crm.models import CrmImportError
-from onyx.server.features.crm.models import CrmImportResult
-from onyx.server.features.crm.models import CrmInteractionAttendeeSnapshot
-from onyx.server.features.crm.models import CrmInteractionCreateRequest
-from onyx.server.features.crm.models import CrmInteractionPatchRequest
-from onyx.server.features.crm.models import CrmInteractionSnapshot
-from onyx.server.features.crm.models import CrmOrganizationCreateRequest
-from onyx.server.features.crm.models import CrmOrganizationPatchRequest
-from onyx.server.features.crm.models import CrmOrganizationSnapshot
-from onyx.server.features.crm.models import CrmSearchResultItem
-from onyx.server.features.crm.models import CrmSettingsPatchRequest
-from onyx.server.features.crm.models import CrmSettingsSnapshot
-from onyx.server.features.crm.models import CrmTagCreateRequest
-from onyx.server.features.crm.models import CrmTagSnapshot
+from onyx.server.features.crm.csv_utils import (
+    CONTACT_CSV_HEADERS,
+    CONTACT_IMPORT_HEADERS,
+    CONTACT_OPTIONAL_IMPORT_HEADERS,
+    INTERACTION_CSV_HEADERS,
+    INTERACTION_IMPORT_HEADERS,
+    MAX_IMPORT_FILE_SIZE,
+    MAX_IMPORT_ROWS,
+    ORGANIZATION_CSV_HEADERS,
+    ORGANIZATION_IMPORT_HEADERS,
+    build_csv_bytes,
+    parse_csv_upload,
+    parse_datetime_or_none,
+    parse_enum_or_none,
+    parse_filter_datetime,
+    parse_pipe_delimited,
+)
+from onyx.server.features.crm.models import (
+    CrmContactCreateRequest,
+    CrmContactPatchRequest,
+    CrmContactSnapshot,
+    CrmEntityType,
+    CrmImportError,
+    CrmImportResult,
+    CrmInteractionAttendeeSnapshot,
+    CrmInteractionCreateRequest,
+    CrmInteractionPatchRequest,
+    CrmInteractionSnapshot,
+    CrmOrganizationCreateRequest,
+    CrmOrganizationPatchRequest,
+    CrmOrganizationSnapshot,
+    CrmSearchResultItem,
+    CrmSettingsPatchRequest,
+    CrmSettingsSnapshot,
+    CrmTagCreateRequest,
+    CrmTagSnapshot,
+)
 from onyx.server.features.projects.projects_file_utils import is_upload_too_large
 from onyx.utils.logger import setup_logger
 

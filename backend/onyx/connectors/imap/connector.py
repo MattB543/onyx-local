@@ -3,14 +3,11 @@ import email
 import imaplib
 import os
 import re
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from email.message import Message
 from email.utils import parseaddr
 from enum import Enum
-from typing import Any
-from typing import cast
+from typing import Any, cast
 
 import bs4
 from pydantic import BaseModel
@@ -18,15 +15,19 @@ from pydantic import BaseModel
 from onyx.access.models import ExternalAccess
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.imap.models import EmailHeaders
-from onyx.connectors.interfaces import CheckpointedConnectorWithPermSync
-from onyx.connectors.interfaces import CheckpointOutput
-from onyx.connectors.interfaces import CredentialsConnector
-from onyx.connectors.interfaces import CredentialsProviderInterface
-from onyx.connectors.interfaces import SecondsSinceUnixEpoch
-from onyx.connectors.models import BasicExpertInfo
-from onyx.connectors.models import ConnectorCheckpoint
-from onyx.connectors.models import Document
-from onyx.connectors.models import TextSection
+from onyx.connectors.interfaces import (
+    CheckpointedConnectorWithPermSync,
+    CheckpointOutput,
+    CredentialsConnector,
+    CredentialsProviderInterface,
+    SecondsSinceUnixEpoch,
+)
+from onyx.connectors.models import (
+    BasicExpertInfo,
+    ConnectorCheckpoint,
+    Document,
+    TextSection,
+)
 from onyx.utils.logger import setup_logger
 from onyx.utils.retry_wrapper import retry_builder
 
@@ -216,7 +217,9 @@ class ImapConnector(
             for email_id in current_todos:
                 email_msg = _fetch_email(mail_client=mail_client, email_id=email_id)
                 if not email_msg:
-                    logger.warning("Failed to fetch message email_id=%s; skipping", email_id)
+                    logger.warning(
+                        "Failed to fetch message email_id=%s; skipping", email_id
+                    )
                     continue
 
                 email_headers = EmailHeaders.from_email_msg(email_msg=email_msg)

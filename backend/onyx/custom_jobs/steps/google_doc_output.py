@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 
 from onyx.configs.constants import DocumentSource
 from onyx.connectors.google_utils.google_auth import get_google_creds
-from onyx.connectors.google_utils.resources import get_drive_service
-from onyx.connectors.google_utils.resources import get_google_docs_service
+from onyx.connectors.google_utils.resources import (
+    get_drive_service,
+    get_google_docs_service,
+)
 from onyx.connectors.google_utils.shared_constants import (
     DB_CREDENTIALS_PRIMARY_ADMIN_KEY,
 )
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
 from onyx.db.credentials import fetch_credential_by_id
 
 

@@ -3,8 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import re
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 

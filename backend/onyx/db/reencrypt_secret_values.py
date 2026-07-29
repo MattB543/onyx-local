@@ -1,24 +1,25 @@
 import argparse
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Any
-from typing import cast
+from dataclasses import dataclass, field
+from typing import Any, cast
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from onyx.configs.app_configs import SECRET_ENCRYPTION_MODE
-from onyx.db.engine.sql_engine import get_session_with_current_tenant
-from onyx.db.engine.sql_engine import SqlEngine
-from onyx.db.models import Base
-from onyx.db.models import EncryptedJson
-from onyx.db.models import EncryptedJsonUnmasked
-from onyx.db.models import EncryptedString
-from onyx.db.models import EncryptedStringUnmasked
-from onyx.utils.encryption import decrypt_bytes_to_string
-from onyx.utils.encryption import encrypt_string_to_bytes
-from onyx.utils.encryption import ensure_secret_encryption_ready
-from onyx.utils.encryption import is_versioned_encrypted_payload
+from onyx.db.engine.sql_engine import SqlEngine, get_session_with_current_tenant
+from onyx.db.models import (
+    Base,
+    EncryptedJson,
+    EncryptedJsonUnmasked,
+    EncryptedString,
+    EncryptedStringUnmasked,
+)
+from onyx.utils.encryption import (
+    decrypt_bytes_to_string,
+    encrypt_string_to_bytes,
+    ensure_secret_encryption_ready,
+    is_versioned_encrypted_payload,
+)
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()

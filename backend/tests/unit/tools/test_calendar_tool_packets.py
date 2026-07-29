@@ -1,7 +1,6 @@
 """Tests for Calendar tool streaming packet emissions and session replay helpers."""
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from queue import Queue
 from unittest.mock import patch
 
@@ -13,9 +12,11 @@ from onyx.chat.emitter import Emitter
 from onyx.db.calendar import CalendarEventSearchResult
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.session_loading import create_calendar_search_packets
-from onyx.server.query_and_chat.streaming_models import CalendarSearchToolDelta
-from onyx.server.query_and_chat.streaming_models import CalendarSearchToolStart
-from onyx.server.query_and_chat.streaming_models import SectionEnd
+from onyx.server.query_and_chat.streaming_models import (
+    CalendarSearchToolDelta,
+    CalendarSearchToolStart,
+    SectionEnd,
+)
 from onyx.tools.models import ToolCallException
 from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
     SearchCalendarTool,

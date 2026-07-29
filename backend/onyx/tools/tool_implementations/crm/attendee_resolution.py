@@ -5,14 +5,18 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from onyx.db.crm import find_contacts_for_attendee_resolution
-from onyx.db.crm import find_users_for_attendee_resolution
-from onyx.db.crm import get_contact_by_id
+from onyx.db.crm import (
+    find_contacts_for_attendee_resolution,
+    find_users_for_attendee_resolution,
+    get_contact_by_id,
+)
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.models import User
-from onyx.tools.tool_implementations.crm.models import contact_full_name
-from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
-from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
+from onyx.tools.tool_implementations.crm.models import (
+    contact_full_name,
+    parse_enum_maybe,
+    parse_uuid_maybe,
+)
 
 
 def serialize_contact_candidate(contact: Any) -> dict[str, Any]:

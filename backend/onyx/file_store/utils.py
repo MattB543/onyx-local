@@ -7,14 +7,11 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from onyx.chat.chat_file_utils import get_chat_upload_file_record
-from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES
-from onyx.configs.app_configs import WEB_DOMAIN
+from onyx.configs.app_configs import USER_FILE_MAX_UPLOAD_SIZE_BYTES, WEB_DOMAIN
 from onyx.configs.constants import FileOrigin
 from onyx.db.models import UserFile
 from onyx.file_store.file_store import get_default_file_store
-from onyx.file_store.models import ChatFileType
-from onyx.file_store.models import FileDescriptor
-from onyx.file_store.models import InMemoryChatFile
+from onyx.file_store.models import ChatFileType, FileDescriptor, InMemoryChatFile
 from onyx.server.query_and_chat.chat_utils import mime_type_to_chat_file_type
 from onyx.utils.b64 import get_image_type
 from onyx.utils.logger import setup_logger

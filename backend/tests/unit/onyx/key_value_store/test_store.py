@@ -3,9 +3,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from onyx.key_value_store.store import cleanup_legacy_kv_store_redis_cache
-from onyx.key_value_store.store import KV_REDIS_LEGACY_CLEANUP_MARKER_KEY
-from onyx.key_value_store.store import PgRedisKVStore
+from onyx.key_value_store.store import (
+    KV_REDIS_LEGACY_CLEANUP_MARKER_KEY,
+    PgRedisKVStore,
+    cleanup_legacy_kv_store_redis_cache,
+)
 
 
 @contextmanager

@@ -1,26 +1,23 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
-from uuid import UUID
-from uuid import uuid4
+from unittest.mock import MagicMock, patch
+from uuid import UUID, uuid4
 
 from onyx.configs.constants import DocumentSource
-from onyx.connectors.models import BasicExpertInfo
-from onyx.connectors.models import Document
-from onyx.connectors.models import IndexAttemptMetadata
-from onyx.connectors.models import TextSection
-from onyx.indexing.adapters.document_indexing_adapter import _build_email_crm_dedupe_key
-from onyx.indexing.adapters.document_indexing_adapter import _extract_document_text
-from onyx.indexing.adapters.document_indexing_adapter import (
-    _get_email_crm_custom_job_uuid,
+from onyx.connectors.models import (
+    BasicExpertInfo,
+    Document,
+    IndexAttemptMetadata,
+    TextSection,
 )
 from onyx.indexing.adapters.document_indexing_adapter import (
     DocumentIndexingBatchAdapter,
+    _build_email_crm_dedupe_key,
+    _extract_document_text,
+    _get_email_crm_custom_job_uuid,
 )
 from onyx.indexing.indexing_pipeline import DocumentBatchPrepareContext
 from onyx.indexing.models import ChunkEnrichmentContext

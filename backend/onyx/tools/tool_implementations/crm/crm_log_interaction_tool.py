@@ -5,33 +5,36 @@ from collections import defaultdict
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
-from onyx.db.crm import add_interaction_attendees
-from onyx.db.crm import create_interaction
-from onyx.db.crm import get_contact_by_id
-from onyx.db.crm import get_interaction_attendees
-from onyx.db.crm import get_organization_by_id
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmInteractionType
+from onyx.db.crm import (
+    add_interaction_attendees,
+    create_interaction,
+    get_contact_by_id,
+    get_interaction_attendees,
+    get_organization_by_id,
+)
+from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
 from onyx.server.query_and_chat.placement import Placement
-from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolDelta
-from onyx.server.query_and_chat.streaming_models import CrmLogInteractionToolStart
-from onyx.server.query_and_chat.streaming_models import Packet
+from onyx.server.query_and_chat.streaming_models import (
+    CrmLogInteractionToolDelta,
+    CrmLogInteractionToolStart,
+    Packet,
+)
 from onyx.tools.interface import Tool
-from onyx.tools.models import ToolCallException
-from onyx.tools.models import ToolResponse
+from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.attendee_resolution import resolve_attendees
-from onyx.tools.tool_implementations.crm.models import as_llm_json
-from onyx.tools.tool_implementations.crm.models import compact_tool_payload_for_model
-from onyx.tools.tool_implementations.crm.models import is_crm_schema_available
-from onyx.tools.tool_implementations.crm.models import parse_datetime_maybe
-from onyx.tools.tool_implementations.crm.models import parse_enum_maybe
-from onyx.tools.tool_implementations.crm.models import parse_uuid_maybe
-from onyx.tools.tool_implementations.crm.models import serialize_interaction
+from onyx.tools.tool_implementations.crm.models import (
+    as_llm_json,
+    compact_tool_payload_for_model,
+    is_crm_schema_available,
+    parse_datetime_maybe,
+    parse_enum_maybe,
+    parse_uuid_maybe,
+    serialize_interaction,
+)
 
 ATTENDEES_NOT_PROVIDED = object()
 

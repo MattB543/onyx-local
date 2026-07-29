@@ -7,9 +7,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from onyx.configs.constants import KV_UNSTRUCTURED_API_KEY
-from onyx.file_processing.unstructured import delete_unstructured_api_key
-from onyx.file_processing.unstructured import get_unstructured_api_key
-from onyx.file_processing.unstructured import update_unstructured_api_key
+from onyx.file_processing.unstructured import (
+    delete_unstructured_api_key,
+    get_unstructured_api_key,
+    update_unstructured_api_key,
+)
 from onyx.key_value_store.interface import KvKeyNotFoundError
 
 

@@ -1,34 +1,21 @@
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from ee.onyx.external_permissions.sharepoint.permission_utils import (
-    _enumerate_ad_groups_paginated,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import _get_azuread_groups
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
-    _has_only_limited_access,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import _is_public_item
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
-    _iter_graph_collection,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import _normalize_email
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
     AD_GROUP_ENUMERATION_THRESHOLD,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
-    get_external_access_from_sharepoint,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
-    get_sharepoint_external_groups,
-)
-from ee.onyx.external_permissions.sharepoint.permission_utils import GroupsResult
-from ee.onyx.external_permissions.sharepoint.permission_utils import (
     SHAREPOINT_GROUP_PRINCIPAL_TYPE,
+    GroupsResult,
+    _enumerate_ad_groups_paginated,
+    _get_azuread_groups,
+    _has_only_limited_access,
+    _is_public_item,
+    _iter_graph_collection,
+    _normalize_email,
+    get_external_access_from_sharepoint,
+    get_sharepoint_external_groups,
 )
 
 MODULE = "ee.onyx.external_permissions.sharepoint.permission_utils"

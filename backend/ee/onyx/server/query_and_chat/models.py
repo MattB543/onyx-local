@@ -1,13 +1,14 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from onyx.context.search.models import BaseFilters
-from onyx.context.search.models import extract_image_url_from_metadata
-from onyx.context.search.models import InferenceSection
-from onyx.context.search.models import SearchDoc
+from onyx.context.search.models import (
+    BaseFilters,
+    InferenceSection,
+    SearchDoc,
+    extract_image_url_from_metadata,
+)
 from onyx.server.manage.models import StandardAnswer
 
 

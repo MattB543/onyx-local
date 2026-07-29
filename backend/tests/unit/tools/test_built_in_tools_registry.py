@@ -12,10 +12,12 @@ It also documents the full expected set, including upstream's CodingAgentTool,
 so the registry's contents are pinned end-to-end.
 """
 
-from onyx.tools.built_in_tools import BUILT_IN_TOOL_MAP
-from onyx.tools.built_in_tools import get_built_in_tool_by_id
-from onyx.tools.built_in_tools import get_built_in_tool_ids
-from onyx.tools.built_in_tools import TOOL_NAME_TO_CLASS
+from onyx.tools.built_in_tools import (
+    BUILT_IN_TOOL_MAP,
+    TOOL_NAME_TO_CLASS,
+    get_built_in_tool_by_id,
+    get_built_in_tool_ids,
+)
 from onyx.tools.tool_implementations.calendar.search_calendar_tool import (
     SearchCalendarTool,
 )

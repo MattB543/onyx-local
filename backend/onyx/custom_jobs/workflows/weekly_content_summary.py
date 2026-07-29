@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.types import WorkflowStepDefinition
+from onyx.custom_jobs.types import WorkflowDefinition, WorkflowStepDefinition
 
 WEEKLY_CONTENT_SUMMARY_WORKFLOW_KEY = "weekly_content_summary_to_slack"
 

@@ -1,7 +1,6 @@
 """Tests for the crm_list AI tool: date-range filters and sort direction."""
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from queue import Queue
 from typing import Any
 from unittest.mock import patch

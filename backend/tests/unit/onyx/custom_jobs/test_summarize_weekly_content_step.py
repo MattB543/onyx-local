@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from onyx.custom_jobs.steps.summarize_weekly_content import _scrub_summary_output
-from onyx.custom_jobs.steps.summarize_weekly_content import MAP_SYSTEM_PROMPT
-from onyx.custom_jobs.steps.summarize_weekly_content import MERGE_SYSTEM_PROMPT
-from onyx.custom_jobs.steps.summarize_weekly_content import SummarizeWeeklyContentStep
-from onyx.custom_jobs.steps.summarize_weekly_content import SUMMARY_OUTPUT_MAX_CHARS
-from onyx.custom_jobs.steps.summarize_weekly_content import SUMMARY_SYSTEM_PROMPT
+from onyx.custom_jobs.steps.summarize_weekly_content import (
+    MAP_SYSTEM_PROMPT,
+    MERGE_SYSTEM_PROMPT,
+    SUMMARY_OUTPUT_MAX_CHARS,
+    SUMMARY_SYSTEM_PROMPT,
+    SummarizeWeeklyContentStep,
+    _scrub_summary_output,
+)
 from onyx.custom_jobs.types import StepContext
 from onyx.db.enums import CustomJobStepStatus
 

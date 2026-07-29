@@ -1,31 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func
-from sqlalchemy import select
-from sqlalchemy import text
-from sqlalchemy import update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
-from onyx.db.enums import CustomJobTriggerEventStatus
-from onyx.db.enums import CustomJobTriggerType
-from onyx.db.models import CustomJob
-from onyx.db.models import CustomJobAuditLog
-from onyx.db.models import CustomJobRun
-from onyx.db.models import CustomJobRunStep
-from onyx.db.models import CustomJobTriggerEvent
-from onyx.db.models import CustomJobTriggerState
+from onyx.db.enums import (
+    CustomJobRunStatus,
+    CustomJobStepStatus,
+    CustomJobTriggerEventStatus,
+    CustomJobTriggerType,
+)
+from onyx.db.models import (
+    CustomJob,
+    CustomJobAuditLog,
+    CustomJobRun,
+    CustomJobRunStep,
+    CustomJobTriggerEvent,
+    CustomJobTriggerState,
+)
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()

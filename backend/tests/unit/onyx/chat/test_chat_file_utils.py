@@ -1,15 +1,15 @@
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from onyx.chat.chat_file_utils import build_chat_upload_metadata
-from onyx.chat.chat_file_utils import enqueue_promoted_user_file_indexing
-from onyx.chat.chat_file_utils import promote_chat_uploads_to_user_files
+from onyx.chat.chat_file_utils import (
+    build_chat_upload_metadata,
+    enqueue_promoted_user_file_indexing,
+    promote_chat_uploads_to_user_files,
+)
 from onyx.configs.constants import FileOrigin
-from onyx.db.models import FileRecord
-from onyx.db.models import UserFile
+from onyx.db.models import FileRecord, UserFile
 from onyx.file_store.models import ChatFileType
 from onyx.file_store.utils import verify_user_files
 

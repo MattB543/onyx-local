@@ -5,9 +5,7 @@ import time
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
 from onyx.db.slack_bot import fetch_slack_bot
 from onyx.onyxbot.slack.formatting import format_slack_message
 

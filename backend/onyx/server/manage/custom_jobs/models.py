@@ -4,15 +4,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
-from onyx.db.enums import CustomJobTriggerType
-from onyx.db.models import CustomJob
-from onyx.db.models import CustomJobRun
-from onyx.db.models import CustomJobRunStep
+from onyx.db.enums import CustomJobRunStatus, CustomJobStepStatus, CustomJobTriggerType
+from onyx.db.models import CustomJob, CustomJobRun, CustomJobRunStep
 
 
 class CustomJobView(BaseModel):

@@ -5,9 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
+from onyx.custom_jobs.types import BaseStep, StepContext, StepResult
 from onyx.db.models import CustomJobRun
 from onyx.utils.logger import setup_logger
 

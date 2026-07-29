@@ -1,6 +1,4 @@
-from unittest.mock import call
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 from uuid import uuid4
 
 from onyx.db.chat import delete_messages_and_files_from_chat_session

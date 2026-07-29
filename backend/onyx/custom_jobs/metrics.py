@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from prometheus_client import Counter
-from prometheus_client import Histogram
+from prometheus_client import Counter, Histogram
 
 CUSTOM_JOB_RUNS_TOTAL = Counter(
     "custom_job_runs_total",

@@ -1,14 +1,13 @@
-from typing import Any
-from typing import IO
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, Any
 
 from onyx.configs.constants import KV_UNSTRUCTURED_API_KEY
-from onyx.db.encrypted_kv_store import delete_encrypted_kv
-from onyx.db.encrypted_kv_store import load_encrypted_kv
-from onyx.db.encrypted_kv_store import upsert_encrypted_kv
+from onyx.db.encrypted_kv_store import (
+    delete_encrypted_kv,
+    load_encrypted_kv,
+    upsert_encrypted_kv,
+)
 from onyx.key_value_store.factory import get_kv_store
-from onyx.key_value_store.interface import KvKeyNotFoundError
-from onyx.key_value_store.interface import unwrap_str
+from onyx.key_value_store.interface import KvKeyNotFoundError, unwrap_str
 from onyx.utils.logger import setup_logger
 
 if TYPE_CHECKING:
@@ -53,8 +52,7 @@ def delete_unstructured_api_key() -> None:
 def _sdk_partition_request(
     file: IO[Any], file_name: str, **kwargs: Any
 ) -> "operations.PartitionRequest":
-    from unstructured_client.models import operations
-    from unstructured_client.models import shared
+    from unstructured_client.models import operations, shared
 
     file.seek(0, 0)
     try:

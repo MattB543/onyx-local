@@ -4,21 +4,22 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import field_validator
-from pydantic import model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from onyx.db.enums import CrmAttendeeRole
-from onyx.db.enums import CrmContactSource
-from onyx.db.enums import CrmInteractionType
-from onyx.db.enums import CrmOrganizationType
-from onyx.db.models import CrmContact
-from onyx.db.models import CrmInteraction
-from onyx.db.models import CrmInteractionAttendee
-from onyx.db.models import CrmOrganization
-from onyx.db.models import CrmSettings
-from onyx.db.models import CrmTag
+from onyx.db.enums import (
+    CrmAttendeeRole,
+    CrmContactSource,
+    CrmInteractionType,
+    CrmOrganizationType,
+)
+from onyx.db.models import (
+    CrmContact,
+    CrmInteraction,
+    CrmInteractionAttendee,
+    CrmOrganization,
+    CrmSettings,
+    CrmTag,
+)
 from onyx.file_store.utils import build_frontend_file_url
 
 

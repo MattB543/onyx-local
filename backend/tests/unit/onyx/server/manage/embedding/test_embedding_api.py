@@ -1,15 +1,18 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from onyx.db.models import SearchSettings
-from onyx.server.manage.embedding.api import list_embedding_models
-from onyx.server.manage.embedding.api import list_embedding_providers
-from onyx.utils.encryption import decrypt_bytes_to_string
-from onyx.utils.encryption import encrypt_string_to_bytes
-from onyx.utils.encryption import mask_string
+from onyx.server.manage.embedding.api import (
+    list_embedding_models,
+    list_embedding_providers,
+)
+from onyx.utils.encryption import (
+    decrypt_bytes_to_string,
+    encrypt_string_to_bytes,
+    mask_string,
+)
 from onyx.utils.sensitive import SensitiveValue
 from onyx.utils.variable_functionality import fetch_versioned_implementation
 from shared_configs.enums import EmbeddingProvider

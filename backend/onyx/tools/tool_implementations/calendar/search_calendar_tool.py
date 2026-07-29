@@ -4,13 +4,11 @@ import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
-from zoneinfo import ZoneInfo
-from zoneinfo import ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
@@ -18,22 +16,21 @@ from onyx.configs.constants import DocumentSource
 from onyx.db.calendar import search_calendar_events
 from onyx.db.models import Connector
 from onyx.server.query_and_chat.placement import Placement
-from onyx.server.query_and_chat.streaming_models import CalendarSearchToolDelta
-from onyx.server.query_and_chat.streaming_models import CalendarSearchToolStart
-from onyx.server.query_and_chat.streaming_models import Packet
+from onyx.server.query_and_chat.streaming_models import (
+    CalendarSearchToolDelta,
+    CalendarSearchToolStart,
+    Packet,
+)
 from onyx.tools.interface import Tool
-from onyx.tools.models import ToolCallException
-from onyx.tools.models import ToolResponse
-from onyx.tools.tool_implementations.calendar.models import as_llm_json
+from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.calendar.models import (
+    as_llm_json,
     compact_tool_payload_for_model,
-)
-from onyx.tools.tool_implementations.calendar.models import (
     is_calendar_search_schema_available,
+    parse_datetime_maybe,
+    parse_string_list_maybe,
+    serialize_calendar_event,
 )
-from onyx.tools.tool_implementations.calendar.models import parse_datetime_maybe
-from onyx.tools.tool_implementations.calendar.models import parse_string_list_maybe
-from onyx.tools.tool_implementations.calendar.models import serialize_calendar_event
 from onyx.utils.datetime_utils import parse_iso_datetime_in_tz
 from onyx.utils.logger import setup_logger
 

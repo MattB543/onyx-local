@@ -3,19 +3,18 @@ from __future__ import annotations
 import itertools
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import call
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 from uuid import uuid4
 
 from onyx.custom_jobs.runner import execute_custom_job_run
-from onyx.custom_jobs.types import BaseStep
-from onyx.custom_jobs.types import StepContext
-from onyx.custom_jobs.types import StepResult
-from onyx.custom_jobs.types import WorkflowDefinition
-from onyx.custom_jobs.types import WorkflowStepDefinition
-from onyx.db.enums import CustomJobRunStatus
-from onyx.db.enums import CustomJobStepStatus
+from onyx.custom_jobs.types import (
+    BaseStep,
+    StepContext,
+    StepResult,
+    WorkflowDefinition,
+    WorkflowStepDefinition,
+)
+from onyx.db.enums import CustomJobRunStatus, CustomJobStepStatus
 
 
 class _SuccessStep(BaseStep):
