@@ -303,7 +303,7 @@ export default function LogInteractionModal({
                           className={cn(
                             "flex flex-col items-center gap-1 rounded-lg border px-3 py-2 transition-colors",
                             selectedType === type
-                              ? "border-action-link-02 bg-background-tint-02"
+                              ? "border-action-selection-05 bg-background-tint-02"
                               : "border-border-subtle hover:bg-background-tint-02"
                           )}
                         >

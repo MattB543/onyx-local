@@ -49,7 +49,7 @@ const STATUS_COLOR_FALLBACKS: [StatusColorConfig, ...StatusColorConfig[]] = [
   {
     bg: "bg-background-tint-02",
     text: "text-action-text-link-05",
-    dot: "bg-action-link-05",
+    dot: "bg-action-text-link-05",
   },
 ];
 
