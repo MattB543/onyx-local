@@ -7,7 +7,7 @@ import { loginAs } from "@tests/e2e/utils/auth";
 // the login page.
 
 // Patch global settings via the admin API, mirroring the admin UI's
-// read-modify-write (web/src/refresh-pages/admin/ChatPreferencesPage.tsx).
+// read-modify-write (web/src/views/admin/ChatPreferencesPage.tsx).
 // `page` must be authenticated as an admin.
 async function patchAdminSettings(
   page: Page,

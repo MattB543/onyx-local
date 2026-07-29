@@ -126,13 +126,13 @@ Slugs share **one namespace** across personal + admin + built-in skills:
 
 ## 6. Frontend
 
-- **User page** `web/src/refresh-pages/UserSkillsPage.tsx` — lists built-ins +
+- **User page** `web/src/views/UserSkillsPage.tsx` — lists built-ins +
   the user's visible customs; "Create skill" opens
   `UserSkillsPage/CreatePersonalSkillModal.tsx`. Per-card replace/toggle/delete
   live on `web/src/sections/cards/SkillCard.tsx` and are gated by a `busy`
   prop / `pendingId` so a shared hidden file-input can't be retargeted and
   toggles can't race.
-- **Admin page** `web/src/refresh-pages/admin/SkillsPage.tsx` — adds the
+- **Admin page** `web/src/views/admin/SkillsPage.tsx` — adds the
   **promote** action (only shown when `skill.is_personal`); confirm modal warns
   the author loses self-serve management. `promoteTarget` clears only on
   success so a failed promote keeps the dialog open.

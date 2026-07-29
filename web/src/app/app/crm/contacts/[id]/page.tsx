@@ -1,4 +1,4 @@
-import CrmContactDetailPage from "@/refresh-pages/CrmContactDetailPage";
+import CrmContactDetailPage from "@/views/CrmContactDetailPage";
 
 interface ContactDetailPageProps {
   params: Promise<{ id: string }>;

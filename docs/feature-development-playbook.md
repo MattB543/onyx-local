@@ -223,13 +223,13 @@ Add or update:
 Under `web/src/app/app/<feature>/.../page.tsx`, keep wrappers minimal.
 
 Example pattern:
-- `web/src/app/app/crm/contacts/page.tsx` only returns `CrmContactsPage` from `refresh-pages`.
+- `web/src/app/app/crm/contacts/page.tsx` only returns `CrmContactsPage` from `views`.
 
-### 7.2 Put full page implementations in refresh-pages
+### 7.2 Put full page implementations in views
 
 Implement full pages in:
-- `web/src/refresh-pages/`
-- Shared feature nav/components in a subfolder (for example `web/src/refresh-pages/crm/CrmNav.tsx`).
+- `web/src/views/`
+- Shared feature nav/components in a subfolder (for example `web/src/views/crm/CrmNav.tsx`).
 
 ### 7.3 Typed FE service layer
 
@@ -374,7 +374,7 @@ Use this checklist in PR descriptions for new cross-stack features.
 
 ### Frontend Feature UI
 - [ ] Thin app router pages added
-- [ ] `refresh-pages` components added
+- [ ] `views` components added
 - [ ] Typed service module added
 - [ ] SWR hooks extracted
 - [ ] Forms use Formik + Yup + design system components
@@ -398,7 +398,7 @@ When in doubt, use CRM as the reference implementation:
   - `web/src/app/app/crm/crmService.ts`
   - `web/src/lib/hooks/useCrm*.ts`
   - `web/src/app/app/crm/**/page.tsx`
-  - `web/src/refresh-pages/Crm*.tsx`
+  - `web/src/views/Crm*.tsx`
 - Timeline renderer: `web/src/app/app/message/messageComponents/timeline/renderers/crm/CrmToolRenderer.tsx`
 - Tests:
   - `backend/tests/unit/onyx/db/test_crm_queries.py`

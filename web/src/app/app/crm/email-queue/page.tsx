@@ -1,4 +1,4 @@
-import CrmEmailQueuePage from "@/refresh-pages/CrmEmailQueuePage";
+import CrmEmailQueuePage from "@/views/CrmEmailQueuePage";
 
 export default function EmailQueuePage() {
   return <CrmEmailQueuePage />;

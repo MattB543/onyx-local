@@ -1,4 +1,4 @@
-import CrmOrganizationDetailPage from "@/refresh-pages/CrmOrganizationDetailPage";
+import CrmOrganizationDetailPage from "@/views/CrmOrganizationDetailPage";
 
 interface OrganizationDetailPageProps {
   params: Promise<{ id: string }>;

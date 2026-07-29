@@ -1,4 +1,4 @@
-import CrmOrganizationsPage from "@/refresh-pages/CrmOrganizationsPage";
+import CrmOrganizationsPage from "@/views/CrmOrganizationsPage";
 
 export default function OrganizationsPage() {
   return <CrmOrganizationsPage />;

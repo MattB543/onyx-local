@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
-import ContactAvatar from "@/refresh-pages/crm/components/ContactAvatar";
+import ContactAvatar from "@/views/crm/components/ContactAvatar";
 
 describe("ContactAvatar", () => {
   test("renders initials when no profile picture is available", () => {

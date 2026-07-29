@@ -1,4 +1,4 @@
-import CrmHomePage from "@/refresh-pages/CrmHomePage";
+import CrmHomePage from "@/views/CrmHomePage";
 
 export default function CrmPage() {
   return <CrmHomePage />;
