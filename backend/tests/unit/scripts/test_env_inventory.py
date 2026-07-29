@@ -9,7 +9,6 @@ import ast
 from pathlib import Path
 
 import pytest
-
 from scripts.env_inventory import (
     EnvVisitor,
     classify_var,

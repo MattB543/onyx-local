@@ -138,7 +138,9 @@ check_next_build() {
 check_unit_tests() {
   if ! have_python; then echo "python not available"; return 77; fi
   cd "$BACKEND_DIR" || return 1
-  "$PYTHON" -m pytest tests/unit/ -q
+  # os.geteuid does not exist on Windows; upstream test_log_collection.py calls it
+  # at collection time and aborts the whole run — exclude it here (runs in CI).
+  "$PYTHON" -m pytest tests/unit/ -q --ignore=tests/unit/ee/onyx/server/log_export/test_log_collection.py
 }
 
 # python -m ruff check backend/ → clean
@@ -151,8 +153,21 @@ check_ruff() {
   "$PYTHON" -m ruff check backend/
 }
 
-# npx prettier --check "src/**" → clean on custom files
+# Formatting: upstream moved web formatting from prettier to oxfmt (2026-07).
+# oxfmt --check is only meaningful on LF checkouts — on Windows with
+# core.autocrlf=true every file false-positives on line endings, so skip there.
 check_prettier() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      echo "oxfmt --check needs an LF checkout; run in CI/Linux (autocrlf false-positives)"
+      return 77
+      ;;
+  esac
+  cd "$REPO_ROOT/web" || return 1
+  bunx oxfmt --check src
+}
+
+check_prettier_old_unused() {
   if ! have npx; then echo "npx not available"; return 77; fi
   cd "$WEB_DIR" || return 1
   npx prettier --check "src/**"
@@ -276,7 +291,7 @@ else
   run_check "pytest: Google Calendar"     check_pytest_calendar
   run_check "pytest: email triggers"      check_pytest_email_triggers
   run_check "ruff check"                  check_ruff
-  run_check "prettier --check src/**"     check_prettier
+  run_check "oxfmt --check src (web fmt)"  check_prettier
   run_check "alembic single head"         check_alembic_single_head
   run_check "secrets in diff vs origin/main" check_secrets
 fi

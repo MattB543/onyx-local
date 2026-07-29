@@ -166,6 +166,7 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
             filtered_documents=[email_doc, non_email_doc],
             enrichment=_make_result(),
             db_session=db_session,
+            index_to_secondary=False,
         )
 
     assert call_order == ["create_trigger_event", "commit"]
@@ -232,6 +233,7 @@ def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
             filtered_documents=[email_doc],
             enrichment=_make_result(),
             db_session=db_session,
+            index_to_secondary=False,
         )
 
     mock_create_trigger_event.assert_not_called()
@@ -307,6 +309,7 @@ def test_post_index_passes_its_db_session_to_trigger_creation() -> None:
             filtered_documents=[email_doc],
             enrichment=_make_result(),
             db_session=sentinel_session,
+            index_to_secondary=False,
         )
 
     # The trigger-event persistence used the session passed into post_index,

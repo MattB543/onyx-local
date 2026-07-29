@@ -31,7 +31,7 @@ from onyx.server.manage.llm.models import (
 )
 
 
-class TestGetBedrockAvailableModels:
+class TestGetBedrockAvailableModelsPagination:
     """Tests for the AWS Bedrock model fetch endpoint."""
 
     def test_paginates_inference_profiles(self) -> None:
