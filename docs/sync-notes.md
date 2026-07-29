@@ -55,3 +55,21 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
      `GoogleDrive.png`. Fork-only sources must map to upstream-hosted filenames.
   Also from Codex: focused backend tests 125/125 pass; no leftover markers; alembic
   merge migration verified pure.
+
+## Batch 2 — c86993bcd2 (2026-07-29, 1 commit isolated: refresh-pages/ → views/ rename, 652→651 behind)
+
+- Conflicts: 30, ALL benign "CONFLICT (file location)" advisories — git's directory-rename
+  detection auto-moved all 108 files (incl. our 30 fork-only CRM files) to `web/src/views/`
+  with correct content. Resolution was a single `git add web/src/views/`. NO `git mv` needed —
+  running one would have corrupted the index. Zero content conflicts.
+- Also renamed: `web/src/ee/refresh-pages/` → `web/src/ee/views/` (no fork files there).
+  `web/src/refresh-components/` NOT renamed — stays.
+- Fork-side work: `@/refresh-pages/` → `@/views/` rewrites in 18 files (~65 occurrences:
+  7 CRM route shims, 1 test, 10 self-references in moved files), jest.config.js testMatch
+  globs (upstream FORGOT these — 4 suites incl. upstream's own InviteOnlyCard.test.tsx
+  would have silently stopped running), e2e comment, 3 fork docs.
+- Deviations from playbook defaults: none.
+- Verification on main: jest 5 suites / 34 tests pass (suites confirmed executing);
+  tsc 0 errors after `bun run build` in `web/lib/shared` (stale-dist phantom errors
+  otherwise — 495 ButtonProps errors from a Jun 21 dist; rebuild before trusting tsc).
+- Codex sanity check: pending.
