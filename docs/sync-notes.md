@@ -227,3 +227,6 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
 - Alembic merge migration (parents c3b81de70f45 + b7e9a3c1d2f4) → head e4f7a2b91c08.
 - Verification: worktree pytest 46/46 (KMS/ee/config/KV); main sync-verify --batch
   7/7 PASS after installing readerwriterlock.
+- Codex batch 6 (focused review of 4 hand-blends): PASS — restore_masked_credentials
+  composes with fork masking (no MASK_PREFIX dependency), svcSS mapping verified,
+  Dockerfile venv coherent, tsc passed.
