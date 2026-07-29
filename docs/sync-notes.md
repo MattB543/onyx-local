@@ -146,4 +146,12 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
      dropped the DISABLE_MODEL_SERVER shell wrapper from compose — check whether
      the prod overlay still sets DISABLE_MODEL_SERVER (now a no-op).
 - Verification on main: sync-verify --batch all 7 PASS.
-- Codex sanity check: pending.
+
+- Codex sanity check (batch 4): 1 minor, no blockers. Finding: rewritten Calendar
+  OAuth no longer sets GOOGLE_CALENDAR_AUTH_IS_ADMIN_COOKIE_NAME, so admins land on
+  /user/connectors after OAuth. INVESTIGATED: upstream removed the cookie setters
+  for ALL THREE Google connectors in this refactor — the callback route's cookie
+  check is dead code upstream too; gmail/gdrive behave identically. DECISION:
+  accept upstream parity, no fork-only fix (3-line patch possible later if the
+  admin redirect is missed). Everything else PASS: payloads/scopes/API paths
+  consistent, fork features intact, alembic verified.
