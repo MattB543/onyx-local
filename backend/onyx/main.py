@@ -8,6 +8,7 @@ from typing import Any
 from typing import cast
 
 import uvicorn
+from anyio import to_thread
 from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import HTTPException
@@ -34,6 +35,7 @@ from onyx.auth.users import fastapi_users
 from onyx.auth.users import mobile_auth_backend
 from onyx.auth.users import verify_user_auth_secret
 from onyx.cache.interface import CacheBackendType
+from onyx.configs.app_configs import API_SERVER_THREADPOOL_SIZE
 from onyx.configs.app_configs import APP_API_PREFIX
 from onyx.configs.app_configs import APP_HOST
 from onyx.configs.app_configs import APP_PORT
@@ -90,6 +92,7 @@ from onyx.server.features.default_assistant.api import (
 )
 from onyx.server.features.document_set.api import router as document_set_router
 from onyx.server.features.hierarchy.api import router as hierarchy_router
+from onyx.server.features.image_generation.api import router as image_generation_router
 from onyx.server.features.input_prompt.api import (
     admin_router as admin_input_prompt_router,
 )
@@ -108,7 +111,6 @@ from onyx.server.features.persona.api import agents_router
 from onyx.server.features.persona.api import basic_router as persona_router
 from onyx.server.features.projects.api import router as projects_router
 from onyx.server.features.search.api import router as search_api_router
-from onyx.server.features.skill.api import admin_router as skill_admin_router
 from onyx.server.features.skill.api import user_router as skill_router
 from onyx.server.features.tool.api import admin_router as admin_tool_router
 from onyx.server.features.tool.api import router as tool_router
@@ -134,6 +136,7 @@ from onyx.server.manage.opensearch_migration.api import (
 )
 from onyx.server.manage.search_settings import router as search_settings_router
 from onyx.server.manage.slack_bot import router as slack_bot_management_router
+from onyx.server.manage.tracing.api import admin_router as tracing_admin_router
 from onyx.server.manage.users import router as user_router
 from onyx.server.manage.voice.api import admin_router as voice_admin_router
 from onyx.server.manage.voice.user_api import router as voice_router
@@ -337,6 +340,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         sys.setrecursionlimit(SYSTEM_RECURSION_LIMIT)
         logger.notice("System recursion limit set to %s", SYSTEM_RECURSION_LIMIT)
 
+    # Size the anyio threadpool that serves sync endpoints (incl. the streaming
+    # chat generator). Must run inside the event loop, as the limiter is per-loop.
+    if API_SERVER_THREADPOOL_SIZE > 0:
+        to_thread.current_default_thread_limiter().total_tokens = (
+            API_SERVER_THREADPOOL_SIZE
+        )
+        logger.notice(
+            "API server threadpool size set to %s", API_SERVER_THREADPOOL_SIZE
+        )
+
     SqlEngine.set_app_name(POSTGRES_WEB_APP_NAME)
 
     SqlEngine.init_engine(
@@ -527,6 +540,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, projects_router)
     include_router_with_global_prefix_prepended(application, public_build_router)
     include_router_with_global_prefix_prepended(application, build_router)
+    include_router_with_global_prefix_prepended(application, image_generation_router)
     include_router_with_global_prefix_prepended(application, document_set_router)
     include_router_with_global_prefix_prepended(application, hierarchy_router)
     include_router_with_global_prefix_prepended(application, search_api_router)
@@ -570,6 +584,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
         include_router_with_global_prefix_prepended(
             application, custom_jobs_admin_router
         )
+    include_router_with_global_prefix_prepended(application, tracing_admin_router)
     include_router_with_global_prefix_prepended(application, voice_admin_router)
     include_router_with_global_prefix_prepended(application, voice_router)
     include_router_with_global_prefix_prepended(application, voice_websocket_router)
@@ -585,7 +600,6 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, mcp_router)
     include_router_with_global_prefix_prepended(application, mcp_admin_router)
     include_router_with_global_prefix_prepended(application, skill_router)
-    include_router_with_global_prefix_prepended(application, skill_admin_router)
 
     include_router_with_global_prefix_prepended(application, pat_router)
     include_router_with_global_prefix_prepended(application, captcha_router)

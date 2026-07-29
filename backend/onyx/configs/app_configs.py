@@ -9,6 +9,7 @@ from onyx.auth.schemas import AuthBackend
 from onyx.cache.interface import CacheBackendType
 from onyx.configs.constants import AuthType
 from onyx.configs.constants import QueryHistoryType
+from onyx.document_index.opensearch.constants import OpenSearchAuthMethod
 from onyx.file_processing.enums import HtmlBasedConnectorTransformLinksStrategy
 from onyx.prompts.image_analysis import DEFAULT_IMAGE_SUMMARIZATION_SYSTEM_PROMPT
 from onyx.prompts.image_analysis import DEFAULT_IMAGE_SUMMARIZATION_USER_PROMPT
@@ -68,10 +69,6 @@ DEFAULT_USER_FILE_MAX_UPLOAD_SIZE_MB = _non_negative_int_env(
 GENERATIVE_MODEL_ACCESS_CHECK_FREQ = int(
     os.environ.get("GENERATIVE_MODEL_ACCESS_CHECK_FREQ") or 86400
 )  # 1 day
-
-# Per-user cap on self-managed personal skills. Env-overridable so CI can lower
-# it without uploading the full quota of real bundles to exercise the limit.
-MAX_PERSONAL_SKILLS_PER_USER = _non_negative_int_env("MAX_PERSONAL_SKILLS_PER_USER", 50)
 
 # Controls whether users can use User Knowledge (personal documents) in assistants
 DISABLE_USER_KNOWLEDGE = os.environ.get("DISABLE_USER_KNOWLEDGE", "").lower() == "true"
@@ -489,6 +486,24 @@ OPENSEARCH_CA_CERTS: str | None = os.environ.get("OPENSEARCH_CA_CERTS") or None
 OPENSEARCH_CLIENT_CERT: str | None = os.environ.get("OPENSEARCH_CLIENT_CERT") or None
 OPENSEARCH_CLIENT_KEY: str | None = os.environ.get("OPENSEARCH_CLIENT_KEY") or None
 
+# Authentication method for connecting to OpenSearch. "basic" uses
+# OPENSEARCH_ADMIN_USERNAME / OPENSEARCH_ADMIN_PASSWORD (HTTP basic auth); the
+# default and the only option for self-hosted / docker-compose OpenSearch. "iam"
+# uses AWS SigV4 request signing and is only valid against an AWS managed domain
+# whose fine-grained access control master is an IAM ARN. This is independent of
+# USING_AWS_MANAGED_OPENSEARCH: AWS managed domains can use a master user too.
+OPENSEARCH_AUTH_METHOD = OpenSearchAuthMethod(
+    (
+        os.environ.get("OPENSEARCH_AUTH_METHOD") or OpenSearchAuthMethod.BASIC.value
+    ).lower()
+)
+# AWS region of the managed OpenSearch domain. Required when
+# OPENSEARCH_AUTH_METHOD=iam; used to compute the SigV4 signature.
+OPENSEARCH_AWS_REGION: str | None = os.environ.get("OPENSEARCH_AWS_REGION") or None
+# AWS service name for SigV4 signing: "es" for managed OpenSearch domains,
+# "aoss" for OpenSearch Serverless.
+OPENSEARCH_AWS_SERVICE = os.environ.get("OPENSEARCH_AWS_SERVICE") or "es"
+
 if OPENSEARCH_VERIFY_CERTS and not OPENSEARCH_USE_SSL:
     logger.warning(
         "OPENSEARCH_VERIFY_CERTS=true has no effect when OPENSEARCH_USE_SSL is "
@@ -507,9 +522,25 @@ for _os_name, _os_path in (
     if _os_path and not os.path.exists(_os_path):
         raise ValueError(f"{_os_name}={_os_path!r} does not exist.")
 
+if OPENSEARCH_AUTH_METHOD == OpenSearchAuthMethod.IAM and not OPENSEARCH_AWS_REGION:
+    raise ValueError(
+        "OPENSEARCH_AWS_REGION must be set when OPENSEARCH_AUTH_METHOD=iam "
+        "(AWS SigV4 signing needs the domain's region)."
+    )
+
 USING_AWS_MANAGED_OPENSEARCH = (
     os.environ.get("USING_AWS_MANAGED_OPENSEARCH", "").lower() == "true"
 )
+
+if (
+    OPENSEARCH_AUTH_METHOD == OpenSearchAuthMethod.IAM
+    and not USING_AWS_MANAGED_OPENSEARCH
+):
+    raise ValueError(
+        "OPENSEARCH_AUTH_METHOD=iam is only supported for "
+        "AWS-managed instances of OpenSearch."
+    )
+
 # Profiling adds some overhead to OpenSearch operations. This overhead is
 # unknown right now. It is enabled by default so we can get useful logs for
 # investigating slow queries. We may never disable it if the overhead is
@@ -564,6 +595,9 @@ VERIFY_CREATE_OPENSEARCH_INDEX_ON_INIT_MT = (
 OPENSEARCH_MIGRATION_GET_VESPA_CHUNKS_PAGE_SIZE = int(
     os.environ.get("OPENSEARCH_MIGRATION_GET_VESPA_CHUNKS_PAGE_SIZE") or 500
 )
+# Lifetime of a point-in-time used to scan an index consistently (reindex port).
+# Each search extends the lease; an idle PIT self-expires after this.
+PIT_KEEP_ALIVE: str = os.environ.get("PIT_KEEP_ALIVE") or "5m"
 # If set, will override the default number of shards and replicas for the index.
 OPENSEARCH_INDEX_NUM_SHARDS: int | None = (
     int(os.environ["OPENSEARCH_INDEX_NUM_SHARDS"])
@@ -931,6 +965,14 @@ for _redis_tls_name, _redis_tls_path in (
 
 CELERY_RESULT_EXPIRES = int(os.environ.get("CELERY_RESULT_EXPIRES", 86400))  # seconds
 
+# A failed prune is skipped for this long before the beat re-dispatches it.
+# Floor: the re-dispatch interval (BLOCK_PRUNING = 60s * beat_multiplier, ~8 min
+# in cloud) so a failure can't hot-loop. Ceiling: prune_freq, so it still retries
+# well before the next scheduled prune. 30m is a midpoint with transient slack.
+PRUNE_FAILURE_BACKOFF_SECONDS = int(
+    os.environ.get("PRUNE_FAILURE_BACKOFF_SECONDS") or 30 * 60
+)
+
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#broker-pool-limit
 # Setting to None may help when there is a proxy in the way closing idle connections
 _CELERY_BROKER_POOL_LIMIT_DEFAULT = 10
@@ -978,6 +1020,13 @@ except ValueError:
     CELERY_WORKER_DOCPROCESSING_CONCURRENCY = (
         _CELERY_WORKER_DOCPROCESSING_CONCURRENCY_DEFAULT
     )
+
+# Reindex-port runs on the docprocessing worker; cap concurrent port attempts well
+# below its concurrency so a large reindex leaves slots for live indexing.
+# Floor at 1: 0 (or negative) would gate off every new port attempt.
+MAX_CONCURRENT_PORT_ATTEMPTS = max(
+    1, _non_negative_int_env("MAX_CONCURRENT_PORT_ATTEMPTS", 2)
+)
 
 _CELERY_WORKER_DOCFETCHING_CONCURRENCY_DEFAULT = 1
 try:
@@ -1425,11 +1474,10 @@ MAX_XLSX_CELLS_PER_SHEET = max(
     0, int(os.environ.get("MAX_XLSX_CELLS_PER_SHEET") or 10_000_000)
 )
 
-# A worksheet whose uncompressed XML exceeds this is streamed to a file-backed
-# TabularSection (CSV staged in the file store) instead of an in-memory string,
-# so a huge sheet stays off the worker heap rather than being truncated.
-XLSX_STREAM_SHEET_BYTES = max(
-    0, int(os.environ.get("XLSX_STREAM_SHEET_BYTES") or 50 * 1024 * 1024)
+# PDF text extraction runs isolated (a malformed PDF can make PDFium hard-abort
+# or hang); this is the timeout before the subprocess is killed and pypdf runs.
+PDF_TEXT_EXTRACTION_TIMEOUT_SECONDS = float(
+    os.environ.get("PDF_TEXT_EXTRACTION_TIMEOUT_SECONDS") or 120
 )
 
 # Use document summary for contextual rag
@@ -1467,6 +1515,27 @@ CODE_INTERPRETER_DEFAULT_TIMEOUT_MS = int(
 
 CODE_INTERPRETER_MAX_OUTPUT_LENGTH = int(
     os.environ.get("CODE_INTERPRETER_MAX_OUTPUT_LENGTH") or 50_000
+)
+
+# Backstop on per-execution file staging. Session files accumulate over a chat
+# (generated artifacts get carried forward), and staging each one is a blocking
+# object-store read + upload in the request worker; an unbounded set can block
+# longer than the api-server liveness window. Cap by count and cumulative bytes
+# and drop the overflow (oldest first).
+CODE_INTERPRETER_MAX_STAGED_FILES = int(
+    os.environ.get("CODE_INTERPRETER_MAX_STAGED_FILES") or 25
+)
+
+CODE_INTERPRETER_MAX_STAGED_BYTES = int(
+    os.environ.get("CODE_INTERPRETER_MAX_STAGED_BYTES") or 100 * 1024 * 1024
+)
+
+# Bounds the fan-out of both staging phases — reading files from the object
+# store and uploading cache misses to the sandbox — so neither blocks the
+# request worker serially nor overwhelms a backend with a burst. Each I/O call
+# is individually bounded by its own per-request timeout.
+CODE_INTERPRETER_STAGING_CONCURRENCY = int(
+    os.environ.get("CODE_INTERPRETER_STAGING_CONCURRENCY") or 8
 )
 
 # Per-call MCP read timeout; configurable since some tools (e.g. data-agent
@@ -1515,6 +1584,8 @@ DISABLE_TELEMETRY = os.environ.get("DISABLE_TELEMETRY", "").lower() == "true"
 BRAINTRUST_PROJECT = os.environ.get("BRAINTRUST_PROJECT", "Onyx")
 # Braintrust API key - if provided, Braintrust tracing will be enabled
 BRAINTRUST_API_KEY = os.environ.get("BRAINTRUST_API_KEY") or ""
+# Optional custom Braintrust API URL (self-hosted / non-default deployments)
+BRAINTRUST_API_URL = os.environ.get("BRAINTRUST_API_URL") or ""
 # Maximum concurrency for Braintrust evaluations
 # None means unlimited concurrency, otherwise specify a number
 _braintrust_concurrency = os.environ.get("BRAINTRUST_MAX_CONCURRENCY")
@@ -1546,6 +1617,12 @@ LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY") or ""
 LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY") or ""
 LANGFUSE_HOST = os.environ.get("LANGFUSE_HOST") or ""  # For self-hosted Langfuse
 
+# Per-process cache TTL for the resolved tracing config; bounds how quickly a UI
+# connect/disconnect takes effect (no restart needed).
+TRACING_CONFIG_CACHE_TTL_SECONDS = float(
+    os.environ.get("TRACING_CONFIG_CACHE_TTL_SECONDS") or "30"
+)
+
 # Defined custom query/answer conditions to validate the query and the LLM answer.
 # Format: list of strings
 CUSTOM_ANSWER_VALIDITY_CONDITIONS = json.loads(
@@ -1565,6 +1642,11 @@ VESPA_MIGRATION_SERVER_SIDE_REQUEST_TIMEOUT = os.environ.get(
 )
 
 SYSTEM_RECURSION_LIMIT = int(os.environ.get("SYSTEM_RECURSION_LIMIT") or "1000")
+
+# Size of the api-server anyio threadpool that runs sync endpoints, including the
+# streaming chat generator (each long request holds one thread for its duration).
+# 0 keeps the anyio default (40). Set via the api.threadpoolSize Helm value.
+API_SERVER_THREADPOOL_SIZE = int(os.environ.get("ONYX_API_THREADPOOL_SIZE") or "0")
 
 PARSE_WITH_TRAFILATURA = os.environ.get("PARSE_WITH_TRAFILATURA", "").lower() == "true"
 

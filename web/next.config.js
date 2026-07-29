@@ -5,6 +5,7 @@ const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
   output: "standalone",
   // Hosts allowed to load Next.js dev resources (e.g. HMR) cross-origin.
   // Needed when accessing the local dev server through a tunnel like ngrok.

@@ -85,6 +85,24 @@ class PermissionSyncStatus(str, PyEnum):
         )
 
 
+class PortAttemptStatus(str, PyEnum):
+    NOT_STARTED = "NOT_STARTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+
+    def is_terminal(self) -> bool:
+        return self in {
+            PortAttemptStatus.SUCCESS,
+            PortAttemptStatus.FAILED,
+            PortAttemptStatus.CANCELED,
+        }
+
+    def is_successful(self) -> bool:
+        return self == PortAttemptStatus.SUCCESS
+
+
 class IndexingMode(str, PyEnum):
     UPDATE = "update"
     REINDEX = "reindex"
@@ -237,6 +255,14 @@ class ThemePreference(str, PyEnum):
     LIGHT = "light"
     DARK = "dark"
     SYSTEM = "system"
+
+
+class SupportedLanguage(str, PyEnum):
+    EN = "en"
+    ES = "es"
+    PT = "pt"
+    FR = "fr"
+    DE = "de"
 
 
 class DefaultAppMode(str, PyEnum):
@@ -597,6 +623,7 @@ class Permission(str, PyEnum):
     READ_CHAT = "read:chat"
     WRITE_CHAT = "write:chat"
     READ_ADMIN = "read:admin"
+    GENERATE_IMAGE = "generate:image"
 
     # Add / Manage pairs
     ADD_AGENTS = "add:agents"
@@ -614,6 +641,10 @@ class Permission(str, PyEnum):
     CREATE_USER_API_KEYS = "create:user_api_keys"
     CREATE_SERVICE_ACCOUNT_API_KEYS = "create:service_account_api_keys"
     CREATE_SLACK_DISCORD_BOTS = "create:slack_discord_bots"
+
+    # Role scopes — a bundle token implying the surfaces a given machine
+    # identity may use. PAT-only; never granted to a group/user.
+    CRAFT_SANDBOX = "craft_sandbox"
 
     # Override — any permission check passes
     FULL_ADMIN_PANEL_ACCESS = "admin"
@@ -633,6 +664,7 @@ Permission.IMPLIED = frozenset(
         Permission.READ_CHAT,
         Permission.WRITE_CHAT,
         Permission.READ_ADMIN,
+        Permission.GENERATE_IMAGE,
     }
 )
 
@@ -641,6 +673,22 @@ class PersonaSharePermission(str, PyEnum):
     """Level granted by a persona share row (user or group), or to the whole
     org via `Persona.public_permission`."""
 
+    EDITOR = "EDITOR"
+    VIEWER = "VIEWER"
+
+
+class SkillSharePermission(str, PyEnum):
+    """Level granted by a skill share row (user or group), or to the whole org
+    via `Skill.public_permission`."""
+
+    EDITOR = "EDITOR"
+    VIEWER = "VIEWER"
+
+
+class SkillAccessLevel(str, PyEnum):
+    """Computed access the requesting user holds on a skill."""
+
+    OWNER = "OWNER"
     EDITOR = "EDITOR"
     VIEWER = "VIEWER"
 
