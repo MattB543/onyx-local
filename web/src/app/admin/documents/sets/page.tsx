@@ -1,6 +1,6 @@
 "use client";
 
-import { ThreeDotsLoader } from "@/components/Loading";
+import { PageLoader } from "@/refresh-components/PageLoader";
 import { PageSelector } from "@/components/PageSelector";
 import { SvgInfo, SvgPlusCircle } from "@opal/icons";
 import {
@@ -368,7 +368,7 @@ function Main() {
   if (isDocumentSetsLoading || isEditableDocumentSetsLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <ThreeDotsLoader />
+        <PageLoader />
       </div>
     );
   }

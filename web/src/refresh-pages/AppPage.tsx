@@ -2,7 +2,14 @@
 
 import { redirect, useRouter, useSearchParams } from "next/navigation";
 import { personaIncludesRetrieval } from "@/app/app/services/lib";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast, useToastFromQuery } from "@/hooks/useToast";
 import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
 import { Section } from "@/layouts/general-layouts";
@@ -72,6 +79,7 @@ import { useSidebarState } from "@opal/layouts";
 import { useQueryController } from "@/providers/QueryControllerProvider";
 import WelcomeMessage from "@/app/app/components/WelcomeMessage";
 import ChatUI from "@/sections/chat/ChatUI";
+import { useFullWidthChat } from "@/providers/FullWidthChatProvider";
 import { paidTierGated } from "@/ce";
 import EESearchUI from "@/ee/sections/SearchUI";
 const SearchUI = paidTierGated(EESearchUI);
@@ -143,25 +151,14 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     currentChatSessionId,
     isLoading: isLoadingChatSessions,
   } = useChatSessions();
-  // handle redirect if chat page is disabled
-  // NOTE: this must be done here, in a client component since
-  // settings are passed in via Context and therefore aren't
-  // available in server-side components
   const settings = useSettings();
   const { appName } = settings;
 
-  const appNameRef = useRef<string>("Onyx");
-  useEffect(() => {
-    appNameRef.current = appName;
+  useLayoutEffect(() => {
     document.title = currentChatSession?.name
       ? `${currentChatSession.name} — ${appName}`
       : appName;
   }, [currentChatSession?.name, appName]);
-  useEffect(() => {
-    return () => {
-      document.title = appNameRef.current;
-    };
-  }, []);
 
   const { vectorDbEnabled } = settings;
   const { ccPairs } = useCCPairs(vectorDbEnabled);
@@ -420,6 +417,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   const isStreaming = currentChatState === "streaming";
 
   const multiModel = useMultiModelChat(llmManager);
+
+  const { fullWidthChat } = useFullWidthChat();
+
+  // Full-width only takes effect inside an actual conversation, not the
+  // new-session view (where only the input bar is shown).
+  const fullWidthActive =
+    fullWidthChat && appFocus.isChat() && !!currentChatSessionId;
 
   // Auto-fold sidebar when a multi-model message is submitted.
   // Stays collapsed until the user exits multi-model mode (removes models).
@@ -825,6 +829,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                       autoScroll={autoScrollEnabled}
                       isStreaming={isStreaming}
                       onScrollButtonVisibilityChange={setShowScrollButton}
+                      flushContent={fullWidthActive}
                     >
                       <ChatUI
                         liveAgent={liveAgent!}
@@ -840,6 +845,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         onResubmit={handleResubmitLastMessage}
                         anchorNodeId={anchorNodeId}
                         selectedModels={multiModel.selectedModels}
+                        fullWidthChat={fullWidthActive}
                       />
                     </ChatScrollContainer>
                   </Fade>
@@ -936,7 +942,13 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                     sessionFetchError && "hidden"
                   )}
                 >
-                  <div className="relative w-full max-w-(--app-page-main-content-width) flex flex-col">
+                  <div
+                    className={cn(
+                      "relative w-full flex flex-col",
+                      !fullWidthActive &&
+                        "max-w-(--app-page-main-content-width)"
+                    )}
+                  >
                     {/* Scroll to bottom button - positioned absolutely above AppInputBar */}
                     {appFocus.isChat() && showScrollButton && (
                       <div className="absolute -top-14 self-center">

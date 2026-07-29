@@ -19,6 +19,7 @@ import {
   useLoadingError,
   useUncaughtError,
 } from "@/app/app/stores/useChatSessionStore";
+import { cn } from "@opal/utils";
 
 /** Width constraint for normal (non-multi-model) messages. */
 const MSG_MAX_W = "max-w-[720px] min-w-[400px]";
@@ -60,6 +61,9 @@ export interface ChatUIProps {
 
   /** Currently selected models for multi-model comparison. */
   selectedModels?: SelectedModel[];
+
+  /** When on, messages drop the reading-width cap and fill the window. */
+  fullWidthChat?: boolean;
 }
 
 const ChatUI = memo(
@@ -75,6 +79,7 @@ const ChatUI = memo(
     onResubmit,
     anchorNodeId,
     selectedModels,
+    fullWidthChat,
   }: ChatUIProps) => {
     // Get messages and error state from store
     const messages = useCurrentMessageHistory();
@@ -84,6 +89,9 @@ const ChatUI = memo(
     // Stable fallbacks to avoid changing prop identities on each render
     const emptyDocs = useMemo<OnyxDocument[]>(() => [], []);
     const emptyChildrenIds = useMemo<number[]>(() => [], []);
+
+    // Reading-width cap on messages; dropped in full-width mode.
+    const msgWidth = fullWidthChat ? undefined : MSG_MAX_W;
 
     // Lookup: model identifier → provider slug (for icon resolution).
     // Indexes by both raw model name ("claude-sonnet-4-6") and display name
@@ -207,7 +215,12 @@ const ChatUI = memo(
       <>
         {/* No max-width on container — individual messages control their own width.
             Multi-model responses use full width while normal messages stay centered. */}
-        <div className="flex flex-col w-full h-full pt-4 pb-8 pr-1 gap-12">
+        <div
+          className={cn(
+            "flex flex-col w-full h-full pt-4 pb-8 gap-12",
+            !fullWidthChat && "pr-1"
+          )}
+        >
           {messages.map((message, i) => {
             const messageReactComponentKey = `message-${message.nodeId}`;
             const parentMessage = message.parentNodeId
@@ -224,8 +237,7 @@ const ChatUI = memo(
                   key={messageReactComponentKey}
                   className="flex flex-col gap-12 w-full"
                 >
-                  {/* Human message stays at normal chat width */}
-                  <div className={`w-full ${MSG_MAX_W} self-center`}>
+                  <div className={cn("w-full self-center", msgWidth)}>
                     <HumanMessage
                       disableSwitchingForStreaming={
                         (nextMessage && nextMessage.is_generating) || false
@@ -270,7 +282,7 @@ const ChatUI = memo(
                 return (
                   <div
                     key={`error-${message.nodeId}`}
-                    className={`p-4 w-full ${MSG_MAX_W} self-center`}
+                    className={cn("p-4 w-full self-center", msgWidth)}
                   >
                     <ErrorBanner
                       resubmit={onResubmit}
@@ -307,9 +319,10 @@ const ChatUI = memo(
                 <div
                   id={`message-${message.nodeId}`}
                   key={messageReactComponentKey}
-                  className={`w-full ${MSG_MAX_W} self-center`}
+                  className={cn("w-full self-center", msgWidth)}
                 >
                   <AgentMessage
+                    fullWidthChat={fullWidthChat}
                     rawPackets={message.packets}
                     packetCount={message.packetCount}
                     chatState={chatStateData}
@@ -340,7 +353,7 @@ const ChatUI = memo(
             messages[messages.length - 1]?.type === "user") ||
             (messages[messages.length - 1]?.type === "error" &&
               !messages[messages.length - 1]?.modelDisplayName)) && (
-            <div className={`p-4 w-full ${MSG_MAX_W} self-center`}>
+            <div className={cn("p-4 w-full self-center", msgWidth)}>
               <ErrorBanner
                 resubmit={onResubmit}
                 error={error || loadError || ""}

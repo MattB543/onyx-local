@@ -1,14 +1,15 @@
 import { useMemo } from "react";
-
-import { constructCurrentSearchState } from "@/app/app/message/messageComponents/timeline/renderers/search/searchStateUtils";
+import { TurnGroup } from "../transformers";
 import {
   PacketType,
   SearchToolPacket,
   StopReason,
   CustomToolStart,
 } from "@/app/app/services/streamingModels";
-
-import { TurnGroup } from "../transformers";
+import {
+  formatSearchHeader,
+  constructCurrentSearchState,
+} from "@/app/app/message/messageComponents/timeline/renderers/search/searchStateUtils";
 
 export interface TimelineHeaderResult {
   headerText: string;
@@ -64,10 +65,11 @@ export function useTimelineHeader(
       let headerText: string;
       if (searchState.hasResults && !searchState.isInternetSearch) {
         headerText = "Reading";
+      } else if (searchState.isInternetSearch) {
+        headerText = "Searching the web";
       } else {
-        headerText = searchState.isInternetSearch
-          ? "Searching the web"
-          : "Searching internal documents";
+        // A source filter overrides the header with the connector(s).
+        headerText = formatSearchHeader(searchState.sourceFilters);
       }
       return { headerText, hasPackets, userStopped };
     }
