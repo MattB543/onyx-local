@@ -272,3 +272,40 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
 - No new migrations; single head f1a6d0c93b27 unchanged. Codex: skipped
   (mechanical batch, per policy).
 - Verification: worktree pytest 181/181; main sync-verify --batch 7/7 PASS.
+
+## Batch 9 — 4ea5da046c = upstream tip (2026-07-29, 235 commits, 235→0 behind. SYNC MERGE COMPLETE)
+
+- Conflicts: 9. Key items:
+  - chat_utils.py load_chat_file: upstream's lazy rewrite deleted the only call
+    sites of fork-only chat_file_utils.py — fork fallback re-added under
+    `if not user_file_id_str:` (raw uploads would have silently gotten
+    token_count=0). ADD chat_file_utils.py to the recurring watch list.
+  - Compose files are now GENERATED from docker-compose.template.yml
+    (docker-compose-sync pre-commit hook; ods is a Go binary with no win32 wheel —
+    hook no-ops locally but runs in CI). Our ONYX_VERSION args added to the
+    template with `#!for prod,no-letsencrypt` scoping so the default variant and
+    the embedded CLI copy (drift-tested) stay byte-identical. prod-tunnel.yml
+    (fork-only) got `target: runtime` (dev stage is now the default last stage).
+  - svcSS.ts: kept fork never-throw fallback + added REQUIRED passwordAuthEnabled
+    (default true — otherwise password login vanishes when /auth/type hiccups).
+  - env.prod.template: ours + upstream's commented legacy-SSO block. Env-based
+    SSO deprecated, removal planned v4.5 — migrate prod to DB-backed SSO rows.
+  - app_configs.py: upstream tenant-sharding block added (no-op unless
+    ONYX_DB_SHARDS set). POSTGRES_HOSTS (ours) has zero consumers — candidate
+    for removal.
+- Alembic: final merge migration 563e4c5f4903 (parents f1a6d0c93b27 +
+  f57f35403f6c); alembic_tenants separate single head b1c4e9d72f38 (multi-tenant
+  only). NOTE: upstream migration 1e0a3e4226f7 calls encrypt_string_to_bytes at
+  migration time — ONLY if llm_provider rows with provider='ollama_chat' exist.
+  Pre-deploy check: SELECT id FROM llm_provider WHERE provider = 'ollama_chat';
+  If rows exist, api_server needs KMS/SSM reachable at startup.
+- DEPLOY FLAGS (batch 9 additions):
+  - Runtime docker image lost curl/vim/nano/ps/psql (dev stage has them,
+    published with -dev tag). Check prod runbooks/healthchecks that exec into
+    api_server/background.
+  - jest 29→30 + @types/jest 30, Storybook 8→10 (addon-essentials/blocks
+    removed), oxfmt 0.59, ruff 0.16, dnd-kit sortable 8→10, azure blob deps new.
+  - cryptography pin drift pre-existing: pyproject 46.0.5 vs requirements/uv.lock
+    48.0.1 (Docker uses requirements → inert; reconcile later).
+- Verification: worktree pytest 616/617 (1 known Windows env failure), ruff clean,
+  all compose files parse + build blocks verified, rev-list vs upstream = 0.
