@@ -109,3 +109,41 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   lib/shared rebuild + .next clear; CRM jest 34/34; backend custom suites green).
 - Codex sanity check: PASS (models.py blend verified, chat retention AST-equivalent,
   auth fallback faithful, email triggers intact, alembic parents correct).
+
+## Batch 4 — d318c47220 (2026-07-29, 49 commits, 501→452 behind)
+
+- Conflicts: 10. Dominant theme: upstream's Google-credential architecture rewrite
+  (07c235d978, 0aec0aa8f9, 12b6de9bdb) — app creds moved from KV store onto the
+  credential row (`DB_CREDENTIALS_DICT_APP_CREDENTIAL_KEY`), 18 admin endpoints and
+  6 google_kv.py functions deleted, `get_auth_url` +2 params, `build_service_account_creds`
+  takes the key directly.
+- DECISION (Option A, taken): ported our Google Calendar connector to the row-based
+  flow instead of keeping a fork-local KV island. Frontend gcalendar pages rewritten
+  from the merged gdrive equivalents (single-section auth UI, −~490 lines);
+  `setupGoogleCalendarOAuth` now sends `google_app_credential` in credential_json;
+  calendar service-account endpoint mirrors gdrive's. Existing prod Calendar
+  credentials keep working (client id/secret ride in the stored token blob via
+  upstream's `_app_cred_on_row` fallback; service-account keys already lived in
+  credential_json). Old KV rows `google_calendar_*` are orphaned/harmless.
+  USER-VISIBLE: Calendar admin setup UI is now the one-section flow (release note).
+- Silent-break traps (no conflict markers): upstream's import deletions auto-merged
+  while our code using them sat inside a conflict hunk (NameError trap); two
+  signature changes broke auto-merged fork call sites (`get_auth_url` in our
+  calendar authorize route, `build_service_account_creds` in our SA endpoint).
+  Both fixed. LESSON: after big-deletion batches run RUFF, not just ast.parse —
+  it also caught a leftover unused `current_admin_user` import.
+- Cheap assertion for take-theirs-wholesale files: `git diff <upstream-sha> -- <file>`
+  should be empty (credential.py verified byte-identical).
+- Our batch-3 auth hardening in web/src/lib/auth/svcSS.ts survived upstream's
+  requireAuth/requireAdminAuth move into the same file (import-union blend only).
+- Alembic merge migration `a1c7d4e90b62` (parents fb9bb92cc072 + 8c8ff08f8035).
+- DEPLOY FLAGS:
+  1. Upstream migration `1fc2904131a3` (sso_provider seed) calls
+     `encrypt_string_to_bytes` AT MIGRATION TIME — with our KMS envelope encryption,
+     prod `alembic upgrade` needs KMS/SSM reachable IF the SAML/OIDC env-seed path
+     fires (AUTH_TYPE=saml/oidc env config present with no existing row).
+  2. Upstream switched model-server entrypoint to `python -m model_server` and
+     dropped the DISABLE_MODEL_SERVER shell wrapper from compose — check whether
+     the prod overlay still sets DISABLE_MODEL_SERVER (now a no-op).
+- Verification on main: sync-verify --batch all 7 PASS.
+- Codex sanity check: pending.
