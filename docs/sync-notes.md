@@ -200,3 +200,30 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   {"value": ...}; a byte copy would produce unwrap_str failures. All other
   security invariants independently verified by Codex: KMS files byte-unchanged,
   no secret writer on the cached path, handshake hardening + Calendar intact.
+
+## Batch 6 — 9cdc575958 (2026-07-29, 150 commits, 451→301 behind)
+
+- Conflicts: 14 (11 content, 3 modify/delete). Highlights:
+  - Dockerfile.model_server TRAP: upstream moved installs into /app/.venv; keep-ours
+    (--system) would ship an image with an empty venv. Blend = theirs' --python flag
+    minus --require-hashes.
+  - backend/onyx/utils/encryption.py: upstream added restore_masked_credentials
+    (HARD BOOT DEP via sso_admin_router) — appended to our KMS module verbatim;
+    kept our input_str spelling (upstream has intput_str typo; body uses ours).
+  - web/src/lib/auth/svcSS.ts: hand-blended again (3rd batch in a row touching it);
+    our fallback architecture + upstream's password-policy fields + sso_providers
+    mapping; AuthType now imported from @/lib/auth/types NOT constants.
+  - EmailPasswordForm/SignInButton moved into web/src/lib/auth/components.tsx;
+    our type="email" ported. components/credentials/* moved to lib/credentials/*.
+  - AppSidebar: upstream dropped wrapper div; crmButton re-inserted.
+- Out-of-marker trap: @/hooks/useToast + ToastProvider moved into @opal/layouts —
+  4 fork files (gcalendar Credential, CreateContactModal, CrmContactDetailPage,
+  CrmOrganizationDetailPage) silently broken by auto-merge; fixed.
+- ENVIRONMENT: upstream added readerwriterlock dep (installed into .venv);
+  requirements/default.txt now pulls audioop-lts (Python>=3.13) — venv is 3.11.
+  POST-SYNC TASK: check upstream's target Python + rebuild venv accordingly.
+- ruff format --check fails repo-wide pre-existing (format vs lint); ruff CHECK is
+  the gate. CRLF on disk — Python-script edits with \n patterns silently no-op.
+- Alembic merge migration (parents c3b81de70f45 + b7e9a3c1d2f4) → head e4f7a2b91c08.
+- Verification: worktree pytest 46/46 (KMS/ee/config/KV); main sync-verify --batch
+  7/7 PASS after installing readerwriterlock.
