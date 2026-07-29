@@ -72,4 +72,5 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
 - Verification on main: jest 5 suites / 34 tests pass (suites confirmed executing);
   tsc 0 errors after `bun run build` in `web/lib/shared` (stale-dist phantom errors
   otherwise — 495 ButtonProps errors from a Jun 21 dist; rebuild before trusting tsc).
-- Codex sanity check: pending.
+- Codex sanity check: PASS (all 30 fork files byte-preserved, route shims valid,
+  jest globs verified, refresh-components intact, EE relocation counts match).
