@@ -13,7 +13,11 @@ import {
   deleteCrmOrganization,
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
-import { SettingsLayouts, toast } from "@opal/layouts";
+import {
+  ConfirmationModalLayout,
+  SettingsLayouts,
+  toast,
+} from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -26,7 +30,6 @@ import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import ConfirmationModalLayout from "@/refresh-components/layouts/ConfirmationModalLayout";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/views/crm/components/ActivityTimeline";
 import CrmBreadcrumbs from "@/views/crm/components/CrmBreadcrumbs";

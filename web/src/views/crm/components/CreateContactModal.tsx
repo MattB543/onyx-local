@@ -24,7 +24,7 @@ import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import Modal from "@/refresh-components/Modal";
+import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import {
   CONTACT_SOURCES,

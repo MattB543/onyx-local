@@ -2,39 +2,17 @@ import "server-only";
 
 import { buildUrl, UrlBuilder } from "@/lib/utilsSS";
 import { getDomain } from "@/lib/redirectSS";
-import {
-  NEXT_PUBLIC_CLOUD_ENABLED,
-  SERVER_SIDE_ONLY__AUTH_TYPE,
-} from "@/lib/constants";
+import { NEXT_PUBLIC_CLOUD_ENABLED } from "@/lib/constants";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  AuthType,
-  AuthTypeMetadata,
-  type SSOProviderType,
-} from "@/lib/auth/types";
+import { AuthTypeMetadata, type SSOProviderType } from "@/lib/auth/types";
 import { User, UserRole } from "@/lib/types";
 import { getCurrentUserSS } from "@/lib/users/svcSS";
 
-const AUTH_TYPE_VALUES = new Set<string>(Object.values(AuthType));
-
-function resolveAuthType(rawAuthType: string | null | undefined): AuthType {
-  if (NEXT_PUBLIC_CLOUD_ENABLED) {
-    return AuthType.CLOUD;
-  }
-
-  if (rawAuthType && AUTH_TYPE_VALUES.has(rawAuthType)) {
-    return rawAuthType as AuthType;
-  }
-
-  return SERVER_SIDE_ONLY__AUTH_TYPE;
-}
-
+// Fork: a failing/slow /auth/type must never hard-fail a server render, so
+// fall back to conservative single-tenant metadata instead of throwing.
 function buildFallbackAuthTypeMetadata(): AuthTypeMetadata {
-  const fallbackAuthType = resolveAuthType(null);
   return {
-    authType: fallbackAuthType,
-    autoRedirect:
-      fallbackAuthType === AuthType.OIDC || fallbackAuthType === AuthType.SAML,
+    multiTenant: NEXT_PUBLIC_CLOUD_ENABLED,
     requiresVerification: false,
     anonymousUserEnabled: null,
     passwordMinLength: 8,
@@ -60,7 +38,7 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
     }
 
     const data = (await res.json()) as {
-      auth_type?: string;
+      multi_tenant?: boolean;
       requires_verification?: boolean;
       anonymous_user_enabled?: boolean | null;
       password_min_length?: number;
@@ -79,59 +57,48 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       }[];
     };
 
-    const authType = resolveAuthType(data.auth_type);
-    const requiresVerification =
-      typeof data.requires_verification === "boolean"
-        ? data.requires_verification
-        : false;
-    const anonymousUserEnabled =
-      typeof data.anonymous_user_enabled === "boolean"
-        ? data.anonymous_user_enabled
-        : null;
-    const passwordMinLength =
-      typeof data.password_min_length === "number"
-        ? data.password_min_length
-        : 8;
-    const passwordMaxLength =
-      typeof data.password_max_length === "number"
-        ? data.password_max_length
-        : 128;
-    const passwordRequireUppercase =
-      typeof data.password_require_uppercase === "boolean"
-        ? data.password_require_uppercase
-        : false;
-    const passwordRequireLowercase =
-      typeof data.password_require_lowercase === "boolean"
-        ? data.password_require_lowercase
-        : false;
-    const passwordRequireDigit =
-      typeof data.password_require_digit === "boolean"
-        ? data.password_require_digit
-        : false;
-    const passwordRequireSpecialChar =
-      typeof data.password_require_special_char === "boolean"
-        ? data.password_require_special_char
-        : false;
-    const hasUsers =
-      typeof data.has_users === "boolean" ? data.has_users : true;
-    const oauthEnabled =
-      typeof data.oauth_enabled === "boolean" ? data.oauth_enabled : false;
-
-    // for SAML / OIDC, we auto-redirect the user to the IdP when the user visits
-    // Onyx in an un-authenticated state
+    const fallback = buildFallbackAuthTypeMetadata();
     return {
-      authType,
-      autoRedirect: authType === AuthType.OIDC || authType === AuthType.SAML,
-      requiresVerification,
-      anonymousUserEnabled,
-      passwordMinLength,
-      passwordMaxLength,
-      passwordRequireUppercase,
-      passwordRequireLowercase,
-      passwordRequireDigit,
-      passwordRequireSpecialChar,
-      hasUsers,
-      oauthEnabled,
+      multiTenant: NEXT_PUBLIC_CLOUD_ENABLED
+        ? true
+        : typeof data.multi_tenant === "boolean"
+          ? data.multi_tenant
+          : fallback.multiTenant,
+      requiresVerification:
+        typeof data.requires_verification === "boolean"
+          ? data.requires_verification
+          : fallback.requiresVerification,
+      anonymousUserEnabled:
+        typeof data.anonymous_user_enabled === "boolean"
+          ? data.anonymous_user_enabled
+          : null,
+      passwordMinLength:
+        typeof data.password_min_length === "number"
+          ? data.password_min_length
+          : fallback.passwordMinLength,
+      passwordMaxLength:
+        typeof data.password_max_length === "number"
+          ? data.password_max_length
+          : fallback.passwordMaxLength,
+      passwordRequireUppercase:
+        typeof data.password_require_uppercase === "boolean"
+          ? data.password_require_uppercase
+          : false,
+      passwordRequireLowercase:
+        typeof data.password_require_lowercase === "boolean"
+          ? data.password_require_lowercase
+          : false,
+      passwordRequireDigit:
+        typeof data.password_require_digit === "boolean"
+          ? data.password_require_digit
+          : false,
+      passwordRequireSpecialChar:
+        typeof data.password_require_special_char === "boolean"
+          ? data.password_require_special_char
+          : false,
+      hasUsers: typeof data.has_users === "boolean" ? data.has_users : true,
+      oauthEnabled:
+        typeof data.oauth_enabled === "boolean" ? data.oauth_enabled : false,
       ssoProviders: (data.sso_providers ?? []).map((provider) => ({
         name: provider.name,
         displayName: provider.display_name,
@@ -145,13 +112,6 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
   }
 }
 
-async function getOIDCAuthUrlSS(nextUrl: string | null): Promise<string> {
-  const url = UrlBuilder.fromClientUrl("/api/auth/oidc/authorize");
-  if (nextUrl) url.addParam("next", nextUrl);
-  url.addParam("redirect", true);
-  return url.toString();
-}
-
 async function getGoogleOAuthUrlSS(nextUrl: string | null): Promise<string> {
   const url = UrlBuilder.fromClientUrl("/api/auth/oauth/authorize");
   if (nextUrl) url.addParam("next", nextUrl);
@@ -159,52 +119,19 @@ async function getGoogleOAuthUrlSS(nextUrl: string | null): Promise<string> {
   return url.toString();
 }
 
-async function getSAMLAuthUrlSS(nextUrl: string | null): Promise<string> {
-  const url = UrlBuilder.fromInternalUrl("/auth/saml/authorize");
-  if (nextUrl) url.addParam("next", nextUrl);
-
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error("Failed to fetch data");
-
-  const data: { authorization_url: string } = await res.json();
-  return data.authorization_url;
-}
-
 export async function getAuthUrlSS(
-  authType: AuthType,
+  multiTenant: boolean,
   nextUrl: string | null
 ): Promise<string> {
-  switch (authType) {
-    case AuthType.BASIC:
-      return "";
-    case AuthType.GOOGLE_OAUTH:
-    case AuthType.CLOUD:
-      return getGoogleOAuthUrlSS(nextUrl);
-    case AuthType.SAML:
-      return getSAMLAuthUrlSS(nextUrl);
-    case AuthType.OIDC:
-      return getOIDCAuthUrlSS(nextUrl);
-  }
+  return multiTenant ? getGoogleOAuthUrlSS(nextUrl) : "";
 }
 
 async function logoutStandardSS(headers: Headers): Promise<Response> {
   return fetch(buildUrl("/auth/logout"), { method: "POST", headers });
 }
 
-async function logoutSAMLSS(headers: Headers): Promise<Response> {
-  return fetch(buildUrl("/auth/saml/logout"), { method: "POST", headers });
-}
-
-export async function logoutSS(
-  authType: AuthType,
-  headers: Headers
-): Promise<Response | null> {
-  switch (authType) {
-    case AuthType.SAML:
-      return logoutSAMLSS(headers);
-    default:
-      return logoutStandardSS(headers);
-  }
+export async function logoutSS(headers: Headers): Promise<Response | null> {
+  return logoutStandardSS(headers);
 }
 
 export async function authErrorRedirect(

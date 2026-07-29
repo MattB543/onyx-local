@@ -6,7 +6,7 @@ import { useDropzone } from "react-dropzone";
 import { CrmImportResult, importCrmCsv } from "@/app/app/crm/crmService";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import Button from "@/refresh-components/buttons/Button";
-import Modal from "@/refresh-components/Modal";
+import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgUploadCloud } from "@opal/icons";

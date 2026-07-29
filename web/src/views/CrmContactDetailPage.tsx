@@ -16,7 +16,11 @@ import {
   uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import { SettingsLayouts, toast } from "@opal/layouts";
+import {
+  ConfirmationModalLayout,
+  SettingsLayouts,
+  toast,
+} from "@opal/layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -35,7 +39,6 @@ import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import ConfirmationModalLayout from "@/refresh-components/layouts/ConfirmationModalLayout";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/views/crm/components/ActivityTimeline";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";

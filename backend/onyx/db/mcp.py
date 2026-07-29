@@ -2,6 +2,8 @@ import datetime
 from typing import cast
 from uuid import UUID
 
+from pydantic import BaseModel
+from pydantic import ConfigDict
 from sqlalchemy import and_
 from sqlalchemy import delete
 from sqlalchemy import Select
@@ -26,6 +28,7 @@ from onyx.db.models import Tool
 from onyx.db.models import User
 from onyx.db.models import User__UserGroup
 from onyx.db.models import UserRole
+from onyx.server.features.mcp.models import DENYLISTED_MCP_HEADERS
 from onyx.server.features.mcp.models import MCPConnectionData
 from onyx.utils.logger import setup_logger
 from onyx.utils.sensitive import SensitiveValue
@@ -337,6 +340,93 @@ def get_user_connection_config(
             )
         )
     )
+
+
+class MCPCredentialsError(Exception):
+    """Credentials for an MCP server cannot be resolved for this user."""
+
+
+class ResolvedMCPCredentials(BaseModel):
+    """Credential source for one (server, user) pair.
+
+    Exactly one of the fields is populated (both are None for auth type NONE):
+    `connection_config` for API_TOKEN / OAUTH servers, `user_oauth_token` for
+    PT_OAUTH servers.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+    connection_config: MCPConnectionConfig | None
+    user_oauth_token: str | None
+
+    def build_headers(self) -> dict[str, str]:
+        """Auth headers for a request to the server: the stored
+        connection-config headers, with PT_OAUTH's login token taking
+        precedence. Empty when no credentials are stored.
+
+        Denylisted headers (see DENYLISTED_MCP_HEADERS) are stripped so every
+        consumer gets the security filter automatically — stored credentials
+        must never source e.g. a Host header."""
+        stored = extract_connection_data(self.connection_config).get("headers", {})
+        headers = {
+            k: v for k, v in stored.items() if k.lower() not in DENYLISTED_MCP_HEADERS
+        }
+        if len(headers) != len(stored):
+            # Names only — header values are credentials.
+            logger.warning(
+                "Stored MCP credential headers contained denylisted headers "
+                "that were stripped: %s",
+                sorted(k for k in stored if k.lower() in DENYLISTED_MCP_HEADERS),
+            )
+        if self.user_oauth_token:
+            headers["Authorization"] = f"Bearer {self.user_oauth_token}"
+        return headers
+
+
+def resolve_mcp_credentials(
+    mcp_server: MCPServer,
+    user: User,
+    db_session: Session,
+) -> ResolvedMCPCredentials:
+    """Resolve which stored credentials authenticate `user` against `mcp_server`.
+
+    The single source of truth for the performer/auth-type branching, shared by
+    chat's MCPTool construction and Craft's sandbox-proxy credential injection:
+    - PT_OAUTH: the user's login OAuth token; no stored config row.
+    - API_TOKEN / OAUTH: the user's own `mcp_connection_config` row for
+      PER_USER servers, the admin config row otherwise.
+    - NONE: no credentials.
+
+    Raises MCPCredentialsError for PT_OAUTH with the anonymous user, who has no
+    login OAuth token.
+    """
+    if mcp_server.auth_type == MCPAuthenticationType.PT_OAUTH:
+        if user.is_anonymous:
+            raise MCPCredentialsError(
+                f"Anonymous user cannot use PT_OAUTH MCP server {mcp_server.id}"
+            )
+        return ResolvedMCPCredentials(
+            connection_config=None,
+            user_oauth_token=(
+                user.oauth_accounts[0].access_token if user.oauth_accounts else None
+            ),
+        )
+
+    if mcp_server.auth_type in (
+        MCPAuthenticationType.API_TOKEN,
+        MCPAuthenticationType.OAUTH,
+    ):
+        if mcp_server.auth_performer == MCPAuthenticationPerformer.PER_USER:
+            connection_config = get_user_connection_config(
+                mcp_server.id, user.email, db_session
+            )
+        else:
+            connection_config = mcp_server.admin_connection_config
+        return ResolvedMCPCredentials(
+            connection_config=connection_config, user_oauth_token=None
+        )
+
+    return ResolvedMCPCredentials(connection_config=None, user_oauth_token=None)
 
 
 def get_user_connection_configs_for_server(

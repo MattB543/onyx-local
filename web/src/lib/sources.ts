@@ -4,6 +4,7 @@ import {
   GoogleStorageIcon,
   GoogleCalendarIcon,
   BraintrustIcon,
+  BoxIcon,
 } from "@/components/icons/icons";
 import { ValidSources } from "@/lib/types";
 import { SourceCategory, SourceMetadata } from "@/lib/search/interfaces";
@@ -212,6 +213,12 @@ export const SOURCE_METADATA_MAP: SourceMap = {
     docs: `${DOCS_ADMINS_PATH}/connectors/official/google_drive/overview`,
     oauthSupported: true,
     isPopular: true,
+  },
+  box: {
+    icon: BoxIcon,
+    displayName: "Box",
+    category: SourceCategory.Storage,
+    docs: `${DOCS_ADMINS_PATH}/connectors/official/box`,
   },
   dropbox: {
     icon: SvgDropbox,

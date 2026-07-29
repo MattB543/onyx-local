@@ -13,7 +13,7 @@ import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import Modal from "@/refresh-components/Modal";
+import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgOrganization } from "@opal/icons";

@@ -245,6 +245,7 @@ class DocumentSource(str, Enum):
     GOOGLE_SITES = "google_sites"
     ZENDESK = "zendesk"
     LOOPIO = "loopio"
+    BOX = "box"
     DROPBOX = "dropbox"
     SHAREPOINT = "sharepoint"
     TEAMS = "teams"
@@ -322,16 +323,6 @@ class BlobType(str, Enum):
 class DocumentIndexType(str, Enum):
     COMBINED = "combined"  # Vespa
     SPLIT = "split"  # Typesense + Qdrant
-
-
-class AuthType(str, Enum):
-    BASIC = "basic"
-    GOOGLE_OAUTH = "google_oauth"
-    OIDC = "oidc"
-    SAML = "saml"
-
-    # google auth and basic
-    CLOUD = "cloud"
 
 
 class QueryHistoryType(str, Enum):
@@ -760,6 +751,7 @@ DocumentSourceDescription: dict[DocumentSource, str] = {
     DocumentSource.GOOGLE_SITES: "Website pages and content",
     DocumentSource.ZENDESK: "Support tickets and help articles",
     DocumentSource.LOOPIO: "RFP responses and content library",
+    DocumentSource.BOX: "Cloud-stored files and folders",
     DocumentSource.DROPBOX: "Cloud-stored files and folders",
     DocumentSource.SHAREPOINT: "Documents and team sites",
     DocumentSource.TEAMS: "Chat messages and channels",

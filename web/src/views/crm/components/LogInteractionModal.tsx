@@ -25,7 +25,7 @@ import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
-import Modal from "@/refresh-components/Modal";
+import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgPlusCircle } from "@opal/icons";
