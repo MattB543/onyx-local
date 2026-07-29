@@ -74,3 +74,37 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   otherwise — 495 ButtonProps errors from a Jun 21 dist; rebuild before trusting tsc).
 - Codex sanity check: PASS (all 30 fork files byte-preserved, route shims valid,
   jest globs verified, refresh-components intact, EE relocation counts match).
+
+## Batch 3 — 11554205b8 (2026-07-29, 150 commits, 651→501 behind)
+
+- Conflicts: 8 (4 content, 3 modify/delete, 1 rename+content). New files not in the
+  recurring table:
+  - `backend/onyx/db/chat.py` — looked like keep-ours but was dead reformatting;
+    upstream's last-activity retention query (47475038f0) taken.
+  - `web/src/lib/projects/svc.ts` + NEW `types.ts` — upstream extracted types; our
+    `ProjectFile.attachment_source`/`index_for_later` fields ported into types.ts
+    (TWO-file fix; marker-only resolution would silently break 6 consumer files).
+  - `web/src/lib/userSS.ts` — deleted upstream, split into `web/src/lib/auth/svcSS.ts`
+    + `auth/types.ts`. Our auth-type hardening (AUTH_TYPE_VALUES, resolveAuthType,
+    buildFallbackAuthTypeMetadata, try/catch getAuthTypeMetadataSS) ported into
+    auth/svcSS.ts. Future auth edits go there.
+  - `web/src/components/MultiSelectDropdown.tsx` — deleted; react-select removed
+    from package.json entirely. Do not resurrect.
+  - `backend/ee/onyx/server/oauth/google_drive.py` — KEEP OURS (scope-sync via
+    GOOGLE_SCOPES); upstream's only delta was a docs-URL comment.
+- Deviations from playbook defaults: none. Alembic merge migration `fb9bb92cc072`
+  (parents f75baf85603b + 2e0b2b146de1). Upstream added UserUsage/ModelCostOverride
+  models+migration (no consumers yet — code lands in a later batch).
+- New upstream patterns:
+  - Span-replacement gotcha: when both conflict sides share a trailing suffix, git
+    parks that suffix AFTER the last >>>>>>> marker — inspect ~5 lines past the
+    marker before whole-span replacements (models.py near-miss).
+  - Large web refactor: lib/user.ts→lib/users/svc.ts, hooks/useCurrentUser→
+    lib/users/hooks.ts, lib/hooks/useProjects→lib/projects/hooks.ts,
+    app/app/services/fileUtils→lib/projects/utils.ts. No fork dangling imports.
+  - Stale `.next/` build artifacts caused 4 phantom tsc errors after upstream
+    deleted routes (craft/v1/skills/manage) — `rm -rf web/.next` before trusting tsc.
+  - Alembic DOES run from a worktree using the main checkout's venv python.
+- Verification on main: sync-verify --batch all 7 PASS (tsc 0 after bun install +
+  lib/shared rebuild + .next clear; CRM jest 34/34; backend custom suites green).
+- Codex sanity check: pending.
