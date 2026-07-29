@@ -8,7 +8,7 @@ from onyx.llm.interfaces import LLM
 from onyx.llm.model_response import ModelResponse
 from onyx.llm.models import ToolCall
 from onyx.tracing.flows import LLMFlow
-from onyx.tracing.framework.create import generation_span
+from onyx.tracing.framework.create import generation_span, get_current_span
 from onyx.tracing.framework.span_data import GenerationSpanData
 from onyx.tracing.framework.spans import Span
 
@@ -56,6 +56,7 @@ def traced_llm_call(
     model: str,
     provider: str,
     extra_config: Mapping[str, str] | None = None,
+    image_count: int | None = None,
     input_messages: Sequence[Any] | Any | None = None,
     tools: Sequence[Mapping[str, Any]] | None = None,
     parent: Any | None = None,
@@ -76,6 +77,7 @@ def traced_llm_call(
     with generation_span(
         model=model,
         model_config=model_config,
+        image_count=image_count,
         tools=tools,
         parent=parent,
     ) as span:
@@ -90,6 +92,16 @@ def traced_llm_call(
                 Sequence[Mapping[str, Any]], normalized_messages
             )
         yield span
+
+
+def record_llm_request_params(params: Mapping[str, Any]) -> None:
+    """Attach request-shaping params (reasoning effort, provider kwargs) to the
+    active generation span. Call once per send attempt with the provider-mapped
+    kwargs: last write wins. No-op when the current span is not a generation span."""
+    span = get_current_span()
+    if span is None or not isinstance(span.span_data, GenerationSpanData):
+        return
+    span.span_data.request_params = dict(params)
 
 
 def record_llm_response(

@@ -70,12 +70,12 @@ from onyx.auth.email_utils import (
 )
 from onyx.auth.invited_users import get_invited_users, remove_user_from_invited_users
 from onyx.auth.jwt import verify_jwt_token
+from onyx.auth.login_claims_capture import capture_oauth_login_claims
 from onyx.auth.mobile_sso.sso_completion import (
     apply_mobile_state,
     complete_mobile_sso,
     is_mobile_sso,
 )
-from onyx.auth.oauth_claims_capture import capture_oauth_login_claims
 from onyx.auth.pat import get_hashed_pat_from_request
 from onyx.auth.schemas import AuthBackend, UserCreate, UserRole
 from onyx.auth.session_tokens import (
@@ -168,6 +168,7 @@ from shared_configs.configs import (
 )
 from shared_configs.contextvars import (
     CURRENT_TENANT_ID_CONTEXTVAR,
+    CURRENT_USER_ID_CONTEXTVAR,
     get_current_tenant_id,
 )
 
@@ -287,17 +288,17 @@ def anonymous_user_enabled(*, tenant_id: str | None = None) -> bool:
 
 
 def workspace_invite_only_enabled() -> bool:
-    settings = load_settings()
+    try:
+        settings = load_settings(raise_on_error=True)
+    except Exception:
+        # Fail closed: if the setting can't be read, treat the workspace as
+        # invite-only rather than silently admitting uninvited users.
+        logger.error("Could not load invite-only setting; failing closed (invite-only)")
+        return True
     return settings.invite_only_enabled
 
 
-def verify_email_is_invited(email: str, *, sso_managed: bool = False) -> None:
-    # An SSO provider manages membership for users it provisions, and its
-    # allowed_email_domains is the admin's per-provider control, so the
-    # workspace invite list does not apply.
-    if sso_managed:
-        return
-
+def verify_email_is_invited(email: str) -> None:
     if not workspace_invite_only_enabled():
         return
 
@@ -332,12 +333,14 @@ def verify_email_is_invited(email: str, *, sso_managed: bool = False) -> None:
     )
 
 
-def verify_email_in_whitelist(
-    email: str, tenant_id: str, *, sso_managed: bool = False
-) -> None:
+def verify_email_in_whitelist(email: str, tenant_id: str) -> None:
     with get_session_with_tenant(tenant_id=tenant_id) as db_session:
-        if not get_user_by_email(email, db_session):
-            verify_email_is_invited(email, sso_managed=sso_managed)
+        user = get_user_by_email(email, db_session)
+        # A permission-sync placeholder is not a member: appearing in a
+        # connector's ACLs must not satisfy invite-only, so the invite check
+        # applies until the person actually joins.
+        if user is None or not user.account_type.is_web_login():
+            verify_email_is_invited(email)
 
 
 def verify_email_domain(
@@ -559,12 +562,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user_create: schemas.UC | UserCreate,
         safe: bool = False,
         request: Optional[Request] = None,
-        *,
-        sso_managed: bool = False,
     ) -> User:
         # Check for disposable emails FIRST so obvious throwaway domains are
         # rejected before hitting Google's siteverify API. Cheap local check.
         security_settings = get_security_settings()
+
+        if safe and not MULTI_TENANT and not security_settings.password_auth_enabled:
+            raise OnyxError(
+                OnyxErrorCode.REGISTRATION_DISABLED,
+                "Password signup is disabled. Sign in through your SSO provider.",
+            )
+
         try:
             verify_email_domain(
                 user_create.email,
@@ -645,13 +653,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     user_count = await get_user_count()
                     if user_count > 0:
                         # Tenant already has users - require invite for new users
-                        verify_email_is_invited(
-                            user_create.email, sso_managed=sso_managed
-                        )
+                        verify_email_is_invited(user_create.email)
                 else:
-                    # Single-tenant: the gate self-skips for SSO-managed users
-                    # and when invite-only is off
-                    verify_email_is_invited(user_create.email, sso_managed=sso_managed)
+                    # Single-tenant: the gate self-skips when invite-only is off
+                    verify_email_is_invited(user_create.email)
                 if MULTI_TENANT:
                     tenant_user_db = SQLAlchemyUserAdminDB[User, uuid.UUID](
                         db_session, User, OAuthAccount
@@ -883,7 +888,6 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         associate_by_email: bool = False,
         is_verified_by_default: bool = False,
         allowed_email_domains_override: Sequence[str] | None = None,
-        sso_managed: bool = False,
     ) -> User:
         referral_source = (
             getattr(request.state, "referral_source", None) if request else None
@@ -907,7 +911,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         async with get_async_session_context_manager(tenant_id) as db_session:
             token = CURRENT_TENANT_ID_CONTEXTVAR.set(tenant_id)
 
-            verify_email_in_whitelist(account_email, tenant_id, sso_managed=sso_managed)
+            verify_email_in_whitelist(account_email, tenant_id)
             oauth_security_settings = get_security_settings()
             effective_valid_email_domains = (
                 allowed_email_domains_override
@@ -949,9 +953,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     user = await self.user_db.get_by_email(account_email)
                     if user is None:
                         raise exceptions.UserNotExists()
-                    if not associate_by_email:
+                    if not associate_by_email and user.account_type.is_web_login():
                         # Linking a login to an existing same-email account is
                         # an account-takeover vector unless explicitly enabled.
+                        # Non-web-login placeholders (permission-sync
+                        # EXT_PERM_USER, bots) carry no credentials or sessions,
+                        # so there is nothing to take over, and the non-web-login
+                        # upgrade below claims them.
                         raise exceptions.UserAlreadyExists()
 
                     user = await self.user_db.add_oauth_account(
@@ -1053,8 +1061,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
                 # Refresh the async user object so downstream code
                 # (e.g. oidc_expiry check) sees the updated fields.
+                # Cache id before expire. Accessing attrs on an expired object
+                # triggers a sync lazy-load which raises MissingGreenlet in this
+                # async context.
+                refreshed_user_id = user.id
                 self.user_db.session.expire(user)
-                user = await self.user_db.get(user.id)
+                user = await self.user_db.get(refreshed_user_id)
                 assert user is not None
 
             # this is needed if an organization toggles track_external_idp_expiry from
@@ -1286,9 +1298,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             valid_email_domains=get_security_settings().valid_email_domains,
         )
 
-        logger.notice(
-            "Verification requested for user %s. Verification token: %s", user.id, token
-        )
+        # Never log the verification token: it is a replayable credential that
+        # marks the account verified, and the log stream is a wider audience
+        # than the intended email channel.
+        logger.notice("Verification requested for user %s", user.id)
         user_count = await get_user_count()
         try:
             send_user_verification_email(
@@ -1321,6 +1334,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 outcome,
                 actor=AuditActor(email=email),
             )
+
+        if not MULTI_TENANT and not get_security_settings().password_auth_enabled:
+            _audit_login_failure(AuditOutcome.DENIED)
+            raise BasicAuthenticationError(detail="PASSWORD_LOGIN_DISABLED")
 
         tenant_id: str | None = None
         try:
@@ -1989,11 +2006,11 @@ def _scoped_pat_permitted_on_route(
     )
 
 
-async def optional_user(
+async def _resolve_optional_user(
     request: Request,
-    async_db_session: AsyncSession = Depends(get_async_session),
-    user: User | None = Depends(optional_fastapi_current_user),
-    user_manager: BaseUserManager[User, uuid.UUID] = Depends(get_user_manager),
+    async_db_session: AsyncSession,
+    user: User | None,
+    user_manager: BaseUserManager[User, uuid.UUID],
 ) -> User | None:
     if user := await _check_for_saml_and_jwt(request, user, async_db_session):
         # If user is already set, _check_for_saml_and_jwt returns the same user object
@@ -2028,6 +2045,25 @@ async def optional_user(
     if user is not None:
         await _maybe_refresh_oauth_tokens(user, async_db_session, user_manager)
     return user
+
+
+async def optional_user(
+    request: Request,
+    async_db_session: AsyncSession = Depends(get_async_session),
+    user: User | None = Depends(optional_fastapi_current_user),
+    user_manager: BaseUserManager[User, uuid.UUID] = Depends(get_user_manager),
+) -> AsyncGenerator[User | None, None]:
+    user = await _resolve_optional_user(
+        request,
+        async_db_session,
+        user,
+        user_manager,
+    )
+    token = CURRENT_USER_ID_CONTEXTVAR.set(str(user.id) if user is not None else None)
+    try:
+        yield user
+    finally:
+        CURRENT_USER_ID_CONTEXTVAR.reset(token)
 
 
 def get_anonymous_user() -> User:
@@ -2098,12 +2134,16 @@ async def current_limited_user(
 
 async def current_chat_accessible_user(
     user: User | None = Depends(optional_user),
-) -> User:
+) -> AsyncGenerator[User, None]:
     tenant_id = get_current_tenant_id()
-
-    return await double_check_user(
+    user = await double_check_user(
         user, allow_anonymous_access=anonymous_user_enabled(tenant_id=tenant_id)
     )
+    token = CURRENT_USER_ID_CONTEXTVAR.set(str(user.id))
+    try:
+        yield user
+    finally:
+        CURRENT_USER_ID_CONTEXTVAR.reset(token)
 
 
 async def current_user(
@@ -2203,11 +2243,11 @@ def is_same_origin(actual: str, expected: str) -> bool:
 async def current_user_from_websocket(
     websocket: WebSocket,
     token: str = Query(..., description="WebSocket authentication token"),
-) -> User:
+) -> AsyncGenerator[User, None]:
     """
     WebSocket authentication dependency using query parameter.
 
-    Validates the WS token from query param and returns the User.
+    Validates the WS token from query param and yields the User.
     Raises BasicAuthenticationError if authentication fails.
 
     The token must be obtained from POST /voice/ws-token before connecting.
@@ -2266,7 +2306,11 @@ async def current_user_from_websocket(
         )
 
     logger.debug("WS auth: authenticated %s", user.email)
-    return user
+    context_token = CURRENT_USER_ID_CONTEXTVAR.set(str(user.id))
+    try:
+        yield user
+    finally:
+        CURRENT_USER_ID_CONTEXTVAR.reset(context_token)
 
 
 def get_default_admin_user_emails_() -> list[str]:
@@ -2286,7 +2330,7 @@ class OAuth2AuthorizeResponse(BaseModel):
 
 
 def generate_state_token(
-    data: Dict[str, str],
+    data: Dict[str, Any],
     secret: SecretType,
     lifetime_seconds: int = STATE_TOKEN_LIFETIME_SECONDS,
 ) -> str:
@@ -2321,7 +2365,7 @@ def decode_and_validate_oauth_state(
     state_secret: SecretType,
     csrf_token_cookie_name: str = CSRF_TOKEN_COOKIE_NAME,
     expected_provider_name: str | None = None,
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """Decode the signed OAuth state and enforce the CSRF double-submit.
     Optionally bind the flow to a provider so a state minted for one provider
     cannot be replayed on another provider's callback."""
@@ -2370,7 +2414,6 @@ async def complete_login_flow(
     associate_by_email: bool,
     is_verified_by_default: bool,
     allowed_email_domains_override: Sequence[str] | None = None,
-    sso_managed: bool = False,
 ) -> RedirectResponse:
     """Shared post-token OAuth/OIDC login: read the verified identity, create or
     authenticate the user, and return a web or mobile redirect."""
@@ -2420,7 +2463,6 @@ async def complete_login_flow(
             associate_by_email=associate_by_email,
             is_verified_by_default=is_verified_by_default,
             allowed_email_domains_override=allowed_email_domains_override,  # ty: ignore[unknown-argument]
-            sso_managed=sso_managed,  # ty: ignore[unknown-argument]
         )
     except UserAlreadyExists:
         raise OnyxError(

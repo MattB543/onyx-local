@@ -11,7 +11,8 @@ from onyx.db.enums import SkillAccessLevel, SkillSharePermission
 from onyx.db.models import Skill
 from onyx.server.models import MinimalUserSnapshot
 from onyx.skills.built_in import BuiltInSkillDefinition
-from onyx.skills.models import SkillBundleFile
+from onyx.skills.models import GITHUB_SKILL_MAX_COUNT, SkillBundleFile
+from onyx.utils.github import GITHUB_COMMIT_SHA_PATTERN
 
 
 class SkillUserShare(BaseModel):
@@ -25,10 +26,16 @@ class SkillGroupShare(BaseModel):
     permission: SkillSharePermission
 
 
+class SkillExternalAppDependencyResponse(BaseModel):
+    external_app_id: int
+    name: str
+    enabled: bool
+    ready: bool
+
+
 class SkillResponse(BaseModel):
     source: Literal["builtin", "custom"]
     id: UUID
-    slug: str
     name: str
     description: str
 
@@ -49,6 +56,7 @@ class SkillResponse(BaseModel):
     public_permission: SkillSharePermission | None = None
     is_personal: bool = False
     user_permission: SkillAccessLevel | None = None
+    external_app: SkillExternalAppDependencyResponse | None = None
 
     @classmethod
     def from_builtin(
@@ -58,11 +66,11 @@ class SkillResponse(BaseModel):
         db_session: Session,
         enabled: bool,
         can_toggle: bool,
+        external_app: SkillExternalAppDependencyResponse | None = None,
     ) -> "SkillResponse":
         return cls(
             source="builtin",
             id=skill.id,
-            slug=skill.slug,
             name=skill.name,
             description=skill.description,
             is_available=definition.is_available(db_session),
@@ -70,6 +78,7 @@ class SkillResponse(BaseModel):
             enabled=enabled,
             can_toggle=can_toggle,
             user_permission=SkillAccessLevel.VIEWER,
+            external_app=external_app,
         )
 
     @classmethod
@@ -81,6 +90,7 @@ class SkillResponse(BaseModel):
         can_toggle: bool = True,
         user_permission: SkillAccessLevel | None = None,
         include_share_details: bool = False,
+        external_app: SkillExternalAppDependencyResponse | None = None,
     ) -> "SkillResponse":
         user_shares = [
             SkillUserShare(
@@ -104,7 +114,6 @@ class SkillResponse(BaseModel):
         return cls(
             source="custom",
             id=skill.id,
-            slug=skill.slug,
             name=skill.name,
             description=skill.description,
             is_valid=skill.is_valid,
@@ -129,6 +138,7 @@ class SkillResponse(BaseModel):
             and not user_shares
             and not group_shares,
             user_permission=user_permission,
+            external_app=external_app,
         )
 
 
@@ -144,6 +154,7 @@ class SkillPreviewResponse(BaseModel):
     description: str
     author_email: str | None = None
     instructions_markdown: str
+    external_app: SkillExternalAppDependencyResponse | None = None
 
     @classmethod
     def from_builtin(
@@ -151,6 +162,7 @@ class SkillPreviewResponse(BaseModel):
         skill: Skill,
         *,
         instructions_markdown: str,
+        external_app: SkillExternalAppDependencyResponse | None = None,
     ) -> "SkillPreviewResponse":
         return cls(
             source="builtin",
@@ -159,6 +171,7 @@ class SkillPreviewResponse(BaseModel):
             description=skill.description,
             author_email=None,
             instructions_markdown=instructions_markdown,
+            external_app=external_app,
         )
 
     @classmethod
@@ -167,6 +180,7 @@ class SkillPreviewResponse(BaseModel):
         skill: Skill,
         *,
         instructions_markdown: str,
+        external_app: SkillExternalAppDependencyResponse | None = None,
     ) -> "SkillPreviewResponse":
         return cls(
             source="custom",
@@ -175,6 +189,7 @@ class SkillPreviewResponse(BaseModel):
             description=skill.description,
             author_email=skill.author.email if skill.author is not None else None,
             instructions_markdown=instructions_markdown,
+            external_app=external_app,
         )
 
 
@@ -190,8 +205,51 @@ class SkillBundleInspectResponse(BaseModel):
     files: list[SkillBundleFile]
 
 
+class GitHubSkillPreview(BaseModel):
+    path: str
+    name: str
+    description: str | None
+    unavailable_reason: str | None
+
+
+class GitHubSkillsPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repository: str
+
+
+class GitHubSkillsPreviewResponse(BaseModel):
+    repository: str
+    revision: str
+    subpath: str | None
+    skills: list[GitHubSkillPreview]
+
+
+class GitHubSkillsImportRequest(GitHubSkillsPreviewRequest):
+    revision: str = Field(pattern=GITHUB_COMMIT_SHA_PATTERN)
+    subpath: str | None = None
+    paths: list[str] = Field(min_length=1, max_length=GITHUB_SKILL_MAX_COUNT)
+
+
+class GitHubImportedSkill(BaseModel):
+    skill: SkillResponse
+    disabled_reason: str | None = None
+
+
+class GitHubSkillNotImported(BaseModel):
+    path: str
+    name: str
+    reason: str
+
+
+class GitHubSkillsImportResponse(BaseModel):
+    imported: list[GitHubImportedSkill]
+    not_imported: list[GitHubSkillNotImported]
+
+
 class SkillEnableRequest(BaseModel):
     enabled: bool
+    replace_conflict: bool = False
 
 
 class SkillCreateRequest(BaseModel):

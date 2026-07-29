@@ -22,6 +22,7 @@ _VALID_EFFECTIVE_KWARGS: dict[str, Any] = {
     "track_external_idp_expiry": False,
     "ssrf_protection_level": SSRFProtectionLevel.VALIDATE_LLM,
     "mask_credential_prefix": True,
+    "llm_custom_config_env_injection": True,
     "valid_email_domains": (),
     "password_min_length": 8,
     "password_max_length": 64,
@@ -29,6 +30,7 @@ _VALID_EFFECTIVE_KWARGS: dict[str, Any] = {
     "password_require_lowercase": True,
     "password_require_digit": True,
     "password_require_special_char": False,
+    "password_auth_enabled": True,
 }
 
 

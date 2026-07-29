@@ -45,6 +45,7 @@ from onyx.db.models import Persona
 from onyx.llm.constants import LlmProviderNames
 from onyx.llm.interfaces import LLM, LLMUserIdentity, ToolChoiceOptions
 from onyx.llm.model_capabilities import is_true_openai_model
+from onyx.llm.models import ReasoningEffort
 from onyx.prompts.chat_prompts import IMAGE_GEN_REMINDER, OPEN_URL_REMINDER
 from onyx.prompts.prompt_utils import substitute_user_placeholders
 from onyx.server.query_and_chat.placement import Placement
@@ -74,9 +75,8 @@ from onyx.tools.tool_implementations.web_search.utils import extract_url_snippet
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
 from onyx.tools.tool_runner import run_tool_calls
 from onyx.tools.utils import compute_all_tool_tokens
-from onyx.tracing.framework.create import trace
+from onyx.tracing.framework.create import ChatTraceMetadata, trace
 from onyx.utils.logger import setup_logger
-from shared_configs.contextvars import get_current_tenant_id
 
 logger = setup_logger()
 
@@ -655,6 +655,7 @@ def run_llm_loop(
     user_identity: LLMUserIdentity | None = None,
     chat_session_id: str | None = None,
     chat_files: list[ChatFile] | None = None,
+    reasoning_effort: ReasoningEffort = ReasoningEffort.AUTO,
     include_citations: bool = True,
     all_injected_file_metadata: dict[str, FileToolMetadata] | None = None,
     inject_memories_in_prompt: bool = True,
@@ -663,11 +664,10 @@ def run_llm_loop(
     with trace(
         "run_llm_loop",
         group_id=chat_session_id,
-        metadata={
-            "tenant_id": get_current_tenant_id(),
-            "chat_session_id": chat_session_id,
-            "user_id": user_identity.user_id if user_identity else None,
-        },
+        metadata=ChatTraceMetadata(
+            chat_session_id=chat_session_id,
+            user_id=user_identity.user_id if user_identity else None,
+        ).model_dump(),
     ):
         # Fix some LiteLLM issues,
         from onyx.llm.litellm_singleton.config import (
@@ -948,6 +948,7 @@ def run_llm_loop(
                 final_documents=gathered_documents,
                 user_identity=user_identity,
                 pre_answer_processing_time=pre_answer_processing_time,
+                reasoning_effort=reasoning_effort,
             )
             if has_reasoned:
                 reasoning_cycles += 1

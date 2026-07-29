@@ -39,6 +39,7 @@ class OnyxErrorCode(Enum):
     UNAUTHORIZED = ("UNAUTHORIZED", 403)
     INSUFFICIENT_PERMISSIONS = ("INSUFFICIENT_PERMISSIONS", 403)
     ADMIN_ONLY = ("ADMIN_ONLY", 403)
+    REGISTRATION_DISABLED = ("REGISTRATION_DISABLED", 403)
     EE_REQUIRED = ("EE_REQUIRED", 403)
     SINGLE_TENANT_ONLY = ("SINGLE_TENANT_ONLY", 403)
     ENV_VAR_GATED = ("ENV_VAR_GATED", 403)
@@ -67,6 +68,7 @@ class OnyxErrorCode(Enum):
     # --------------------------------------------------------------------------
     CONFLICT = ("CONFLICT", 409)
     DUPLICATE_RESOURCE = ("DUPLICATE_RESOURCE", 409)
+    SKILL_NAME_CONFLICT = ("SKILL_NAME_CONFLICT", 409)
 
     # --------------------------------------------------------------------------
     # Rate Limiting / Quotas (429 / 402)

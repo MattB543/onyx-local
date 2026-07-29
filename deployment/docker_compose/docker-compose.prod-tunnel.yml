@@ -6,6 +6,9 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
+      # The shipped image; the Dockerfile's default (last) stage is the dev variant
+      # with debugging tools (published with a -dev tag suffix).
+      target: runtime
       args:
         - ONYX_VERSION=${ONYX_VERSION:-0.0.0-dev}
     command: >
@@ -59,6 +62,9 @@ services:
     build:
       context: ../../backend
       dockerfile: Dockerfile
+      # The shipped image; the Dockerfile's default (last) stage is the dev variant
+      # with debugging tools (published with a -dev tag suffix).
+      target: runtime
       args:
         - ONYX_VERSION=${ONYX_VERSION:-0.0.0-dev}
     command: >

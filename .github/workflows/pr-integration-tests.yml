@@ -193,7 +193,7 @@ jobs:
           echo "cache-suffix=${CACHE_SUFFIX}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # ratchet:docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # ratchet:docker/setup-buildx-action@v4
 
       - name: Log in to ECR pull-through cache
         uses: ./.github/actions/login-ecr-pullthrough-cache
@@ -201,7 +201,7 @@ jobs:
           ecr-registry: ${{ vars.ECR_REGISTRY }}
 
       - name: Build and push Devcontainer Docker image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: .devcontainer
           file: .devcontainer/Dockerfile
@@ -327,7 +327,7 @@ jobs:
 
       - name: Build CLI binary (for CLI integration tests)
         if: contains(matrix.test-dir.path, 'tests/cli')
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # zizmor: ignore[cache-poisoning]
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # zizmor: ignore[cache-poisoning]
         with:
           go-version: "1.26.4"
           cache-dependency-path: "cli/go.sum"

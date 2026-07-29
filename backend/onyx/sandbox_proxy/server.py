@@ -23,9 +23,13 @@ from onyx.sandbox_proxy.credential_injection import (
     CredentialResolver,
 )
 from onyx.sandbox_proxy.identity import IdentityResolver, SandboxIPLookup
-from onyx.sandbox_proxy.request_evaluator import ExternalAppRequestEvaluator
+from onyx.sandbox_proxy.request_evaluator import (
+    CompositeRequestEvaluator,
+    ExternalAppRequestEvaluator,
+    McpRequestEvaluator,
+)
 from onyx.sandbox_proxy.resolvers.external_app import ExternalAppResolver
-from onyx.sandbox_proxy.resolvers.llm_provider_key import LLMProviderKeyResolver
+from onyx.sandbox_proxy.resolvers.mcp_server import MCPServerResolver
 from onyx.sandbox_proxy.resolvers.onyx_pat import OnyxPatResolver
 from onyx.server.features.build.configs import (
     SANDBOX_NAMESPACE,
@@ -163,7 +167,11 @@ def build_resolvers() -> list[CredentialResolver]:
     canonical hosts). Order is a safety net against accidental overlap, not a
     designed-in priority.
     """
-    return [OnyxPatResolver(), LLMProviderKeyResolver(), ExternalAppResolver()]
+    return [
+        OnyxPatResolver(),
+        MCPServerResolver(),
+        ExternalAppResolver(),
+    ]
 
 
 def _install_signal_handlers(
@@ -248,7 +256,9 @@ def main() -> int:
         )
         gate = GateAddon(
             identity=identity,
-            request_evaluator=ExternalAppRequestEvaluator(),
+            request_evaluator=CompositeRequestEvaluator(
+                [ExternalAppRequestEvaluator(), McpRequestEvaluator()]
+            ),
             cache_factory=_build_cache_factory(),
             proxy_instance_id=proxy_instance_id,
             credential_dispatcher=CredentialInjectionDispatcher(resolvers),

@@ -28,8 +28,8 @@ from onyx.redis.redis_pool import get_redis_client
 from onyx.server.features.build.db.build_session import (
     allocate_nextjs_port,
     get_build_session,
+    session_runtime_stale,
     set_build_session_sharing_scope,
-    skills_are_stale,
 )
 from onyx.server.features.build.db.sandbox import (
     get_latest_snapshot_for_session,
@@ -39,7 +39,14 @@ from onyx.server.features.build.db.sandbox import (
 from onyx.server.features.build.models import UploadResponse
 from onyx.server.features.build.sandbox.factory import get_sandbox_manager
 from onyx.server.features.build.sandbox.models import DirectoryListing
+from onyx.server.features.build.sandbox.util.mcp_config import (
+    resolve_craft_mcp_servers,
+)
 from onyx.server.features.build.session.errors import UploadLimitExceededError
+from onyx.server.features.build.session.locks import (
+    SessionCreationLockAcquisitionError,
+    session_creation_lock,
+)
 from onyx.server.features.build.session.manager import SessionManager
 from onyx.server.features.build.session.models import (
     ArtifactResponse,
@@ -101,10 +108,6 @@ def list_sessions(
     )
 
 
-# Lock timeout for session creation (should be longer than max provision time)
-SESSION_CREATE_LOCK_TIMEOUT_SECONDS = 300
-
-
 @router.post("", response_model=DetailedSessionResponse)
 def create_session(
     request: SessionCreateRequest,
@@ -123,40 +126,26 @@ def create_session(
     Uses Redis lock to prevent race conditions when multiple requests try to
     create/provision a session for the same user concurrently.
     """
-    tenant_id = get_current_tenant_id()
-    redis_client = get_redis_client(tenant_id=tenant_id)
-
-    # Lock on user_id to prevent concurrent session creation for the same user
-    # This prevents race conditions where two requests both see sandbox as SLEEPING
-    # and both try to provision, with one deleting the other's work
-    lock_key = f"session_create:{user.id}"
-    lock = redis_client.lock(lock_key, timeout=SESSION_CREATE_LOCK_TIMEOUT_SECONDS)
-
-    # blocking=True means wait if another create is in progress
-    acquired = lock.acquire(
-        blocking=True, blocking_timeout=SESSION_CREATE_LOCK_TIMEOUT_SECONDS
-    )
-    if not acquired:
-        raise HTTPException(
-            status_code=503,
-            detail="Session creation timed out waiting for lock",
-        )
-
     try:
-        session_manager = SessionManager(db_session)
-        build_session = session_manager.get_or_create_empty_session(
-            user.id,
-            llm_provider_type=request.llm_provider_type,
-            llm_model_name=request.llm_model_name,
-            headless=request.headless,
-        )
-        db_session.commit()
+        with session_creation_lock(user.id):
+            session_manager = SessionManager(db_session)
+            build_session = session_manager.get_or_create_empty_session(
+                user.id,
+                headless=request.headless,
+            )
+            sandbox = get_sandbox_by_user_id(db_session, user.id)
+            if sandbox is None:
+                raise RuntimeError("Session creation completed without a sandbox")
+            update_sandbox_heartbeat(db_session, sandbox.id)
+            db_session.commit()
 
-        sandbox = get_sandbox_by_user_id(db_session, user.id)
         base_response = SessionResponse.from_model(build_session, sandbox)
         return DetailedSessionResponse.from_session_response(
             base_response, session_loaded_in_sandbox=True
         )
+    except SessionCreationLockAcquisitionError as e:
+        db_session.rollback()
+        raise OnyxError(OnyxErrorCode.SERVICE_UNAVAILABLE, str(e)) from e
     except OnyxError:
         # e.g. no provider exposes a supported model; let the global handler
         # return its own status code instead of collapsing to 429/500.
@@ -170,9 +159,6 @@ def create_session(
         db_session.rollback()
         logger.error("Session creation failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Session creation failed: {e}")
-    finally:
-        if lock.owned():
-            lock.release()
 
 
 @router.get("/{session_id}", response_model=DetailedSessionResponse)
@@ -412,10 +398,11 @@ def restore_session(
                 sandbox.id, session_id
             ):
                 session.status = BuildSessionStatus.ACTIVE
-                if skills_are_stale(session, sandbox):
+                if session_runtime_stale(session, sandbox):
                     SessionManager(db_session).reload_session_skills(session_id, user)
                 else:
                     update_sandbox_heartbeat(db_session, sandbox.id)
+                    db_session.commit()
                 base_response = SessionResponse.from_model(session, sandbox)
                 return DetailedSessionResponse.from_session_response(
                     base_response, session_loaded_in_sandbox=True
@@ -432,7 +419,7 @@ def restore_session(
                 db_session.commit()
                 db_session.refresh(sandbox)
 
-        llm_config, all_llm_configs = SessionManager(db_session).build_llm_configs(user)
+        llm_config = SessionManager(db_session).build_llm_configs(user)
 
         if sandbox.status in (SandboxStatus.SLEEPING, SandboxStatus.TERMINATED):
             mark_sandbox_provisioning(db_session, sandbox)
@@ -446,7 +433,6 @@ def restore_session(
                 user,
                 user.id,
                 tenant_id,
-                all_llm_configs,
             )
             db_session.commit()
 
@@ -470,6 +456,7 @@ def restore_session(
                     sandbox.id,
                     user,
                     db_session,
+                    connectable_apps_section=connectable_apps_section,
                     skills_files=skills_files,
                 )
                 if snapshot:
@@ -481,9 +468,11 @@ def restore_session(
                             nextjs_port=session.nextjs_port,
                             llm_config=llm_config,
                             connectable_apps_section=connectable_apps_section,
+                            mcp_servers=resolve_craft_mcp_servers(db_session, user),
                         )
                         session.status = BuildSessionStatus.ACTIVE
                         session.skills_hash = sandbox.skills_hash
+                        session.mcp_config_hash = sandbox.mcp_config_hash
                         db_session.commit()
                     except Exception as e:
                         logger.error(
@@ -499,9 +488,11 @@ def restore_session(
                         llm_config=llm_config,
                         nextjs_port=session.nextjs_port,
                         connectable_apps_section=connectable_apps_section,
+                        mcp_servers=resolve_craft_mcp_servers(db_session, user),
                     )
                     session.status = BuildSessionStatus.ACTIVE
                     session.skills_hash = sandbox.skills_hash
+                    session.mcp_config_hash = sandbox.mcp_config_hash
                     db_session.commit()
 
         else:
@@ -546,6 +537,7 @@ def restore_session(
 
     # Update heartbeat to mark sandbox as active after successful restore
     update_sandbox_heartbeat(db_session, sandbox.id)
+    db_session.commit()
 
     base_response = SessionResponse.from_model(session, sandbox)
     return DetailedSessionResponse.from_session_response(

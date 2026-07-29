@@ -23,6 +23,7 @@ function buildFallbackAuthTypeMetadata(): AuthTypeMetadata {
     passwordRequireSpecialChar: false,
     hasUsers: true,
     oauthEnabled: false,
+    passwordAuthEnabled: true,
     ssoProviders: [],
   };
 }
@@ -49,6 +50,7 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       password_require_special_char?: boolean;
       has_users?: boolean;
       oauth_enabled?: boolean;
+      password_auth_enabled?: boolean;
       sso_providers?: {
         name: string;
         display_name: string;
@@ -99,6 +101,10 @@ export async function getAuthTypeMetadataSS(): Promise<AuthTypeMetadata> {
       hasUsers: typeof data.has_users === "boolean" ? data.has_users : true,
       oauthEnabled:
         typeof data.oauth_enabled === "boolean" ? data.oauth_enabled : false,
+      passwordAuthEnabled:
+        typeof data.password_auth_enabled === "boolean"
+          ? data.password_auth_enabled
+          : true,
       ssoProviders: (data.sso_providers ?? []).map((provider) => ({
         name: provider.name,
         displayName: provider.display_name,

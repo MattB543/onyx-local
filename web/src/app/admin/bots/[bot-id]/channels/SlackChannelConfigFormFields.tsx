@@ -269,7 +269,7 @@ export function SlackChannelConfigFormFields({
                             (viewUnselectableSets) => !viewUnselectableSets
                           )
                         }
-                        className="text-sm text-action-link-05"
+                        className="text-sm text-action-selection-05"
                       >
                         {viewUnselectableSets
                           ? "Hide un-selectable "
@@ -358,7 +358,7 @@ export function SlackChannelConfigFormFields({
                             (viewSyncEnabledAgents) => !viewSyncEnabledAgents
                           )
                         }
-                        className="text-sm text-action-link-05"
+                        className="text-sm text-action-selection-05"
                       >
                         {viewSyncEnabledAgents
                           ? "Hide un-selectable "
@@ -424,7 +424,7 @@ export function SlackChannelConfigFormFields({
                             (viewSyncEnabledAgents) => !viewSyncEnabledAgents
                           )
                         }
-                        className="text-sm text-action-link-05"
+                        className="text-sm text-action-selection-05"
                       >
                         {viewSyncEnabledAgents
                           ? "Hide un-selectable "

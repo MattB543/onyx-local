@@ -3,13 +3,18 @@ import type {
   ExternalAppUserResponse,
 } from "@/app/craft/v1/apps/registry";
 import type { BuiltinSkill, CustomSkill } from "@/lib/skills/types";
+import {
+  MCPAuthenticationPerformer,
+  MCPAuthenticationType,
+  MCPServerStatus,
+  type MCPServer,
+} from "@/lib/tools/interfaces";
 
 export function builtinFixture(over: Partial<BuiltinSkill> = {}): BuiltinSkill {
   return {
     source: "builtin",
     id: "builtin-1",
-    slug: "pptx",
-    name: "PPTX",
+    name: "pptx",
     description: "Build PowerPoint decks.",
     is_available: true,
     unavailable_reason: null,
@@ -27,6 +32,7 @@ export function builtinFixture(over: Partial<BuiltinSkill> = {}): BuiltinSkill {
     group_shares: [],
     public_permission: null,
     user_permission: "VIEWER",
+    external_app: null,
     ...over,
   };
 }
@@ -35,8 +41,7 @@ export function customFixture(over: Partial<CustomSkill> = {}): CustomSkill {
   return {
     source: "custom",
     id: "custom-1",
-    slug: "report-writer",
-    name: "Report Writer",
+    name: "report-writer",
     description: "Draft a structured report from notes.",
     is_available: null,
     unavailable_reason: null,
@@ -54,6 +59,7 @@ export function customFixture(over: Partial<CustomSkill> = {}): CustomSkill {
     group_shares: [],
     public_permission: "VIEWER",
     user_permission: "VIEWER",
+    external_app: null,
     ...over,
   };
 }
@@ -61,17 +67,37 @@ export function customFixture(over: Partial<CustomSkill> = {}): CustomSkill {
 export function appFixture(
   over: Partial<ExternalAppUserResponse> & {
     app_type: ExternalAppType;
-    slug: string;
+    id: number;
   }
 ): ExternalAppUserResponse {
   return {
-    id: over.slug.length,
-    name: over.slug,
-    description: `${over.slug} integration`,
+    name: `App ${over.id}`,
     credential_keys: ["token"],
     credential_values: over.authenticated === false ? {} : { token: "***" },
     authenticated: true,
     supports_oauth: false,
+    ...over,
+  };
+}
+
+export function mcpServerFixture(
+  over: Partial<MCPServer> & { id: number }
+): MCPServer {
+  return {
+    name: `MCP ${over.id}`,
+    description: "An MCP server",
+    server_url: `https://mcp-${over.id}.example.com/mcp`,
+    owner: "admin@example.com",
+    auth_type: MCPAuthenticationType.API_TOKEN,
+    auth_performer: MCPAuthenticationPerformer.PER_USER,
+    is_authenticated: true,
+    craft_connected: true,
+    status: MCPServerStatus.CONNECTED,
+    is_public: true,
+    groups: [],
+    users: [],
+    available_in_craft: true,
+    tool_count: 2,
     ...over,
   };
 }

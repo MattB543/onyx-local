@@ -113,6 +113,9 @@ class SecuritySettingsOverrides(BaseModel):
     mask_credential_prefix: bool | None = Field(
         default=None, json_schema_extra=_operator_locked()
     )
+    llm_custom_config_env_injection: bool | None = Field(
+        default=None, json_schema_extra=_operator_locked()
+    )
     valid_email_domains: list[str] | None = Field(
         default=None, json_schema_extra=_operator_locked()
     )
@@ -132,6 +135,12 @@ class SecuritySettingsOverrides(BaseModel):
         default=None, json_schema_extra=_operator_locked()
     )
     password_require_special_char: bool | None = Field(
+        default=None, json_schema_extra=_operator_locked()
+    )
+    # Single-tenant kill switch: off refuses password login and public signup,
+    # SSO is unaffected. KV-backed (no security_settings column) so it
+    # backports without a schema migration.
+    password_auth_enabled: bool | None = Field(
         default=None, json_schema_extra=_operator_locked()
     )
 
@@ -181,6 +190,7 @@ class SecuritySettings(BaseModel):
     track_external_idp_expiry: bool
     ssrf_protection_level: SSRFProtectionLevel
     mask_credential_prefix: bool
+    llm_custom_config_env_injection: bool
     valid_email_domains: tuple[str, ...]
     password_min_length: int
     password_max_length: int
@@ -188,6 +198,7 @@ class SecuritySettings(BaseModel):
     password_require_lowercase: bool
     password_require_digit: bool
     password_require_special_char: bool
+    password_auth_enabled: bool
 
     @model_validator(mode="after")
     def _check_password_length_invariants(self) -> Self:

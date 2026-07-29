@@ -65,6 +65,7 @@ from onyx.server.features.build.sandbox.event_schema import (
     ToolCallStart,
 )
 from onyx.server.features.build.sandbox.event_schema import Error as SandboxError
+from onyx.server.features.build.sandbox.models import PromptAttachment
 from onyx.server.features.build.sandbox.opencode.serve_client import _merge_field_meta
 from onyx.server.features.build.sandbox.serve_transport import PromptSlot
 from onyx.server.features.build.sandbox.sse import SSEKeepalive
@@ -356,7 +357,7 @@ def merge_events_with_announces(
             output.put(
                 ConnectAppRequestPacket(
                     request_id=request.request_id,
-                    app_slug=request.app_slug,
+                    external_app_id=request.external_app_id,
                     reason=request.reason,
                 )
             )
@@ -474,6 +475,7 @@ def _refresh_sandbox_heartbeat_best_effort(sandbox_id: UUID) -> None:
     try:
         with get_session_with_current_tenant() as hb_session:
             update_sandbox_heartbeat(hb_session, sandbox_id)
+            hb_session.commit()
     except Exception:
         logger.warning(
             "Failed to refresh heartbeat for sandbox %s", sandbox_id, exc_info=True
@@ -487,6 +489,7 @@ def yield_sandbox_events(
     session_id: UUID,
     user_message_content: str,
     *,
+    attachments: list[PromptAttachment] | None = None,
     opencode_session_id: str | None,
     agent_provider: str | None,
     agent_model: str | None,
@@ -521,6 +524,7 @@ def yield_sandbox_events(
         sandbox_id,
         session_id,
         user_message_content,
+        attachments=attachments,
         opencode_session_id=opencode_session_id,
         agent_provider=agent_provider,
         agent_model=agent_model,
@@ -940,6 +944,7 @@ def stream_subagent_turn(
         # Flush the accumulated assistant message tagged with routing _meta.
         finalize_persist(db_session, session_id, state, routing_meta)
         update_sandbox_heartbeat(db_session, sandbox_id)
+        db_session.commit()
 
     except GeneratorExit:
         logger.warning(

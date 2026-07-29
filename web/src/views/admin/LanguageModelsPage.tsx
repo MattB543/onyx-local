@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useSWRConfig } from "swr";
 import { useAdminLLMProviders } from "@/lib/languageModels/hooks";
-import { PageLoader } from "@/refresh-components/PageLoader";
+import { PageLoader } from "@opal/layouts";
 import { Content, ContentAction, InputHorizontal, toast } from "@opal/layouts";
 import {
   Button,
@@ -73,6 +73,7 @@ const PROVIDER_GROUPS: ProviderGroup[] = [
     providerNames: [
       LLMProviderName.OPENROUTER,
       LLMProviderName.LITELLM_PROXY,
+      LLMProviderName.PORTKEY,
       LLMProviderName.NEBIUS_TOKENFACTORY,
       LLMProviderName.BIFROST,
     ],

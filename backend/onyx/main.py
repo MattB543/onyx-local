@@ -19,7 +19,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from starlette.types import Lifespan
 
 from onyx import __version__
-from onyx.auth.schemas import UserCreate, UserRead, UserUpdate
+from onyx.auth.schemas import AuthBackend, UserCreate, UserRead, UserUpdate
 from onyx.auth.users import (
     auth_backend,
     create_onyx_oauth_router,
@@ -34,6 +34,7 @@ from onyx.configs.app_configs import (
     APP_API_PREFIX,
     APP_HOST,
     APP_PORT,
+    AUTH_BACKEND,
     CACHE_BACKEND,
     DISABLE_VECTOR_DB,
     ENABLE_CUSTOM_JOBS,
@@ -64,6 +65,7 @@ from onyx.error_handling.exceptions import register_onyx_exception_handlers
 from onyx.file_store.file_store import get_default_file_store
 from onyx.hooks.registry import validate_registry
 from onyx.key_value_store.store import cleanup_legacy_kv_store_redis_cache
+from onyx.redis.redis_pool import log_redis_server_diagnostics
 from onyx.server.api_key.api import router as api_key_router
 from onyx.server.auth.captcha_api import CaptchaCookieMiddleware, LoginCaptchaMiddleware
 from onyx.server.auth.captcha_api import router as captcha_router
@@ -107,9 +109,12 @@ from onyx.server.features.search.api import router as search_api_router
 from onyx.server.features.skill.api import user_router as skill_router
 from onyx.server.features.tool.api import admin_router as admin_tool_router
 from onyx.server.features.tool.api import router as tool_router
+from onyx.server.features.usage.api import admin_usage_router, user_usage_router
+from onyx.server.features.usage.api import router as cost_override_router
 from onyx.server.features.user_oauth_token.api import router as user_oauth_token_router
 from onyx.server.features.web_search.api import router as web_search_router
 from onyx.server.federated.api import router as federated_router
+from onyx.server.gateway.api import router as llm_gateway_router
 from onyx.server.kg.api import admin_router as kg_admin_router
 from onyx.server.manage.administrative import router as admin_router
 from onyx.server.manage.code_interpreter.api import (
@@ -393,6 +398,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     # Will throw exception if USER_AUTH_SECRET is missing on a real deployment
     verify_user_auth_secret()
 
+    # Surface Redis configs that can silently drop session keys. Only relevant
+    # when sessions live in Redis; lite deployments may not run Redis at all.
+    if AUTH_BACKEND == AuthBackend.REDIS:
+        await log_redis_server_diagnostics()
+
     if OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET:
         logger.notice("Both OAuth Client ID and Secret are configured.")
 
@@ -439,6 +449,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         start_periodic_poller(POSTGRES_DEFAULT_SCHEMA)
 
     yield
+
+    # Flush buffered per-user usage before disposing the DB engines its drain
+    # thread writes through.
+    from onyx.tracing.setup import shutdown_tracing
+
+    shutdown_tracing()
 
     if DISABLE_VECTOR_DB:
         from onyx.background.periodic_poller import stop_periodic_poller
@@ -546,6 +562,7 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(application, public_build_router)
     include_router_with_global_prefix_prepended(application, build_router)
     include_router_with_global_prefix_prepended(application, build_admin_router)
+    include_router_with_global_prefix_prepended(application, llm_gateway_router)
     include_router_with_global_prefix_prepended(application, image_generation_router)
     include_router_with_global_prefix_prepended(application, document_set_router)
     include_router_with_global_prefix_prepended(application, hierarchy_router)
@@ -602,6 +619,9 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_router_with_global_prefix_prepended(
         application, token_rate_limit_settings_router
     )
+    include_router_with_global_prefix_prepended(application, cost_override_router)
+    include_router_with_global_prefix_prepended(application, user_usage_router)
+    include_router_with_global_prefix_prepended(application, admin_usage_router)
     include_router_with_global_prefix_prepended(application, api_key_router)
     include_router_with_global_prefix_prepended(application, standard_oauth_router)
     include_router_with_global_prefix_prepended(application, federated_router)

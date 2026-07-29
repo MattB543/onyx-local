@@ -60,8 +60,8 @@ node_modules
 # MCP configs
 .playwright-mcp
 
-# plans
-plans/
+# plans (include symlinked plans dir too)
+plans
 
 # claude
 claude/
