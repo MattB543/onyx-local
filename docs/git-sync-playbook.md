@@ -219,6 +219,8 @@ These files conflict in nearly every batch because our fork adds code in the sam
 | `web/src/hooks/useAppFocus.ts`                          | `"crm"` in AppFocusType union   | **KEEP OURS.** Our version is a superset — has `"crm"` plus all upstream types. Just add any new upstream types to our union.                                         |
 | `web/src/app/app/services/lib.tsx`                      | `timezone` in chat payload      | **MANUAL BLEND.** Keep both `timezone` (ours) and `additional_context` (theirs) in the payload. Import conflict: take theirs.                                         |
 | `web/src/refresh-components/inputs/InputComboBox/`      | `onClear` prop                  | **MANUAL BLEND.** Keep both `onClear` (ours) and `showOtherOptions` (theirs) in both `InputComboBox.tsx` and `types.ts`.                                              |
+| `web/src/lib/auth/svcSS.ts`                             | Never-throw auth-metadata fallback | **MANUAL BLEND.** Blended in 5 of 9 batches of the 2026-07 sync. Keep our `buildFallbackAuthTypeMetadata` + try/catch `getAuthTypeMetadataSS`; add any new upstream `AuthTypeMetadata` fields to BOTH the fallback and the success path (required fields break tsc silently otherwise). |
+| `backend/onyx/chat/chat_utils.py`                       | Raw chat-upload token counting  | **MANUAL BLEND.** Fork-only `chat_file_utils.py` provides `get_chat_upload_token_count`/`estimate_token_count_for_text`; upstream refactors of `load_chat_file` tend to delete its call sites — re-add the `if not user_file_id_str:` fallback or raw uploads silently get token_count=0. |
 
 ## Conflict Resolution Defaults
 
@@ -285,7 +287,8 @@ Known baseline (as of 2026-07-29, ruff-clean tree):
 
 - `ruff check backend/` must run from the **repo root** — the per-file-ignores in `pyproject.toml` are rooted there and silently stop matching if run from inside `backend/`. The script does this correctly.
 - Fork code is ruff-clean; a nonzero ruff result after a sync means the merge introduced it.
-- On the Windows dev box, ~27 unit tests fail for environmental reasons (PDF fixtures, Docker-dependent sandbox_proxy tests, metrics timing) — in `test_pdf.py`, `test_simple_job_terminate.py`, `test_save_chat.py`, `test_confluence_checkpointing.py`, `sandbox_proxy/`, `server/metrics/`. Failures **outside** that set are real regressions.
+- On the Windows dev box, ~30 unit tests fail for environmental reasons (symlinks/POSIX file modes, signals, Docker, mimetypes registry, cp1252 default encoding) — in `test_simple_job_terminate.py`, `test_save_chat.py` (csv/TABULAR), `test_confluence_checkpointing.py`, `sandbox_proxy/`, `server/features/craft/sandbox/` (sandbox_daemon, safe_extract, docker_manager_config), `utils/test_process_isolation.py`, `skills/test_pptx_skill_docs.py`. Failures **outside** that set are real regressions. (`ee/server/log_export/test_log_collection.py` is excluded by the script — `os.geteuid` at collection time aborts the whole run on Windows.)
+- Web formatting is `oxfmt` (upstream dropped prettier 2026-07); the check only works on LF checkouts, so the script skips it on Windows — CI is the real gate.
 
 ```
 [ ] git rev-list --count HEAD..upstream/main  → 0
