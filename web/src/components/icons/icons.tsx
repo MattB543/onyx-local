@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { StaticImageData } from "next/image";
-import { BrainIcon as Brain } from "@phosphor-icons/react";
 import {
   FiAlertCircle,
   FiAlertTriangle,
