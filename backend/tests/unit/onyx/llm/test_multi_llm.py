@@ -490,6 +490,71 @@ def test_empty_tools_list_is_omitted(default_multi_llm: LitellmLLM) -> None:
         assert mock_completion.call_args.kwargs["tools"] is None
 
 
+class TestClaudeDefaultMaxTokens:
+    """When the caller passes max_tokens=None, Claude requests must carry an
+    explicit max_tokens (min of ANTHROPIC_MAX_OUTPUT_TOKENS and the model's
+    registry output limit) — otherwise LiteLLM/Bedrock apply a 4096-token
+    default that truncates answers and empties hard-thinking responses."""
+
+    def _llm(
+        self, model_name: str, deployment_name: str | None = None
+    ) -> LitellmLLM:
+        return LitellmLLM(
+            api_key="test_key",
+            timeout=30,
+            model_provider=LlmProviderNames.LITELLM_PROXY,
+            model_name=model_name,
+            deployment_name=deployment_name,
+            max_input_tokens=100_000,
+        )
+
+    def _sent_max_tokens(
+        self, llm: LitellmLLM, max_tokens: int | None = None
+    ) -> int | None:
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = []
+            messages: LanguageModelInput = [UserMessage(content="Hi")]
+            list(llm.stream(messages, max_tokens=max_tokens))
+            return mock_completion.call_args.kwargs["max_tokens"]
+
+    def test_opus_5_defaults_to_capped_limit(self) -> None:
+        # 128K registry limit (via CUSTOM_LITELLM_MODEL_OVERRIDES) capped by
+        # ANTHROPIC_MAX_OUTPUT_TOKENS (100k default).
+        assert self._sent_max_tokens(self._llm("claude-opus-5")) == 100_000
+
+    def test_explicit_caller_value_is_preserved(self) -> None:
+        assert self._sent_max_tokens(self._llm("claude-opus-5"), 1234) == 1234
+
+    def test_claude_identity_in_deployment_name_resolves_limits(self) -> None:
+        # Foundry-style: opaque model_name, canonical id in deployment alias.
+        llm = self._llm("foundry-deploy-1", deployment_name="claude-opus-5")
+        assert self._sent_max_tokens(llm) == 100_000
+
+    def test_unknown_claude_alias_keeps_provider_default(self) -> None:
+        # Unresolvable Claude identity may be a legacy 3.x model with a 4096
+        # output cap — sending an explicit larger value would 400. Preserve
+        # the provider's own default instead.
+        assert self._sent_max_tokens(self._llm("my-claude-deployment")) is None
+
+    def test_legacy_model_clamps_to_registry_limit(self) -> None:
+        # claude-3-haiku has a 4096 output cap in the litellm registry.
+        assert self._sent_max_tokens(self._llm("claude-3-haiku-20240307")) == 4096
+
+    def test_non_claude_model_is_untouched(self) -> None:
+        assert self._sent_max_tokens(self._llm("gpt-4o")) is None
+
+    def test_older_thinking_budget_does_not_shrink_default(self) -> None:
+        # Non-adaptive Claude (< 4.7): thinking budget path runs
+        # max(budget_tokens + 1, max_tokens) — must keep the large default.
+        llm = self._llm("claude-sonnet-4-5")
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = []
+            messages: LanguageModelInput = [UserMessage(content="Hi")]
+            list(llm.stream(messages, reasoning_effort=ReasoningEffort.MEDIUM))
+            sent = mock_completion.call_args.kwargs["max_tokens"]
+            assert sent is not None and sent >= 8192
+
+
 def test_claude_only_in_deployment_name_omits_temperature_and_reasons() -> None:
     # Custom providers (e.g. Azure AI Foundry) may carry the model identity only
     # in the deployment alias — the string actually sent to LiteLLM — while

@@ -45,6 +45,32 @@ CUSTOM_LITELLM_MODEL_OVERRIDES: dict[str, dict[str, Any]] = {
     for model_name in _TWELVE_LABS_PEGASUS_MODEL_NAMES
 }
 
+# Claude Opus 5 is missing from the pinned LiteLLM's model registry, so token
+# limit lookups fall through to GEN_AI_MODEL_FALLBACK_MAX_TOKENS. Mirror the
+# claude-opus-4-8 registry entry (1M context, 128K output) until a LiteLLM bump
+# includes it — get_model_map() prefers the real registry entry once it exists.
+_CLAUDE_OPUS_5_MODEL_NAMES = [
+    "claude-opus-5",
+    "anthropic.claude-opus-5",
+    "us.anthropic.claude-opus-5",
+    "eu.anthropic.claude-opus-5",
+    "global.anthropic.claude-opus-5",
+]
+CUSTOM_LITELLM_MODEL_OVERRIDES.update(
+    {
+        model_name: {
+            "max_input_tokens": 1_000_000,
+            "max_output_tokens": 128_000,
+            "max_tokens": 128_000,
+            "supports_reasoning": True,
+            "supports_vision": True,
+            "supports_function_calling": True,
+            "supports_prompt_caching": True,
+        }
+        for model_name in _CLAUDE_OPUS_5_MODEL_NAMES
+    }
+)
+
 
 @lru_cache(maxsize=1)  # the copy.deepcopy is expensive, so we cache the result
 def get_model_map() -> dict:

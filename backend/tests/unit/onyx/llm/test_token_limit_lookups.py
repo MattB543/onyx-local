@@ -183,6 +183,22 @@ class TestGetLlmMaxOutputTokens:
             model_provider="ollama_chat",
         ) == int(GEN_AI_MODEL_FALLBACK_MAX_TOKENS)
 
+    def test_claude_opus_5_resolves_via_override(self) -> None:
+        # Claude Opus 5 is absent from the pinned LiteLLM registry; without the
+        # CUSTOM_LITELLM_MODEL_OVERRIDES entry this fell back to
+        # GEN_AI_MODEL_FALLBACK_MAX_TOKENS and requests were capped at
+        # LiteLLM/Bedrock's 4096-token Anthropic default.
+        from onyx.llm.model_capabilities import get_model_map
+
+        assert (
+            get_llm_max_output_tokens(
+                model_map=get_model_map(),
+                model_name="us.anthropic.claude-opus-5",
+                model_provider="bedrock",
+            )
+            == 128_000
+        )
+
 
 class TestGetMaxInputTokens:
     def test_subtracts_reserved_output_tokens(self) -> None:

@@ -17,7 +17,11 @@ from onyx.configs.chat_configs import (
     LLM_FIRST_CHUNK_MAX_RETRIES,
     LLM_SOCKET_READ_TIMEOUT,
 )
-from onyx.configs.model_configs import GEN_AI_TEMPERATURE, LITELLM_EXTRA_BODY
+from onyx.configs.model_configs import (
+    ANTHROPIC_MAX_OUTPUT_TOKENS,
+    GEN_AI_TEMPERATURE,
+    LITELLM_EXTRA_BODY,
+)
 from onyx.llm.api_surfaces import (
     OPENAI_COMPATIBLE_SURFACES,
     LlmApiSurface,
@@ -38,6 +42,8 @@ from onyx.llm.interfaces import (
     ToolChoiceOptions,
 )
 from onyx.llm.model_capabilities import (
+    find_model_obj,
+    get_model_map,
     is_true_openai_model,
     model_is_reasoning_model,
     openai_model_rejects_reasoning_effort,
@@ -355,6 +361,42 @@ def _anthropic_uses_adaptive_thinking(model_name: str) -> bool:
 def _anthropic_omits_sampling_params(model_name: str) -> bool:
     version = _parse_anthropic_model_version(model_name)
     return version is not None and version >= _ANTHROPIC_ADAPTIVE_THINKING_MIN_VERSION
+
+
+def _default_claude_max_tokens(
+    model_identity_names: list[str],
+    model_provider: str,
+) -> int | None:
+    """Explicit max_tokens for a Claude request when the caller didn't set one.
+
+    Anthropic requires max_tokens; when we send None, LiteLLM/Bedrock apply a
+    4096-token default that thinking tokens also count against — hard tasks
+    exhaust it mid-thinking (empty responses), long answers truncate silently,
+    and tool calls get cut off mid-emission. Instead send the model's registry
+    output limit, capped by ANTHROPIC_MAX_OUTPUT_TOKENS.
+
+    Returns None — preserving the provider's own default — when no identity
+    resolves in the model map: an unknown Claude alias may be a legacy 3.x
+    model with a 4096/8192 output cap, and a larger explicit value would turn
+    today's silent truncation into a hard 400.
+    """
+    model_map = get_model_map()
+    model_obj: dict | None = None
+    for name in model_identity_names:
+        model_obj = find_model_obj(model_map, model_provider, name)
+        if model_obj:
+            break
+    if not model_obj:
+        return None
+
+    max_output_tokens = model_obj.get("max_output_tokens")
+    if max_output_tokens is None:
+        registry_max_tokens = model_obj.get("max_tokens")
+        if registry_max_tokens is None:
+            return None
+        max_output_tokens = int(registry_max_tokens * 0.1)
+
+    return max(1, min(ANTHROPIC_MAX_OUTPUT_TOKENS, int(max_output_tokens)))
 
 
 def _env_injection_enabled() -> bool:
@@ -679,6 +721,17 @@ class LitellmLLM(LLM):
         if not omits_sampling_params:
             optional_kwargs["temperature"] = 1 if is_reasoning else self._temperature
 
+        # See _default_claude_max_tokens: replaces the provider-side 4096-token
+        # default that truncated answers and emptied hard-thinking responses.
+        # auto_max_tokens marks the value as ours (not caller-set) so a
+        # context-overflow 400 can degrade back to the provider default below.
+        auto_max_tokens = False
+        if max_tokens is None and is_claude_model:
+            max_tokens = _default_claude_max_tokens(
+                model_identity_names, self.config.model_provider
+            )
+            auto_max_tokens = max_tokens is not None
+
         if stream and not is_vertex_model_rejecting_output_config:
             optional_kwargs["stream_options"] = {"include_usage": True}
 
@@ -869,7 +922,7 @@ class LitellmLLM(LLM):
                     tuple(sorted(self._env_only_custom_config)),
                 )
 
-            def _call_litellm(opts: dict[str, Any]) -> Any:
+            def _call_litellm(opts: dict[str, Any], max_tokens_arg: int | None) -> Any:
                 # Injection disabled means no env writer exists anywhere in
                 # the process, so skip the rwlock entirely. Built per attempt
                 # because the context manager is single-use.
@@ -891,7 +944,7 @@ class LitellmLLM(LLM):
                         tools=tools or None,
                         stream=stream,
                         timeout=timeout_override or self._timeout,
-                        max_tokens=max_tokens,
+                        max_tokens=max_tokens_arg,
                         client=client,
                         **opts,
                         **passthrough_kwargs,
@@ -908,37 +961,62 @@ class LitellmLLM(LLM):
                 if len(stripped) < len(attempts[-1]):
                     attempts.append(stripped)
 
-            for i, opts in enumerate(attempts):
-                # Last write wins: sent_kwargs holds what the returning (or
-                # final failing) attempt sent, reasoning_effort the requested
-                # intent.
-                record_llm_request_params(
-                    {
-                        "reasoning_effort": reasoning_effort.value,
-                        "max_tokens": max_tokens,
-                        "sent_kwargs": {
-                            k: opts[k]
-                            for k in sorted(_BEST_EFFORT_KWARG_KEYS & opts.keys())
-                        },
-                    }
-                )
-                try:
-                    return _call_litellm(opts)
-                except BadRequestError as e:
-                    if i == len(attempts) - 1:
-                        raise
-                    # Only retry rejections a later attempt can strip away.
-                    remaining_strippable = set(opts) - set(attempts[-1])
-                    if not _rejection_names_strippable_kwargs(e, remaining_strippable):
-                        raise
-                    logger.warning(
-                        "Provider rejected request for model %s. Retrying "
-                        "without %s: %s",
-                        model,
-                        sorted(set(opts) - set(attempts[i + 1])),
-                        e,
+            def _run_attempts(max_tokens_arg: int | None) -> Any:
+                for i, opts in enumerate(attempts):
+                    # Last write wins: sent_kwargs holds what the returning (or
+                    # final failing) attempt sent, reasoning_effort the requested
+                    # intent.
+                    record_llm_request_params(
+                        {
+                            "reasoning_effort": reasoning_effort.value,
+                            "max_tokens": max_tokens_arg,
+                            "sent_kwargs": {
+                                k: opts[k]
+                                for k in sorted(_BEST_EFFORT_KWARG_KEYS & opts.keys())
+                            },
+                        }
                     )
-            raise RuntimeError("unreachable: retry ladder always returns or raises")
+                    try:
+                        return _call_litellm(opts, max_tokens_arg)
+                    except BadRequestError as e:
+                        if i == len(attempts) - 1:
+                            raise
+                        # Only retry rejections a later attempt can strip away.
+                        remaining_strippable = set(opts) - set(attempts[-1])
+                        if not _rejection_names_strippable_kwargs(
+                            e, remaining_strippable
+                        ):
+                            raise
+                        logger.warning(
+                            "Provider rejected request for model %s. Retrying "
+                            "without %s: %s",
+                            model,
+                            sorted(set(opts) - set(attempts[i + 1])),
+                            e,
+                        )
+                raise RuntimeError(
+                    "unreachable: retry ladder always returns or raises"
+                )
+
+            try:
+                return _run_attempts(max_tokens)
+            except BadRequestError as e:
+                # Newer Claude models validate prompt_tokens + max_tokens
+                # against the context window and 400 instead of shrinking the
+                # output budget. When the rejected max_tokens was our own
+                # default (not caller-set), degrade to the provider default —
+                # the pre-explicit-max_tokens behavior — rather than failing
+                # the message.
+                if not (auto_max_tokens and "max_tokens" in str(e).lower()):
+                    raise
+                logger.warning(
+                    "Provider rejected auto max_tokens=%s for model %s; "
+                    "retrying with provider default: %s",
+                    max_tokens,
+                    model,
+                    e,
+                )
+                return _run_attempts(None)
         except Exception as e:
             # for break pointing
             if isinstance(e, Timeout):

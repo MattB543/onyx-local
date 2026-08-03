@@ -70,6 +70,24 @@ GEN_AI_MODEL_FALLBACK_MAX_TOKENS = int(
     os.environ.get("GEN_AI_MODEL_FALLBACK_MAX_TOKENS") or 32000
 )
 
+# Upper bound on the explicit max_tokens sent to Anthropic (Claude) models when
+# the caller doesn't specify one. Anthropic requires max_tokens, so when we send
+# None LiteLLM/Bedrock apply a 4096-token default — thinking tokens count against
+# it, so hard tasks silently truncate or return empty responses. The effective
+# value is min(this, the model's registry max_output_tokens), which keeps models
+# with lower ceilings (e.g. Haiku 4.5 at 64K) within their real limits while
+# bounding the worst-case cost of a runaway response.
+# NOTE: Bedrock token quotas burn down by input_tokens + max_tokens at request
+# admission (unused capacity is replenished afterwards), so under heavy
+# concurrency a large value here can cause throttling even when actual outputs
+# are short — lower this (e.g. to 32_000) if ThrottlingExceptions appear.
+_ANTHROPIC_MAX_OUTPUT_TOKENS_DEFAULT = 100_000
+ANTHROPIC_MAX_OUTPUT_TOKENS = int(
+    os.environ.get("ANTHROPIC_MAX_OUTPUT_TOKENS") or _ANTHROPIC_MAX_OUTPUT_TOKENS_DEFAULT
+)
+if ANTHROPIC_MAX_OUTPUT_TOKENS <= 0:
+    ANTHROPIC_MAX_OUTPUT_TOKENS = _ANTHROPIC_MAX_OUTPUT_TOKENS_DEFAULT
+
 # Fraction of max_input_tokens to hold back when fitting history: headroom for
 # tiktoken undercounting the provider's tokenizer and overflowing the context.
 GEN_AI_INPUT_TOKEN_SAFETY_MARGIN = float(
