@@ -314,3 +314,29 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   scoping validated (default + embedded copies byte-identical), svcSS produces
   every required AuthTypeMetadata field on both paths, migration parents correct,
   all fork-feature spot-checks present.
+
+## Batch 2026-08-03 — b87d5e1513 (single-batch, 80 commits)
+
+- Conflicts: 0 (pure auto-merge; none of the recurring table files fired despite
+  both sides touching llm_step/llm_loop/process_message — disjoint hunks)
+- Deviations from playbook defaults: none. Stages 1-3 collapsed into one
+  implementation agent (zero-conflict probe).
+- Rode along with the sync: fork fix be0cc5db51 (explicit max_tokens for Claude
+  models — Bedrock 4096-default truncation/EmptyLLMResponseError). Upstream
+  954c514a7d + 374f2f1136 land MODEL_REFUSAL classification (closes the Opus 5
+  refusal misdiagnosis; complements the max_tokens fix).
+- New upstream patterns: 4 new migrations (heads merged in ebf99a6ad57e);
+  Bifrost admin-selectable API mode (ad70f68e4c); license reclaim tasks (EE).
+- Learnings:
+  - Worktree base drift: the agent worktree branched 1 commit behind main and
+    the "clean" merge silently dropped be0cc5db51 until the critical-file check
+    caught it. Before merging in a worktree, assert
+    `git merge-base --is-ancestor main HEAD`.
+  - web/ has only bun.lock — `npm ci` fails; use `bun install --frozen-lockfile`.
+  - test_litellm_monkey_patches.py::test_bridge_check_delegates_without_prefix
+    fails on local venv (litellm 1.81.6 vs pin 1.93.0) — clears after venv
+    rebuild; not merge damage.
+- Codex sanity check: PASS (fix byte-intact, refusal integration coherent,
+  25 targeted tests passed, alembic single head ebf99a6ad57e, imports OK).
+  Noted stale playbook path: whitelabel logo now in web/src/lib/app/components.tsx
+  (was refresh-components/Logo.tsx).

@@ -137,6 +137,7 @@ Only needed when conflicts require complex blending (e.g., structural refactors,
 
 **What the agent does:**
 
+0. Asserts the worktree is not behind main: `git merge-base --is-ancestor main HEAD` (2026-08 sync: a worktree branched 1 commit behind main produced a "clean" merge silently missing the newest fork commit). If it fails, `git reset --hard main` first.
 1. Runs `git merge <target> --no-edit` in the worktree
 2. Resolves manual blend conflicts first (reads files, applies precise edits)
 3. Bulk-resolves "take theirs" files: `git checkout --theirs <file>`
@@ -289,6 +290,7 @@ Known baseline (as of 2026-07-29, ruff-clean tree):
 - Fork code is ruff-clean; a nonzero ruff result after a sync means the merge introduced it.
 - On the Windows dev box, ~30 unit tests fail for environmental reasons (symlinks/POSIX file modes, signals, Docker, mimetypes registry, cp1252 default encoding) — in `test_simple_job_terminate.py`, `test_save_chat.py` (csv/TABULAR), `test_confluence_checkpointing.py`, `sandbox_proxy/`, `server/features/craft/sandbox/` (sandbox_daemon, safe_extract, docker_manager_config), `utils/test_process_isolation.py`, `skills/test_pptx_skill_docs.py`. Failures **outside** that set are real regressions. (`ee/server/log_export/test_log_collection.py` is excluded by the script — `os.geteuid` at collection time aborts the whole run on Windows.)
 - Web formatting is `oxfmt` (upstream dropped prettier 2026-07); the check only works on LF checkouts, so the script skips it on Windows — CI is the real gate.
+- `web/` has only `bun.lock` (no package-lock.json) — `npm ci` fails; install with `bun install --frozen-lockfile`.
 
 ```
 [ ] git rev-list --count HEAD..upstream/main  → 0
@@ -350,7 +352,7 @@ Refresh this table before each sync (Pre-work step 4) — diff `upstream/main..H
 | Chat answer persistence fix | `backend/onyx/chat/process_message.py` (commit 393aa6252b) | No test — the fallback persisting completed answers with empty `answer_tokens` must not be reverted; a "take theirs" here silently restores the "terminated prior to completion" placeholder bug |
 | `MinimalUserSnapshot.full_name` | `backend/onyx/server/models.py`, `backend/onyx/server/manage/users.py` (`full_name=u.personal_name`) | No test — upstream dropped the field; we re-add it. Keep ours. |
 | `auth_check` admin dependency | `backend/onyx/server/auth_check.py` (`current_admin_user` in accepted-dependency chain) | No test — dropping it breaks app startup for admin-only routes |
-| Whitelabel branding | `WHITELABEL_NAME` in `backend/onyx/configs/app_configs.py`, `backend/onyx/server/settings/models.py`, `backend/onyx/server/settings/store.py`, `web/src/lib/settings/types.ts`, `web/src/refresh-components/Logo.tsx`, `web/src/app/app/components/WelcomeMessage.tsx` | grep `whitelabel_name`/`WHITELABEL_NAME` across those files |
+| Whitelabel branding | `WHITELABEL_NAME` in `backend/onyx/configs/app_configs.py`, `backend/onyx/server/settings/models.py`, `backend/onyx/server/settings/store.py`, `web/src/lib/settings/types.ts`, `web/src/lib/app/components.tsx` (logo), `web/src/app/app/components/WelcomeMessage.tsx` | grep `whitelabel_name`/`WHITELABEL_NAME` across those files |
 | Google Drive write scopes + Calendar scope | `backend/onyx/connectors/google_utils/shared_constants.py`, `resources.py`, `google_kv.py`, `backend/ee/onyx/server/oauth/google_drive.py` | `pytest backend/tests/unit/onyx/connectors/google_drive/test_google_drive_scopes.py` |
 | CRM frontend unit tests | `web/src/lib/crmService.test.ts`, `web/src/components/ContactAvatar.test.tsx`, `web/src/views/crm/crmOptions.test.ts`, `web/src/views/crm/components/crmDateUtils.test.ts`, `web/src/views/crm/components/CrmDateRangeFilter.test.ts` | `cd web && npx jest src/lib/crmService.test.ts src/components/ContactAvatar.test.tsx src/views/crm` |
 | Cloudflare Tunnel  | `deployment/docker_compose/docker-compose.prod-tunnel.yml`, `deployment/docker_compose/env.ec2.cloudflare.template`, `deployment/data/nginx/app.conf.template.tunnel`, `deployment/docker_compose/onyx.service.tunnel`, `deployment/docker_compose/bootstrap-env.sh` | Files exist and are unmodified                                                                                                                                    |
