@@ -15,6 +15,9 @@ from onyx.configs.app_configs import (
 )
 from onyx.configs.chat_configs import (
     LLM_FIRST_CHUNK_MAX_RETRIES,
+    LLM_SERVICE_UNAVAILABLE_BACKOFF_BASE_S,
+    LLM_SERVICE_UNAVAILABLE_BACKOFF_MAX_S,
+    LLM_SERVICE_UNAVAILABLE_MAX_RETRIES,
     LLM_SOCKET_READ_TIMEOUT,
 )
 from onyx.configs.model_configs import (
@@ -1162,6 +1165,7 @@ class LitellmLLM(LLM):
         from litellm import HTTPHandler
         from litellm.exceptions import APIConnectionError as LiteLLMAPIConnectionError
         from litellm.exceptions import InternalServerError as LiteLLMInternalServerError
+        from litellm.exceptions import RateLimitError as LiteLLMRateLimitError
         from litellm.exceptions import (
             ServiceUnavailableError as LiteLLMServiceUnavailableError,
         )
@@ -1174,8 +1178,26 @@ class LitellmLLM(LLM):
             LiteLLMAPIConnectionError,
             LiteLLMServiceUnavailableError,
             LiteLLMInternalServerError,
+            # Throttling: raised raw during stream iteration, or wrapped by
+            # _completion at call time.
+            LiteLLMRateLimitError,
+            LLMRateLimitError,
         )
-        max_attempts: int = 1 + LLM_FIRST_CHUNK_MAX_RETRIES
+        # Quota exhaustion arrives as a rate-limit error but is not transient —
+        # backing off just delays the inevitable.
+        capacity_exceptions = (
+            LiteLLMServiceUnavailableError,
+            LiteLLMRateLimitError,
+            LLMRateLimitError,
+        )
+
+        def _is_quota_exhaustion(exc: Exception) -> bool:
+            msg = str(exc).lower()
+            return "insufficient_quota" in msg or "exceeded your current quota" in msg
+
+        max_immediate_attempts: int = 1 + LLM_FIRST_CHUNK_MAX_RETRIES
+        immediate_failures: int = 0
+        unavailable_failures: int = 0
         yielded_any: bool = False
 
         # HTTPHandler Threading & Connection Pool Notes:
@@ -1207,7 +1229,7 @@ class LitellmLLM(LLM):
         #    - litellm's InMemoryCache (used for client caching) is NOT thread-safe
         #    - Shared pools can have connections corrupted by other threads
         #    - Per-request HTTPHandler eliminates cross-thread interference
-        for attempt in range(max_attempts):
+        while True:
             client = None
             if self._uses_isolated_client():
                 client = HTTPHandler(timeout=timeout_override or self._timeout)
@@ -1241,15 +1263,48 @@ class LitellmLLM(LLM):
                     yield model_response
                 return
             except retryable_exceptions as e:
-                if yielded_any or attempt >= max_attempts - 1:
+                if yielded_any:
                     raise
-                logger.warning(
-                    "Retrying pre-chunk stream for model %s after %s on attempt %d/%d",
-                    self.config.model_name,
-                    type(e).__name__,
-                    attempt + 1,
-                    max_attempts,
-                )
+                # 503s and throttling are transient provider-side capacity
+                # congestion; wait them out with backoff instead of burning
+                # retries instantly.
+                if isinstance(e, capacity_exceptions):
+                    if _is_quota_exhaustion(e):
+                        raise
+                    unavailable_failures += 1
+                    if unavailable_failures > LLM_SERVICE_UNAVAILABLE_MAX_RETRIES:
+                        raise
+                    backoff_s = min(
+                        LLM_SERVICE_UNAVAILABLE_BACKOFF_BASE_S
+                        * (2 ** (unavailable_failures - 1)),
+                        LLM_SERVICE_UNAVAILABLE_BACKOFF_MAX_S,
+                    )
+                    logger.warning(
+                        "Provider capacity error (%s) for model %s; retry "
+                        "%d/%d after %.1fs backoff",
+                        type(e).__name__,
+                        self.config.model_name,
+                        unavailable_failures,
+                        LLM_SERVICE_UNAVAILABLE_MAX_RETRIES,
+                        backoff_s,
+                    )
+                    # Release this attempt's connection before sleeping, not
+                    # after — the finally below sees client=None and no-ops.
+                    if client is not None:
+                        client.close()
+                        client = None
+                    time.sleep(backoff_s)
+                else:
+                    immediate_failures += 1
+                    if immediate_failures >= max_immediate_attempts:
+                        raise
+                    logger.warning(
+                        "Retrying pre-chunk stream for model %s after %s on attempt %d/%d",
+                        self.config.model_name,
+                        type(e).__name__,
+                        immediate_failures,
+                        max_immediate_attempts,
+                    )
             finally:
                 if client is not None:
                     client.close()

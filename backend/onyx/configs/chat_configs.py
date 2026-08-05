@@ -38,6 +38,21 @@ CHAT_HEARTBEAT_INTERVAL_S = int(os.environ.get("CHAT_HEARTBEAT_INTERVAL_S") or "
 LLM_FIRST_CHUNK_MAX_RETRIES = max(
     0, int(os.environ.get("LLM_FIRST_CHUNK_MAX_RETRIES") or "2")
 )
+# 503 Service Unavailable and 429 throttling get their own, more generous
+# pre-first-chunk retry budget with exponential backoff (unlike the immediate
+# retries above), because they usually mean transient provider-side capacity
+# congestion (e.g. Bedrock "Too many connections" / ThrottlingException) that
+# resolves within seconds. Hard quota exhaustion is excluded — see
+# multi_llm.stream().
+LLM_SERVICE_UNAVAILABLE_MAX_RETRIES = max(
+    0, int(os.environ.get("LLM_SERVICE_UNAVAILABLE_MAX_RETRIES") or "5")
+)
+LLM_SERVICE_UNAVAILABLE_BACKOFF_BASE_S = max(
+    0.0, float(os.environ.get("LLM_SERVICE_UNAVAILABLE_BACKOFF_BASE_S") or "2")
+)
+LLM_SERVICE_UNAVAILABLE_BACKOFF_MAX_S = max(
+    0.0, float(os.environ.get("LLM_SERVICE_UNAVAILABLE_BACKOFF_MAX_S") or "20")
+)
 # Socket-read timeout for deep-research report calls — bounds inter-chunk gaps
 # (including a zero-chunk stall), not total generation time.
 DR_REPORT_LLM_TIMEOUT_S = int(os.environ.get("DR_REPORT_LLM_TIMEOUT_S") or "60")

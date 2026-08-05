@@ -139,6 +139,35 @@ This rebuilds and recreates every service in the stack. Nginx is included so no 
 
 ---
 
+## Changing Environment Variables (bootstrap-env.sh boxes)
+
+On boxes managed by `onyx.service` (FLI/FLF prod-tunnel setups), **never edit `deployment/docker_compose/.env` directly** — it is regenerated from scratch on every service start. `systemctl start/restart onyx.service` runs `bootstrap-env.sh` as an `ExecStartPre`, which rebuilds `.env` from two sources and overwrites the old file:
+
+1. **`deployment/docker_compose/env.config`** — the durable template for all non-secret settings. Put ordinary env vars here (e.g. `LLM_SOCKET_READ_TIMEOUT=500`).
+2. **AWS SSM parameters under `/onyx/prod/secrets/`** — secrets, fetched with decryption and appended. On a key collision, the SSM value wins over `env.config`.
+
+So the procedure for any env change is:
+
+```bash
+cd /home/ec2-user/onyx/deployment/docker_compose
+echo "MY_SETTING=value" >> env.config      # non-secret settings
+sudo systemctl restart onyx.service        # regenerates .env + recreates changed containers
+```
+
+Verify it reached the running container (not just the file):
+
+```bash
+grep MY_SETTING .env
+docker exec onyx-stack-api_server-1 env | grep MY_SETTING
+```
+
+Notes:
+- Secrets go in SSM (`aws ssm put-parameter --name /onyx/prod/secrets/MY_SECRET ...`), not `env.config`. Note the EC2 instance role can *read* but not *write* SSM, so put-parameter must run from an admin credential; if that's blocked, a non-secret-sensitive value can live in `env.config` (chmod 600) as a fallback.
+- A plain `docker compose restart` does not re-read `.env` — containers must be recreated, which the systemd unit's `up -d` does automatically when the env differs.
+- This bit us on 2026-08-03: `LLM_SOCKET_READ_TIMEOUT=500` appended to `.env` silently vanished on restart and the container kept running with the 60s default.
+
+---
+
 ## Troubleshooting
 
 ### "Backend unavailable" or 502 errors after deploy

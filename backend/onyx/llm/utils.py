@@ -266,14 +266,14 @@ def litellm_exception_to_error_msg(
         # Check if this is specifically the Bedrock "Too many connections" error
         if "Too many connections" in error_msg or "BedrockException" in error_msg:
             error_msg = (
-                f"{provider_name} is experiencing high connection volume and cannot process your request right now. "
-                "This typically happens when there are too many simultaneous requests to the AI model. "
-                "Please wait a moment and try again. If this persists, contact your system administrator "
-                "to review connection limits and retry configurations."
+                f"{provider_name} rejected the request with 503 Service Unavailable — "
+                "the model is temporarily over capacity on the provider's side (this can "
+                "happen even with light usage). Please try again in a minute. "
+                f"Provider error: {str(core_exception)}"
             )
         else:
             # Generic 503 Service Unavailable
-            error_msg = f"{provider_name} service error: {str(core_exception)}"
+            error_msg = f"{provider_name} service error (HTTP 503): {str(core_exception)}"
         error_code = "SERVICE_UNAVAILABLE"
         is_retryable = True
     elif isinstance(core_exception, APIConnectionError):
@@ -287,7 +287,11 @@ def litellm_exception_to_error_msg(
         error_code = "BUDGET_EXCEEDED"
         is_retryable = False
     elif isinstance(core_exception, Timeout):
-        error_msg = "Request timed out: The operation took too long to complete. Please try again."
+        error_msg = (
+            "Request timed out: the provider did not respond (or stopped sending "
+            "data) within the configured timeout. Please try again. "
+            f"Provider error: {str(core_exception)}"
+        )
         error_code = "CONNECTION_ERROR"
         is_retryable = True
     elif str(getattr(core_exception, "status_code", "")) == "413" or (

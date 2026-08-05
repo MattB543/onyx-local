@@ -1376,6 +1376,13 @@ def _run_models(
             model_succeeded[model_idx] = True
 
         except Exception as e:
+            # Log server-side too — otherwise the traceback only reaches the
+            # browser via StreamingError and never appears in container logs.
+            logger.exception(
+                "LLM loop failed for model %s (chat_session_id=%s)",
+                setup.model_display_names[model_idx],
+                setup.chat_session.id,
+            )
             model_errored[model_idx] = True
             model_error_info[model_idx] = litellm_exception_to_safe_error(
                 e, model_llm, fallback_to_error_msg=True
