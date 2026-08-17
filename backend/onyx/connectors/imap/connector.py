@@ -49,6 +49,11 @@ _add_imap_retries = retry_builder(
 )
 
 _DEFAULT_IMAP_PORT_NUMBER = int(os.environ.get("IMAP_PORT", 993))
+# Without a socket timeout, imaplib blocks forever if the server goes silent
+# mid-connection (observed with AWS WorkMail: an ESTABLISHED socket that never
+# delivers bytes hung docfetching for 11 days). A timeout turns that into a
+# TimeoutError, which _add_imap_retries handles.
+_IMAP_SOCKET_TIMEOUT_SECONDS = int(os.environ.get("IMAP_SOCKET_TIMEOUT_SECONDS", 60))
 _IMAP_OKAY_STATUS = "OK"
 _PAGE_SIZE = 100
 _USERNAME_KEY = "imap_username"
@@ -144,7 +149,9 @@ class ImapConnector(
 
         @_add_imap_retries
         def _connect_and_login() -> imaplib.IMAP4_SSL:
-            client = imaplib.IMAP4_SSL(host=self._host, port=self._port)
+            client = imaplib.IMAP4_SSL(
+                host=self._host, port=self._port, timeout=_IMAP_SOCKET_TIMEOUT_SECONDS
+            )
             status, _data = client.login(user=username, password=password)
             if status != _IMAP_OKAY_STATUS:
                 raise RuntimeError(f"Failed to log into imap server; {status=}")
