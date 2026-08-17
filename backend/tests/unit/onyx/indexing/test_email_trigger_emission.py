@@ -50,7 +50,7 @@ def _make_adapter() -> DocumentIndexingBatchAdapter:
     # NOTE: upstream's DocumentIndex interface refactor moved session ownership
     # out of __init__; each phase now receives a short-lived db_session as a
     # parameter. post_index(..., db_session=...) carries the session that the
-    # email-CRM trigger emission + final commit use.
+    # email-CRM trigger emission uses.
     return DocumentIndexingBatchAdapter(
         connector_id=1,
         credential_id=2,
@@ -111,7 +111,7 @@ def test_extract_document_text_truncates_across_sections() -> None:
     assert _extract_document_text(doc, limit=5) == "abc\n\nde"
 
 
-def test_post_index_emits_email_trigger_events_before_commit() -> None:
+def test_post_index_emits_email_trigger_events_without_committing() -> None:
     db_session = MagicMock()
     adapter = _make_adapter()
     updated_at = datetime(2026, 2, 20, 15, 30, tzinfo=timezone.utc)
@@ -169,7 +169,7 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
             index_to_secondary=False,
         )
 
-    assert call_order == ["create_trigger_event", "commit"]
+    assert call_order == ["create_trigger_event"]
     assert len(captured_events) == 1
 
     event_kwargs = captured_events[0]
@@ -191,7 +191,11 @@ def test_post_index_emits_email_trigger_events_before_commit() -> None:
     # and early filtering would prevent external-lead emails from ever reaching
     # the CRM pipeline. The test that asserted the filter's presence was
     # deleted alongside the filter.
-    db_session.commit.assert_called_once()
+    #
+    # post_index must NOT commit: it runs inside prepare_to_modify_documents'
+    # begin() block, which permits exactly one commit — issued by lock_context
+    # after the caller's body (incl. update_docs_content_hash__no_commit).
+    db_session.commit.assert_not_called()
 
 
 def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
@@ -237,7 +241,7 @@ def test_post_index_skips_trigger_emission_when_job_id_not_configured() -> None:
         )
 
     mock_create_trigger_event.assert_not_called()
-    db_session.commit.assert_called_once()
+    db_session.commit.assert_not_called()
 
 
 def test_post_index_passes_its_db_session_to_trigger_creation() -> None:
@@ -318,8 +322,8 @@ def test_post_index_passes_its_db_session_to_trigger_creation() -> None:
     assert captured_sessions == [sentinel_session]
     assert mock_create_trigger_event.call_args.kwargs["db_session"] is sentinel_session
 
-    # And the final commit happens on that same session.
-    sentinel_session.commit.assert_called_once()
+    # post_index never commits; lock_context owns the single commit.
+    sentinel_session.commit.assert_not_called()
 
 
 def test_get_email_crm_custom_job_uuid_invalid_value_returns_none() -> None:

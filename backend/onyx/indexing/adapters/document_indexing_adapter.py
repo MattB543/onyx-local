@@ -392,7 +392,11 @@ class DocumentIndexingBatchAdapter(IndexingBatchAdapter):
                     email_doc_count,
                 )
 
-        db_session.commit()
+        # No commit here: we're inside prepare_to_modify_documents' begin()
+        # block, which allows exactly one commit — lock_context issues it after
+        # the caller's body (including update_docs_content_hash__no_commit)
+        # finishes. Committing here closed the transaction early and made every
+        # subsequent statement raise InvalidRequestError, failing the batch.
 
     def _emit_email_crm_trigger_events(
         self,
