@@ -1,3 +1,4 @@
+import email.errors
 import email.header
 import email.utils
 from datetime import datetime
@@ -36,14 +37,38 @@ class EmailHeaders(BaseModel):
             if not value:
                 return None
 
-            decoded_value, encoding = email.header.decode_header(value)[0]
-            if isinstance(decoded_value, bytes):
-                encoding = encoding or "utf-8"
-                return decoded_value.decode(encoding, errors="replace")
-            elif isinstance(decoded_value, str):
-                return decoded_value
-            else:
-                return None
+            # decode_header returns a LIST of fragments; a header like
+            # '=?UTF-8?Q?Frank_McCourt?= <frank@example.com>' decodes to an
+            # encoded display-name fragment followed by a literal address
+            # fragment. Taking only fragment [0] silently dropped the address.
+            try:
+                fragments = email.header.decode_header(value)
+            except email.errors.HeaderParseError:
+                return value
+
+            try:
+                return str(email.header.make_header(fragments))
+            except (LookupError, UnicodeDecodeError, email.errors.HeaderParseError):
+                # Unknown/broken charset in some fragment: decode leniently.
+                decoded_parts = []
+                for decoded_value, encoding in fragments:
+                    if isinstance(decoded_value, bytes):
+                        try:
+                            decoded_parts.append(
+                                decoded_value.decode(
+                                    encoding or "utf-8", errors="replace"
+                                )
+                            )
+                        except LookupError:
+                            # The charset itself is unknown to Python
+                            # (e.g. '=?x-unknown?...?='); errors="replace"
+                            # can't help with that.
+                            decoded_parts.append(
+                                decoded_value.decode("utf-8", errors="replace")
+                            )
+                    else:
+                        decoded_parts.append(decoded_value)
+                return "".join(decoded_parts) or None
 
         def _parse_date(date_str: str | None) -> datetime | None:
             if not date_str:

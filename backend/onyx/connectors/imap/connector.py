@@ -5,9 +5,10 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from email.message import Message
-from email.utils import parseaddr
+from email.utils import getaddresses
 from enum import Enum
 from typing import Any, cast
+from urllib.parse import unquote
 
 import bs4
 from pydantic import BaseModel
@@ -56,6 +57,10 @@ _DEFAULT_IMAP_PORT_NUMBER = int(os.environ.get("IMAP_PORT", 993))
 _IMAP_SOCKET_TIMEOUT_SECONDS = int(os.environ.get("IMAP_SOCKET_TIMEOUT_SECONDS", 60))
 _IMAP_OKAY_STATUS = "OK"
 _PAGE_SIZE = 100
+# IMAP has no per-message size guard the way the Gmail connector does (10 MB
+# at the API layer), so cap the extracted body to keep pathological emails
+# from ballooning indexing/CRM payloads.
+_MAX_EMAIL_BODY_CHARS = 500_000
 _USERNAME_KEY = "imap_username"
 _PASSWORD_KEY = "imap_password"
 
@@ -424,22 +429,24 @@ def _convert_email_headers_and_body_into_document(
         else []
     )
 
-    expert_info_map = {
+    # Mirror the Gmail connector's convention (and what the email-CRM payload
+    # builder expects): sender in primary_owners, recipients in
+    # secondary_owners. Lumping recipients into primary_owners left the CRM
+    # prompt's "To:" line permanently empty for IMAP mail. The two sets are
+    # independent: a self-addressed sender stays a recipient too.
+    recipient_info_map = {
         recipient_addr: BasicExpertInfo(
             display_name=recipient_name, email=recipient_addr
         )
         for recipient_name, recipient_addr in parsed_recipients
     }
-    if sender_addr not in expert_info_map:
-        expert_info_map[sender_addr] = BasicExpertInfo(
-            display_name=sender_name, email=sender_addr
-        )
 
     email_body = _parse_email_body(email_msg=email_msg, email_headers=email_headers)
-    primary_owners = list(expert_info_map.values())
+    primary_owners = [BasicExpertInfo(display_name=sender_name, email=sender_addr)]
+    secondary_owners = list(recipient_info_map.values())
     external_access = (
         ExternalAccess(
-            external_user_emails=set(expert_info_map.keys()),
+            external_user_emails={sender_addr, *recipient_info_map.keys()},
             external_user_group_ids=set(),
             is_public=False,
         )
@@ -467,8 +474,29 @@ def _convert_email_headers_and_body_into_document(
             email_headers.date.astimezone(timezone.utc) if email_headers.date else None
         ),
         primary_owners=primary_owners,
+        secondary_owners=secondary_owners,
         external_access=external_access,
     )
+
+
+def _iter_candidate_body_parts(part: Message) -> list[Message]:
+    """Leaf text parts that belong to THIS message's body.
+
+    Message.walk() descends into attached content — an attached .eml
+    (message/rfc822) or attached multipart container yields children with no
+    attachment disposition of their own, letting an attachment's body shadow
+    the real one. Recursing manually lets a part inherit its ancestor's
+    attachment status.
+    """
+    if part.get_content_disposition() == "attachment":
+        return []
+    if part.is_multipart():
+        leaf_parts: list[Message] = []
+        for sub_part in part.get_payload():
+            if isinstance(sub_part, Message):
+                leaf_parts.extend(_iter_candidate_body_parts(sub_part))
+        return leaf_parts
+    return [part]
 
 
 def _parse_email_body(
@@ -477,54 +505,131 @@ def _parse_email_body(
 ) -> str:
     plain_body = None
     html_body = None
-    for part in email_msg.walk():
-        if part.is_multipart():
-            # Multipart parts are *containers* for other parts, not the actual content itself.
-            # Therefore, we skip until we find the individual parts instead.
-            continue
-
+    for part in _iter_candidate_body_parts(email_msg):
         content_type = part.get_content_type()
         if content_type not in ("text/plain", "text/html"):
             continue
 
         charset = part.get_content_charset() or "utf-8"
 
-        try:
-            raw_payload = part.get_payload(decode=True)
-            if not isinstance(raw_payload, bytes):
-                logger.warning(
-                    "Payload section from email was expected to be an array of bytes, instead got type(raw_payload)=%r, raw_payload=%r",
-                    type(raw_payload),
-                    raw_payload,
-                )
-                continue
-            decoded = raw_payload.decode(charset)
-            if content_type == "text/plain" and plain_body is None:
-                plain_body = decoded
-            elif content_type == "text/html" and html_body is None:
-                html_body = decoded
-        except (UnicodeDecodeError, LookupError) as e:
-            logger.warning("Could not decode part with charset %s: %s", charset, e)
+        raw_payload = part.get_payload(decode=True)
+        if not isinstance(raw_payload, bytes):
+            logger.warning(
+                "Payload section from email was expected to be an array of bytes, instead got type(raw_payload)=%r, raw_payload=%r",
+                type(raw_payload),
+                raw_payload,
+            )
             continue
+        try:
+            decoded = raw_payload.decode(charset)
+        except (UnicodeDecodeError, LookupError) as e:
+            logger.warning(
+                "Could not decode part with charset %s (%s); retrying as utf-8 with replacement",
+                charset,
+                e,
+            )
+            decoded = raw_payload.decode("utf-8", errors="replace")
 
-    body = plain_body or html_body
+        # Keep the first NON-BLANK candidate of each type: a blank first part
+        # must not mask a real body later in the message.
+        if not decoded.strip():
+            continue
+        if content_type == "text/plain" and plain_body is None:
+            plain_body = decoded
+        elif content_type == "text/html" and html_body is None:
+            html_body = decoded
 
-    if not body:
-        logger.warning(
-            "Email with email_headers.id=%r has an empty body; returning an empty string",
-            email_headers.id,
-        )
-        return ""
+        if plain_body is not None:
+            # Plain is always preferred; no need to keep scanning.
+            break
 
-    soup = bs4.BeautifulSoup(markup=body, features="html.parser")
+    # Plain text must be returned verbatim: running it through an HTML parser
+    # deletes angle-bracketed addresses ("Frank <frank@example.com>" in quoted
+    # forward headers) as if they were tags, and flattens the line structure
+    # the LLM needs to read quoted headers.
+    if plain_body:
+        return plain_body.replace("\r\n", "\n").strip()[:_MAX_EMAIL_BODY_CHARS]
 
-    return " ".join(str_section for str_section in soup.stripped_strings)
+    if html_body:
+        return _email_html_to_text(html_body)[:_MAX_EMAIL_BODY_CHARS]
+
+    logger.warning(
+        "Email with email_headers.id=%r has an empty body; returning an empty string",
+        email_headers.id,
+    )
+    return ""
+
+
+# Tags that imply a line break when HTML email is rendered as text.
+_HTML_BLOCK_TAGS = [
+    "blockquote",
+    "br",
+    "div",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "table",
+    "tr",
+    "ul",
+]
+
+
+def _email_html_to_text(html_body: str) -> str:
+    """Self-contained HTML-to-text for email bodies.
+
+    Deliberately does NOT use html_utils.format_document_soup: its output
+    depends on the global link-transform strategy (under "markdown" it wraps
+    every text fragment near an anchor into mailto links) and its closing-tag
+    handling is unreachable with BeautifulSoup descendants, leaking table
+    state into subsequent content.
+    """
+    soup = bs4.BeautifulSoup(markup=html_body, features="html.parser")
+
+    for tag in soup.find_all(["script", "style", "head", "title"]):
+        tag.decompose()
+
+    # <a href="mailto:frank@example.com">Frank</a> renders as just "Frank";
+    # the href is often the only place a participant's address appears, so
+    # inject it into the anchor text before flattening.
+    for anchor in soup.find_all("a"):
+        href = anchor.get("href")
+        if isinstance(href, list):
+            href = href[0] if href else None
+        if not isinstance(href, str) or not href.lower().startswith("mailto:"):
+            continue
+        addr = unquote(href[len("mailto:") :].split("?", 1)[0].strip())
+        if addr and addr.lower() not in anchor.get_text().lower():
+            anchor.append(f" <{addr}>")
+
+    for tag in soup.find_all(_HTML_BLOCK_TAGS):
+        tag.insert_before("\n")
+        tag.insert_after("\n")
+    for tag in soup.find_all(["td", "th"]):
+        tag.insert_after(" ")
+
+    text = soup.get_text()
+    lines = [re.sub(r"[ \t\xa0]+", " ", line).strip() for line in text.splitlines()]
+    collapsed: list[str] = []
+    for line in lines:
+        # Allow at most one consecutive blank line.
+        if line or (collapsed and collapsed[-1]):
+            collapsed.append(line)
+    return "\n".join(collapsed).strip()
 
 
 def _parse_addrs(raw_header: str) -> list[tuple[str, str]]:
-    addrs = raw_header.split(",")
-    name_addr_pairs = [parseaddr(addr=addr) for addr in addrs if addr]
-    return [(name, addr) for name, addr in name_addr_pairs if addr]
+    # getaddresses handles quoted display names containing commas
+    # ('"Doe, Jane" <jane@example.com>') and address groups, which naive
+    # comma-splitting + parseaddr silently mangled.
+    return [(name, addr) for name, addr in getaddresses([raw_header]) if addr]
 
 
 def _parse_singular_addr(raw_header: str) -> tuple[str, str]:
