@@ -273,8 +273,10 @@ def test_build_prompt_instructs_update_before_create_when_record_exists() -> Non
     assert "Sender email (for CRM lookup): alice@example.com" in prompt
     assert "try multiple search terms" in prompt
     assert "email domain" in prompt
-    assert "only use `contact_id` values from contacts you have" in prompt
-    assert "Do NOT pass raw email addresses" in prompt
+    assert '"email", "call", "meeting", "event", and' in prompt
+    assert "Set `occurred_at` to when the interaction actually happened." in prompt
+    assert "pass their email address" in prompt
+    assert "Unresolved attendees do not block the interaction" in prompt
 
 
 def test_process_email_crm_success_uses_context_db_session_and_legacy_fallbacks() -> None:

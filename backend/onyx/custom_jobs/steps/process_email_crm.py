@@ -31,7 +31,8 @@ You may have access to the following CRM tools:
 - `crm_create` for creating missing contacts, organizations, or tags.
 - `crm_update` for enriching existing contacts or organizations with reliable
   new information.
-- `crm_log_interaction` for logging this email thread as an activity.
+- `crm_log_interaction` for logging this email thread — or a meeting, call,
+  or event it describes — as an activity.
 
 Perform the following workflow using the available CRM tools:
 
@@ -82,15 +83,37 @@ Perform the following workflow using the available CRM tools:
    candidate match before deciding.
 8. If a relevant organization already exists, update it with reliable net-new
    information from the email when appropriate. If it does not exist, create it.
-9. Log this email as an interaction/activity. Use `interaction_type` "email"
-   or "note" as appropriate, and set `occurred_at` to the email date so the
-   interaction is recorded at the correct time. Include the key relationship
+9. Log this email as an interaction/activity. Include the key relationship
    context from the email body, any action items, and link it to the best
-   matching contact and organization.
-   - For attendees, only use `contact_id` values from contacts you have
-     already found or created in the CRM. Do NOT pass raw email addresses or
-     names as attendees — unresolvable attendees can block the interaction
-     from being saved.
+   matching contact and organization via `contact_id` and `organization_id`.
+   - Choose the `interaction_type` that best matches what actually happened.
+     The available types are: "email", "call", "meeting", "event", and
+     "note".
+     - If the email thread describes a meeting, call, or event that took
+       place (e.g. a teammate forwarding a recap of a meeting with an
+       external contact), log THAT as the interaction — use "meeting",
+       "call", or "event" accordingly.
+     - If the email itself is the interaction (an exchange with an external
+       contact), use "email".
+     - Use "note" only when nothing more specific fits.
+   - Set `occurred_at` to when the interaction actually happened. If the
+     email gives clear context clues about when a described meeting, call,
+     or event took place (e.g. "we met last Tuesday", "on our call
+     yesterday", an explicit date), use that date. If there are no clear
+     clues, or the email itself is the interaction, use the email date.
+     Never leave `occurred_at` unset.
+   - For attendees, include the people who actually participated:
+     - For external contacts, prefer `contact_id` values from contacts you
+       have already found or created in the CRM.
+     - For internal teammates (e.g. the person who forwarded or sent the
+       email), pass their email address and the system will try to match
+       them to the corresponding team member. Prefer email over name —
+       name-only matching is fuzzy and a name shared with an existing CRM
+       contact may attach the wrong person. Only fall back to full name
+       when no email is available.
+     - Unresolved attendees do not block the interaction from being saved;
+       they are simply reported back as warnings, so include everyone who
+       plausibly participated rather than omitting uncertain ones.
 
 IMPORTANT:
 - Do NOT create or update contacts/organizations for internal domains. These
