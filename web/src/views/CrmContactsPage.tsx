@@ -483,7 +483,8 @@ export default function CrmContactsPage() {
             <div className="flex flex-col gap-2">
               {contacts.map((contact) => {
                 const orgName = contact.organization_id
-                  ? orgNameById.get(contact.organization_id) ||
+                  ? contact.organization_name ||
+                    orgNameById.get(contact.organization_id) ||
                     "Linked organization"
                   : null;
 
