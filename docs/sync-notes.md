@@ -340,3 +340,49 @@ Fold stable patterns into `docs/git-sync-playbook.md` after the sync completes.
   25 targeted tests passed, alembic single head ebf99a6ad57e, imports OK).
   Noted stale playbook path: whitelabel logo now in web/src/lib/app/components.tsx
   (was refresh-components/Logo.tsx).
+
+# Sync Notes — 2026-09-08 upstream sync (522 commits behind at start)
+
+Merge-base `b87d5e1513` → `upstream/main` tip `5bf03a2c0f`. Backup branch
+`pre-sync-backup-2026-09-08` (e1c7a8d161). Probe from start: N125=7, N150=11,
+N200=18, N250=22, N350=23 (flat), N400=38, N450=49 (i18n extraction), N522=50.
+
+## Batch 1 — 43e1bd4d6a (2026-09-08, 125 commits, 522→397 behind)
+
+- Conflicts: 7 (exactly as probed). 1 fork-authored (`multi_llm.py`: Claude
+  max_tokens be0cc5db51 + capacity backoff 6ea39ca4f0 vs upstream's Vertex
+  stream-options rename 16a34b1fbd — blend; both sides verified present), 1
+  semantic surprise (`web/next.config.js` — see deviations), 5 cosmetic
+  take-theirs (`SandboxStatusIndicator.tsx`, `SearchUI.tsx`,
+  `MCPAuthenticationModal.tsx`, `ChatUI.tsx`, `anonymous_chat.spec.ts`).
+- Deviations from playbook defaults: `web/next.config.js` was assumed cosmetic
+  but carries fork-only `allowedDevOrigins` (ngrok host) and `"mime"` in
+  `transpilePackages` (4b17ea2b05). Promoted to the recurring table.
+- New upstream patterns:
+  - Cosmetic eslint-collision class: `SandboxStatusIndicator`, `SearchUI`,
+    `MCPAuthenticationModal`, `ChatUI` all conflict solely because of fork
+    commit b4a033ab62 (Feb 2026 eslint-disable / `memo` / `Record<string,never>`
+    rewrites). Cheap signal: `git log --no-merges <merge-base>..main -- <file>`
+    resolving to only b4a033ab62 ⇒ take theirs. Expect the same set again.
+  - `/admin/settings` is now PATCH with partial-merge (#13266); fork
+    `whitelabel_name` is env-forced on every `load_settings()` so unaffected.
+  - EE extraction continues: `onyx/server/gateway/api.py` → `ee/...`, siblings
+    (`models.py`, `configs.py`, `model_catalog.py`) stay CE. Watch for silently
+    relocated sibling symbols in future batches.
+  - alembic `merge heads` emits unused `op`/`sa` imports and the `black`
+    post-write hook is broken in the venv (`Could not find entrypoint
+    console_scripts.black`) — hand-clean each merge migration (ruff --fix +
+    ruff format on the file). The 2026-08-03 migration `ebf99a6ad57e` carried 2
+    F401s on main until this batch; fixed on main.
+- Alembic merge migration `d03b8fbe9465` (parents a44c4ebac3d6 + ebf99a6ad57e).
+- DEPLOY FLAGS: `a44c4ebac3d6` adds `file_record.file_size` with an
+  `UPDATE … FROM file_content` backfill (full-table write, no crypto);
+  aiohttp 3.14.3 + requirements bumps ⇒ venv rebuild; next 16.3.0, tailwind
+  4.3.3, lucide 1.25; new optional env vars `CELERY_EXTERNAL_GROUP_SYNC_LOCK_TIMEOUT`,
+  `IMAGE_SUMMARIZATION_TIMEOUT`, `CONTEXTUAL_RAG_LLM_TIMEOUT`,
+  `ANTHROPIC_GATEWAY_PASSTHROUGH_ENABLED`/`OPENAI_GATEWAY_PASSTHROUGH_ENABLED`
+  (default on); `ONYX_DB_SHARDS*` dropped from env.template (unused by fork).
+- Verification: worktree pytest 972/973 (1 known Windows csv/TABULAR), ruff 0 new,
+  web+backend import audit of fork-only files clean; main sync-verify --batch:
+  7/7 PASS (tsc 0 after bun install + lib/shared rebuild + .next clear).
+- Codex sanity check: skipped (mechanical batch; 1 blend already test-covered).
