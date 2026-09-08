@@ -78,9 +78,9 @@ from onyx.auth.mobile_sso.sso_completion import (
 )
 from onyx.auth.oidc_client import log_token_exchange_failure
 from onyx.auth.pat import get_hashed_pat_from_request
-from onyx.auth.permissions import has_global_permission
+from onyx.auth.permissions import has_global_permission, require_permission
 from onyx.auth.pkce import generate_pkce_pair
-from onyx.auth.schemas import AuthBackend, UserCreate, UserRole
+from onyx.auth.schemas import AuthBackend, UserCreate
 from onyx.auth.session_tokens import (
     SESSION_TOKEN_GRACE_PERIOD_SECONDS,
     SessionRejection,
@@ -2308,34 +2308,14 @@ async def current_user(
     return user
 
 
-_CURATOR_OR_ADMIN_ROLES = frozenset(
-    {UserRole.GLOBAL_CURATOR, UserRole.CURATOR, UserRole.ADMIN}
-)
-
-
-def is_user_curator_or_admin(user: User) -> bool:
-    return user.role in _CURATOR_OR_ADMIN_ROLES
-
-
-async def current_curator_or_admin_user(
-    user: User = Depends(current_user),
-) -> User:
-    if not is_user_curator_or_admin(user):
-        raise BasicAuthenticationError(
-            detail="Access denied. User is not a curator or admin.",
-        )
-
-    return user
-
-
-async def current_admin_user(
-    user: User = Depends(current_user),
-) -> User:
-    if user.role != UserRole.ADMIN:
-        raise BasicAuthenticationError(
-            detail="Access denied. User is not an admin.",
-        )
-    return user
+# Fork-only route dependencies (CRM, custom jobs, Google Calendar admin endpoints).
+# These predate upstream's permission system. `User.role` is now a nullable legacy
+# tombstone (migration c8e316473aaa) and admin grants live in group membership, so
+# the checks must delegate to `require_permission` rather than read the role column.
+# Kept under the old names so ~40 fork call sites and test dependency_overrides
+# keep working; `auth_check.check_router_auth` recognises these closures.
+current_admin_user = require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)
+current_curator_or_admin_user = require_permission(Permission.MANAGE_CONNECTORS)
 
 
 async def _get_user_from_token_data(token_data: dict) -> User | None:

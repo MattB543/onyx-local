@@ -439,6 +439,96 @@ N200=18, N250=22, N350=23 (flat), N400=38, N450=49 (i18n extraction), N522=50.
   `loadtest/`, `profiling/` moved to `tools/`.
 - Verification: worktree ruff clean; pytest 4080 pass / 29 Windows-env fails
   (test_save_chat csv + 28 craft sandbox path/symlink tests — new known-noise
-  set); targeted fork suites 263/263; main sync-verify --batch: VERIFY_PLACEHOLDER
+  set); targeted fork suites 263/263; main sync-verify --batch: 6/7 → 7/7 after 2 type-drift fixes (ae39d61758: Divider `paddingParallel="fit"` → `{0}`; `isCurator` → `hasAdminAccess` in CrmNav.tsx)
 - Codex sanity check (astra low, focus on auth/users.py KEEP OURS + unified
   delete path + spacing rescale): ran during batch 3 — see addendum below.
+
+### Batch 2 addendum — Codex sanity check (astra low): ISSUES → fixed on main
+
+Codex verdict on 7261e1155a: 3 blockers + 1 should-fix. All three blockers verified
+by reading code and fixed on main (commit after batch 3, see below):
+1. (BLOCKER, startup) `auth_check.check_router_auth` accepts `current_admin_user`,
+   `current_user`, and `require_permission` closures — but NOT
+   `current_curator_or_admin_user`, which the fork's Calendar SA-credential route
+   used → `RuntimeError` at api_server boot. Fix: route now uses
+   `require_permission(Permission.MANAGE_CONNECTORS)` (parity with gmail/gdrive).
+2. (BLOCKER, semantics) The kept role shim read `user.role`, which upstream turned
+   into a nullable legacy tombstone (c8e316473aaa); admin grants now live in group
+   membership → newly promoted admins would be locked out of CRM/custom-jobs
+   routes, demoted legacy admins would keep access, and PAT token scopes were not
+   enforced. Fix: `current_admin_user = require_permission(FULL_ADMIN_PANEL_ACCESS)`,
+   `current_curator_or_admin_user = require_permission(MANAGE_CONNECTORS)` in
+   `auth/users.py` (names kept so ~40 fork call sites + test dependency_overrides
+   are untouched; `UserRole` import dropped). DECISION: "curator" mapped to
+   MANAGE_CONNECTORS (used by CRM email-queue routes + Calendar). Full call-site
+   migration to `require_permission` remains an optional follow-up; the shim is
+   now semantically correct so the recurring conflict is the only remaining cost.
+3. (BLOCKER, privacy) Fork `beginChatUpload` (raw `/api/chat/files/upload`) does
+   not carry the incognito session id, so drag-drop uploads in an incognito chat
+   escaped incognito cleanup. Fix: `useChatController` drop handler routes through
+   upstream's session-aware `uploadFiles` when `incognitoEnabledRef.current`;
+   `process_message.py` now rejects `index_for_later_file_ids` when the session's
+   record mode does not persist content.
+4. (SHOULD-FIX, inherited) `ProjectsContext`/`useChatController` list
+   `incognitoUploadsEnabled` twice and omit `incognitoSessionId` from dep arrays —
+   present verbatim in upstream 97b67aab32; left as-is to avoid conflict noise.
+Codex verified correct: multi_llm request_params reflect the actual max_tokens
+(incl. degrade retry), chat_utils fallback reachable, unified delete keeps
+UserFile protection, 4 SearchDoc image sites, AppSidebar/WelcomeMessage/
+ChatDocumentDisplay JSX, spacing rescale factor and coverage, 8 ruff changes
+behavior-preserving, alembic parents, no markers, fork imports resolve.
+
+## Batch 3 — 8ffe7b4093 (2026-09-08, 50 commits, 172→122 behind)
+
+- Conflicts: 13, all frontend. 8 take-theirs (b4a033ab62-only), 2 take-theirs that
+  were fork cherry-picks of upstream PRs (`MessageToolbar.tsx` 9947837f9f = #8582,
+  `ParallelStreamingHeader.tsx` bc324a8070 = #8425 — always take theirs), 1
+  modify/delete accepted (`web/src/lib/tools/openApiService.ts`, upstream
+  reorganized lib/tools; won't recur), `toolDisplayHelpers.tsx` blend (CRM +
+  Calendar `case` arms kept as literal strings next to upstream's `t("toolNames.*")`),
+  `ChatPreferencesPage.tsx` in-marker take-theirs (CRM Settings block intact).
+- Deviations from playbook defaults: none.
+- OUT-OF-MARKER (large): upstream deleted `refresh-components/buttons/Button.tsx`
+  (9597046bee). 14 fork files / 39 call sites migrated to `@opal/components`
+  `Button` following upstream's own mapping: `main`→default, `action`/`danger`→
+  `variant`, `secondary`/`tertiary`/`internal`→`prominence`, `leftIcon`→`icon`,
+  layout `className`→wrapper div (Opal Button is WithoutStyles), icon-only
+  children→`icon={({className,style}) => ...}` (must forward `style`),
+  `!w-full justify-start`→`width="full"` + `[&_button]:justify-start` on parent.
+  `IconButton`/`LineItem` survive. Rounding rescale (6bd66b856a): zero fork
+  `rounding=` usages — no action. UserRole removal: frontend no-op.
+- i18n: `NextIntlClientProvider` wraps root layout — fork routes need no wrapper.
+  New oxlint `i18n/no-raw-jsx-text` is "error" on admin/sidebar/message globs that
+  carry fork code. DECISION: rule exemption over translation keys — fork-local
+  final override in `web/.oxlintrc.json` (gcalendar, CrmToolRenderer, AppSidebar
+  CRM tab, ChatPreferences CRM block), because `src/i18n/messages/keyParity.ts`
+  enforces exact key parity across en/de/es/fr/pt → every fork string would need
+  5 catalogs. NEW STANDING DIVERGENCE; batch 4's i18n completion widens the globs
+  → re-audit + extend the override.
+- ruff C901 enabled (8e04d65c8c): 6 fork findings handled via upstream's own
+  convention — `per-file-ignores` entries in `pyproject.toml` (google_calendar
+  connector, db/crm.py, crm/api.py, crm_log_interaction_tool, crm_update_tool).
+  NEW STANDING DIVERGENCE (alphabetically interleaved; small conflicts expected).
+- Whitelabel (b0688f33a1): NO CHANGE. Upstream brands auth pages from EE
+  enterprise-settings (`application_name`, custom logo); fork `whitelabel_name`
+  rides the core settings endpoint which `/auth/*` skips. Login page still shows
+  "Onyx" unless EE settings are configured — closing that is a new capability
+  (expose whitelabel_name pre-auth), not a merge item. FOLLOW-UP CANDIDATE.
+- Verification rig (reusable): worktree tsc works with tsconfig `paths`
+  `@opal/*`→`./lib/opal/src/*` (source, no dist build) + `web/node_modules` as a
+  real dir of per-entry junctions to main's node_modules, COPYING (not
+  junctioning) packages the batch newly adds (junctions resolve React from the
+  realpath → duplicate-React crashes). Never `bun install` against the junction.
+  Do not run pytest and full jest concurrently (5s timeouts cascade).
+- Alembic merge migration `cb4eb0dc83fd` (parents 466166715a66 + 66a70ddc0652).
+- DEPLOY FLAGS: `next-intl` new runtime dep ⇒ `bun install` mandatory; locale via
+  `NEXT_LOCALE` cookie, defaults en. Migration 66a70ddc0652 adds nullable
+  `user.temperature_default`/`reasoning_effort_default` (no crypto/backfill).
+  Backend deps: google-genai 1.52→2.18 (major), google-auth 2.57,
+  google-cloud-aiplatform 1.165 ⇒ venv rebuild + Vertex/Gemini smoke test.
+  Web: react-dropzone 14→20 (major).
+- Verification: worktree tsc 0 (real run), jest 137 suites/1248 pass, ruff clean,
+  pytest 3933 pass / 29 known Windows-env; main sync-verify --batch 7/7 PASS (with Codex batch-2 fixes applied; targeted pytest 2133 pass, tsc 0).
+- Codex sanity check: skipped for batch 3 itself (mechanical UI migration,
+  tsc-verified); Codex batch-2 fixes above landed on main in the same commit as
+  these notes.

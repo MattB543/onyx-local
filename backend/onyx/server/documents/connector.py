@@ -32,7 +32,6 @@ from onyx.auth.permissions import (
 from onyx.auth.scoped_permissions import assert_within_scope
 from onyx.auth.users import (
     current_chat_accessible_user,
-    current_curator_or_admin_user,
     current_user,
 )
 from onyx.background.celery.tasks.pruning.tasks import try_creating_prune_generator_task
@@ -227,7 +226,7 @@ def upsert_gmail_service_account_credential(
 @router.put("/admin/connector/google-calendar/service-account-credential")
 def upsert_google_calendar_service_account_credential(
     service_account_credential_request: GoogleServiceAccountCredentialRequest,
-    user: User = Depends(current_curator_or_admin_user),
+    user: User = Depends(require_permission(Permission.MANAGE_CONNECTORS)),
     db_session: Session = Depends(get_session),
 ) -> ObjectCreationIdResponse:
     credential_base = build_service_account_creds(

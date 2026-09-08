@@ -720,6 +720,10 @@ def build_chat_turn(
     token_counter = get_llm_token_counter(llms[0])
 
     promoted_user_file_ids: list[int] = []
+    if new_msg_req.index_for_later_file_ids and not record_mode_persists_content(
+        chat_session.incognito_record_mode
+    ):
+        raise ValueError("Cannot index files for later from an incognito chat session")
     if new_msg_req.index_for_later_file_ids:
         file_descriptor_ids = {
             file_descriptor["id"] for file_descriptor in new_msg_req.file_descriptors

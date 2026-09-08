@@ -156,7 +156,7 @@ export default function useChatController({
   const { pinnedAgents, togglePinnedAgent } = usePinnedAgents();
   const { agentPreferences } = useAgentPreferences();
   const { forcedToolIds } = useForcedTools();
-  const { fetchProjects, beginChatUpload } =
+  const { fetchProjects, beginChatUpload, uploadFiles } =
     useProjectsContext();
   const { incognitoEnabledRef, incognitoSessionId } = useIncognito();
 
@@ -1533,12 +1533,25 @@ export default function useChatController({
       }
       updateChatStateAction(getCurrentSessionId(), "uploading");
       try {
-        await beginChatUpload(Array.from(acceptedFiles));
+        // Incognito sessions must not create untracked raw chat uploads: route
+        // them through the session-aware upload path so incognito cleanup sees them.
+        if (incognitoEnabledRef.current) {
+          await uploadFiles(Array.from(acceptedFiles));
+        } else {
+          await beginChatUpload(Array.from(acceptedFiles));
+        }
       } finally {
         updateChatStateAction(getCurrentSessionId(), "input");
       }
     },
-    [beginChatUpload, activeAgent, llmManager, updateChatStateAction]
+    [
+      beginChatUpload,
+      uploadFiles,
+      incognitoEnabledRef,
+      activeAgent,
+      llmManager,
+      updateChatStateAction,
+    ]
   );
 
   useEffect(() => {
