@@ -146,7 +146,6 @@ function buildItems(
       add(SECTIONS.USAGE, ADMIN_ROUTES.TRACING);
     }
     addGated(SECTIONS.USAGE, ADMIN_ROUTES.USAGE, Tier.BUSINESS);
-    addGated(SECTIONS.USAGE, ADMIN_ROUTES.TOKEN_RATE_LIMITS, Tier.ENTERPRISE);
     if (
       settings?.query_history_type !== "disabled" &&
       !settings?.hide_query_history_from_admin_panel
@@ -164,7 +163,10 @@ function buildItems(
   if (!isCurator) {
     addGated(SECTIONS.ORGANIZATION, ADMIN_ROUTES.THEME, Tier.BUSINESS);
     add(SECTIONS.ORGANIZATION, ADMIN_ROUTES.SECURITY_HARDENING);
-    add(SECTIONS.ORGANIZATION, ADMIN_ROUTES.SSO_PROVIDERS);
+    // SSO provider config is not supported on multi-tenant cloud.
+    if (!enableCloud) {
+      add(SECTIONS.ORGANIZATION, ADMIN_ROUTES.SSO_PROVIDERS);
+    }
     if (hasSubscription) {
       add(SECTIONS.ORGANIZATION, ADMIN_ROUTES.BILLING);
     }

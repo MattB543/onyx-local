@@ -7,11 +7,17 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
   output: "standalone",
+  typescript: {
+    ignoreBuildErrors: process.env.SKIP_TYPE_CHECK === "1",
+  },
   // Hosts allowed to load Next.js dev resources (e.g. HMR) cross-origin.
   // Needed when accessing the local dev server through a tunnel like ngrok.
   allowedDevOrigins: ["cataract-brunette-icon.ngrok-free.dev"],
   transpilePackages: ["@onyx-ai/opal", "@onyx-ai/shared", "mime"],
   typedRoutes: true,
+  // `next dev` otherwise appends its own managed block to web/AGENTS.md on every
+  // start, which dirties the tree. Keep our agent instructions author-owned.
+  agentRules: false,
   // NOTE: `reactCompiler` is set per-phase in module.exports below — enabled for
   // builds, disabled for the dev server. See the comment there for the rationale.
   // Pin the workspace root to this directory so Turbopack resolves modules

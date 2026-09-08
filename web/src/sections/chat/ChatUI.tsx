@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Message } from "@/app/app/interfaces";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/interfaces";
 import HumanMessage from "@/app/app/message/HumanMessage";
@@ -39,7 +39,6 @@ export interface ChatUIProps {
   onSubmit: (args: {
     message: string;
     messageIdToResend?: number;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentMessageFiles: any[];
     deepResearch: boolean;
     modelOverride?: LlmDescriptor;
@@ -52,7 +51,6 @@ export interface ChatUIProps {
     selectedModels?: SelectedModel[];
   }) => Promise<void>;
   deepResearchEnabled: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentMessageFiles: any[];
 
   onResubmit: () => void;
@@ -70,7 +68,7 @@ export interface ChatUIProps {
   fullWidthChat?: boolean;
 }
 
-const ChatUI = memo(
+const ChatUI = React.memo(
   ({
     liveAgent,
     llmManager,
@@ -108,10 +106,13 @@ const ChatUI = memo(
     const deepResearchEnabledRef = useRef(deepResearchEnabled);
     const currentMessageFilesRef = useRef(currentMessageFiles);
     const selectedModelsRef = useRef(selectedModels);
-    onSubmitRef.current = onSubmit;
-    deepResearchEnabledRef.current = deepResearchEnabled;
-    currentMessageFilesRef.current = currentMessageFiles;
-    selectedModelsRef.current = selectedModels;
+
+    useEffect(() => {
+      onSubmitRef.current = onSubmit;
+      deepResearchEnabledRef.current = deepResearchEnabled;
+      currentMessageFilesRef.current = currentMessageFiles;
+      selectedModelsRef.current = selectedModels;
+    }, [onSubmit, deepResearchEnabled, currentMessageFiles, selectedModels]);
 
     const createRegenerator = useCallback(
       (regenerationRequest: {

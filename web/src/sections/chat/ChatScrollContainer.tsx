@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -76,7 +77,6 @@ const ChatScrollContainer = memo(
         children,
         anchorSelector,
         autoScroll = true,
-        isStreaming = false,
         onScrollButtonVisibilityChange,
         sessionId,
         hideScrollbar = false,
@@ -106,12 +106,15 @@ const ChatScrollContainer = memo(
       const onScrollButtonVisibilityChangeRef = useRef(
         onScrollButtonVisibilityChange
       );
-      onScrollButtonVisibilityChangeRef.current =
-        onScrollButtonVisibilityChange;
       const autoScrollRef = useRef(autoScroll);
-      autoScrollRef.current = autoScroll;
-      const isStreamingRef = useRef(isStreaming);
-      isStreamingRef.current = isStreaming;
+
+      // Layout effect: queued rAF/observer callbacks fire after commit, so a
+      // passive sync could let them scroll with a stale autoScroll flag.
+      useLayoutEffect(() => {
+        onScrollButtonVisibilityChangeRef.current =
+          onScrollButtonVisibilityChange;
+        autoScrollRef.current = autoScroll;
+      }, [onScrollButtonVisibilityChange, autoScroll]);
 
       // Get current scroll state
       const getScrollState = useCallback((): ScrollState => {
