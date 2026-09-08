@@ -13,12 +13,15 @@ import useShareableUsers from "@/hooks/useShareableUsers";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import {
+  Button,
+  EmptyMessageCard,
+  InputTypeIn,
+  Popover,
+} from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import { EmptyMessageCard } from "@opal/components";
 import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import CreateOrganizationModal from "@/views/crm/components/CreateOrganizationModal";
@@ -47,8 +50,8 @@ import {
   SvgPlusCircle,
   SvgUploadCloud,
 } from "@opal/icons";
+import { cn } from "@opal/utils";
 import { Section } from "@/layouts/general-layouts";
-import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 
@@ -180,17 +183,24 @@ export default function CrmOrganizationsPage() {
                   onOpenChange={setMorePopoverOpen}
                 >
                   <Popover.Trigger asChild>
-                    <Button secondary className="!p-2">
-                      <SvgMoreHorizontal className="h-4 w-4 rotate-90 stroke-text-03" />
-                    </Button>
+                    <Button
+                      prominence="secondary"
+                      icon={({ className, style }) => (
+                        // Opal's iconWrapper supplies the sizing/colour through
+                        // className+style; only the 90 degree rotation is ours.
+                        <SvgMoreHorizontal
+                          className={cn(className, "rotate-90")}
+                          style={style}
+                        />
+                      )}
+                    />
                   </Popover.Trigger>
                   <Popover.Content align="end">
                     <Section gap={2} alignItems="stretch">
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        leftIcon={SvgDownload}
-                        className="gap-2"
+                        icon={SvgDownload}
                         onClick={() => {
                           setMorePopoverOpen(false);
                           handleExport();
@@ -201,10 +211,9 @@ export default function CrmOrganizationsPage() {
                       </Button>
                       {isAdmin && (
                         <Button
-                          tertiary
+                          prominence="tertiary"
                           size="md"
-                          leftIcon={SvgUploadCloud}
-                          className="gap-2"
+                          icon={SvgUploadCloud}
                           onClick={() => {
                             setMorePopoverOpen(false);
                             setImportModalOpen(true);
@@ -217,9 +226,8 @@ export default function CrmOrganizationsPage() {
                   </Popover.Content>
                 </Popover>
                 <Button
-                  action
-                  primary
-                  leftIcon={SvgPlusCircle}
+                  variant="action"
+                  icon={SvgPlusCircle}
                   onClick={() => setCreateModalOpen(true)}
                 >
                   New Organization
@@ -324,7 +332,12 @@ export default function CrmOrganizationsPage() {
             </div>
 
             {hasActiveFilters && (
-              <Button action tertiary size="md" onClick={handleClearFilters}>
+              <Button
+                variant="action"
+                prominence="tertiary"
+                size="md"
+                onClick={handleClearFilters}
+              >
                 Clear filters
               </Button>
             )}

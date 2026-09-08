@@ -19,13 +19,12 @@ import useShareableUsers from "@/hooks/useShareableUsers";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, Modal } from "@opal/components";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
-import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgPlusCircle } from "@opal/icons";
@@ -388,8 +387,8 @@ export default function LogInteractionModal({
               </Modal.Body>
               <Modal.Footer>
                 <Button
-                  action
-                  secondary
+                  variant="action"
+                  prominence="secondary"
                   size="md"
                   type="button"
                   onClick={() => onOpenChange(false)}
@@ -397,8 +396,7 @@ export default function LogInteractionModal({
                   Cancel
                 </Button>
                 <Button
-                  action
-                  primary
+                  variant="action"
                   size="md"
                   type="submit"
                   disabled={isSubmitting}

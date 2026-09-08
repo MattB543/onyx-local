@@ -23,7 +23,6 @@ import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
@@ -42,7 +41,7 @@ import TypeBadge from "@/views/crm/components/TypeBadge";
 import CrmNav from "@/views/crm/CrmNav";
 
 import { Disabled } from "@opal/core";
-import { Button as OpalButton } from "@opal/components";
+import { Button } from "@opal/components";
 import { SvgEdit, SvgOrganization, SvgTrash } from "@opal/icons";
 
 const ORGANIZATION_TYPES: CrmOrganizationType[] = [
@@ -185,8 +184,8 @@ export default function CrmOrganizationDetailPage({
           description="Organization Details"
           rightChildren={
             <Button
-              action
-              tertiary
+              variant="action"
+              prominence="tertiary"
               size="md"
               type="button"
               onClick={() => router.back()}
@@ -200,8 +199,8 @@ export default function CrmOrganizationDetailPage({
               organization &&
               (isEditing ? (
                 <Button
-                  action
-                  secondary
+                  variant="action"
+                  prominence="secondary"
                   type="button"
                   onClick={() => setIsEditing(false)}
                 >
@@ -219,10 +218,9 @@ export default function CrmOrganizationDetailPage({
                     />
                   )}
                   <Button
-                    action
-                    primary
+                    variant="action"
                     type="button"
-                    leftIcon={SvgEdit}
+                    icon={SvgEdit}
                     onClick={() => setIsEditing(true)}
                   >
                     Edit
@@ -451,8 +449,7 @@ export default function CrmOrganizationDetailPage({
 
                             <div className="flex justify-end">
                               <Button
-                                action
-                                primary
+                                variant="action"
                                 size="md"
                                 type="submit"
                                 disabled={isSubmitting}
@@ -681,12 +678,12 @@ export default function CrmOrganizationDetailPage({
           }
           submit={
             <Disabled disabled={isDeletingOrganization}>
-              <OpalButton
+              <Button
                 variant="danger"
                 onClick={() => void handleDeleteOrganization()}
               >
                 {isDeletingOrganization ? "Deleting..." : "Delete Organization"}
-              </OpalButton>
+              </Button>
             </Disabled>
           }
         >
@@ -712,12 +709,12 @@ export default function CrmOrganizationDetailPage({
           }
           submit={
             <Disabled disabled={isDeletingInteraction}>
-              <OpalButton
+              <Button
                 variant="danger"
                 onClick={() => void handleDeleteInteraction()}
               >
                 {isDeletingInteraction ? "Deleting..." : "Delete Interaction"}
-              </OpalButton>
+              </Button>
             </Disabled>
           }
         >

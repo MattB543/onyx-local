@@ -8,12 +8,11 @@ import {
   CrmOrganizationType,
 } from "@/app/app/crm/crmService";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, Modal } from "@opal/components";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgOrganization } from "@opal/icons";
@@ -146,8 +145,8 @@ export default function CreateOrganizationModal({
               </Modal.Body>
               <Modal.Footer>
                 <Button
-                  action
-                  secondary
+                  variant="action"
+                  prominence="secondary"
                   size="md"
                   type="button"
                   onClick={() => onOpenChange(false)}
@@ -155,8 +154,7 @@ export default function CreateOrganizationModal({
                   Cancel
                 </Button>
                 <Button
-                  action
-                  primary
+                  variant="action"
                   size="md"
                   type="submit"
                   disabled={isSubmitting}

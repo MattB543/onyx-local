@@ -14,7 +14,7 @@ import { toast } from "@opal/layouts";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, Modal } from "@opal/components";
 import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
@@ -24,7 +24,6 @@ import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import {
   CONTACT_SOURCES,
@@ -353,8 +352,8 @@ export default function CreateContactModal({
               </Modal.Body>
               <Modal.Footer>
                 <Button
-                  action
-                  secondary
+                  variant="action"
+                  prominence="secondary"
                   size="md"
                   type="button"
                   onClick={() => onOpenChange(false)}
@@ -362,8 +361,7 @@ export default function CreateContactModal({
                   Cancel
                 </Button>
                 <Button
-                  action
-                  primary
+                  variant="action"
                   size="md"
                   type="submit"
                   disabled={isSubmitting}

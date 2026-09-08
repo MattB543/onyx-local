@@ -27,7 +27,6 @@ import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
 import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
@@ -60,7 +59,7 @@ import {
 } from "@/views/crm/crmOptions";
 
 import { Disabled } from "@opal/core";
-import { Button as OpalButton } from "@opal/components";
+import { Button } from "@opal/components";
 import { SvgEdit, SvgTrash, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
@@ -293,8 +292,8 @@ export default function CrmContactDetailPage({
           description="Contact Details"
           rightChildren={
             <Button
-              action
-              tertiary
+              variant="action"
+              prominence="tertiary"
               size="md"
               type="button"
               onClick={() => router.back()}
@@ -308,8 +307,8 @@ export default function CrmContactDetailPage({
               contact &&
               (isEditing ? (
                 <Button
-                  action
-                  secondary
+                  variant="action"
+                  prominence="secondary"
                   type="button"
                   onClick={() => setIsEditing(false)}
                 >
@@ -327,10 +326,9 @@ export default function CrmContactDetailPage({
                     />
                   )}
                   <Button
-                    action
-                    primary
+                    variant="action"
                     type="button"
-                    leftIcon={SvgEdit}
+                    icon={SvgEdit}
                     onClick={() => setIsEditing(true)}
                   >
                     Edit
@@ -843,8 +841,7 @@ export default function CrmContactDetailPage({
 
                             <div className="flex justify-end">
                               <Button
-                                action
-                                primary
+                                variant="action"
                                 size="md"
                                 type="submit"
                                 disabled={isSubmitting}
@@ -1074,12 +1071,12 @@ export default function CrmContactDetailPage({
           }
           submit={
             <Disabled disabled={isDeletingContact}>
-              <OpalButton
+              <Button
                 variant="danger"
                 onClick={() => void handleDeleteContact()}
               >
                 {isDeletingContact ? "Deleting..." : "Delete Contact"}
-              </OpalButton>
+              </Button>
             </Disabled>
           }
         >
@@ -1106,12 +1103,12 @@ export default function CrmContactDetailPage({
           }
           submit={
             <Disabled disabled={isDeletingInteraction}>
-              <OpalButton
+              <Button
                 variant="danger"
                 onClick={() => void handleDeleteInteraction()}
               >
                 {isDeletingInteraction ? "Deleting..." : "Delete Interaction"}
-              </OpalButton>
+              </Button>
             </Disabled>
           }
         >

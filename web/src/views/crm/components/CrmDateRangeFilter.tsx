@@ -7,11 +7,10 @@ import {
   isAfterDate,
   normalizeDate,
 } from "@/lib/dateUtils";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, Popover } from "@opal/components";
 import InputDatePicker from "@/refresh-components/inputs/InputDatePicker";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
-import { Popover } from "@opal/components";
 import { SvgCalendar } from "@opal/icons";
 
 export type CrmDateField = "created" | "updated";
@@ -113,7 +112,7 @@ export default function CrmDateRangeFilter({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <Button action secondary leftIcon={SvgCalendar}>
+        <Button variant="action" prominence="secondary" icon={SvgCalendar}>
           {buildTriggerLabel(value)}
         </Button>
       </Popover.Trigger>
@@ -155,8 +154,8 @@ export default function CrmDateRangeFilter({
 
           <div className="flex justify-end">
             <Button
-              action
-              tertiary
+              variant="action"
+              prominence="tertiary"
               size="md"
               onClick={handleClear}
               disabled={!value.from && !value.to}

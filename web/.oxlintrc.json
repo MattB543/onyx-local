@@ -140,6 +140,28 @@
       "rules": {
         "i18n/no-raw-jsx-text": "off"
       }
+    },
+    {
+      // FORK-LOCAL (onyx-local): the CRM and Google Calendar UI is fork-only and
+      // ships English-only, so its copy is not in the message catalogs. Adding
+      // keys is not free here: src/i18n/messages/keyParity.ts enforces exact key
+      // parity across en/de/es/fr/pt at type-check time, so every fork string
+      // would have to be duplicated into all five catalogs and then re-merged on
+      // every upstream sync. Exempt the fork surfaces instead.
+      //
+      // ChatPreferencesPage.tsx and AppSidebar.tsx are upstream files carrying a
+      // fork-only block (the "CRM Settings" collapsible and the CRM sidebar tab);
+      // they are listed whole because the rule cannot be scoped to a region.
+      // Drop an entry here if its fork feature is ever removed or translated.
+      "files": [
+        "**/pages/gcalendar/**",
+        "src/app/app/message/messageComponents/timeline/renderers/crm/**",
+        "src/views/admin/ChatPreferencesPage.tsx",
+        "src/sections/sidebar/AppSidebar.tsx"
+      ],
+      "rules": {
+        "i18n/no-raw-jsx-text": "off"
+      }
     }
   ],
   "ignorePatterns": [

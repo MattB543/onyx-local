@@ -5,8 +5,7 @@ import { useDropzone } from "react-dropzone";
 
 import { CrmImportResult, importCrmCsv } from "@/app/app/crm/crmService";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
-import Button from "@/refresh-components/buttons/Button";
-import { Modal } from "@opal/components";
+import { Button, Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgUploadCloud } from "@opal/icons";
@@ -248,8 +247,8 @@ export default function ImportCsvModal({
         </Modal.Body>
         <Modal.Footer>
           <Button
-            action
-            secondary
+            variant="action"
+            prominence="secondary"
             size="md"
             type="button"
             onClick={() => handleOpenChange(false)}
@@ -257,8 +256,8 @@ export default function ImportCsvModal({
             Cancel
           </Button>
           <Button
-            action
-            secondary
+            variant="action"
+            prominence="secondary"
             size="md"
             type="button"
             disabled={!file || loading}
@@ -267,8 +266,7 @@ export default function ImportCsvModal({
             {loading ? "Validating..." : "Dry Run"}
           </Button>
           <Button
-            action
-            primary
+            variant="action"
             size="md"
             type="button"
             disabled={!file || loading}

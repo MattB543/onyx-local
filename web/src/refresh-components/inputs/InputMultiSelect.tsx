@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import Button from "@/refresh-components/buttons/Button";
+import { Button } from "@opal/components";
 import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 
 export interface InputMultiSelectOption {
@@ -174,8 +174,8 @@ export default function InputMultiSelect({
             immediately, so the button is only needed for custom values. */}
         {allowCustom && (
           <Button
-            action
-            secondary
+            variant="action"
+            prominence="secondary"
             type="button"
             disabled={!canAdd}
             onClick={() => {

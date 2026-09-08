@@ -12,9 +12,8 @@ import useShareableUsers from "@/hooks/useShareableUsers";
 import { SettingsLayouts } from "@opal/layouts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, EmptyMessageCard, Popover } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import { EmptyMessageCard } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -30,8 +29,8 @@ import {
   SvgMoreHorizontal,
   SvgUploadCloud,
 } from "@opal/icons";
+import { cn } from "@opal/utils";
 import { Section } from "@/layouts/general-layouts";
-import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 
@@ -116,17 +115,24 @@ export default function CrmInteractionsPage() {
                   onOpenChange={setMorePopoverOpen}
                 >
                   <Popover.Trigger asChild>
-                    <Button secondary className="!p-2">
-                      <SvgMoreHorizontal className="h-4 w-4 rotate-90 stroke-text-03" />
-                    </Button>
+                    <Button
+                      prominence="secondary"
+                      icon={({ className, style }) => (
+                        // Opal's iconWrapper supplies the sizing/colour through
+                        // className+style; only the 90 degree rotation is ours.
+                        <SvgMoreHorizontal
+                          className={cn(className, "rotate-90")}
+                          style={style}
+                        />
+                      )}
+                    />
                   </Popover.Trigger>
                   <Popover.Content align="end">
                     <Section gap={2} alignItems="stretch">
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        leftIcon={SvgDownload}
-                        className="gap-2"
+                        icon={SvgDownload}
                         onClick={() => {
                           setMorePopoverOpen(false);
                           handleExport();
@@ -137,10 +143,9 @@ export default function CrmInteractionsPage() {
                       </Button>
                       {isAdmin && (
                         <Button
-                          tertiary
+                          prominence="tertiary"
                           size="md"
-                          leftIcon={SvgUploadCloud}
-                          className="gap-2"
+                          icon={SvgUploadCloud}
                           onClick={() => {
                             setMorePopoverOpen(false);
                             setImportModalOpen(true);

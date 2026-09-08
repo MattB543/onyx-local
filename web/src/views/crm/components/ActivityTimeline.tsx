@@ -1,8 +1,7 @@
 "use client";
 
 import { CrmInteraction } from "@/app/app/crm/crmService";
-import Button from "@/refresh-components/buttons/Button";
-import { EmptyMessageCard } from "@opal/components";
+import { Button, EmptyMessageCard } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgActivity, SvgPlusCircle } from "@opal/icons";
@@ -42,15 +41,16 @@ export default function ActivityTimeline({
         <Text as="p" mainUiAction text05>
           Activity
         </Text>
-        <Button
-          action
-          tertiary
-          className="ml-auto"
-          leftIcon={SvgPlusCircle}
-          onClick={onLogInteraction}
-        >
-          Log Interaction
-        </Button>
+        <div className="ml-auto">
+          <Button
+            variant="action"
+            prominence="tertiary"
+            icon={SvgPlusCircle}
+            onClick={onLogInteraction}
+          >
+            Log Interaction
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -89,7 +89,11 @@ export default function ActivityTimeline({
 
           {hasMore && (
             <div className="mt-1 flex justify-center">
-              <Button action tertiary onClick={onLoadMore}>
+              <Button
+                variant="action"
+                prominence="tertiary"
+                onClick={onLoadMore}
+              >
                 Load more
               </Button>
             </div>

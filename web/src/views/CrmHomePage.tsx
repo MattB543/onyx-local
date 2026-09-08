@@ -14,10 +14,9 @@ import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import { Button, Popover } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { Popover } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import ImportCsvModal from "@/views/crm/components/ImportCsvModal";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
@@ -108,35 +107,42 @@ export default function CrmHomePage() {
                 >
                   <Popover.Trigger asChild>
                     <Button
-                      secondary
-                      leftIcon={SvgDownload}
+                      prominence="secondary"
+                      icon={SvgDownload}
                       disabled={exporting}
                     >
                       {exporting ? "Exporting..." : "Export"}
                     </Button>
                   </Popover.Trigger>
                   <Popover.Content align="end">
-                    <Section gap={2} alignItems="stretch">
+                    {/* Opal's Button centers its label and rejects `className`
+                        (`.interactive-container` is `justify-center`), so these
+                        menu rows keep left alignment via the wrapper below. */}
+                    <Section
+                      gap={2}
+                      alignItems="stretch"
+                      className="[&_button]:justify-start"
+                    >
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        className="!w-full justify-start"
+                        width="full"
                         onClick={() => handleExport(exportCrmContacts)}
                       >
                         Export Contacts
                       </Button>
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        className="!w-full justify-start"
+                        width="full"
                         onClick={() => handleExport(exportCrmOrganizations)}
                       >
                         Export Organizations
                       </Button>
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        className="!w-full justify-start"
+                        width="full"
                         onClick={() => handleExport(exportCrmInteractions)}
                       >
                         Export Interactions
@@ -146,8 +152,8 @@ export default function CrmHomePage() {
                 </Popover>
                 {isAdmin && (
                   <Button
-                    secondary
-                    leftIcon={SvgUploadCloud}
+                    prominence="secondary"
+                    icon={SvgUploadCloud}
                     onClick={() => setImportModalOpen(true)}
                   >
                     Import

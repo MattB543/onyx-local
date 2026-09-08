@@ -17,14 +17,17 @@ import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
-import Button from "@/refresh-components/buttons/Button";
+import {
+  Button,
+  EmptyMessageCard,
+  InputTypeIn,
+  Popover,
+} from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import { EmptyMessageCard } from "@opal/components";
 import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { InputTypeIn } from "@opal/components";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
@@ -54,9 +57,9 @@ import {
   SvgUploadCloud,
   SvgUser,
 } from "@opal/icons";
+import { cn } from "@opal/utils";
 import CopyEmailButton from "@/views/crm/components/CopyEmailButton";
 import { Section } from "@/layouts/general-layouts";
-import { Popover } from "@opal/components";
 
 const PAGE_SIZE = 25;
 
@@ -246,17 +249,24 @@ export default function CrmContactsPage() {
                   onOpenChange={setMorePopoverOpen}
                 >
                   <Popover.Trigger asChild>
-                    <Button secondary className="!p-2">
-                      <SvgMoreHorizontal className="h-4 w-4 rotate-90 stroke-text-03" />
-                    </Button>
+                    <Button
+                      prominence="secondary"
+                      icon={({ className, style }) => (
+                        // Opal's iconWrapper supplies the sizing/colour through
+                        // className+style; only the 90 degree rotation is ours.
+                        <SvgMoreHorizontal
+                          className={cn(className, "rotate-90")}
+                          style={style}
+                        />
+                      )}
+                    />
                   </Popover.Trigger>
                   <Popover.Content align="end">
                     <Section gap={2} alignItems="stretch">
                       <Button
-                        tertiary
+                        prominence="tertiary"
                         size="md"
-                        leftIcon={SvgDownload}
-                        className="gap-2"
+                        icon={SvgDownload}
                         onClick={() => {
                           setMorePopoverOpen(false);
                           handleExport();
@@ -267,10 +277,9 @@ export default function CrmContactsPage() {
                       </Button>
                       {isAdmin && (
                         <Button
-                          tertiary
+                          prominence="tertiary"
                           size="md"
-                          leftIcon={SvgUploadCloud}
-                          className="gap-2"
+                          icon={SvgUploadCloud}
                           onClick={() => {
                             setMorePopoverOpen(false);
                             setImportModalOpen(true);
@@ -283,9 +292,8 @@ export default function CrmContactsPage() {
                   </Popover.Content>
                 </Popover>
                 <Button
-                  action
-                  primary
-                  leftIcon={SvgPlusCircle}
+                  variant="action"
+                  icon={SvgPlusCircle}
                   onClick={() => setCreateModalOpen(true)}
                 >
                   New Contact
@@ -302,7 +310,12 @@ export default function CrmContactsPage() {
                 <Text as="p" secondaryBody text03 className="text-sm">
                   Showing contacts linked to the selected organization.
                 </Text>
-                <Button action tertiary size="md" href="/app/crm/contacts">
+                <Button
+                  variant="action"
+                  prominence="tertiary"
+                  size="md"
+                  href="/app/crm/contacts"
+                >
                   Clear Filter
                 </Button>
               </div>
@@ -452,7 +465,12 @@ export default function CrmContactsPage() {
             </div>
 
             {hasActiveFilters && (
-              <Button action tertiary size="md" onClick={handleClearFilters}>
+              <Button
+                variant="action"
+                prominence="tertiary"
+                size="md"
+                onClick={handleClearFilters}
+              >
                 Clear filters
               </Button>
             )}

@@ -12,9 +12,7 @@ import {
   removeTagFromOrganization,
 } from "@/app/app/crm/crmService";
 import { cn } from "@/lib/utils";
-import Button from "@/refresh-components/buttons/Button";
-import { InputTypeIn } from "@opal/components";
-import { Popover } from "@opal/components";
+import { Button, InputTypeIn, Popover } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgPlus, SvgTag, SvgX } from "@opal/icons";
@@ -215,8 +213,8 @@ export default function TagManager({
 
               <div className="flex justify-end">
                 <Button
-                  action
-                  tertiary
+                  variant="action"
+                  prominence="tertiary"
                   size="md"
                   onClick={() => setOpen(false)}
                 >
