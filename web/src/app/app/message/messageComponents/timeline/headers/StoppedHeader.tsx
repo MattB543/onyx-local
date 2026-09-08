@@ -1,4 +1,5 @@
-import { memo } from "react";
+import React from "react";
+import { useTranslations } from "next-intl";
 import { SvgFold, SvgExpand } from "@opal/icons";
 import { Button } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
@@ -13,12 +14,13 @@ export interface StoppedHeaderProps {
 }
 
 /** Header when user stopped/cancelled */
-export const StoppedHeader = memo(function StoppedHeader({
+export const StoppedHeader = React.memo(function StoppedHeader({
   totalSteps,
   collapsible,
   isExpanded,
   onToggle,
 }: StoppedHeaderProps) {
+  const t = useTranslations("chat.messages.timeline");
   const isInteractive = collapsible && totalSteps > 0;
 
   const className = cn(
@@ -29,7 +31,7 @@ export const StoppedHeader = memo(function StoppedHeader({
   const label = (
     <div className="px-(--timeline-header-text-padding-x) py-(--timeline-header-text-padding-y)">
       <Text as="p" mainUiAction text03>
-        Interrupted Thinking
+        {t("interruptedThinking.label")}
       </Text>
     </div>
   );
@@ -48,7 +50,7 @@ export const StoppedHeader = memo(function StoppedHeader({
     <div
       role="button"
       tabIndex={0}
-      aria-label="Toggle timeline"
+      aria-label={t("toggleRow.ariaLabel")}
       onKeyDown={clickOnKeyDown(onToggle)}
       onClick={onToggle}
       className={className}
@@ -60,10 +62,14 @@ export const StoppedHeader = memo(function StoppedHeader({
         size="md"
         onClick={noProp(onToggle)}
         rightIcon={isExpanded ? SvgFold : SvgExpand}
-        aria-label={isExpanded ? "Collapse timeline" : "Expand timeline"}
+        aria-label={
+          isExpanded
+            ? t("collapseButton.ariaLabel")
+            : t("expandButton.ariaLabel")
+        }
         aria-expanded={isExpanded}
       >
-        {`${totalSteps} ${totalSteps === 1 ? "step" : "steps"}`}
+        {t("stepsButton.label", { count: totalSteps })}
       </Button>
     </div>
   );

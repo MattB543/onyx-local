@@ -10,6 +10,7 @@ import {
 import {
   applyPreferredResponse,
   chooseImplicitPreferred,
+  getMostVisibleResponseId,
   getMultiModelChildren,
   getUnresolvedMultiModelTurn,
 } from "@/app/app/message/multiModel";
@@ -29,7 +30,7 @@ import {
 } from "@/app/app/services/messageTree";
 import { MinimalAgent } from "@/lib/agents/types";
 import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
-import { SEARCH_TOOL_ID } from "@/app/app/components/tools/constants";
+import { SEARCH_TOOL_ID } from "@/lib/tools/constants";
 import { OnyxDocument } from "@/lib/search/interfaces";
 import { FilterManager, LlmDescriptor, LlmManager } from "@/lib/hooks";
 import {
@@ -80,7 +81,7 @@ import { Packet, MessageStart } from "@/app/app/services/streamingModels";
 import { SelectedModel } from "@/sections/model-selector/MultiModelSelector";
 import { useAgentPreferences } from "@/lib/agents/hooks";
 import { useForcedTools } from "@/lib/hooks/useForcedTools";
-import { ProjectFile, useProjectsContext } from "@/providers/ProjectsContext";
+import { ProjectFile, useProjectsContext } from "@/lib/projects/providers";
 import { useIncognito } from "@/providers/IncognitoProvider";
 import { useAppParams } from "@/hooks/appNavigation";
 import { projectFilesToFileDescriptors } from "@/lib/projects/utils";
@@ -676,7 +677,8 @@ export default function useChatController({
           ? chooseImplicitPreferred(
               currentHistory,
               currentMessageTreeLocal,
-              unresolvedTurn
+              unresolvedTurn,
+              getMostVisibleResponseId(unresolvedTurn.userMessage.nodeId)
             )
           : null;
         if (

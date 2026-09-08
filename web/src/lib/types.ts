@@ -1,4 +1,6 @@
 import { Agent } from "@/lib/agents/types";
+import type { ReasoningEffortOverride } from "@/lib/languageModels/types";
+import type { Locale } from "@/i18n/config";
 import { Credential } from "./connectors/credentials";
 import { Connector } from "./connectors/connectors";
 import { ConnectorCredentialPairStatus } from "@/app/admin/connector/[ccPairId]/types";
@@ -30,7 +32,11 @@ interface UserPreferences {
   auto_scroll: boolean;
   shortcut_enabled: boolean;
   temperature_override_enabled: boolean;
+  temperature_default?: number | null;
+  reasoning_effort_default?: ReasoningEffortOverride | null;
   theme_preference: ThemePreference | null;
+  // UI language, mirrors the backend SupportedLanguage enum
+  language: Locale | null;
   chat_background: string | null;
   default_app_mode: "AUTO" | "CHAT" | "SEARCH";
   // Input preferences

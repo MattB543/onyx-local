@@ -57,6 +57,80 @@ func TestNeverReplaysPostOnServerError(t *testing.T) {
 	}
 }
 
+// The cc-pair create is a PUT that creates, so it must be excluded from the
+// "any non-POST is safe to replay" rule: a replay answers "already
+// associated" instead of returning the object the first attempt made.
+func TestNeverReplaysCreatingPut(t *testing.T) {
+	c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+	_, err := c.CreateCCPair(context.Background(), 3, 5, CCPairCreate{Name: "docs", AccessType: "public"})
+	if err == nil {
+		t.Fatal("a failed creating PUT must surface, not be replayed")
+	}
+	if attempts.Load() != 1 {
+		t.Errorf("got %d attempts, want 1", attempts.Load())
+	}
+}
+
+// Plain updates stay replayable: they are idempotent.
+func TestRetriesNonCreatingPut(t *testing.T) {
+	c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+	if err := c.SetCCPairStatus(context.Background(), 77, CCPairStatusActive); err != nil {
+		t.Fatalf("an idempotent PUT should survive transient 5xx: %v", err)
+	}
+	if attempts.Load() != 2 {
+		t.Errorf("got %d attempts, want 2", attempts.Load())
+	}
+}
+
+// A document set write leaves the set syncing, and Onyx rejects a change to a
+// syncing set — so neither mutation may be replayed even though one is a PATCH
+// and the other a DELETE.
+func TestNeverReplaysDocumentSetMutations(t *testing.T) {
+	t.Run("update", func(t *testing.T) {
+		c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+		if err := c.UpdateDocumentSet(context.Background(), DocumentSetUpdate{ID: 1}); err == nil {
+			t.Fatal("a failed document set update must surface, not be replayed")
+		}
+		if attempts.Load() != 1 {
+			t.Errorf("got %d attempts, want 1", attempts.Load())
+		}
+	})
+	t.Run("delete", func(t *testing.T) {
+		c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+		if err := c.DeleteDocumentSet(context.Background(), 1); err == nil {
+			t.Fatal("a failed document set delete must surface, not be replayed")
+		}
+		if attempts.Load() != 1 {
+			t.Errorf("got %d attempts, want 1", attempts.Load())
+		}
+	})
+}
+
+// Every user group write that passes through the sync gate leaves the group
+// syncing once it commits, so a replay meets the gate the first attempt set
+// and reports a failure for a change that landed. Same shape as the document
+// set mutations above.
+func TestNeverReplaysGatedUserGroupWrites(t *testing.T) {
+	t.Run("rename", func(t *testing.T) {
+		c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+		if _, err := c.RenameUserGroup(context.Background(), 4, "platform"); err == nil {
+			t.Fatal("a failed rename must surface, not be replayed")
+		}
+		if attempts.Load() != 1 {
+			t.Errorf("got %d attempts, want 1", attempts.Load())
+		}
+	})
+	t.Run("delete", func(t *testing.T) {
+		c, attempts := newCountingServer(t, http.StatusBadGateway, http.StatusOK)
+		if err := c.DeleteUserGroup(context.Background(), 4); err == nil {
+			t.Fatal("a failed delete must surface, not be replayed")
+		}
+		if attempts.Load() != 1 {
+			t.Errorf("got %d attempts, want 1", attempts.Load())
+		}
+	})
+}
+
 func TestRetriesRateLimitsOnWrites(t *testing.T) {
 	c, attempts := newCountingServer(t, http.StatusTooManyRequests, http.StatusOK)
 	// A 429 is rejected before the handler runs, so replaying is safe.

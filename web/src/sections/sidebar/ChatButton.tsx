@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, memo, useMemo, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useDraggable } from "@dnd-kit/core";
 import useChatSessions from "@/hooks/useChatSessions";
 import { deleteChatSession, renameChatSession } from "@/app/app/services/lib";
@@ -14,14 +15,14 @@ import {
   removeChatSessionFromProject,
   createProject as createProjectService,
 } from "@/lib/projects/svc";
-import { useProjectsContext } from "@/providers/ProjectsContext";
+import { useProjectsContext } from "@/lib/projects/providers";
 import { MoveCustomAgentChatModal } from "@/lib/agents/components";
 import { UNNAMED_CHAT } from "@/lib/constants";
 import ShareChatSessionModal from "@/sections/modals/ShareChatSessionModal";
 import { Button, LineItemButton, SidebarTab } from "@opal/components";
 import { InputTypeIn } from "@opal/components";
 import { Hoverable } from "@opal/core";
-import useFocusOnMount from "@opal/hooks/useFocusOnMount";
+import { useFocusOnMount } from "@opal/hooks";
 import { DRAG_TYPES, LOCAL_STORAGE_KEYS } from "@/lib/sidebar/constants";
 import {
   shouldShowMoveModal,
@@ -41,7 +42,7 @@ import {
   SvgTrash,
 } from "@opal/icons";
 import useOnMount from "@/hooks/useOnMount";
-import { useAgents, usePinnedAgents } from "@/lib/agents/hooks";
+import { usePinChatAgent } from "@/lib/agents/hooks";
 
 export interface PopoverSearchInputProps {
   setShowMoveOptions: (show: boolean) => void;
@@ -52,6 +53,7 @@ export function PopoverSearchInput({
   setShowMoveOptions,
   onSearch,
 }: PopoverSearchInputProps) {
+  const t = useTranslations("sidebar");
   const [searchTerm, setSearchTerm] = useState("");
   const focusOnMount = useFocusOnMount<HTMLInputElement>();
 
@@ -85,7 +87,7 @@ export function PopoverSearchInput({
         value={searchTerm}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Search Projects"
+        placeholder={t("chatButton.projectSearchInput.placeholder")}
         onClick={noProp()}
         variant="internal"
         ref={focusOnMount}
@@ -102,6 +104,7 @@ export interface ChatButtonProps {
 
 const ChatButton = memo(
   ({ chatSession, project, draggable = false }: ChatButtonProps) => {
+    const t = useTranslations("sidebar");
     const route = useAppRouter();
     const activeSidebarTab = useAppFocus();
     const active = useMemo(
@@ -129,8 +132,7 @@ const ChatButton = memo(
       currentProjectId,
       createProject,
     } = useProjectsContext();
-    const { agents } = useAgents();
-    const { pinnedAgents, togglePinnedAgent } = usePinnedAgents();
+    const pinChatAgent = usePinChatAgent();
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [pendingMoveProjectId, setPendingMoveProjectId] = useState<
       number | null
@@ -194,34 +196,36 @@ const ChatButton = memo(
           <LineItemButton
             key="share"
             sizePreset="main-ui"
-            rounding="sm"
+            rounding={2}
             icon={SvgShare}
-            title="Share"
+            title={t("chatButton.share.label")}
             onClick={noProp(() => setShowShareModal(true))}
           />,
           <LineItemButton
             key="rename"
             sizePreset="main-ui"
-            rounding="sm"
+            rounding={2}
             icon={SvgEdit}
-            title="Rename"
+            title={t("chatButton.rename.label")}
             onClick={noProp(() => setRenaming(true))}
           />,
           <LineItemButton
             key="move"
             sizePreset="main-ui"
-            rounding="sm"
+            rounding={2}
             icon={SvgFolderIn}
-            title="Move to Project"
+            title={t("chatButton.moveToProject.label")}
             onClick={noProp(() => setShowMoveOptions(true))}
           />,
           project && (
             <LineItemButton
               key="remove"
               sizePreset="main-ui"
-              rounding="sm"
+              rounding={2}
               icon={SvgFolder}
-              title={`Remove from ${project.name}`}
+              title={t("chatButton.removeFromProject.label", {
+                projectName: project.name,
+              })}
               onClick={noProp(() => handleRemoveFromProject())}
             />
           ),
@@ -229,10 +233,10 @@ const ChatButton = memo(
           <LineItemButton
             key="delete"
             sizePreset="main-ui"
-            rounding="sm"
+            rounding={2}
             color="danger"
             icon={SvgTrash}
-            title="Delete"
+            title={t("chatButton.delete.label")}
             onClick={noProp(() => setDeleteConfirmationModalOpen(true))}
           />,
         ];
@@ -252,7 +256,7 @@ const ChatButton = memo(
             <LineItemButton
               key={targetProject.id}
               sizePreset="main-ui"
-              rounding="sm"
+              rounding={2}
               icon={SvgFolder}
               title={targetProject.name}
               onClick={noProp(() => handleChatMove(targetProject))}
@@ -265,9 +269,11 @@ const ChatButton = memo(
                 <LineItemButton
                   key="create-new"
                   sizePreset="main-ui"
-                  rounding="sm"
+                  rounding={2}
                   icon={SvgFolderPlus}
-                  title={`Create ${searchTerm.trim()}`}
+                  title={t("chatButton.createProject.label", {
+                    projectName: searchTerm.trim(),
+                  })}
                   onClick={noProp(() =>
                     handleCreateProjectAndMove(searchTerm.trim())
                   )}
@@ -288,17 +294,12 @@ const ChatButton = memo(
       chatSession.id,
       searchTerm,
       createProject,
+      t,
     ]);
 
     // Pin the chat's agent when clicking on the conversation
     async function handleClick() {
-      const agent = agents.find((a) => a.id === chatSession.persona_id);
-      if (agent) {
-        const isAlreadyPinned = pinnedAgents.some((a) => a.id === agent.id);
-        if (!isAlreadyPinned) {
-          await togglePinnedAgent(agent, true);
-        }
-      }
+      await pinChatAgent(chatSession);
     }
 
     async function handleRename(newName: string) {
@@ -324,7 +325,7 @@ const ChatButton = memo(
         await refreshChatSessions();
       } catch (error) {
         console.error("Failed to delete chat:", error);
-        showErrorNotification("Failed to delete chat. Please try again.");
+        showErrorNotification(t("chatButton.deleteError.message"));
       }
     }
 
@@ -397,7 +398,7 @@ const ChatButton = memo(
         setNavigateAfterMoveProjectId(null);
       } catch (error) {
         console.error("Failed to create project and move chat:", error);
-        showErrorNotification("Failed to create project. Please try again.");
+        showErrorNotification(t("chatButton.createProjectError.message"));
         setNavigateAfterMoveProjectId(null);
       }
     }
@@ -405,7 +406,7 @@ const ChatButton = memo(
     const rightMenu = (
       <>
         <Popover.Trigger asChild onClick={noProp()}>
-          <div>
+          <div data-testid="ChatButton/options">
             {/* While renaming the row is an input, so the menu stays away unless
                 its own popover is already open. */}
             {(!renaming || popoverOpen) && (
@@ -420,7 +421,12 @@ const ChatButton = memo(
             )}
           </div>
         </Popover.Trigger>
-        <Popover.Content side="right" align="start" width="md">
+        <Popover.Content
+          data-testid="ChatButton/popover"
+          side="right"
+          align="start"
+          width="md"
+        >
           <PopoverMenu>{popoverItems}</PopoverMenu>
         </Popover.Content>
       </>
@@ -439,6 +445,7 @@ const ChatButton = memo(
         <Popover.Anchor>
           <Hoverable.Root
             group="ChatButton"
+            data-testid="ChatButton"
             interaction={popoverOpen ? "hover" : "rest"}
           >
             <SidebarTab
@@ -472,7 +479,7 @@ const ChatButton = memo(
       <>
         {deleteConfirmationModalOpen && (
           <ConfirmationModalLayout
-            title="Delete Chat"
+            title={t("chatButton.deleteConfirmation.title")}
             icon={SvgTrash}
             onClose={() => setDeleteConfirmationModalOpen(false)}
             submit={
@@ -483,12 +490,11 @@ const ChatButton = memo(
                   handleChatDelete();
                 }}
               >
-                Delete
+                {t("chatButton.deleteConfirmation.confirmButton.label")}
               </Button>
             }
           >
-            Are you sure you want to delete this chat? This action cannot be
-            undone.
+            {t("chatButton.deleteConfirmation.description")}
           </ConfirmationModalLayout>
         )}
 

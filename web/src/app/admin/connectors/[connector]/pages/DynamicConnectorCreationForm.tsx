@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import CredentialSubText from "@/lib/credentials/components/CredentialFields";
 import { ConnectionConfiguration } from "@/lib/connectors/connectors";
 import { TextFormField } from "@/components/Field";
@@ -12,10 +13,8 @@ import { useFormikContext } from "formik";
 
 export interface DynamicConnectionFormProps {
   config: ConnectionConfiguration;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   values: any;
   connector: ConfigurableSources;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentCredential: Credential<any> | null;
 }
 
@@ -25,7 +24,7 @@ export default function DynamicConnectionForm({
   connector,
   currentCredential,
 }: DynamicConnectionFormProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const t = useTranslations("admin.connectorsList");
   const { setFieldValue } = useFormikContext<any>(); // Get Formik's context functions
 
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -53,9 +52,9 @@ export default function DynamicConnectionForm({
       )}
 
       <TextFormField
-        subtext="A descriptive name for the connector."
+        subtext={t("connectorName.subtext")}
         type={"text"}
-        label={"Connector Name"}
+        label={t("connectorName.label")}
         name={"name"}
       />
 

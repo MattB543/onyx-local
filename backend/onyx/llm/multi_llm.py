@@ -472,6 +472,7 @@ class LitellmLLM(LLM):
         extra_body: dict | None = LITELLM_EXTRA_BODY,
         model_kwargs: dict[str, Any] | None = None,
         reasoning_effort_default: ReasoningEffort | None = None,
+        reasoning_effort_user_default: ReasoningEffort | None = None,
         reasoning_effort_max: ReasoningEffort | None = None,
     ):
         # Timeout in seconds for each socket read operation (i.e., max time between
@@ -493,6 +494,7 @@ class LitellmLLM(LLM):
         self._max_input_tokens = max_input_tokens
         self._custom_config = custom_config
         self._reasoning_effort_default = reasoning_effort_default
+        self._reasoning_effort_user_default = reasoning_effort_user_default
         self._reasoning_effort_max = reasoning_effort_max
 
         self._api_surface = resolve_api_surface(model_provider, custom_config)
@@ -785,8 +787,9 @@ class LitellmLLM(LLM):
         # see the same effort the provider will.
         reasoning_effort = resolve_reasoning_effort(
             reasoning_effort,
-            self.config.reasoning_effort_default,
-            self.config.reasoning_effort_max,
+            default=self.config.reasoning_effort_default,
+            user_default=self.config.reasoning_effort_user_default,
+            maximum=self.config.reasoning_effort_max,
         )
 
         # Note, there is a reasoning_effort parameter in LiteLLM but it is completely jank and does not work for any
@@ -1142,6 +1145,7 @@ class LitellmLLM(LLM):
             custom_config=self._custom_config,
             max_input_tokens=self._max_input_tokens,
             reasoning_effort_default=self._reasoning_effort_default,
+            reasoning_effort_user_default=self._reasoning_effort_user_default,
             reasoning_effort_max=self._reasoning_effort_max,
         )
 

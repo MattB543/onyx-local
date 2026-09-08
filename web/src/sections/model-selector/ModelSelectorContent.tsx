@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Button,
@@ -33,14 +34,10 @@ import {
 } from "@/lib/languageModels/options";
 import { ReasoningEffortOverride } from "@/lib/languageModels/types";
 import {
-  ADMIN_LIMITED_SETTING_TOOLTIP,
   ALL_REASONING_STOPS,
   PaneSlider,
-  REASONING_STOP_LABELS,
   SettingRow,
-  UNKNOWN_CONTEXT_TOOLTIP,
   UNSET_REASONING_STOP,
-  UNSUPPORTED_SETTING_TOOLTIP,
   cappedReasoningStop,
   formatContextWindow,
   maxReasoningStop,
@@ -115,15 +112,17 @@ export function useModelDetailManagers(
 }
 
 /** Where the slider parks on open: the session's own choice, else the admin
- *  default, bounded by the selected model's slider maximum. */
+ *  default, else the user's own default, bounded by the selected model's
+ *  slider maximum. */
 function initialTemperature(
   option: LLMOption,
-  manager: TemperatureManager | undefined
+  manager: TemperatureManager | undefined,
+  userTemperatureDefault: number | null
 ): number {
   const sessionTemperature = manager?.temperature ?? 0.5;
   if (manager?.hasTemperatureOverride) return sessionTemperature;
   return Math.min(
-    option.temperatureDefault ?? sessionTemperature,
+    option.temperatureDefault ?? userTemperatureDefault ?? sessionTemperature,
     manager?.maxTemperature ?? 2
   );
 }
@@ -156,6 +155,8 @@ interface ModelDetailPaneProps {
 }
 
 function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
+  const t = useTranslations("chat.modelSelector");
+  const { user } = useUser();
   // Backend pins temperature to 1 (or omits it) for reasoning models, so
   // the slider is locked at 1.
   const temperatureManager = managers.temperature;
@@ -181,20 +182,33 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
   // temperature is always concrete, so the override flag decides when the
   // admin default applies.
   const [localTemperature, setLocalTemperature] = useState(() =>
-    initialTemperature(option, temperatureManager)
+    initialTemperature(
+      option,
+      temperatureManager,
+      user?.preferences.temperature_default ?? null
+    )
   );
   // A stored level the model doesn't support (e.g. xhigh after switching
   // models) displays clamped to the highest supported stop.
   const storedStop = reasoningStopIndex(
-    reasoningManager?.reasoningEffort ?? option.reasoningEffortDefault
+    reasoningManager?.reasoningEffort ??
+      option.reasoningEffortDefault ??
+      user?.preferences.reasoning_effort_default
   );
   const [localEffortStop, setLocalEffortStop] = useState(
     clampStop(storedStop >= 0 ? storedStop : UNSET_REASONING_STOP)
   );
 
   const displayTemperature = temperatureEnabled ? localTemperature : 1;
+  const reasoningStopLabels = {
+    off: t("reasoningLevel.off.label"),
+    low: t("reasoningLevel.low.label"),
+    medium: t("reasoningLevel.medium.label"),
+    high: t("reasoningLevel.high.label"),
+    xhigh: t("reasoningLevel.xhigh.label"),
+  } satisfies Record<ReasoningEffortOverride, string>;
   const effortLabel =
-    REASONING_STOP_LABELS[ALL_REASONING_STOPS[localEffortStop] ?? "medium"];
+    reasoningStopLabels[ALL_REASONING_STOPS[localEffortStop] ?? "medium"];
 
   const maxTemperature = temperatureManager?.maxTemperature ?? 2;
   const temperatureFraction =
@@ -236,10 +250,12 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
 
       <SettingRow
         icon={SvgCode}
-        title="Context Window"
+        title={t("contextWindow.row.title")}
         value={contextLabel ?? "—"}
-        valueTooltip={contextLabel ? undefined : UNKNOWN_CONTEXT_TOOLTIP}
-        caption="Tokens limit for each session"
+        valueTooltip={
+          contextLabel ? undefined : t("contextWindow.unknown.tooltip")
+        }
+        caption={t("contextWindow.row.caption")}
       />
 
       {/* A row is absent when an admin withheld the control, and greyed
@@ -248,11 +264,11 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
       {temperatureManager && (
         <SettingRow
           icon={SvgThermometer}
-          title="Temperature"
+          title={t("temperature.row.title")}
           value={displayTemperature.toFixed(1)}
-          caption="How predictable or creative the model should respond"
+          caption={t("temperature.row.caption")}
           disabled={!temperatureEnabled}
-          disabledTooltip={UNSUPPORTED_SETTING_TOOLTIP}
+          disabledTooltip={t("unsupportedSetting.tooltip")}
         >
           <PaneSlider
             value={displayTemperature}
@@ -266,7 +282,11 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
             }
           />
           <div className="flex flex-row items-center justify-between">
-            {["Deterministic", "Balanced", "Creative"].map((label, index) => (
+            {[
+              t("temperature.deterministic.label"),
+              t("temperature.balanced.label"),
+              t("temperature.creative.label"),
+            ].map((label, index) => (
               <Text
                 key={label}
                 font="figure-small-value"
@@ -282,11 +302,11 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
       {reasoningManager && (
         <SettingRow
           icon={SvgBarChart}
-          title="Reasoning Level"
+          title={t("reasoningLevel.row.title")}
           value={effortLabel}
-          caption="How much thinking the model should perform before answering"
+          caption={t("reasoningLevel.row.caption")}
           disabled={!reasoningEnabled}
-          disabledTooltip={UNSUPPORTED_SETTING_TOOLTIP}
+          disabledTooltip={t("unsupportedSetting.tooltip")}
         >
           <PaneSlider
             value={localEffortStop}
@@ -321,8 +341,8 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
                     disabled={reasoningEnabled && index > maxSupportedStop}
                     tooltip={
                       index > capabilityStop
-                        ? UNSUPPORTED_SETTING_TOOLTIP
-                        : ADMIN_LIMITED_SETTING_TOOLTIP
+                        ? t("unsupportedSetting.tooltip")
+                        : t("adminLimitedSetting.tooltip")
                     }
                     tooltipSide="top"
                   >
@@ -335,7 +355,7 @@ function ModelDetailPane({ option, managers, onBack }: ModelDetailPaneProps) {
                       }
                       nowrap
                     >
-                      {REASONING_STOP_LABELS[stop]}
+                      {reasoningStopLabels[stop]}
                     </Text>
                   </Disabled>
                 </div>
@@ -367,6 +387,9 @@ export interface ModelSelectorContentProps {
   includeGlobalDefault?: boolean;
   /** When provided, model rows gain a drill-in settings pane. */
   modelDetail?: ModelDetailManagers;
+  /** Opening a model's settings also selects it. Hosts pass their select
+   *  action WITHOUT closing the popover, so the pane stays visible. */
+  onDetailSelect?: (option: LLMOption) => void;
 }
 
 export default function ModelSelectorContent({
@@ -381,7 +404,9 @@ export default function ModelSelectorContent({
   scrollContainerRef: externalScrollRef,
   includeGlobalDefault = false,
   modelDetail,
+  onDetailSelect,
 }: ModelSelectorContentProps) {
+  const t = useTranslations("chat.modelSelector");
   const [detailOption, setDetailOption] = useState<LLMOption | null>(null);
   const {
     llmProviders: currentAgentProviderOptions,
@@ -488,9 +513,13 @@ export default function ModelSelectorContent({
                     icon={SvgSliders}
                     prominence="tertiary"
                     size="sm"
-                    aria-label={`${option.displayName} settings`}
+                    aria-label={t("modelSettingsButton.ariaLabel", {
+                      model: option.displayName,
+                    })}
+                    tooltip={t("modelSettingsButton.tooltip")}
                     onClick={(e) => {
                       e.stopPropagation();
+                      onDetailSelect?.(option);
                       setDetailOption(option);
                     }}
                   />
@@ -498,7 +527,7 @@ export default function ModelSelectorContent({
               ) : null
             }
             sizePreset="main-ui"
-            rounding="sm"
+            rounding={2}
           />
         </Hoverable.Root>
       </Disabled>
@@ -522,7 +551,7 @@ export default function ModelSelectorContent({
         variant="internal"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        placeholder="Search models..."
+        placeholder={t("searchInput.placeholder")}
       />
 
       <PopoverMenu scrollContainerRef={scrollContainerRef}>
@@ -540,7 +569,7 @@ export default function ModelSelectorContent({
                   description={globalDefaultDisplayName ?? undefined}
                   onClick={() => onSelect(GLOBAL_DEFAULT_LLM_OPTION)}
                   sizePreset="main-ui"
-                  rounding="sm"
+                  rounding={2}
                 />,
               ]
             : []),
@@ -548,13 +577,13 @@ export default function ModelSelectorContent({
           ...(isLoading
             ? [
                 <Text key="loading" font="secondary-body" color="text-03">
-                  Loading models...
+                  {t("list.loading.text")}
                 </Text>,
               ]
             : groupedOptions.length === 0
               ? [
                   <Text key="empty" font="secondary-body" color="text-03">
-                    No models found
+                    {t("list.empty.text")}
                   </Text>,
                 ]
               : groupedOptions.length === 1
@@ -576,7 +605,7 @@ export default function ModelSelectorContent({
                           <Interactive.Stateless prominence="tertiary">
                             <Interactive.Container
                               size="fit"
-                              rounding="sm"
+                              rounding={2}
                               width="full"
                             >
                               <div className="pl-2 pr-1 py-1 w-full rounded-08 bg-background-tint-01">

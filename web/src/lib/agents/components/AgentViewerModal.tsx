@@ -22,7 +22,7 @@ import {
   SvgUser,
 } from "@opal/icons";
 import { useMcpServers } from "@/lib/tools/hooks";
-import { getActionIcon } from "@/lib/tools/mcpUtils";
+import { getActionIcon } from "@/lib/tools/utils";
 import { MCPServer, ToolSnapshot } from "@/lib/tools/types";
 import { EmptyMessageCard } from "@opal/components";
 import { Switch } from "@opal/components";
@@ -31,7 +31,7 @@ import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
 import AppInputBar from "@/sections/input/AppInputBar";
 import { useFilters, useLlmManager } from "@/lib/hooks";
 import { formatMmDdYyyy } from "@/lib/dateUtils";
-import { useProjectsContext } from "@/providers/ProjectsContext";
+import { useProjectsContext } from "@/lib/projects/providers";
 import { FileCard } from "@/sections/cards/FileCard";
 import DocumentSetCard from "@/sections/cards/DocumentSetCard";
 import { getDisplayName } from "@/lib/languageModels/utils";
@@ -56,7 +56,7 @@ function ViewerMCPServerCard({ server, tools }: ViewerMCPServerCardProps) {
       expandable
       expanded={expanded}
       border="solid"
-      rounding="lg"
+      rounding={4}
       padding={2}
       expandedContent={
         tools.length > 0 ? (
@@ -102,7 +102,7 @@ function ViewerMCPServerCard({ server, tools }: ViewerMCPServerCardProps) {
  */
 function ViewerOpenApiToolCard({ tool }: { tool: ToolSnapshot }) {
   return (
-    <Card border="solid" rounding="lg" padding={4}>
+    <Card border="solid" rounding={4} padding={4}>
       <Content
         icon={SvgActions}
         title={tool.display_name}

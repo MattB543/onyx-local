@@ -148,6 +148,12 @@ func (p *onyxProvider) Resources(_ context.Context) []func() resource.Resource {
 		NewEmbeddingProviderResource,
 		NewCredentialResource,
 		NewConnectorResource,
+		NewCCPairResource,
+		NewDocumentSetResource,
+		NewCustomToolResource,
+		NewPersonaResource,
+		NewMCPServerResource,
+		NewUserGroupResource,
 	}
 }
 
