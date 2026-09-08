@@ -386,3 +386,59 @@ N200=18, N250=22, N350=23 (flat), N400=38, N450=49 (i18n extraction), N522=50.
   web+backend import audit of fork-only files clean; main sync-verify --batch:
   7/7 PASS (tsc 0 after bun install + lib/shared rebuild + .next clear).
 - Codex sanity check: skipped (mechanical batch; 1 blend already test-covered).
+
+## Batch 2 — 97b67aab32 (2026-09-08, 225 commits, 397→172 behind)
+
+- Conflicts: 17 (exactly as probed). 11 blends/keeps, 5 cosmetic take-theirs
+  (`OptionItem`, `MCPLineItem`, `OpenApiActionCard`, `KickoffCSVExport`,
+  `CreateStdOAuthCredential` — all b4a033ab62/a6d8239133-only, prediction held),
+  1 inherited (`CreateStdOAuthCredential`).
+- NEW RECURRING: `backend/onyx/auth/users.py` — KEEP OURS. Upstream deleted
+  `current_admin_user` / `current_curator_or_admin_user` /
+  `is_user_curator_or_admin` in favour of `require_permission(Permission.X)`;
+  20+ fork-only call sites (crm/api.py, email_queue_api.py,
+  manage/custom_jobs/api.py, auth_check.py, Calendar endpoints in
+  documents/connector.py) still use the role shim. `UserRole` import re-added.
+  STANDING DIVERGENCE — follow-up: migrate fork routes to `require_permission`
+  to retire the shim (removes this recurring conflict).
+- NEW RECURRING: `backend/onyx/server/documents/connector.py` — take upstream's
+  import block, re-add `current_curator_or_admin_user` + `current_user` for the
+  fork's Google Calendar SA-credential + callback endpoints.
+- Deviations from playbook defaults: `web/src/lib/constants.ts` accepted upstream's
+  removal of `TENANT_ID_COOKIE_NAME` (unsigned `onyx_tid` cookie dropped,
+  ee51fcc2d6; zero consumers) while keeping the `*_AUTH_IS_ADMIN_COOKIE_NAME`s.
+- `multi_llm.py` shrank: upstream upstreamed the `_anthropic_*` version helpers
+  into `model_capabilities.py`; fork's local copies dropped. Fork delta is now
+  just `_default_claude_max_tokens`/`auto_max_tokens` + degrade retry + backoff
+  ladder; upstream's `request_params` recording parameterized on `max_tokens_arg`.
+- OUT-OF-MARKER (new failure classes):
+  1. Silent design-system rescale: f624117dce changed `<Section>` `gap`/`padding`
+     from rem to numeric steps (N/4 rem) and ×4'd upstream call sites; fork-only
+     call sites (gcalendar/Credential.tsx, CrmContactsPage/HomePage/
+     InteractionsPage/OrganizationsPage, ChatPreferencesPage CRM block) had no
+     conflict, no tsc error, no lint error — pure visual regression. 10 sites
+     rescaled. RULE: after any `refactor(opal): …scale…` commit, diff every
+     `gap=`/`padding=`/size-prop line in fork files against upstream's copy.
+  2. Upstream widened `ruff select` (+B, +PERF): 8 violations, all in fork-only
+     code (PERF401 in custom_jobs/registry.py, steps/*, db/crm.py ×2,
+     db/reencrypt_secret_values.py; B905 `zip(strict=False)` in chat_files.py).
+     RULE: run `ruff check backend/` right after the merge, before tests.
+- Alembic merge migration `466166715a66` (parents d03b8fbe9465 + e7c00417d1e5);
+  alembic_tenants head a754e4f72e60. No migration in this range runs crypto.
+- DEPLOY FLAGS: `/health` is now pure liveness, readiness moved to
+  `/health/ready` (226ec979bd) — prod compose healthchecks still resolve but
+  gate earlier; consider `/health/ready` for api_server. New optional env:
+  `MCP_SERVER_API_REQUEST_TIMEOUT_SECONDS`, `JWT_EXPECTED_AUDIENCE`,
+  `JWT_EXPECTED_ISSUER`, `SALESFORCE_CLIENT_ID/SECRET`; JWT settings moved
+  env→DB (cf085d9e2b) — verify `JWT_PUBLIC_KEY_URL` in env.config still honored.
+  Deps: langfuse 3→4.14 (major), reportlab 5.0 new, ruff 0.16.1, onyx-devtools
+  0.12.2 ⇒ venv rebuild; web: `@oxlint/plugins` new ⇒ bun install. Data
+  migrations (bounded): 28bb08137807 SCIM username backfill + unique index,
+  c8e316473aaa `user_role` nullable, c71a18ea7d07 is_manager flags,
+  4d93b0fd5ca8 seed pinned assistants, f54501f1435a cost-budget normalize.
+  `loadtest/`, `profiling/` moved to `tools/`.
+- Verification: worktree ruff clean; pytest 4080 pass / 29 Windows-env fails
+  (test_save_chat csv + 28 craft sandbox path/symlink tests — new known-noise
+  set); targeted fork suites 263/263; main sync-verify --batch: VERIFY_PLACEHOLDER
+- Codex sanity check (astra low, focus on auth/users.py KEEP OURS + unified
+  delete path + spacing rescale): ran during batch 3 — see addendum below.

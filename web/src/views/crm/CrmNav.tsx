@@ -41,8 +41,8 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const activeTab = getCurrentTab(pathname);
-  const { isAdmin, isCurator } = useUser();
-  const showEmailQueue = isAdmin || isCurator;
+  const { isAdmin, hasAdminAccess } = useUser();
+  const showEmailQueue = isAdmin || hasAdminAccess;
 
   return (
     <div

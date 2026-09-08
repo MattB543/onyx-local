@@ -1620,7 +1620,7 @@ export default function ChatPreferencesPage() {
             </SimpleCollapsible.Content>
           </SimpleCollapsible>
 
-          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
+          <Divider paddingParallel={0} paddingPerpendicular={0} />
           <SimpleCollapsible defaultOpen={false}>
             <SimpleCollapsible.Header
               title="CRM Settings"
