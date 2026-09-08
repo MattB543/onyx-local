@@ -9,7 +9,7 @@ import { InputTypeIn } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import { Divider } from "@opal/components";
 import type { MCPAuthFormValues } from "@/sections/actions/modals/MCPAuthenticationModal";
-import { MCPAuthenticationType } from "@/lib/tools/interfaces";
+import { MCPAuthenticationType } from "@/lib/tools/types";
 import { SvgUser } from "@opal/icons";
 
 interface PerUserAuthConfigProps {
@@ -171,7 +171,7 @@ export function PerUserAuthConfig({
 
       {credentialFields.length > 0 && (
         <>
-          <Divider paddingParallel="fit" paddingPerpendicular="fit" />
+          <Divider paddingParallel={0} paddingPerpendicular={0} />
 
           <div className="flex flex-col gap-4">
             <div className="flex items-start gap-1">

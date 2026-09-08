@@ -116,7 +116,7 @@ export default function CrmHomePage() {
                     </Button>
                   </Popover.Trigger>
                   <Popover.Content align="end">
-                    <Section gap={0.5} alignItems="stretch">
+                    <Section gap={2} alignItems="stretch">
                       <Button
                         tertiary
                         size="md"

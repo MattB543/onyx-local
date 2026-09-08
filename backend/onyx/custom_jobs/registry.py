@@ -108,15 +108,14 @@ def get_step_class(step_key: str) -> type:
 
 
 def get_step_catalog() -> list[dict[str, Any]]:
-    catalog: list[dict[str, Any]] = []
-    for step_key in sorted(STEP_CLASS_MAP.keys()):
-        catalog.append(
-            {
-                "step_key": step_key,
-                "description": STEP_DESCRIPTION_MAP.get(step_key, ""),
-                "config_schema": STEP_CONFIG_SCHEMAS.get(step_key, {"type": "object"}),
-            }
-        )
+    catalog: list[dict[str, Any]] = [
+        {
+            "step_key": step_key,
+            "description": STEP_DESCRIPTION_MAP.get(step_key, ""),
+            "config_schema": STEP_CONFIG_SCHEMAS.get(step_key, {"type": "object"}),
+        }
+        for step_key in sorted(STEP_CLASS_MAP.keys())
+    ]
     return catalog
 
 

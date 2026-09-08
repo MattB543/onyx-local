@@ -1,13 +1,8 @@
-import { useRef, useState } from "react";
-
 import { toast } from "@opal/layouts";
 import Button from "@/refresh-components/buttons/Button";
-
-import { SvgLoader, SvgPlayCircle } from "@opal/icons";
-import { cn } from "@opal/utils";
-
-import { DateRange } from "../../../../../components/dateRangeSelectors/AdminDateRangeSelector";
-
+import { useRef, useState } from "react";
+import type { DateRange } from "@/refresh-components/DateRangePicker";
+import { withRequestId, withDateRange } from "./utils";
 import {
   CHECK_QUERY_HISTORY_EXPORT_STATUS_URL,
   DOWNLOAD_QUERY_HISTORY_URL,
@@ -20,8 +15,8 @@ import {
   SpinnerStatus,
   StartQueryHistoryExportResponse,
 } from "./types";
-import { withRequestId, withDateRange } from "./utils";
-
+import { cn } from "@opal/utils";
+import { SvgLoader, SvgPlayCircle } from "@opal/icons";
 export default function KickoffCSVExport({
   dateRange,
 }: {
@@ -29,13 +24,10 @@ export default function KickoffCSVExport({
 }) {
   const timerIdRef = useRef<null | number>(null);
   const retryCount = useRef<number>(0);
-  const [, setRerenderCounter] = useState(0);
-  const rerender = () => {
-    setRerenderCounter((count) => count + 1);
-  };
+  const [, rerender] = useState<void>();
   const [spinnerStatus, setSpinnerStatus] = useState<SpinnerStatus>("static");
 
-  const reset = (failure = false) => {
+  const reset = (failure: boolean = false) => {
     setSpinnerStatus("static");
     if (timerIdRef.current) {
       clearInterval(timerIdRef.current);
@@ -75,10 +67,12 @@ export default function KickoffCSVExport({
 
     const { request_id } =
       (await response.json()) as StartQueryHistoryExportResponse;
-    const timer = setInterval(
+    // `window.setInterval` returns a number; the bare global resolves to the
+    // Node overload, which returns a `Timeout` object.
+    const timer = window.setInterval(
       () => checkStatus(request_id),
       RETRY_COOLDOWN_MILLISECONDS
-    ) as unknown as number;
+    );
     timerIdRef.current = timer;
     rerender();
   };

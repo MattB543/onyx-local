@@ -1,5 +1,5 @@
-import React, { memo } from "react";
-import { cn } from "@opal/utils";
+import React from "react";
+import { cn, clickOnKeyDown } from "@opal/utils";
 import { ComboBoxOption } from "../types";
 import { sanitizeOptionId } from "../utils/aria";
 
@@ -48,7 +48,7 @@ const highlightMatch = (text: string, searchTerm: string): React.ReactNode => {
  * Renders a single option item in the dropdown
  * Memoized to prevent unnecessary re-renders
  */
-export const OptionItem = memo(
+export const OptionItem = React.memo(
   ({
     option,
     index,
@@ -66,12 +66,14 @@ export const OptionItem = memo(
         id={`${fieldId}-option-${sanitizeOptionId(option.value)}`}
         data-index={index}
         role="option"
+        tabIndex={-1}
         aria-selected={isSelected}
         aria-disabled={option.disabled}
         onClick={(e) => {
           e.stopPropagation();
           onSelect(option);
         }}
+        onKeyDown={clickOnKeyDown(() => onSelect(option))}
         onMouseDown={(e) => {
           e.preventDefault();
         }}

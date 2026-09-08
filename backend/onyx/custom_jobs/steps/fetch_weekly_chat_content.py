@@ -43,17 +43,16 @@ class FetchWeeklyChatContentStep(BaseStep):
             limit=max_messages,
         )
 
-        items: list[dict[str, Any]] = []
-        for msg in messages:
-            items.append(
-                {
-                    "chat_session_id": str(msg.chat_session_id),
-                    "message_id": msg.id,
-                    "message_type": msg.message_type.value,
-                    "time_sent": msg.time_sent.isoformat(),
-                    "message": msg.message,
-                }
-            )
+        items: list[dict[str, Any]] = [
+            {
+                "chat_session_id": str(msg.chat_session_id),
+                "message_id": msg.id,
+                "message_type": msg.message_type.value,
+                "time_sent": msg.time_sent.isoformat(),
+                "message": msg.message,
+            }
+            for msg in messages
+        ]
 
         if len(items) < min_messages:
             return StepResult.skipped(

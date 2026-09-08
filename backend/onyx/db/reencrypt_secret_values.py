@@ -67,15 +67,15 @@ def _build_targets() -> list[EncryptedColumnTarget]:
         if not pk_columns:
             continue
 
-        for column in table.columns:
-            if isinstance(column.type, _SUPPORTED_ENCRYPTED_TYPES):
-                targets.append(
-                    EncryptedColumnTarget(
-                        table_name=table.name,
-                        column_name=column.name,
-                        pk_columns=pk_columns,
-                    )
-                )
+        targets.extend(
+            EncryptedColumnTarget(
+                table_name=table.name,
+                column_name=column.name,
+                pk_columns=pk_columns,
+            )
+            for column in table.columns
+            if isinstance(column.type, _SUPPORTED_ENCRYPTED_TYPES)
+        )
     return targets
 
 

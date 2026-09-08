@@ -14,7 +14,7 @@ import {
   useInitialValues,
   buildValidationSchema,
   BaseLLMFormValues,
-  mergeFetchedModelConfigurations,
+  withFetchedModels,
 } from "@/sections/modals/languageModels/utils";
 import { submitProvider } from "@/sections/modals/languageModels/svc";
 import { LLMProviderConfiguredSource } from "@/lib/analytics/utils";
@@ -81,18 +81,12 @@ function OllamaModalInternals({
     if (error) {
       throw new Error(error);
     }
-    formikProps.setFieldValue(
-      "model_configurations",
-      mergeFetchedModelConfigurations(
-        models,
-        formikProps.values.model_configurations
-      )
-    );
+    formikProps.setValues(withFetchedModels(models));
   };
 
   return (
     <>
-      <Card background="light" border="none" padding="sm">
+      <Card background="light" border="none" padding={2}>
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <Tabs.List>
             <Tabs.Trigger value={Tab.TAB_SELF_HOSTED}>

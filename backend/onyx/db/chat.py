@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import Row, delete, desc, func, nullsfirst, or_, select, update
 from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.sql.expression import ColumnElement
 
 from onyx.configs.chat_configs import HARD_DELETE_CHATS
 from onyx.configs.constants import MessageType
@@ -16,6 +17,7 @@ from onyx.context.search.models import (
     extract_image_url_from_metadata,
 )
 from onyx.context.search.models import SearchDoc as ServerSearchDoc
+from onyx.db.enums import IncognitoRecordMode, record_mode_persists_content
 from onyx.db.models import (
     ChatMessage,
     ChatMessage__SearchDoc,
@@ -136,6 +138,28 @@ def get_chat_messages_in_time_range(
     return list(db_session.scalars(stmt).all())
 
 
+def get_incognito_session_ids_for_user(
+    user_id: UUID, db_session: Session
+) -> list[UUID]:
+    return list(
+        db_session.scalars(
+            select(ChatSession.id).where(
+                ChatSession.user_id == user_id,
+                ChatSession.incognito_record_mode.is_not(None),
+            )
+        )
+    )
+
+
+def content_persisting_sessions_filter() -> ColumnElement[bool]:
+    """Ordinary chats plus incognito modes that persist content. Content-free
+    sessions have no message content to show on any history surface."""
+    persisting = [m for m in IncognitoRecordMode if m.persists_content]
+    return ChatSession.incognito_record_mode.is_(
+        None
+    ) | ChatSession.incognito_record_mode.in_(persisting)
+
+
 # Retrieves chat sessions by user
 # Chat sessions do not include onyxbot flows
 def get_chat_sessions_by_user(
@@ -147,6 +171,8 @@ def get_chat_sessions_by_user(
     project_id: int | None = None,
     only_non_project_chats: bool = False,
     include_failed_chats: bool = False,
+    exclude_incognito: bool = False,
+    exclude_content_free: bool = False,
 ) -> list[ChatSession]:
     stmt = (
         select(ChatSession)
@@ -154,6 +180,15 @@ def get_chat_sessions_by_user(
         .where(ChatSession.onyxbot_flow.is_(False))
         .order_by(desc(ChatSession.time_updated))
     )
+
+    # The two exclusions are independent because the surfaces differ: the owner
+    # sees none of their incognito sessions, while a workspace surface keeps the
+    # full-history ones and drops only those with no content to show.
+    if exclude_incognito:
+        stmt = stmt.where(ChatSession.incognito_record_mode.is_(None))
+
+    if exclude_content_free:
+        stmt = stmt.where(content_persisting_sessions_filter())
 
     if deleted is not None:
         stmt = stmt.where(ChatSession.deleted == deleted)
@@ -275,8 +310,13 @@ def create_chat_session(
     onyxbot_flow: bool = False,
     slack_thread_id: str | None = None,
     project_id: int | None = None,
+    incognito_record_mode: IncognitoRecordMode | None = None,
+    session_id: UUID | None = None,
 ) -> ChatSession:
     chat_session = ChatSession(
+        # Caller-supplied only for incognito, where uploads name the session
+        # before it exists so the server can verify them.
+        **({"id": session_id} if session_id is not None else {}),
         user_id=user_id,
         persona_id=persona_id,
         description=description,
@@ -285,6 +325,7 @@ def create_chat_session(
         onyxbot_flow=onyxbot_flow,
         slack_thread_id=slack_thread_id,
         project_id=project_id,
+        incognito_record_mode=incognito_record_mode,
     )
 
     db_session.add(chat_session)
@@ -310,6 +351,8 @@ def duplicate_chat_session_for_user_from_slack(
         user_id=None,  # Ignore user permissions for this
         db_session=db_session,
     )
+    if chat_session.incognito_record_mode is not None:
+        raise ValueError("Incognito chat sessions cannot be duplicated")
     if not chat_session:
         raise HTTPException(status_code=400, detail="Invalid Chat Session ID provided")
 
@@ -349,7 +392,12 @@ def update_chat_session(
     if chat_session.deleted:
         raise ValueError("Trying to rename a deleted chat session")
 
-    if description is not None:
+    # A title is conversation-derived, so a content-free session never stores
+    # one. Enforced here rather than at each caller: auto-naming, manual
+    # rename, and the patch endpoint all write through this.
+    if description is not None and record_mode_persists_content(
+        chat_session.incognito_record_mode
+    ):
         chat_session.description = description
     if sharing_status is not None:
         chat_session.shared_status = sharing_status
@@ -534,6 +582,9 @@ def add_chats_to_session_from_slack_thread(
     slack_chat_session_id: UUID,
     new_chat_session_id: UUID,
 ) -> None:
+    source_session = db_session.get(ChatSession, slack_chat_session_id)
+    if source_session and source_session.incognito_record_mode is not None:
+        raise ValueError("Incognito chat sessions cannot be duplicated")
     new_root_message = get_or_create_root_message(
         chat_session_id=new_chat_session_id,
         db_session=db_session,
@@ -1016,6 +1067,7 @@ def translate_db_message_to_chat_message_detail(
         latest_child_message=chat_message.latest_child_message_id,
         message=chat_message.message,
         reasoning_tokens=chat_message.reasoning_tokens,
+        request_params=chat_message.request_params,
         message_type=chat_message.message_type,
         context_docs=top_documents,
         citations=converted_citations,

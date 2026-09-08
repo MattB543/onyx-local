@@ -5,7 +5,7 @@ import {
   MCPAuthenticationType,
   MCPAuthenticationPerformer,
   ToolSnapshot,
-} from "@/lib/tools/interfaces";
+} from "@/lib/tools/types";
 import LineItem from "@/refresh-components/buttons/LineItem";
 import { noProp } from "@/lib/utils";
 import { cn } from "@opal/utils";
@@ -28,9 +28,7 @@ export interface MCPServer {
   server_url: string;
   auth_type: MCPAuthenticationType;
   auth_performer: MCPAuthenticationPerformer;
-  is_authenticated: boolean;
-  user_authenticated?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user_can_authenticate?: boolean;
   auth_template?: any;
   user_credentials?: Record<string, string>;
 }
@@ -103,7 +101,7 @@ export default function MCPLineItem({
       strikethrough={allToolsDisabled}
       selected={isActive}
       rightChildren={
-        <Section gap={0.25} flexDirection="row">
+        <Section gap={1} flexDirection="row">
           {isAuthenticated &&
             tools.length > 0 &&
             enabledTools.length > 0 &&

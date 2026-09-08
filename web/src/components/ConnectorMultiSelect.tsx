@@ -138,6 +138,7 @@ export const ConnectorMultiSelect = ({
             setOpen(true);
           }}
           onKeyDown={handleKeyDown}
+          data-testid="connector-search-input"
         />
 
         {open && (
@@ -165,9 +166,10 @@ export const ConnectorMultiSelect = ({
             ) : (
               <div>
                 {filteredUnselectedConnectors.map((connector) => (
-                  <div
+                  <button
+                    type="button"
                     key={connector.cc_pair_id}
-                    className="flex items-center justify-between py-2 px-3 cursor-pointer hover:bg-background-neutral-01 text-xs"
+                    className="w-full flex items-center justify-between py-2 px-3 cursor-pointer hover:bg-background-neutral-01 text-xs"
                     onClick={() => selectConnector(connector.cc_pair_id)}
                   >
                     <div className="flex items-center truncate mr-2">
@@ -179,7 +181,7 @@ export const ConnectorMultiSelect = ({
                         showMetadata={false}
                       />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

@@ -48,15 +48,15 @@ class SlackChannelInputStep(BaseStep):
                     latest=latest,
                     limit=max_messages_per_channel,
                 )
-                for message in response.get("messages", []):
-                    results.append(
-                        {
-                            "channel_id": channel_id,
-                            "ts": message.get("ts"),
-                            "user": message.get("user"),
-                            "text": message.get("text", ""),
-                        }
-                    )
+                results.extend(
+                    {
+                        "channel_id": channel_id,
+                        "ts": message.get("ts"),
+                        "user": message.get("user"),
+                        "text": message.get("text", ""),
+                    }
+                    for message in response.get("messages", [])
+                )
                 time.sleep(1)
             except SlackApiError as e:
                 error_code = str(e.response.get("error", "unknown_error"))

@@ -162,8 +162,10 @@ from onyx.server.query_and_chat.query_backend import admin_router as admin_query
 from onyx.server.query_and_chat.query_backend import basic_router as query_router
 from onyx.server.saml_multi import router as saml_multi_router
 from onyx.server.security.api import admin_router as security_admin_router
+from onyx.server.security.store import seed_jwt_settings_from_env
 from onyx.server.settings.api import admin_router as settings_admin_router
 from onyx.server.settings.api import basic_router as settings_router
+from onyx.server.sso_discovery import router as sso_discovery_router
 from onyx.server.utils import BasicAuthenticationError
 from onyx.setup import setup_multitenant_onyx, setup_onyx
 from onyx.tracing.setup import setup_tracing
@@ -422,6 +424,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
             # api_server has the mount the migration job lacks, so this is where it
             # runs. No-op unless AUTH_TYPE=saml with no SAML row yet.
             seed_saml_provider_from_conf_dir(db_session)
+            # No-op when env is unset or the row already matches.
+            seed_jwt_settings_from_env()
             # set up the file store (e.g. create bucket if needed). On multi-tenant,
             # this is done via IaC
             get_default_file_store().initialize()
@@ -718,6 +722,13 @@ def get_application(lifespan_override: Lifespan | None = None) -> FastAPI:
     include_auth_router_with_prefix(
         application,
         oidc_multi_router,
+    )
+
+    # Resolves which workspace's providers to offer before any of the above can
+    # run. Mounted unconditionally: single-tenant answers from its one schema.
+    include_auth_router_with_prefix(
+        application,
+        sso_discovery_router,
     )
 
     include_auth_router_with_prefix(

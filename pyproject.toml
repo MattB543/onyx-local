@@ -100,6 +100,8 @@ backend = [
     "pywikibot==11.4.2",
     "readerwriterlock==1.0.9",
     "redis==5.0.8",
+    # PDF generation for the usage report review pack.
+    "reportlab==5.0.0",
     "requests==2.33.0",
     "requests-oauthlib==2.0.0",
     "simple-salesforce==1.12.6",
@@ -123,7 +125,7 @@ backend = [
     "sendgrid==6.12.5",
     "exa_py==1.15.4",
     "braintrust==0.3.9",
-    "langfuse==3.10.0",
+    "langfuse==4.14.4",
     "nest_asyncio==1.6.0",
     "openinference-instrumentation==0.1.42",
     "opentelemetry-proto>=1.42.1",
@@ -141,7 +143,7 @@ dev = [
     "manygo==0.2.0",
     "matplotlib==3.10.8",
     "ty==0.0.63",
-    "onyx-devtools==0.10.6",
+    "onyx-devtools==0.12.2",
     "openapi-generator-cli==7.17.0",
     "pre-commit==3.2.2",
     "pytest-alembic==0.12.1",
@@ -155,7 +157,7 @@ dev = [
     "release-tag==0.5.2",
     # Keep in sync with the pinned `ruff==` in the ruff / ruff-format hooks in
     # .pre-commit-config.yaml, which install ruff into an isolated overlay.
-    "ruff==0.16.0",
+    "ruff==0.16.1",
     "types-docker==7.1.0.20260518",
     "types-beautifulsoup4==4.12.0.3",
     "types-html5lib==1.1.11.13",
@@ -180,9 +182,9 @@ zizmor = ["zizmor==1.25.2"]
 # Enterprise Edition features
 ee = ["posthog==3.7.4"]
 
-# Locust load-test runtime (the loadtest/ project). Kept OUT of default-groups
+# Locust load-test runtime (the tools/loadtest/ project). Kept OUT of default-groups
 # so a normal `uv sync` doesn't pull locust's heavy gevent/flask/socketio tree.
-# Opt in with `uv sync --group loadtest`. See loadtest/README.md.
+# Opt in with `uv sync --group loadtest`. See tools/loadtest/README.md.
 loadtest = [
     "locust>=2.32",
     "fastapi>=0.115",
@@ -286,9 +288,24 @@ ignore = [
     # Tracked in kanban ticket #491 — to be removed once existing violations are
     # cleaned up:
     "S113", # request-without-timeout (~463 existing violations).
+    # flake8-bugbear (B) rule deferred — to be removed once existing violations
+    # are cleaned up:
+    "B904", # raise-without-from-inside-except (~465 existing violations).
 ]
 # G004: f-strings in logging break Sentry's message-pattern grouping.
-select = ["ARG", "E", "F", "G004", "I", "S", "W"]
+select = ["ARG", "B", "E", "F", "G004", "I", "PERF", "S", "W"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection markers are the intended way to write these
+# defaults, so B008 must not flag them.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+    "onyx.auth.permissions.require_permission",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["onyx", "ee", "tests", "shared_configs", "model_server"]

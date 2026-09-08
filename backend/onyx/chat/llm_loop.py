@@ -67,6 +67,7 @@ from onyx.tools.interface import Tool
 from onyx.tools.models import (
     ChatFile,
     CustomToolCallSummary,
+    CustomToolUserFileSnapshot,
     MemoryToolResponseSnapshot,
     PythonToolRichResponse,
     ToolCallInfo,
@@ -84,6 +85,7 @@ from onyx.tools.tool_runner import run_tool_calls
 from onyx.tools.utils import compute_all_tool_tokens
 from onyx.tracing.framework.create import ChatTraceMetadata, trace
 from onyx.utils.logger import setup_logger
+from shared_configs.contextvars import get_current_incognito_record_mode
 
 logger = setup_logger()
 
@@ -510,7 +512,6 @@ def construct_message_history(
     # Track dropped file messages so we can provide their metadata to the
     # FileReaderTool instead.
     truncated_history_before: list[ChatMessageSimple] = []
-    dropped_file_ids: list[str] = []
     current_token_count = 0
 
     for msg in reversed(history_before_last_user):
@@ -529,9 +530,11 @@ def construct_message_history(
     # recent messages, so the dropped ones are at the start of the original
     # list up to (len(history) - len(kept)).
     num_kept = len(truncated_history_before)
-    for msg in history_before_last_user[: len(history_before_last_user) - num_kept]:
-        if msg.file_id is not None:
-            dropped_file_ids.append(msg.file_id)
+    dropped_file_ids: list[str] = [
+        msg.file_id
+        for msg in history_before_last_user[: len(history_before_last_user) - num_kept]
+        if msg.file_id is not None
+    ]
 
     # Also treat "orphaned" metadata entries as dropped -- these are files
     # from messages removed by summary truncation (before convert_chat_history
@@ -661,10 +664,10 @@ def _create_file_tool_metadata_message(
         "read sections of any file. You MUST pass the file_id UUID (not the "
         "filename) to read_file:"
     ]
-    for meta in file_metadata:
-        lines.append(
-            f'- file_id="{meta.file_id}" filename="{meta.filename}" (~{meta.approx_char_count:,} chars)'
-        )
+    lines.extend(
+        f'- file_id="{meta.file_id}" filename="{meta.filename}" (~{meta.approx_char_count:,} chars)'
+        for meta in file_metadata
+    )
 
     message_content = "\n".join(lines)
     return ChatMessageSimple(
@@ -818,7 +821,7 @@ def run_llm_loop(
             msg.message_type == MessageType.USER and msg.image_files
             for msg in simple_chat_history
         ) and not model_supports_image_input(
-            llm.config.model_name, llm.config.model_provider
+            llm.config.model_name, llm.config.model_provider, llm.config.deployment_name
         )
         tool_choice: ToolChoiceOptions = ToolChoiceOptions.AUTO
         # Initialize gathered_documents with project files if present
@@ -1222,35 +1225,60 @@ def run_llm_loop(
                         tool_response.rich_response.generated_files or None
                     )
 
-                # Persist memory if this is a memory tool response
-                memory_snapshot: MemoryToolResponseSnapshot | None = None
-                if isinstance(tool_response.rich_response, MemoryToolResponse):
-                    persisted_memory_id: int | None = None
-                    if user_memory_context and user_memory_context.user_id:
-                        if tool_response.rich_response.index_to_replace is not None:
-                            persisted_memory_id = update_memory_at_index(
-                                user_id=user_memory_context.user_id,
-                                index=tool_response.rich_response.index_to_replace,
-                                new_text=tool_response.rich_response.memory_text,
-                            )
-                        else:
-                            persisted_memory_id = add_memory(
-                                user_id=user_memory_context.user_id,
-                                memory_text=tool_response.rich_response.memory_text,
-                            )
-                    operation: Literal["add", "update"] = (
-                        "update"
-                        if tool_response.rich_response.index_to_replace is not None
-                        else "add"
-                    )
-                    memory_snapshot = MemoryToolResponseSnapshot(
-                        memory_text=tool_response.rich_response.memory_text,
-                        operation=operation,
-                        memory_id=persisted_memory_id,
-                        index=tool_response.rich_response.index_to_replace,
+                # Custom tools save image/CSV blobs and return their ids.
+                generated_file_ids = None
+                if isinstance(
+                    tool_response.rich_response, CustomToolCallSummary
+                ) and isinstance(
+                    tool_response.rich_response.tool_result, CustomToolUserFileSnapshot
+                ):
+                    generated_file_ids = (
+                        tool_response.rich_response.tool_result.file_ids or None
                     )
 
-                if memory_snapshot:
+                # Persist memory if this is a memory tool response
+                memory_snapshot: MemoryToolResponseSnapshot | None = None
+                incognito_memory_refusal: str | None = None
+                if isinstance(tool_response.rich_response, MemoryToolResponse):
+                    # Any incognito mode refuses memory writes with an explicit
+                    # error, so neither the model nor the user sees a saved
+                    # memory that does not exist.
+                    if get_current_incognito_record_mode() is not None:
+                        incognito_memory_refusal = (
+                            "Error: memories cannot be saved from an incognito "
+                            "chat. Tell the user their request was not saved."
+                        )
+                    else:
+                        persisted_memory_id: int | None = None
+                        if user_memory_context and user_memory_context.user_id:
+                            if tool_response.rich_response.index_to_replace is not None:
+                                persisted_memory_id = update_memory_at_index(
+                                    user_id=user_memory_context.user_id,
+                                    index=tool_response.rich_response.index_to_replace,
+                                    new_text=tool_response.rich_response.memory_text,
+                                )
+                            else:
+                                persisted_memory_id = add_memory(
+                                    user_id=user_memory_context.user_id,
+                                    memory_text=tool_response.rich_response.memory_text,
+                                )
+                        operation: Literal["add", "update"] = (
+                            "update"
+                            if tool_response.rich_response.index_to_replace is not None
+                            else "add"
+                        )
+                        memory_snapshot = MemoryToolResponseSnapshot(
+                            memory_text=tool_response.rich_response.memory_text,
+                            operation=operation,
+                            memory_id=persisted_memory_id,
+                            index=tool_response.rich_response.index_to_replace,
+                        )
+
+                if incognito_memory_refusal:
+                    saved_response = incognito_memory_refusal
+                    # The next LLM cycle must see the refusal too.
+                    tool_response.llm_facing_response = incognito_memory_refusal
+                elif memory_snapshot:
                     saved_response = json.dumps(memory_snapshot.model_dump())
                 elif isinstance(tool_response.rich_response, CustomToolCallSummary):
                     saved_response = json.dumps(
@@ -1274,6 +1302,7 @@ def run_llm_loop(
                     search_docs=displayed_docs or search_docs,
                     generated_images=generated_images,
                     generated_files=generated_files,
+                    generated_file_ids=generated_file_ids,
                 )
                 # Add to state container for partial save support
                 state_container.add_tool_call(tool_call_info)

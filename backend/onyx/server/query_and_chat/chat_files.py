@@ -83,7 +83,9 @@ def upload_chat_files(
         )
 
         uploaded_files: list[ChatUploadFileSnapshot] = []
-        for file_id, file in zip(upload_response.file_paths, categorized_files.acceptable):
+        for file_id, file in zip(
+            upload_response.file_paths, categorized_files.acceptable, strict=False
+        ):
             content_type = file.content_type
             token_count = categorized_files.acceptable_file_to_token_count.get(
                 file.filename or "",

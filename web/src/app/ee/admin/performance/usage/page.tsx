@@ -1,7 +1,7 @@
 "use client";
 
-import { AdminDateRangeSelector } from "@/components/dateRangeSelectors/AdminDateRangeSelector";
-import { useTimeRange } from "@/app/ee/admin/performance/lib";
+import { DateRangePicker } from "@/refresh-components/DateRangePicker";
+import { useTimeRange } from "@/lib/usage/hooks";
 import PerUserUsagePanel from "@/views/admin/PerUserUsagePanel";
 import { ADMIN_ROUTES } from "@/lib/admin-routes";
 import { Divider } from "@opal/components";
@@ -20,17 +20,16 @@ export default function UsagePage() {
         title={route.title}
         description="Monitor workspace spend and review usage by user."
         divider
+        rightChildren={
+          <DateRangePicker
+            value={timeRange}
+            onValueChange={(value) => setTimeRange(value as any)}
+            size="sm"
+          />
+        }
       />
       <SettingsLayouts.Body>
-        <PerUserUsagePanel
-          timeRange={timeRange}
-          headerRight={
-            <AdminDateRangeSelector
-              value={timeRange}
-              onValueChange={(value) => setTimeRange(value as any)}
-            />
-          }
-        />
+        <PerUserUsagePanel timeRange={timeRange} />
         <Divider />
         <TokenRateLimitsPanel embedded />
       </SettingsLayouts.Body>

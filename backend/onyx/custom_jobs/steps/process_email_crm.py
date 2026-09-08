@@ -210,15 +210,13 @@ def _summarize_tool_calls(
     tool_calls: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
     """Return a lightweight list of tool-call summaries for the step output."""
-    summaries: list[dict[str, str]] = []
-    for tc in tool_calls:
-        summaries.append(
-            {
-                "tool_name": tc.get("tool_name", "unknown"),
-                "tool_result_preview": str(tc.get("tool_result", ""))[:500],
-            }
-        )
-    return summaries
+    return [
+        {
+            "tool_name": tc.get("tool_name", "unknown"),
+            "tool_result_preview": str(tc.get("tool_result", ""))[:500],
+        }
+        for tc in tool_calls
+    ]
 
 
 class ProcessEmailCrmStep(BaseStep):

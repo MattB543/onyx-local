@@ -1619,26 +1619,25 @@ def export_all_organizations(db_session: Session) -> list[dict]:
         ).all()
         creator_emails = {uid: email for uid, email in user_rows}
 
-    results: list[dict] = []
-    for org in orgs:
-        results.append(
-            {
-                "id": str(org.id),
-                "name": _strip_or_none(org.name) or "",
-                "website": _strip_or_none(org.website) or "",
-                "type": org.type.value if org.type is not None else "",
-                "sector": _strip_or_none(org.sector) or "",
-                "location": _strip_or_none(org.location) or "",
-                "size": _strip_or_none(org.size) or "",
-                "notes": _normalize_text(org.notes) or "",
-                "tags": "|".join(org_tags.get(org.id, [])),
-                "created_by": creator_emails.get(org.created_by, "")
-                if org.created_by is not None
-                else "",
-                "created_at": str(org.created_at) if org.created_at is not None else "",
-                "updated_at": str(org.updated_at) if org.updated_at is not None else "",
-            }
-        )
+    results: list[dict] = [
+        {
+            "id": str(org.id),
+            "name": _strip_or_none(org.name) or "",
+            "website": _strip_or_none(org.website) or "",
+            "type": org.type.value if org.type is not None else "",
+            "sector": _strip_or_none(org.sector) or "",
+            "location": _strip_or_none(org.location) or "",
+            "size": _strip_or_none(org.size) or "",
+            "notes": _normalize_text(org.notes) or "",
+            "tags": "|".join(org_tags.get(org.id, [])),
+            "created_by": creator_emails.get(org.created_by, "")
+            if org.created_by is not None
+            else "",
+            "created_at": str(org.created_at) if org.created_at is not None else "",
+            "updated_at": str(org.updated_at) if org.updated_at is not None else "",
+        }
+        for org in orgs
+    ]
     return results
 
 
@@ -1700,42 +1699,41 @@ def export_all_contacts(db_session: Session) -> list[dict]:
         ).all()
         creator_emails = {uid: email for uid, email in user_rows}
 
-    results: list[dict] = []
-    for c in contacts:
-        results.append(
-            {
-                "id": str(c.id),
-                "first_name": _strip_or_none(c.first_name) or "",
-                "last_name": _strip_or_none(c.last_name) or "",
-                "email": _normalize_email(c.email) or "",
-                "phone": _strip_or_none(c.phone) or "",
-                "title": _strip_or_none(c.title) or "",
-                "organization_name": _strip_or_none(org_names.get(c.organization_id))
-                if c.organization_id is not None
-                else "",
-                "owner_emails": "|".join(contact_owners.get(c.id, [])),
-                "source": c.source.value if c.source is not None else "",
-                "status": _normalize_existing_status(c.status) or "",
-                "category": _strip_or_none(c.category) or "",
-                "party_affiliation": _strip_or_none(c.party_affiliation) or "",
-                "us_state": _normalize_us_state(c.us_state) or "",
-                "principal": _strip_or_none(c.principal) or "",
-                "notes": _normalize_text(c.notes) or "",
-                "linkedin_url": _strip_or_none(c.linkedin_url) or "",
-                "location": _strip_or_none(c.location) or "",
-                "profile_picture_url": (
-                    build_frontend_file_url(c.profile_picture_file_id)
-                    if c.profile_picture_file_id
-                    else ""
-                ),
-                "tags": "|".join(contact_tags.get(c.id, [])),
-                "created_by": creator_emails.get(c.created_by, "")
-                if c.created_by is not None
-                else "",
-                "created_at": str(c.created_at) if c.created_at is not None else "",
-                "updated_at": str(c.updated_at) if c.updated_at is not None else "",
-            }
-        )
+    results: list[dict] = [
+        {
+            "id": str(c.id),
+            "first_name": _strip_or_none(c.first_name) or "",
+            "last_name": _strip_or_none(c.last_name) or "",
+            "email": _normalize_email(c.email) or "",
+            "phone": _strip_or_none(c.phone) or "",
+            "title": _strip_or_none(c.title) or "",
+            "organization_name": _strip_or_none(org_names.get(c.organization_id))
+            if c.organization_id is not None
+            else "",
+            "owner_emails": "|".join(contact_owners.get(c.id, [])),
+            "source": c.source.value if c.source is not None else "",
+            "status": _normalize_existing_status(c.status) or "",
+            "category": _strip_or_none(c.category) or "",
+            "party_affiliation": _strip_or_none(c.party_affiliation) or "",
+            "us_state": _normalize_us_state(c.us_state) or "",
+            "principal": _strip_or_none(c.principal) or "",
+            "notes": _normalize_text(c.notes) or "",
+            "linkedin_url": _strip_or_none(c.linkedin_url) or "",
+            "location": _strip_or_none(c.location) or "",
+            "profile_picture_url": (
+                build_frontend_file_url(c.profile_picture_file_id)
+                if c.profile_picture_file_id
+                else ""
+            ),
+            "tags": "|".join(contact_tags.get(c.id, [])),
+            "created_by": creator_emails.get(c.created_by, "")
+            if c.created_by is not None
+            else "",
+            "created_at": str(c.created_at) if c.created_at is not None else "",
+            "updated_at": str(c.updated_at) if c.updated_at is not None else "",
+        }
+        for c in contacts
+    ]
     return results
 
 
