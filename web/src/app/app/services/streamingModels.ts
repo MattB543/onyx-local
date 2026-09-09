@@ -44,6 +44,10 @@ export enum PacketType {
   CRM_UPDATE_TOOL_DELTA = "crm_update_tool_delta",
   CRM_LOG_INTERACTION_TOOL_START = "crm_log_interaction_tool_start",
   CRM_LOG_INTERACTION_TOOL_DELTA = "crm_log_interaction_tool_delta",
+  CRM_LIST_TOOL_START = "crm_list_tool_start",
+  CRM_LIST_TOOL_DELTA = "crm_list_tool_delta",
+  CRM_GET_TOOL_START = "crm_get_tool_start",
+  CRM_GET_TOOL_DELTA = "crm_get_tool_delta",
   CALENDAR_SEARCH_TOOL_START = "calendar_search_tool_start",
   CALENDAR_SEARCH_TOOL_DELTA = "calendar_search_tool_delta",
 
@@ -281,6 +285,24 @@ export interface CrmLogInteractionToolDelta extends BaseObj {
   payload: Record<string, unknown>;
 }
 
+export interface CrmListToolStart extends BaseObj {
+  type: "crm_list_tool_start";
+}
+
+export interface CrmListToolDelta extends BaseObj {
+  type: "crm_list_tool_delta";
+  payload: Record<string, unknown>;
+}
+
+export interface CrmGetToolStart extends BaseObj {
+  type: "crm_get_tool_start";
+}
+
+export interface CrmGetToolDelta extends BaseObj {
+  type: "crm_get_tool_delta";
+  payload: Record<string, unknown>;
+}
+
 export interface CalendarSearchToolStart extends BaseObj {
   type: "calendar_search_tool_start";
 }
@@ -470,6 +492,10 @@ export type CrmToolObj =
   | CrmUpdateToolDelta
   | CrmLogInteractionToolStart
   | CrmLogInteractionToolDelta
+  | CrmListToolStart
+  | CrmListToolDelta
+  | CrmGetToolStart
+  | CrmGetToolDelta
   | SectionEnd
   | PacketError;
 export type CalendarToolObj =

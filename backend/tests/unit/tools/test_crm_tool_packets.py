@@ -16,6 +16,8 @@ from onyx.db.models import CrmContact, CrmInteraction
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.session_loading import (
     create_crm_create_packets,
+    create_crm_get_packets,
+    create_crm_list_packets,
     create_crm_log_interaction_packets,
     create_crm_search_packets,
     create_crm_update_packets,
@@ -23,6 +25,10 @@ from onyx.server.query_and_chat.session_loading import (
 from onyx.server.query_and_chat.streaming_models import (
     CrmCreateToolDelta,
     CrmCreateToolStart,
+    CrmGetToolDelta,
+    CrmGetToolStart,
+    CrmListToolDelta,
+    CrmListToolStart,
     CrmLogInteractionToolDelta,
     CrmLogInteractionToolStart,
     CrmSearchToolDelta,
@@ -372,9 +378,7 @@ class TestCrmToolRun:
         )
 
         definition = tool.tool_definition()
-        contact_schema = definition["function"]["parameters"]["properties"][
-            "contact"
-        ]
+        contact_schema = definition["function"]["parameters"]["properties"]["contact"]
 
         assert "first_name" not in contact_schema.get("required", [])
 
@@ -1034,3 +1038,41 @@ class TestCrmSessionReplayPacketBuilders:
         interaction = packets[1].obj.payload["interaction"]
         assert isinstance(interaction, dict)
         assert interaction["title"] == "Call"
+
+    def test_create_crm_list_packets(self) -> None:
+        packets = create_crm_list_packets(
+            tool_call_response='{"status":"ok","entity_type":"contact","items":[]}',
+            turn_index=5,
+            tab_index=0,
+        )
+
+        assert len(packets) == 3
+        assert isinstance(packets[0].obj, CrmListToolStart)
+        assert isinstance(packets[1].obj, CrmListToolDelta)
+        assert isinstance(packets[2].obj, SectionEnd)
+        assert packets[1].obj.payload["entity_type"] == "contact"
+
+    def test_create_crm_get_packets(self) -> None:
+        packets = create_crm_get_packets(
+            tool_call_response='{"status":"ok","record":{"name":"Acme"}}',
+            turn_index=6,
+            tab_index=1,
+        )
+
+        assert len(packets) == 3
+        assert isinstance(packets[0].obj, CrmGetToolStart)
+        assert isinstance(packets[1].obj, CrmGetToolDelta)
+        assert isinstance(packets[2].obj, SectionEnd)
+        record = packets[1].obj.payload["record"]
+        assert isinstance(record, dict)
+        assert record["name"] == "Acme"
+
+    def test_create_crm_get_packets_tolerates_non_json_response(self) -> None:
+        packets = create_crm_get_packets(
+            tool_call_response="not json",
+            turn_index=7,
+            tab_index=0,
+        )
+
+        assert isinstance(packets[1].obj, CrmGetToolDelta)
+        assert packets[1].obj.payload == {"result": "not json"}

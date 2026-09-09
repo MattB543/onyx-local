@@ -126,6 +126,10 @@ export function getToolName(packets: Packet[], t: TimelineTranslate): string {
       return "CRM Update";
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return "CRM Log Interaction";
+    case PacketType.CRM_LIST_TOOL_START:
+      return "CRM List";
+    case PacketType.CRM_GET_TOOL_START:
+      return "CRM Get";
     case PacketType.CALENDAR_SEARCH_TOOL_START:
       return "Calendar Search";
     case PacketType.IMAGE_GENERATION_TOOL_START:
@@ -171,6 +175,8 @@ export function getToolIcon(packets: Packet[]): React.ReactNode {
     case PacketType.CRM_CREATE_TOOL_START:
     case PacketType.CRM_UPDATE_TOOL_START:
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
+    case PacketType.CRM_LIST_TOOL_START:
+    case PacketType.CRM_GET_TOOL_START:
       return <SvgUser className="w-3.5 h-3.5" />;
     case PacketType.CALENDAR_SEARCH_TOOL_START:
       return <SvgCalendar className="w-3.5 h-3.5" />;

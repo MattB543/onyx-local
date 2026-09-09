@@ -31,6 +31,10 @@ from onyx.server.query_and_chat.streaming_models import (
     CodingAgentStart,
     CrmCreateToolDelta,
     CrmCreateToolStart,
+    CrmGetToolDelta,
+    CrmGetToolStart,
+    CrmListToolDelta,
+    CrmListToolStart,
     CrmLogInteractionToolDelta,
     CrmLogInteractionToolStart,
     CrmSearchToolDelta,
@@ -73,6 +77,8 @@ from onyx.tools.tool_implementations.coding_agent.coding_agent_tool import (
     CodingAgentTool,
 )
 from onyx.tools.tool_implementations.crm.crm_create_tool import CrmCreateTool
+from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
+from onyx.tools.tool_implementations.crm.crm_list_tool import CrmListTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
@@ -336,6 +342,34 @@ def create_crm_log_interaction_packets(
             placement=placement,
             obj=CrmLogInteractionToolDelta(payload=payload),
         ),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_crm_list_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmListToolStart()),
+        Packet(placement=placement, obj=CrmListToolDelta(payload=payload)),
+        Packet(placement=placement, obj=SectionEnd()),
+    ]
+
+
+def create_crm_get_packets(
+    tool_call_response: str | None,
+    turn_index: int,
+    tab_index: int = 0,
+) -> list[Packet]:
+    payload = _parse_crm_tool_payload(tool_call_response)
+    placement = Placement(turn_index=turn_index, tab_index=tab_index)
+    return [
+        Packet(placement=placement, obj=CrmGetToolStart()),
+        Packet(placement=placement, obj=CrmGetToolDelta(payload=payload)),
         Packet(placement=placement, obj=SectionEnd()),
     ]
 
@@ -837,6 +871,24 @@ def translate_assistant_message_to_packets(
                     elif tool.in_code_tool_id == CrmLogInteractionTool.__name__:
                         turn_tool_packets.extend(
                             create_crm_log_interaction_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == CrmListTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_list_packets(
+                                tool_call_response=tool_call.tool_call_response,
+                                turn_index=turn_num,
+                                tab_index=tool_call.tab_index,
+                            )
+                        )
+
+                    elif tool.in_code_tool_id == CrmGetTool.__name__:
+                        turn_tool_packets.extend(
+                            create_crm_get_packets(
                                 tool_call_response=tool_call.tool_call_response,
                                 turn_index=turn_num,
                                 tab_index=tool_call.tab_index,

@@ -31,6 +31,10 @@ function getCrmToolLabel(packetType: PacketType): string {
       return "CRM Update";
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return "CRM Log Interaction";
+    case PacketType.CRM_LIST_TOOL_START:
+      return "CRM List";
+    case PacketType.CRM_GET_TOOL_START:
+      return "CRM Get";
     case PacketType.CALENDAR_SEARCH_TOOL_START:
       return "Calendar Search";
     default:
@@ -48,6 +52,10 @@ function getDeltaType(startType: PacketType): PacketType | null {
       return PacketType.CRM_UPDATE_TOOL_DELTA;
     case PacketType.CRM_LOG_INTERACTION_TOOL_START:
       return PacketType.CRM_LOG_INTERACTION_TOOL_DELTA;
+    case PacketType.CRM_LIST_TOOL_START:
+      return PacketType.CRM_LIST_TOOL_DELTA;
+    case PacketType.CRM_GET_TOOL_START:
+      return PacketType.CRM_GET_TOOL_DELTA;
     case PacketType.CALENDAR_SEARCH_TOOL_START:
       return PacketType.CALENDAR_SEARCH_TOOL_DELTA;
     default:

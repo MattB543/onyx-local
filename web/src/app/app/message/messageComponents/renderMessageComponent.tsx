@@ -31,6 +31,7 @@ import { DeepResearchPlanRenderer } from "./timeline/renderers/deepresearch/Deep
 import { ResearchAgentRenderer } from "./timeline/renderers/deepresearch/ResearchAgentRenderer";
 import { WebSearchToolRenderer } from "./timeline/renderers/search/WebSearchToolRenderer";
 import { InternalSearchToolRenderer } from "./timeline/renderers/search/InternalSearchToolRenderer";
+import { CrmToolRenderer } from "./timeline/renderers/crm/CrmToolRenderer";
 
 // Different types of chat packets using discriminated unions
 interface GroupedPackets {
@@ -85,6 +86,25 @@ function isMemoryToolPacket(packet: Packet) {
   return (
     packet.obj.type === PacketType.MEMORY_TOOL_START ||
     packet.obj.type === PacketType.MEMORY_TOOL_NO_ACCESS
+  );
+}
+
+function isCrmToolPacket(packet: Packet) {
+  return (
+    packet.obj.type === PacketType.CRM_SEARCH_TOOL_START ||
+    packet.obj.type === PacketType.CRM_SEARCH_TOOL_DELTA ||
+    packet.obj.type === PacketType.CRM_CREATE_TOOL_START ||
+    packet.obj.type === PacketType.CRM_CREATE_TOOL_DELTA ||
+    packet.obj.type === PacketType.CRM_UPDATE_TOOL_START ||
+    packet.obj.type === PacketType.CRM_UPDATE_TOOL_DELTA ||
+    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_START ||
+    packet.obj.type === PacketType.CRM_LOG_INTERACTION_TOOL_DELTA ||
+    packet.obj.type === PacketType.CRM_LIST_TOOL_START ||
+    packet.obj.type === PacketType.CRM_LIST_TOOL_DELTA ||
+    packet.obj.type === PacketType.CRM_GET_TOOL_START ||
+    packet.obj.type === PacketType.CRM_GET_TOOL_DELTA ||
+    packet.obj.type === PacketType.CALENDAR_SEARCH_TOOL_START ||
+    packet.obj.type === PacketType.CALENDAR_SEARCH_TOOL_DELTA
   );
 }
 
@@ -160,6 +180,11 @@ export function findRenderer(
   }
   if (groupedPackets.packets.some((packet) => isMemoryToolPacket(packet))) {
     return MemoryToolRenderer;
+  }
+  // Must come before the reasoning check: isReasoningPacket also claims
+  // SECTION_END/ERROR, which every completed CRM tool group carries.
+  if (groupedPackets.packets.some((packet) => isCrmToolPacket(packet))) {
+    return CrmToolRenderer;
   }
   if (groupedPackets.packets.some((packet) => isReasoningPacket(packet))) {
     return ReasoningRenderer;

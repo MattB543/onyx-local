@@ -139,6 +139,14 @@ export function useTimelineHeader(
       return { headerText: "Logging CRM interaction", hasPackets, userStopped };
     }
 
+    if (packetType === PacketType.CRM_LIST_TOOL_START) {
+      return { headerText: "Listing CRM records", hasPackets, userStopped };
+    }
+
+    if (packetType === PacketType.CRM_GET_TOOL_START) {
+      return { headerText: "Reading CRM record", hasPackets, userStopped };
+    }
+
     if (packetType === PacketType.CALENDAR_SEARCH_TOOL_START) {
       return { headerText: "Searching calendar", hasPackets, userStopped };
     }
