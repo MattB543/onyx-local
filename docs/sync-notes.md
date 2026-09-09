@@ -663,3 +663,18 @@ Inherited (pre-date this sync at e1c7a8d161) — NOT fixed, follow-up candidates
    image but removes curl — check prod healthchecks/runbooks that exec into the
    containers first (flagged in the 2026-07 batch 9 notes).
 8. 4 pre-existing jsx-a11y oxlint errors (FileCard, TagManager, OptionsList).
+
+### Post-review fixes (2026-09-08, on main)
+- 52eede491e — `CrmToolRenderer` registered in `findRenderer` ahead of the reasoning
+  fallback (inherited bug: it was never imported, so CRM/Calendar tool calls rendered
+  as reasoning). Added CRM List/Get packet types end-to-end (streamingModels enum +
+  interfaces, renderer label/delta maps, toolDisplayHelpers arms, packetUtils/
+  packetProcessor/usePacedTurnGroups/useTimelineHeader CRM blocks, backend
+  `session_loading.py` replay builders + elifs). Tests: renderMessageComponent.test.tsx
+  (16), test_crm_tool_packets.py (+3). NOTE for future syncs: the CRM packet set is now
+  enumerated in SIX frontend files + session_loading.py — all fork-only blocks.
+- c5743d7f64 — Unstructured API key: legacy KV row retired after migration and on
+  delete (shared `_delete_legacy_unstructured_api_key`, best-effort; encrypted-row
+  `KvKeyNotFoundError` contract unchanged). Tests +4.
+- Deliberately left: `build-images.yml` still publishes the `dev` stage (Matt: leave);
+  upstream `providers.tsx` dep-array bug (leave, upstream's).
