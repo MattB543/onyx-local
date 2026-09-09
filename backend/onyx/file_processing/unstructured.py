@@ -35,7 +35,19 @@ def get_unstructured_api_key() -> str | None:
     if not isinstance(api_key, str) or not api_key:
         return None
     upsert_encrypted_kv(KV_UNSTRUCTURED_API_KEY, {"value": api_key})
+    # Retire the legacy row once the encrypted copy exists. Without this a later
+    # delete_unstructured_api_key() would only drop the encrypted row and the
+    # next read would resurrect the key from the plaintext one.
+    _delete_legacy_unstructured_api_key()
     return api_key
+
+
+def _delete_legacy_unstructured_api_key() -> None:
+    """Best-effort removal of the pre-encryption plaintext KV row."""
+    try:
+        get_kv_store().delete(KV_UNSTRUCTURED_API_KEY)
+    except KvKeyNotFoundError:
+        pass
 
 
 def update_unstructured_api_key(api_key: str) -> None:
@@ -44,6 +56,10 @@ def update_unstructured_api_key(api_key: str) -> None:
 
 
 def delete_unstructured_api_key() -> None:
+    # Drop the legacy plaintext row first: if the encrypted row is missing the
+    # delete below raises, and a legacy row left behind would be read-repaired
+    # back into the encrypted store on the next get().
+    _delete_legacy_unstructured_api_key()
     # Propagates KvKeyNotFoundError when unset, matching the previous KV-store
     # backed behavior that callers rely on.
     delete_encrypted_kv(KV_UNSTRUCTURED_API_KEY)
