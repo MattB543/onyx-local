@@ -678,3 +678,14 @@ Inherited (pre-date this sync at e1c7a8d161) — NOT fixed, follow-up candidates
   `KvKeyNotFoundError` contract unchanged). Tests +4.
 - Deliberately left: `build-images.yml` still publishes the `dev` stage (Matt: leave);
   upstream `providers.tsx` dep-array bug (leave, upstream's).
+- Codex review (astra low) of e93bdd3e20 + 52eede491e + c5743d7f64: no blockers;
+  123 backend + 35 jest tests pass, tsc clean. Verified: incognito drops attach
+  exactly once with `incognito_session_id` sent; permission gates match backend;
+  CRM packet wire shapes match backend field-for-field; findRenderer ordering
+  correct; replay branches reachable; Unstructured migration commits the encrypted
+  write before legacy delete, cache purged, only KvKeyNotFoundError swallowed.
+  Minor, deliberately left: upstream dep-array omission in providers.tsx (Matt: leave);
+  drop handler omits `getCurrentSessionId` from deps (same as upstream's own handler);
+  List/Get replay sends the full stored response while live emits
+  `compact_tool_payload_for_model` (display-only difference after reload);
+  packetUtils/packetProcessor tests + `__tests__/testHelpers.ts` lack List/Get cases.
