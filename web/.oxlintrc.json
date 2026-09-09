@@ -118,15 +118,23 @@
       // would have to be duplicated into all five catalogs and then re-merged on
       // every upstream sync. Exempt the fork surfaces instead.
       //
-      // ChatPreferencesPage.tsx and AppSidebar.tsx are upstream files carrying a
-      // fork-only block (the "CRM Settings" collapsible and the CRM sidebar tab);
-      // they are listed whole because the rule cannot be scoped to a region.
-      // Drop an entry here if its fork feature is ever removed or translated.
+      // The last four entries are upstream files carrying a fork-only block (the
+      // "CRM Settings" collapsible, the CRM sidebar tab, the InputComboBox
+      // `onClear` "Clear filter" row, and the FileCard "Index for later"
+      // checkbox); they are listed whole because the rule cannot be scoped to a
+      // region. Drop an entry here if its fork feature is ever removed or
+      // translated.
       "files": [
         "**/pages/gcalendar/**",
         "src/app/app/message/messageComponents/timeline/renderers/crm/**",
+        "src/app/app/crm/**",
+        "src/views/Crm*.tsx",
+        "src/views/crm/**",
+        "src/refresh-components/inputs/InputMultiSelect.tsx",
         "src/views/admin/ChatPreferencesPage.tsx",
-        "src/sections/sidebar/AppSidebar.tsx"
+        "src/sections/sidebar/AppSidebar.tsx",
+        "src/refresh-components/inputs/InputComboBox/components/OptionsList.tsx",
+        "src/sections/cards/FileCard.tsx"
       ],
       "rules": {
         "i18n/no-raw-jsx-text": "off"

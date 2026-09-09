@@ -97,7 +97,7 @@ class RefreshableDriveObject:
         if name == "execute":
             return self.make_refreshable_execute()
         return RefreshableDriveObject(
-            lambda creds: getattr(self.call_stack(creds), name),
+            lambda creds: getattr(self.call_stack(creds), name),  # ods: ignore[getattr]
             self.creds,
             self.creds_getter,
         )

@@ -130,7 +130,7 @@ class ExaClient(WebSearchProvider, WebContentProvider):
             title = (result.title or "").strip()
             # library type stub issue
             snippet = (result.highlights[0] if result.highlights else "").strip()
-            raw_image = getattr(result, "image", None)
+            raw_image = getattr(result, "image", None)  # ods: ignore[getattr]
             results.append(
                 WebSearchResult(
                     title=title,

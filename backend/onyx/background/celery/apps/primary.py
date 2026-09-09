@@ -288,7 +288,7 @@ class HubPeriodicTask(bootsteps.StartStopStep):
         if not celery_is_worker_primary(worker):
             return
 
-        if not getattr(worker, "timer", None):
+        if not getattr(worker, "timer", None):  # ods: ignore[getattr]
             task_logger.warning(
                 "Worker timer not available; skipping primary lock renewal task."
             )

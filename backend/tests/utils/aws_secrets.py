@@ -16,7 +16,7 @@ Usage:
 
         @pytest.fixture(scope="session")
         def test_secrets(request) -> dict[TestSecret, str]:
-            needed = getattr(request.config, "_onyx_test_secrets_needed", set())
+            needed = getattr(request.config, "_onyx_test_secrets_needed", set())  # ods: ignore[getattr]
             return get_secrets(sorted(needed, key=lambda s: s.value))
 
     Then in a test module:

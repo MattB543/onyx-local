@@ -619,7 +619,8 @@ def update_contact(
             "principal",
         }:
             normalized = _strip_or_none(value)
-            if _strip_or_none(getattr(contact, key)) != normalized:
+            current = getattr(contact, key)  # ods: ignore[getattr]
+            if _strip_or_none(current) != normalized:
                 setattr(contact, key, normalized)
                 changed = True
             continue
@@ -688,7 +689,7 @@ def update_contact(
                 changed = True
             continue
 
-        if getattr(contact, key) != value:
+        if getattr(contact, key) != value:  # ods: ignore[getattr]
             setattr(contact, key, value)
             changed = True
 
@@ -892,7 +893,8 @@ def update_organization(
 
         if key in {"website", "sector", "location", "size"}:
             normalized = _strip_or_none(value)
-            if _strip_or_none(getattr(organization, key)) != normalized:
+            current = getattr(organization, key)  # ods: ignore[getattr]
+            if _strip_or_none(current) != normalized:
                 setattr(organization, key, normalized)
                 changed = True
             continue
@@ -904,7 +906,7 @@ def update_organization(
                 changed = True
             continue
 
-        if getattr(organization, key) != value:
+        if getattr(organization, key) != value:  # ods: ignore[getattr]
             setattr(organization, key, value)
             changed = True
 
@@ -1065,7 +1067,7 @@ def update_interaction(
 
         # type (CrmInteractionType), occurred_at (datetime|None),
         # contact_id / organization_id (UUID|None): direct assignment.
-        if getattr(interaction, key) != value:
+        if getattr(interaction, key) != value:  # ods: ignore[getattr]
             setattr(interaction, key, value)
             changed = True
 
