@@ -696,7 +696,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             # Get captcha token from request body or headers
             captcha_token = None
             if hasattr(user_create, "captcha_token"):
-                captcha_token = getattr(user_create, "captcha_token", None)
+                captcha_token = getattr(  # ods: ignore[getattr]
+                    user_create, "captcha_token", None
+                )
 
             # Also check headers as a fallback
             if not captcha_token:
@@ -928,6 +930,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             )
         return
 
+    async def _rewrite_oauth_link(
+        self, user: User, link: OAuthAccount, oauth_account_dict: dict[str, Any]
+    ) -> User:
+        return await self.user_db.update_oauth_account(
+            user,
+            # OAuthAccount implements OAuthAccountProtocol, but the type
+            # checker cannot see it through the fastapi-users generics.
+            link,  # ty: ignore[invalid-argument-type]
+            oauth_account_dict,
+        )
+
     @log_function_time(print_only=True)
     async def oauth_callback(  # ty: ignore[invalid-method-override]
         self,
@@ -945,7 +958,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         enforce_verified_domain: bool = False,
     ) -> User:
         referral_source = (
-            getattr(request.state, "referral_source", None) if request else None
+            getattr(request.state, "referral_source", None)  # ods: ignore[getattr]
+            if request
+            else None
         )
 
         # A workspace-configured provider vouches for who someone is, never for
@@ -1016,6 +1031,18 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                     user = await self.user_db.get_by_email(account_email)
                     if user is None:
                         raise exceptions.UserNotExists()
+                    # No link matched this subject, so any link this provider holds on
+                    # the row is stale: the IdP re-issued its subjects (a new Entra
+                    # app registration).
+                    stale_link: OAuthAccount | None = next(
+                        (
+                            link
+                            for link in user.oauth_accounts
+                            if link.oauth_name == oauth_name
+                        ),
+                        None,
+                    )
+
                     # Placeholders (EXT_PERM_USER, bots) carry no credentials or
                     # sessions, so neither check applies and the upgrade claims them.
                     if user.account_type.is_web_login():
@@ -1026,15 +1053,37 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
                         # An owned row must not take a second provider, and a
                         # rename stops the address identifying the row. All else
-                        # is claimable, password signups included.
+                        # is claimable, password signups included. The same provider
+                        # with a new subject is admin-gated: the subject alone does
+                        # not prove who holds the address now.
+                        relink_allowed: bool = (
+                            stale_link is not None
+                            and oauth_security_settings.allow_same_provider_subject_relink
+                        )
                         if not associate_by_email and (
-                            user.oauth_accounts or user.prior_emails
+                            user.prior_emails
+                            or (user.oauth_accounts and not relink_allowed)
                         ):
                             raise exceptions.UserAlreadyExists()
 
-                    user = await self.user_db.add_oauth_account(
-                        user, oauth_account_dict
-                    )
+                    # Rewrite rather than append: bearer pass-through reads
+                    # oauth_accounts[0], and a second link for this provider could
+                    # hand it the dead token.
+                    if stale_link is None:
+                        user = await self.user_db.add_oauth_account(
+                            user, oauth_account_dict
+                        )
+                    else:
+                        logger.notice(
+                            "Relinked %s login for user %s from subject %s to %s",
+                            oauth_name,
+                            user.id,
+                            stale_link.account_id,
+                            account_id,
+                        )
+                        user = await self._rewrite_oauth_link(
+                            user, stale_link, oauth_account_dict
+                        )
 
                 except exceptions.UserNotExists:
                     # OAuth-created accounts are not subject to the dotted-Gmail
@@ -1073,12 +1122,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                             existing_oauth_account.account_id == account_id
                             and existing_oauth_account.oauth_name == oauth_name
                         ):
-                            user = await self.user_db.update_oauth_account(
-                                user,
-                                # NOTE: OAuthAccount DOES implement the OAuthAccountProtocol
-                                # but the type checker doesn't know that :(
-                                existing_oauth_account,  # ty: ignore[invalid-argument-type]
-                                oauth_account_dict,
+                            user = await self._rewrite_oauth_link(
+                                user, existing_oauth_account, oauth_account_dict
                             )
 
             assert user is not None
@@ -1898,12 +1943,12 @@ class FastAPIUserWithRefreshRouter(FastAPIUsers[models.UP, models.ID]):
 
                 # Check if strategy supports refreshing
                 supports_refresh = hasattr(strategy, "refresh_token") and callable(
-                    getattr(strategy, "refresh_token")  # noqa: B009
+                    getattr(strategy, "refresh_token")  # noqa: B009  # ods: ignore[getattr]
                 )
 
                 if supports_refresh:
                     try:
-                        refresh_method = getattr(strategy, "refresh_token")  # noqa: B009
+                        refresh_method = getattr(strategy, "refresh_token")  # noqa: B009  # ods: ignore[getattr]
                         new_token = await refresh_method(token, user)
                         logger.info(
                             "Successfully refreshed session token for user %s",
@@ -2124,8 +2169,10 @@ def _scoped_pat_permitted_on_route(
     if not isinstance(route, APIRoute):
         return False
     return any(
-        getattr(dependency.call, "_is_require_permission", False)
-        or getattr(dependency.call, "_is_scope_exempt", False)
+        getattr(  # ods: ignore[getattr]
+            dependency.call, "_is_require_permission", False
+        )
+        or getattr(dependency.call, "_is_scope_exempt", False)  # ods: ignore[getattr]
         for dependency in route.dependant.dependencies
     )
 
@@ -2181,7 +2228,7 @@ async def _resolve_optional_user(
     # Fail-closed: a scoped PAT may only reach routes guarded by a
     # require_permission its scopes can satisfy (see require_permission).
     if not _scoped_pat_permitted_on_route(
-        getattr(request.state, "token_scopes", None),
+        getattr(request.state, "token_scopes", None),  # ods: ignore[getattr]
         request.scope.get("route"),
     ):
         raise OnyxError(
@@ -2208,7 +2255,7 @@ async def optional_user(
     )
     token = CURRENT_USER_ID_CONTEXTVAR.set(str(user.id) if user is not None else None)
     credential_token = CURRENT_USAGE_CREDENTIAL_CONTEXTVAR.set(
-        getattr(request.state, "usage_credential", None)
+        getattr(request.state, "usage_credential", None)  # ods: ignore[getattr]
     )
     try:
         yield user

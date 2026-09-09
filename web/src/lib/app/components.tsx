@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useSettings } from "@/lib/settings/hooks";
 import {
   DEFAULT_LOGO_SIZE_PX,
@@ -20,6 +21,7 @@ export interface LogoProps {
 }
 
 export function Logo({ folded, size, className, onyxBranded }: LogoProps) {
+  const t = useTranslations("common");
   const resolvedSize = size ?? DEFAULT_LOGO_SIZE_PX;
   const settings = useSettings();
   const { enterprise, logoUrl } = settings;
@@ -67,7 +69,7 @@ export function Logo({ folded, size, className, onyxBranded }: LogoProps) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        alt="Logo"
+        alt={t("logo.image.alt")}
         src={logoUrl}
         className="object-cover object-center w-full h-full"
       />
@@ -97,7 +99,7 @@ export function Logo({ folded, size, className, onyxBranded }: LogoProps) {
                   className={"line-clamp-1 truncate"}
                   nowrap
                 >
-                  Powered by Onyx
+                  {t("logo.poweredBy.label")}
                 </Text>
               )}
           </div>

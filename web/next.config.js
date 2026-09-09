@@ -140,6 +140,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/admin/craft/instructions",
+        destination: "/admin/craft/preferences",
+        permanent: true,
+      },
+      {
         source: "/admin/assistants/:path*",
         destination: "/admin/agents/:path*",
         permanent: true,

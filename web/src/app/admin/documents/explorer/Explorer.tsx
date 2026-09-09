@@ -1,6 +1,6 @@
 "use client";
 
-import { adminSearch } from "./lib";
+import { adminSearch } from "@/lib/searchFilters/svc";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { OnyxDocument } from "@/lib/search/interfaces";
@@ -11,8 +11,8 @@ import { toast } from "@opal/layouts";
 import { getErrorMsg } from "@/lib/fetchUtils";
 import { ScoreSection } from "../ScoreEditor";
 import { useRouter } from "next/navigation";
-import { useFilters } from "@/lib/hooks";
-import { buildFilters } from "@/lib/search/utils";
+import { useSearchFilters } from "@/lib/searchFilters/hooks";
+import { buildFilters } from "@/lib/searchFilters/utils";
 import { DocumentUpdatedAtBadge } from "@/components/search/DocumentUpdatedAtBadge";
 import { DocumentSetSummary } from "@/lib/types";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -63,14 +63,14 @@ const DocumentDisplay = ({
           rel="noopener noreferrer"
         >
           <SourceIcon sourceType={document.source_type} iconSize={22} />
-          <p className="truncate break-all ml-2 my-auto text-base">
+          <p className="truncate break-all ms-2 my-auto text-base">
             {document.semantic_identifier || document.document_id}
           </p>
         </a>
       </div>
       <div className="flex flex-wrap gap-x-2 mt-1 text-xs">
         <div className="px-1 py-0.5 bg-accent-background-hovered rounded-sm flex">
-          <p className="mr-1 my-auto">{t("explorer.boost.label")}</p>
+          <p className="me-1 my-auto">{t("explorer.boost.label")}</p>
           <ScoreSection
             documentId={document.document_id}
             initialScore={document.boost}
@@ -97,7 +97,7 @@ const DocumentDisplay = ({
               t("visibility.visible.label")
             )}
           </div>
-          <div className="ml-1 my-auto">
+          <div className="ms-1 my-auto">
             <Checkbox checked={!document.hidden} />
           </div>
         </div>
@@ -107,7 +107,7 @@ const DocumentDisplay = ({
           <DocumentUpdatedAtBadge updatedAt={document.updated_at} />
         </div>
       )}
-      <p className="pl-1 pt-2 pb-3 wrap-break-word">
+      <p className="ps-1 pt-2 pb-3 wrap-break-word">
         {buildDocumentSummaryDisplay(document.match_highlights, document.blurb)}
       </p>
     </div>
@@ -132,7 +132,7 @@ export function Explorer({
   const [results, setResults] = useState<OnyxDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const filterManager = useFilters();
+  const filterManager = useSearchFilters();
 
   const onSearch = useCallback(
     async (query: string) => {

@@ -233,13 +233,15 @@ class IndexReclaimStatus(str, PyEnum):
     PENDING: consented at reindex submit; waiting for the swap + port to drain.
     SOAKING: the old index stopped being read; waiting out the retention window.
     DELETING: deleting the old index's data (loops until count-verified empty).
+    RECLAIMED: terminal success — the old index's data is gone; the PAST row is kept
+        (not deleted) as the durable record that this index was reclaimed.
     BLOCKED: parked after repeated failures; alerted, needs operator/cooldown revival.
-    On success the PAST row is deleted, so there is no persisted terminal state.
     """
 
     PENDING = "PENDING"
     SOAKING = "SOAKING"
     DELETING = "DELETING"
+    RECLAIMED = "RECLAIMED"
     BLOCKED = "BLOCKED"
 
 
@@ -311,6 +313,10 @@ class SupportedLanguage(str, PyEnum):
     PT = "pt"
     FR = "fr"
     DE = "de"
+    JA = "ja"
+    ZH = "zh"
+    KO = "ko"
+    AR = "ar"
 
 
 class DefaultAppMode(str, PyEnum):
@@ -540,6 +546,25 @@ class ArtifactType(str, PyEnum):
     IMAGE = "image"
     MARKDOWN = "markdown"
     EXCEL = "excel"
+    PDF = "pdf"
+    CSV = "csv"
+    CODE = "code"
+    DIRECTORY = "directory"
+    AUDIO = "audio"
+    VIDEO = "video"
+    ARCHIVE = "archive"
+    # Generic file type used when no specific type applies.
+    FILE = "file"
+
+
+class ReceiptStatus(str, PyEnum):
+    """Lifecycle of an external-action receipt. The full contract lives on
+    ActionReceipt."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
 
 
 class HierarchyNodeType(str, PyEnum):
@@ -614,6 +639,7 @@ class LLMModelFlowType(str, PyEnum):
     CONTEXTUAL_RAG = "contextual_rag"
     REASONING = "reasoning"
     CHAT_NAMING = "chat_naming"
+    CRAFT = "craft"
 
 
 class CustomJobTriggerType(str, PyEnum):

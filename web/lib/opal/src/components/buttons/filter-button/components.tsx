@@ -68,7 +68,11 @@ function FilterButton({
         <Interactive.Container type="button">
           <div className="flex flex-row items-center gap-1">
             {iconWrapper(Icon, "lg", true)}
-            <Text font="main-ui-action" color="inherit" nowrap>
+            <Text
+              font="main-ui-action"
+              color="inherit"
+              wordWrap="whitespace-nowrap"
+            >
               {children}
             </Text>
             <div style={{ visibility: active ? "hidden" : "visible" }}>
@@ -79,7 +83,7 @@ function FilterButton({
       </Interactive.Stateful>
 
       {active && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+        <div className="absolute end-2 top-1/2 -translate-y-1/2">
           {/* Force hover state so the X stays visually prominent against
               the inverted selected background — without this it renders
               dimmed and looks disabled. */}

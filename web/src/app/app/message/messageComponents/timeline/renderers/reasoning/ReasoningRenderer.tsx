@@ -179,7 +179,7 @@ export const ReasoningRenderer: MessageRenderer<
   }
 
   const reasoningContent = (
-    <div className="pl-(--timeline-common-text-padding)">
+    <div className="ps-(--timeline-common-text-padding)">
       <ExpandableTextDisplay
         title={t("reasoning.fullText.title")}
         content={content}

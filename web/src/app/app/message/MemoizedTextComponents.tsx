@@ -189,7 +189,7 @@ export const MemoizedLink = memo(
           sources={[sourceInfo]}
           onSourceClick={handleSourceClick}
           showDetailsCard
-          className="mr-0.5"
+          className="me-0.5"
         />
       );
     }
@@ -234,15 +234,20 @@ export const MemoizedLink = memo(
 
 interface MemoizedParagraphProps {
   className?: string;
+  // Stamped per-paragraph by the rehypeDirection plugin so RTL and LTR
+  // paragraphs align independently. Unstamped paragraphs inherit their
+  // container's direction.
+  dir?: React.HTMLAttributes<HTMLElement>["dir"];
   children?: React.ReactNode;
 }
 
 export const MemoizedParagraph = memo(function MemoizedParagraph({
   className,
+  dir,
   children,
 }: MemoizedParagraphProps) {
   return (
-    <Text as="p" mainContentBody text04 className={className}>
+    <Text as="p" dir={dir} mainContentBody text04 className={className}>
       {children}
     </Text>
   );

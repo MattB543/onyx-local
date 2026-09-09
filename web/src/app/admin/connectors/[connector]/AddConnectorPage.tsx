@@ -44,7 +44,6 @@ import { useSettings } from "@/lib/settings/hooks";
 import { Modal } from "@opal/components";
 import {
   useGmailCredentials,
-  useGoogleCalendarCredentials,
   useGoogleDriveCredentials,
 } from "@/app/admin/connectors/[connector]/pages/utils/hooks";
 import { Formik } from "formik";
@@ -85,7 +84,11 @@ export async function submitConnector<T>(
   connector: ConnectorBase<T>,
   connectorId?: number,
   fakeCredential?: boolean
-): Promise<{ message: string; isSuccess: boolean; response?: Connector<T> }> {
+): Promise<{
+  errorDetail?: string;
+  isSuccess: boolean;
+  response?: Connector<T>;
+}> {
   const isUpdate = connectorId !== undefined;
   if (!connector.connector_specific_config) {
     connector.connector_specific_config = {} as T;
@@ -105,10 +108,10 @@ export async function submitConnector<T>(
       );
       if (response.ok) {
         const responseJson = await response.json();
-        return { message: "Success!", isSuccess: true, response: responseJson };
+        return { isSuccess: true, response: responseJson };
       } else {
         const errorData = await response.json();
-        return { message: `Error: ${errorData.detail}`, isSuccess: false };
+        return { errorDetail: String(errorData.detail), isSuccess: false };
       }
     } else {
       const response = await fetch(
@@ -124,14 +127,14 @@ export async function submitConnector<T>(
 
       if (response.ok) {
         const responseJson = await response.json();
-        return { message: "Success!", isSuccess: true, response: responseJson };
+        return { isSuccess: true, response: responseJson };
       } else {
         const errorData = await response.json();
-        return { message: `Error: ${errorData.detail}`, isSuccess: false };
+        return { errorDetail: String(errorData.detail), isSuccess: false };
       }
     }
   } catch (error) {
-    return { message: `Error: ${error}`, isSuccess: false };
+    return { errorDetail: String(error), isSuccess: false };
   }
 }
 
@@ -166,7 +169,6 @@ export default function AddConnector({
 
   // State for managing credentials and files
   const [currentCredential, setCurrentCredential] =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
   const [credentialCreationMethod, setCredentialCreationMethod] =
     useState<CredentialCreationMethod | null>(null);
@@ -176,14 +178,12 @@ export default function AddConnector({
   );
 
   // Fetch credentials data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: credentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(connector),
     errorHandlingFetcher,
     { refreshInterval: 5000 }
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: editableCredentials } = useSWR<Credential<any>[]>(
     buildSimilarCredentialInfoURL(connector, true),
     errorHandlingFetcher,
@@ -217,14 +217,11 @@ export default function AddConnector({
   // Hooks for Google Drive and Gmail credentials
   const { liveGDriveCredential } = useGoogleDriveCredentials(connector);
   const { liveGmailCredential } = useGmailCredentials(connector);
-  const { liveGoogleCalendarCredential } =
-    useGoogleCalendarCredentials(connector);
 
   // Check if credential is activated
   const credentialActivated =
     (connector === "google_drive" && liveGDriveCredential) ||
     (connector === "gmail" && liveGmailCredential) ||
-    (connector === "google_calendar" && liveGoogleCalendarCredential) ||
     currentCredential;
 
   // Check if there are no credentials
@@ -259,7 +256,6 @@ export default function AddConnector({
     mutate(buildSimilarCredentialInfoURL(connector));
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onDeleteCredential = async (credential: Credential<any | null>) => {
     const response = await deleteCredential(credential.id, true);
     if (response.ok) {
@@ -270,7 +266,6 @@ export default function AddConnector({
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onSwap = async (selectedCredential: Credential<any>) => {
     setCurrentCredential(selectedCredential);
     setAllowCreate(true);
@@ -369,7 +364,6 @@ export default function AddConnector({
           (acc, [key, value]) => {
             // Filter out empty strings from arrays
             if (Array.isArray(value)) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               value = (value as any[]).filter(
                 (item) => typeof item !== "string" || item.trim() !== ""
               );
@@ -388,25 +382,14 @@ export default function AddConnector({
             }
             return acc;
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as Record<string, any>
         );
 
         // Apply advanced configuration-specific transforms.
-        const isGoogleCalendarConnector =
-          connector === ValidSources.GoogleCalendar;
-        const defaultPruneFreqForConnectorHours = isGoogleCalendarConnector
-          ? 1
-          : defaultPruneFreqHours;
-        const defaultRefreshFreqForConnectorMinutes = isGoogleCalendarConnector
-          ? 60
-          : defaultRefreshFreqMinutes;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const advancedConfiguration: any = {
-          pruneFreq: (pruneFreq ?? defaultPruneFreqForConnectorHours) * 3600,
+          pruneFreq: (pruneFreq ?? defaultPruneFreqHours) * 3600,
           indexingStart: convertStringToDateTime(indexingStart),
-          refreshFreq: (refreshFreq ?? defaultRefreshFreqForConnectorMinutes) * 60,
+          refreshFreq: (refreshFreq ?? defaultRefreshFreqMinutes) * 60,
         };
 
         // File-specific handling
@@ -465,22 +448,22 @@ export default function AddConnector({
           );
 
           const connectorCreationPromise = (async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { message, isSuccess, response } = await submitConnector<any>(
-              {
-                connector_specific_config: transformedConnectorSpecificConfig,
-                input_type: isLoadState(connector) ? "load_state" : "poll", // single case
-                name: name,
-                source: connector,
-                access_type: access_type,
-                refresh_freq: advancedConfiguration.refreshFreq || null,
-                prune_freq: advancedConfiguration.pruneFreq || null,
-                indexing_start: advancedConfiguration.indexingStart || null,
-                groups: groups,
-              },
-              undefined,
-              credentialActivated ? false : true
-            );
+            const { errorDetail, isSuccess, response } =
+              await submitConnector<any>(
+                {
+                  connector_specific_config: transformedConnectorSpecificConfig,
+                  input_type: isLoadState(connector) ? "load_state" : "poll", // single case
+                  name: name,
+                  source: connector,
+                  access_type: access_type,
+                  refresh_freq: advancedConfiguration.refreshFreq || null,
+                  prune_freq: advancedConfiguration.pruneFreq || null,
+                  indexing_start: advancedConfiguration.indexingStart || null,
+                  groups: groups,
+                },
+                undefined,
+                credentialActivated ? false : true
+              );
 
             // Store the connector id immediately for potential timeout
             if (response?.id) {
@@ -491,7 +474,9 @@ export default function AddConnector({
               if (isSuccess) {
                 onSuccess();
               } else {
-                toast.error(message);
+                toast.error(
+                  t("add.error.toast", { detail: errorDetail ?? "" })
+                );
               }
               timeoutErrorHappenedRef.current = false;
               return;
@@ -502,8 +487,7 @@ export default function AddConnector({
               const credential =
                 currentCredential ||
                 liveGDriveCredential ||
-                liveGmailCredential ||
-                liveGoogleCalendarCredential;
+                liveGmailCredential;
               const linkCredentialResponse = await linkCredential(
                 response.id,
                 credential!.id,
@@ -525,7 +509,7 @@ export default function AddConnector({
             } else if (isSuccess) {
               onSuccess();
             } else {
-              toast.error(message);
+              toast.error(t("add.error.toast", { detail: errorDetail ?? "" }));
             }
 
             timeoutErrorHappenedRef.current = false;
@@ -721,7 +705,6 @@ export default function AddConnector({
                   currentCredential ||
                   liveGDriveCredential ||
                   liveGmailCredential ||
-                  liveGoogleCalendarCredential ||
                   null
                 }
               />

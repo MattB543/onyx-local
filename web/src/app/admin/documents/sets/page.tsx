@@ -1,5 +1,6 @@
 "use client";
 
+import { useAdminRouteTitle } from "@/lib/adminNavLabels";
 import { useTranslations } from "next-intl";
 import { PageLoader } from "@opal/layouts";
 import { PageSelector } from "@/components/PageSelector";
@@ -40,6 +41,7 @@ import { SourceIcon } from "@/components/SourceIcon";
 import Link from "next/link";
 
 const route = ADMIN_ROUTES.DOCUMENT_SETS;
+
 const numToDisplay = 50;
 
 // Component to display federated connectors with consistent styling
@@ -61,10 +63,10 @@ const FederatedConnectorTitle = ({
     <>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <SourceIcon sourceType={sourceType as any} iconSize={16} />
-      <div className="ml-1 my-auto text-xs font-medium truncate">
+      <div className="ms-1 my-auto text-xs font-medium truncate">
         {federatedConnector.name}
       </div>
-      <Badge variant="outline" className="text-xs ml-2">
+      <Badge variant="outline" className="text-xs ms-2">
         {t("sets.federatedBadge.label")}
       </Badge>
     </>
@@ -144,7 +146,7 @@ const EditRow = ({
             router.push(`/admin/documents/sets/${documentSet.id}`);
           }}
         >
-          <FiEdit2 className="mr-2 shrink-0" />
+          <FiEdit2 className="me-2 shrink-0" />
           <span className="font-medium">{documentSet.name}</span>
         </button>
       </Tooltip>
@@ -218,7 +220,7 @@ const DocumentSetTable = ({
                                   sourceType={ccPairSummary.source}
                                   iconSize={16}
                                 />
-                                <div className="ml-1 my-auto text-xs font-medium truncate">
+                                <div className="ms-1 my-auto text-xs font-medium truncate">
                                   {ccPairSummary.name ||
                                     t("sets.connector.unnamed.label")}
                                 </div>
@@ -398,9 +400,14 @@ function Main() {
 }
 
 export default function Page() {
+  const adminRouteTitle = useAdminRouteTitle();
   return (
     <SettingsLayouts.Root>
-      <SettingsLayouts.Header icon={route.icon} title={route.title} divider />
+      <SettingsLayouts.Header
+        icon={route.icon}
+        title={adminRouteTitle(route)}
+        divider
+      />
       <SettingsLayouts.Body>
         <Main />
       </SettingsLayouts.Body>

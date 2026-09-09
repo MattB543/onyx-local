@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@opal/utils";
 import { Switch } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
@@ -91,6 +92,8 @@ const ToolItem: React.FC<ToolItemProps> = ({
   canToggle = true,
   className,
 }) => {
+  const t = useTranslations("actions");
+
   const isMcpVariant = variant === "mcp";
 
   const unavailableStyles =
@@ -159,7 +162,7 @@ const ToolItem: React.FC<ToolItemProps> = ({
       )}
     >
       {/* Left Section: Icon and Content */}
-      <div className="flex gap-1 items-start flex-1 min-w-0 pr-2">
+      <div className="flex gap-1 items-start flex-1 min-w-0 pe-2">
         {/* Icon Container */}
         {Icon ? (
           <div
@@ -214,8 +217,8 @@ const ToolItem: React.FC<ToolItemProps> = ({
             <div className="flex items-center min-h-[20px] px-0 py-0.5">
               <div className="flex gap-0.5 items-center">
                 <div className="flex items-center px-0.5">
-                  <Text as="p" text03 secondaryBody className="text-right">
-                    Tool unavailable
+                  <Text as="p" text03 secondaryBody className="text-end">
+                    {t("toolItem.unavailable.label")}
                   </Text>
                 </div>
                 <div className="flex items-center justify-center p-0.5 w-4 h-4">
@@ -252,7 +255,7 @@ const ToolItem: React.FC<ToolItemProps> = ({
           )}
 
           {openApiMetadata?.path && (
-            <Truncated secondaryMono text03 className="text-right truncate">
+            <Truncated secondaryMono text03 className="text-end truncate">
               {highlightedPathContent}
             </Truncated>
           )}

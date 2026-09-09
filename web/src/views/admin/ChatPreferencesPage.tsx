@@ -1,5 +1,6 @@
 "use client";
 
+import { useAdminRouteTitle } from "@/lib/adminNavLabels";
 import { markdown } from "@opal/utils";
 import React, {
   useCallback,
@@ -45,7 +46,7 @@ import { useSettings } from "@/lib/settings/hooks";
 import useCCPairs from "@/hooks/useCCPairs";
 import { getSourceMetadata } from "@/lib/sources";
 import { QueryHistoryType, Settings, toSettings } from "@/lib/settings/types";
-import { useAvailableTools } from "@/hooks/useAvailableTools";
+import { useAvailableTools } from "@/lib/tools/hooks";
 import {
   SEARCH_TOOL_ID,
   IMAGE_GENERATION_TOOL_ID,
@@ -694,6 +695,7 @@ function RetentionField({ value, disabled, onSave }: RetentionFieldProps) {
 
 export default function ChatPreferencesPage() {
   const t = useTranslations("admin.chatPreferences");
+  const adminRouteTitle = useAdminRouteTitle();
   const router = useRouter();
   const settings = useSettings();
   const s = settings;
@@ -1018,7 +1020,7 @@ export default function ChatPreferencesPage() {
       <SettingsLayouts.Root>
         <SettingsLayouts.Header
           icon={route.icon}
-          title={route.title}
+          title={adminRouteTitle(route)}
           description={t("header.description")}
           divider
         />

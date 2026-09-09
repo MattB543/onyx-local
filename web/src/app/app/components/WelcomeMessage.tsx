@@ -53,7 +53,7 @@ export default function WelcomeMessage({
         width="fit"
       >
         <SvgEyeClosed size={32} className="text-text-04" />
-        <Text as="p" headingH2>
+        <Text as="p" dir="auto" headingH2>
           {t("incognito.title")}
         </Text>
       </Section>
@@ -68,7 +68,7 @@ export default function WelcomeMessage({
         width="fit"
       >
         {!whitelabelName && <Logo folded size={32} />}
-        <Text as="p" headingH2>
+        <Text as="p" dir="auto" headingH2>
           {greeting}
         </Text>
       </Section>
@@ -83,7 +83,7 @@ export default function WelcomeMessage({
         width="fit"
       >
         <AgentAvatar agent={agent} size={36} />
-        <Text as="p" headingH2>
+        <Text as="p" dir="auto" headingH2>
           {agent.name}
         </Text>
       </Section>

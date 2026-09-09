@@ -1,8 +1,5 @@
-import {
-  Filters,
-  DocumentInfoPacket,
-  StreamStopInfo,
-} from "@/lib/search/interfaces";
+import { DocumentInfoPacket, StreamStopInfo } from "@/lib/search/interfaces";
+import type { SearchFiltersRequest } from "@/lib/searchFilters/types";
 import { handleSSEStream } from "@/lib/search/streamingUtils";
 import { ReasoningEffortOverride } from "@/lib/languageModels/types";
 import { FeedbackType } from "@/app/app/interfaces";
@@ -162,7 +159,7 @@ export interface SendMessageParams {
   indexForLaterFileIds?: string[];
   parentMessageId: number | null;
   chatSessionId: string;
-  filters: Filters | null;
+  filters: SearchFiltersRequest | null;
   signal?: AbortSignal;
   deepResearch?: boolean;
   enabledToolIds?: number[];

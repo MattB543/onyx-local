@@ -103,6 +103,21 @@ beat_task_templates: list[dict] = [
         },
     },
     {
+        "name": "check-for-old-index-reclaim",
+        "task": OnyxCeleryTask.CHECK_FOR_OLD_INDEX_RECLAIM,
+        "schedule": timedelta(minutes=30),
+        "options": {
+            "priority": OnyxCeleryPriority.MEDIUM,
+            "expires": BEAT_EXPIRES_DEFAULT,
+            # Run on gated tenants too — freeing our storage matters most for non-paying
+            # tenants. Safe because the PAST + is_active_port_backfill_source gates only
+            # reclaim an index once its reindex has truly completed (a gated tenant's
+            # deferred reindex never swaps / never drains, so it's never fetched).
+            "skip_gated": False,
+            "work_gated": True,
+        },
+    },
+    {
         "name": "check-for-checkpoint-cleanup",
         "task": OnyxCeleryTask.CHECK_FOR_CHECKPOINT_CLEANUP,
         "schedule": timedelta(hours=1),
@@ -110,6 +125,18 @@ beat_task_templates: list[dict] = [
             "priority": OnyxCeleryPriority.LOW,
             "expires": BEAT_EXPIRES_DEFAULT,
             # Run on gated tenants too — they may still have stale checkpoints to clean.
+            "skip_gated": False,
+            "work_gated": True,
+        },
+    },
+    {
+        "name": "check-for-stale-capability-runs",
+        "task": OnyxCeleryTask.CHECK_FOR_STALE_CAPABILITY_RUNS,
+        "schedule": timedelta(minutes=10),
+        "options": {
+            "priority": OnyxCeleryPriority.LOW,
+            "expires": BEAT_EXPIRES_DEFAULT,
+            # Gated tenants may still hold dead RUNNING marks to retire.
             "skip_gated": False,
             "work_gated": True,
         },
@@ -354,6 +381,7 @@ if (
 _VECTOR_DB_BEAT_TASK_NAMES: set[str] = {
     "check-for-indexing",
     "check-for-port",
+    "check-for-old-index-reclaim",
     "check-for-connector-deletion",
     "check-for-vespa-sync",
     "check-for-pruning",

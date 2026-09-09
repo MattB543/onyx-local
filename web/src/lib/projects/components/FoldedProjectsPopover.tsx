@@ -6,6 +6,7 @@ import {
 } from "@/lib/projects/components/ProjectFolderButton";
 import CreateProjectModal from "@/lib/projects/components/CreateProjectModal";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Button,
   EmptyMessageCard,
@@ -18,8 +19,7 @@ import {
 import { useFocusOnMount } from "@opal/hooks";
 import { Section } from "@opal/layouts";
 import { SvgFolder, SvgFolderPlus } from "@opal/icons";
-import { useAppRouter } from "@/hooks/appNavigation";
-import useAppFocus from "@/hooks/useAppFocus";
+import { useAppPosition } from "@/lib/position/hooks";
 import { noProp } from "@/lib/utils";
 import { UNNAMED_CHAT } from "@/lib/constants";
 import { usePinChatAgent } from "@/lib/agents/hooks";
@@ -39,8 +39,7 @@ interface ProjectPopoverRowProps {
   onNavigate: () => void;
 }
 function ProjectPopoverRow({ match, onNavigate }: ProjectPopoverRowProps) {
-  const route = useAppRouter();
-  const appFocus = useAppFocus();
+  const appPosition = useAppPosition();
   const pinChatAgent = usePinChatAgent();
   const activeProject = useActiveProject();
   const isActiveProject = activeProject?.id === match.project.id;
@@ -59,7 +58,7 @@ function ProjectPopoverRow({ match, onNavigate }: ProjectPopoverRowProps) {
     // Navigation closes the popover on its own, but re-selecting the project
     // you are already inside leaves the URL alone.
     onNavigate();
-    route({ projectId: match.project.id });
+    appPosition.openProject(match.project.id);
   }
 
   return (
@@ -74,7 +73,7 @@ function ProjectPopoverRow({ match, onNavigate }: ProjectPopoverRowProps) {
           icon={FolderIcon}
           // Same rule as the sidebar: while the chats are hidden, the folder
           // carries the "you are here" mark for them.
-          selected={isActiveProject && (appFocus.isProject() || !open)}
+          selected={isActiveProject && (appPosition.isProject() || !open)}
           onClick={noProp(handleClick)}
         >
           {match.project.name}
@@ -93,7 +92,7 @@ function ProjectPopoverRow({ match, onNavigate }: ProjectPopoverRowProps) {
                 pinChatAgent(chatSession);
                 onNavigate();
               }}
-              selected={appFocus.getId() === chatSession.id}
+              selected={appPosition.chat() === chatSession.id}
             >
               {chatSession.name || UNNAMED_CHAT}
             </SidebarTab>
@@ -119,6 +118,8 @@ function FoldedProjectsPopoverContent({
   onNavigate,
   onNewProject,
 }: FoldedProjectsPopoverContentProps) {
+  const t = useTranslations("chat");
+  const tSidebar = useTranslations("sidebar");
   const [query, setQuery] = useState("");
   const matches = useProjectSearch(query);
   const focusOnMount = useFocusOnMount<HTMLInputElement>();
@@ -132,7 +133,7 @@ function FoldedProjectsPopoverContent({
           clearButton
           ref={focusOnMount}
           variant="internal"
-          placeholder="Search projects..."
+          placeholder={t("projects.foldedPopover.search.placeholder")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           rightChildren={
@@ -141,7 +142,7 @@ function FoldedProjectsPopoverContent({
               icon={SvgFolderPlus}
               prominence="internal"
               size="sm"
-              tooltip="New Project"
+              tooltip={tSidebar("appSidebar.newProject.tooltip")}
               onClick={noProp(onNewProject)}
             />
           }
@@ -153,7 +154,7 @@ function FoldedProjectsPopoverContent({
           ? [
               <EmptyMessageCard
                 key="empty"
-                title="No projects found"
+                title={t("projects.foldedPopover.empty.title")}
                 padding={2}
               />,
             ]
@@ -181,13 +182,14 @@ function FoldedProjectsPopoverContent({
  * search term inside it works the same way, one level down.
  */
 export function FoldedProjectsPopover() {
-  const appFocus = useAppFocus();
+  const tSidebar = useTranslations("sidebar");
+  const appPosition = useAppPosition();
   const createProjectModal = useCreateModal();
   const [open, setOpen] = useState(false);
 
   // Any navigation means the popover has done its job. Folding a project's
   // chats never touches the URL, so the folder icon leaves the popover open.
-  useEffect(() => setOpen(false), [appFocus]);
+  useEffect(() => setOpen(false), [appPosition]);
 
   function handleNewProject() {
     // The modal traps focus, so the popover has to go first.
@@ -210,9 +212,9 @@ export function FoldedProjectsPopover() {
               icon={SvgFolder}
               type="button"
               folded
-              selected={open || appFocus.isProject()}
+              selected={open || appPosition.isProject()}
             >
-              Projects
+              {tSidebar("appSidebar.projects.title")}
             </SidebarTab>
           </div>
         </Popover.Trigger>

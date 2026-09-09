@@ -141,12 +141,12 @@ _CELERY_WORKER_PROGRAMS: list[tuple[str, str]] = [
     (
         "light",
         "vespa_metadata_sync,connector_deletion,doc_permissions_upsert,"
-        "checkpoint_cleanup,index_attempt_cleanup,opensearch_migration",
+        "checkpoint_cleanup,index_attempt_cleanup,index_reclaim,opensearch_migration",
     ),
     (
         "heavy",
         "connector_pruning,connector_doc_permissions_sync,"
-        "connector_external_group_sync,csv_generation,sandbox",
+        "connector_external_group_sync,csv_generation,sandbox,capability_checks",
     ),
     ("docprocessing", "docprocessing,port"),
     (
@@ -545,7 +545,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     checked: set[Path] = set()
 
     for item in items:
-        path = getattr(item, "path", None)
+        path = getattr(item, "path", None)  # ods: ignore[getattr]
         if path is None or path in checked:
             continue
         checked.add(path)

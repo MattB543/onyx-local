@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Modal } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ function CredentialSelectionTable({
   currentCredentialId,
   onDeleteCredential,
 }: CredentialSelectionTableProps) {
+  const t = useTranslations("admin");
   const [selectedCredentialId, setSelectedCredentialId] = useState<
     number | null
   >(null);
@@ -71,23 +73,27 @@ function CredentialSelectionTable({
       <table className="w-full text-sm border-collapse">
         <thead className="sticky top-0 w-full">
           <tr className="bg-neutral-100 dark:bg-neutral-900">
-            <th className="p-2 text-left font-medium text-neutral-600 dark:text-neutral-400">
-              <span className="sr-only">Select</span>
+            <th className="p-2 text-start font-medium text-neutral-600 dark:text-neutral-400">
+              <span className="sr-only">
+                {t("credentials.table.select.label")}
+              </span>
             </th>
-            <th className="p-2 text-left font-medium text-neutral-600 dark:text-neutral-400">
-              ID
+            <th className="p-2 text-start font-medium text-neutral-600 dark:text-neutral-400">
+              {t("credentials.table.id.header")}
             </th>
-            <th className="p-2 text-left font-medium text-neutral-600 dark:text-neutral-400">
-              Name
+            <th className="p-2 text-start font-medium text-neutral-600 dark:text-neutral-400">
+              {t("credentials.table.name.header")}
             </th>
-            <th className="p-2 text-left font-medium text-neutral-600 dark:text-neutral-400">
-              Created
+            <th className="p-2 text-start font-medium text-neutral-600 dark:text-neutral-400">
+              {t("credentials.table.created.header")}
             </th>
-            <th className="p-2 text-left font-medium text-neutral-600 dark:text-neutral-400">
-              Last Updated
+            <th className="p-2 text-start font-medium text-neutral-600 dark:text-neutral-400">
+              {t("credentials.table.lastUpdated.header")}
             </th>
             <th>
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">
+                {t("credentials.table.actions.label")}
+              </span>
             </th>
           </tr>
         </thead>
@@ -114,15 +120,17 @@ function CredentialSelectionTable({
                         type="radio"
                         name="credentialSelection"
                         onChange={() => handleSelectCredential(credential.id)}
-                        className="form-radio ml-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
+                        className="form-radio ms-4 h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
                       />
                     ) : (
-                      <Badge>selected</Badge>
+                      <Badge>{t("credentials.table.selected.badge")}</Badge>
                     )}
                   </td>
                   <td className="p-2">{credential.id}</td>
                   <td className="p-2">
-                    <p>{credential.name ?? "Untitled"}</p>
+                    <p>
+                      {credential.name ?? t("credentials.table.untitled.label")}
+                    </p>
                   </td>
                   <td className="p-2">
                     {new Date(credential.time_created).toLocaleString()}
@@ -142,7 +150,7 @@ function CredentialSelectionTable({
                       <button
                         onClick={() => onEditCredential(credential)}
                         className="cursor-pointer my-auto"
-                        aria-label="Edit credential"
+                        aria-label={t("credentials.table.edit.ariaLabel")}
                       >
                         <SvgEdit size={16} />
                       </button>
@@ -156,7 +164,7 @@ function CredentialSelectionTable({
       </table>
 
       {allCredentials.length == 0 && (
-        <p className="mt-4"> No credentials exist for this connector!</p>
+        <p className="mt-4">{t("credentials.table.empty.message")}</p>
       )}
     </div>
   );
@@ -202,6 +210,7 @@ export default function ModifyCredential({
   onDeleteCredential,
   onCreateNew,
 }: ModifyCredentialProps) {
+  const t = useTranslations("admin");
   const [selectedCredential, setSelectedCredential] =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useState<Credential<any> | null>(null);
@@ -218,14 +227,11 @@ export default function ModifyCredential({
           <Modal.Content width="sm" height="sm">
             <Modal.Header
               icon={SvgAlertTriangle}
-              title="Confirm Deletion"
+              title={t("credentials.delete.confirmTitle")}
               onClose={() => setConfirmDeletionCredential(null)}
             />
             <Modal.Body>
-              <Text as="p">
-                Are you sure you want to delete this credential? You cannot
-                delete credentials that are linked to live connectors.
-              </Text>
+              <Text as="p">{t("credentials.delete.confirmBody.message")}</Text>
             </Modal.Body>
             <Modal.Footer>
               <Button
@@ -234,13 +240,13 @@ export default function ModifyCredential({
                   setConfirmDeletionCredential(null);
                 }}
               >
-                Confirm
+                {t("credentials.delete.confirmButton.label")}
               </Button>
               <Button
                 prominence="secondary"
                 onClick={() => setConfirmDeletionCredential(null)}
               >
-                Cancel
+                {t("credentials.delete.cancelButton.label")}
               </Button>
             </Modal.Footer>
           </Modal.Content>
@@ -249,8 +255,7 @@ export default function ModifyCredential({
 
       <div className="mb-0 w-full">
         <Text as="p" className="mb-4">
-          Select a credential as needed! Ensure that you have selected a
-          credential with the proper permissions for this connector!
+          {t("credentials.modify.instructions.message")}
         </Text>
 
         <CredentialSelectionTable
@@ -283,7 +288,7 @@ export default function ModifyCredential({
           <div className="flex mt-8 justify-between">
             {onCreateNew ? (
               <Button onClick={onCreateNew} icon={SvgBubbleText}>
-                Create
+                {t("credentials.modify.createButton.label")}
               </Button>
             ) : (
               <div />
@@ -304,7 +309,7 @@ export default function ModifyCredential({
               }}
               icon={SvgArrowExchange}
             >
-              Select
+              {t("credentials.modify.selectButton.label")}
             </Button>
           </div>
         )}
