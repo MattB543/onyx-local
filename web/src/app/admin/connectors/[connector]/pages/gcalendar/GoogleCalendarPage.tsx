@@ -6,6 +6,8 @@ import { LoadingAnimation } from "@/components/Loading";
 import { ValidSources } from "@/lib/types";
 import { usePublicCredentials } from "@/lib/hooks";
 import { CalendarAuthSection } from "./Credential";
+import { usePermissionAuthority } from "@/lib/permissions/hooks";
+import { Permission } from "@/lib/types";
 import { useUser } from "@/providers/UserProvider";
 import {
   useGoogleCredentials,
@@ -13,7 +15,10 @@ import {
 } from "@/lib/googleConnector";
 
 const GoogleCalendarMain = () => {
-  const { isAdmin, user } = useUser();
+  const { user } = useUser();
+  const { isGlobalHolder } = usePermissionAuthority(
+    Permission.MANAGE_CONNECTORS
+  );
 
   // Get all public credentials
   const {
@@ -61,7 +66,7 @@ const GoogleCalendarMain = () => {
 
   return (
     <>
-      {isAdmin && (
+      {isGlobalHolder && (
         <>
           <CalendarAuthSection refreshCredentials={handleRefresh} user={user} />
         </>

@@ -154,8 +154,12 @@ export default function useChatController({
   const searchParams = useSearchParams();
   const { refreshChatSessions, addPendingChatSession } = useChatSessions();
   const { pinnedAgents, togglePinnedAgent } = usePinnedAgents();
-  const { fetchProjects, beginChatUpload, uploadFiles } =
-    useProjectsContext();
+  const {
+    fetchProjects,
+    beginChatUpload,
+    beginUpload,
+    setCurrentMessageFiles,
+  } = useProjectsContext();
   const { incognitoEnabledRef, incognitoSessionId } = useIncognito();
 
   // Use selectors to access only the specific fields we need
@@ -1551,7 +1555,13 @@ export default function useChatController({
         // Incognito sessions must not create untracked raw chat uploads: route
         // them through the session-aware upload path so incognito cleanup sees them.
         if (incognitoEnabledRef.current) {
-          await uploadFiles(Array.from(acceptedFiles));
+          // Mirrors upstream's drop handler: the session-aware upload does
+          // not attach to the message by itself.
+          const uploadedMessageFiles = await beginUpload(
+            Array.from(acceptedFiles),
+            null
+          );
+          setCurrentMessageFiles((prev) => [...prev, ...uploadedMessageFiles]);
         } else {
           await beginChatUpload(Array.from(acceptedFiles));
         }
@@ -1561,7 +1571,8 @@ export default function useChatController({
     },
     [
       beginChatUpload,
-      uploadFiles,
+      beginUpload,
+      setCurrentMessageFiles,
       incognitoEnabledRef,
       activeAgent,
       llmManager,

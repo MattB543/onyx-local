@@ -622,3 +622,44 @@ behavior-preserving, alembic parents, no markers, fork imports resolve.
   after ~186k tokens (session 01a0838d-1da2-7a63-91b0-4885cbf65a50); resumed after
   the 10:18 PM reset — verdict recorded below when available.
 - NOT PUSHED to origin yet.
+
+### Whole-sync Codex review (gpt-6-astra, MEDIUM) — VERDICT: ISSUES → 3 fixed, 5 inherited/deferred
+
+Ran against 6d1b09f3ce (resumed after the usage-limit reset; note: the wrapper's
+`resume` branch needed `--all` because Codex filters sessions by cwd, and the cmd
+wrapper still failed with "os error 2" — the resume was run directly from Git Bash).
+Codex independently verified: 683/683 focused fork tests, tsc 0, 44 fork modules
+import, `check_router_auth` accepts all 71 fork routes (CRM 31, email queue 2,
+custom jobs 10, connector 27 incl. 3 Calendar, raw upload 1), alembic graph 475
+revisions single head with all fork migrations connected, both encryption modules
+byte-identical to e1c7a8d161, `useAppPosition()` returns crm on all CRM routes,
+multi_llm request params reflect the real max_tokens incl. the degrade retry.
+
+Fixed on main (this commit):
+1. (sync-introduced, f0f9fbd9f2) incognito drag-drop went through `uploadFiles`,
+   which tracks the upload but never attaches it to `currentMessageFiles` — the
+   file silently never reached the message. Now mirrors upstream's own drop
+   handler: `beginUpload(files, null)` + `setCurrentMessageFiles(prev => [...])`.
+2. (sync-adjacent) `gcalendar/GoogleCalendarPage.tsx` still gated setup on
+   `isAdmin` while the backend route moved to MANAGE_CONNECTORS — now
+   `usePermissionAuthority(Permission.MANAGE_CONNECTORS).isGlobalHolder`, matching
+   upstream's Gmail/Drive pages.
+3. (sync-adjacent) `CrmNav.tsx` Email Queue tab gated on `hasAdminAccess` (any admin
+   capability, incl. scoped) while both endpoints require global MANAGE_CONNECTORS
+   — now the same `isGlobalHolder` gate.
+
+Inherited (pre-date this sync at e1c7a8d161) — NOT fixed, follow-up candidates:
+4. `CrmToolRenderer.tsx` is not registered in `renderMessageComponent.tsx`
+   (`findRenderer()` returns null for all 5 CRM/Calendar start packets, falls to
+   ReasoningRenderer); backend List/Get packets have no frontend packet types or
+   history-replay branches. Fork bug predating the sync.
+5. Upstream dep-array bug in `lib/projects/providers.tsx` (`incognitoSessionId`
+   omitted, `incognitoUploadsEnabled` duplicated) — left verbatim (upstream's).
+6. `file_processing/unstructured.py` read-repair never retires the legacy KV row,
+   so deleting a migrated Unstructured key resurrects it on next read.
+7. `.github/workflows/build-images.yml` builds the backend with no `target`, so
+   published prod tags are the `dev` stage (has curl/vim/psql). Compose selects
+   `runtime`. DECISION FOR MATT: setting `target: runtime` shrinks/hardens the
+   image but removes curl — check prod healthchecks/runbooks that exec into the
+   containers first (flagged in the 2026-07 batch 9 notes).
+8. 4 pre-existing jsx-a11y oxlint errors (FileCard, TagManager, OptionsList).

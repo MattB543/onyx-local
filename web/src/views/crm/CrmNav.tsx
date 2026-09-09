@@ -4,7 +4,8 @@ import { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Tabs } from "@opal/components";
-import { useUser } from "@/providers/UserProvider";
+import { usePermissionAuthority } from "@/lib/permissions/hooks";
+import { Permission } from "@/lib/types";
 
 type CrmTab =
   | "home"
@@ -41,8 +42,10 @@ export default function CrmNav({ rightContent }: CrmNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const activeTab = getCurrentTab(pathname);
-  const { isAdmin, hasAdminAccess } = useUser();
-  const showEmailQueue = isAdmin || hasAdminAccess;
+  // Email-queue endpoints require global MANAGE_CONNECTORS (admins hold it).
+  const { isGlobalHolder: showEmailQueue } = usePermissionAuthority(
+    Permission.MANAGE_CONNECTORS
+  );
 
   return (
     <div
