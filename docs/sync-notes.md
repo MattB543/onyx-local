@@ -532,3 +532,93 @@ behavior-preserving, alembic parents, no markers, fork imports resolve.
 - Codex sanity check: skipped for batch 3 itself (mechanical UI migration,
   tsc-verified); Codex batch-2 fixes above landed on main in the same commit as
   these notes.
+
+## Batch 4 — 94271d7e11 = upstream tip (2026-09-08, 134 commits, 122→0 behind. SYNC MERGE COMPLETE)
+
+- Upstream moved 12 commits during the batch (planned target 5bf03a2c0f); merged
+  live `upstream/main` instead — correct, since the goal is 0-behind. Re-probe
+  against the live ref, not the planned hash.
+- Conflicts: 15 (17 predicted). Key items:
+  - `web/src/hooks/useAppFocus.ts` DELETED upstream (e71fc7f847) → fork `"crm"`
+    position PORTED into `web/src/lib/position/hooks.ts`: `"crm"` in the
+    parameterless `AppPositionType` arm, `hrefFor` case → `/app/crm`, `isCrm()`,
+    `pathname.startsWith("/app/crm")` in `useAppPosition()`. AppSidebar's CRM tab
+    (`activeSidebarTab.isCrm()`) auto-merged onto `useAppPosition()`. The playbook's
+    `useAppFocus.ts` recurring row is retired; `lib/position/hooks.ts` replaces it.
+  - `celery/apps/{heavy,primary}.py`: fork `tasks.custom_jobs` + upstream
+    `tasks.capability_checks` (recurring blend for custom-jobs registration).
+  - `useChatController.ts`: fork `beginChatUpload`/`uploadFiles` + incognito
+    routing kept; upstream removed `useAgentPreferences`/`useForcedTools`
+    (forced tool now lives in `toolConfiguration`, cbfd6b327b/e814627847).
+  - `icons.tsx`: fork's icon superset (GoogleCalendarIcon, GmailIcon, …) kept +
+    upstream `useTranslations` import; no phosphor on either side.
+  - `auth/components.tsx`: fork `type="email"` + upstream i18n placeholder.
+  - `InputComboBox.tsx`: `onClear`/`showAddPrefix` kept; upstream's un-defaulted
+    `separatorLabel` taken (falls back to `t("separator.label")` at call sites).
+  - `FinalStep`/`NameStep`/`ModifyCredential`: import-block blends (keep `memo`/
+    `useMemo` still in use + upstream's `useTranslations`/`React`).
+  - `AppPage.tsx` theirs (deleted `processSearchParamsAndSubmitMessage`);
+    3 b4a033ab62-only cosmetic take-theirs.
+- Deviations from playbook defaults: none.
+- OUT-OF-MARKER: i18n ratchet widened to `src/**` (b65d5cc583) → 298 fork-only
+  `no-raw-jsx-text` errors → `web/.oxlintrc.json` fork override extended to
+  `src/app/app/crm/**`, `src/views/Crm*.tsx`, `src/views/crm/**`,
+  `InputMultiSelect.tsx`, plus fork blocks in `OptionsList.tsx` ("Clear filter")
+  and `sections/cards/FileCard.tsx` ("Index for later") → 0. New `ods check-getattr`
+  pre-commit hook (8ddc6df49c): 8 fork-only `getattr` sites annotated
+  `# ods: ignore[getattr]` (primary.py, google_utils/resources.py
+  `RefreshableDriveObject`, db/crm.py ×5, exa_client.py, tests/utils/aws_secrets.py).
+  NEW STANDING CONVENTION: every new fork `getattr` needs the marker; `ods` is a
+  Linux-only binary so the hook can't run locally — CI verifies.
+- Feature retirements: NONE. c9ca204db8 dropped only the local `unstructured`
+  package; `unstructured-client` + API path stay, so the fork's encrypted-KV
+  Unstructured API key handling + read-repair survive (tests pass). Lesson:
+  check the *client* package before concluding a feature is gone.
+- Checked clean: no rescale commits in range; appearance caps (50f46ffe96) hit EE
+  `enterprise_settings` only, `whitelabel_name` unaffected; `multi_llm.py` fork
+  block intact (upstream only extended the isolated-client set with Bedrock);
+  `session_loading.py`/`tool_constructor.py`/`prompt_utils.py`/`llm_loop.py`/
+  `process_message.py` and all CRM frontend files untouched by the merge.
+- Alembic merge migration `1794c56fdb7c` (parents 287021f3b46c + cb4eb0dc83fd);
+  schema_private head a754e4f72e60 unchanged.
+- DEPLOY FLAGS: 4 new upstream migrations, NO crypto at migration time, no
+  backfills; `287021f3b46c` adds nullable `voice_provider.api_secret` LargeBinary
+  (encrypted at runtime via KMS envelope — KMS/SSM needed only when a voice
+  provider is configured); `947b94d2ebf1` FK → ON DELETE CASCADE. Backend deps:
+  `unstructured` REMOVED (+~23 transitive: langdetect, python-magic, gitpython,
+  html5lib, emoji, filetype, …); extraction is Unstructured-API-only now → API key
+  must be present in encrypted_kv_store for deployments that relied on local
+  partitioning. Bumps: braintrust 0.3.9→0.37 (major), nltk 3.10.3, pypdf 6.16.1.
+  Web: `@radix-ui/react-direction` new; react 19.2.8, next 16.3.3,
+  react-icons 4→5 (major — fork icons.tsx uses FiCalendar/FaRobot/SiBookstack,
+  type-clean, visual check advised). Env: `CODE_INTERPRETER_IMAGE_TAG` (optional),
+  `OLD_INDEX_RECLAIM_ENABLED` (default true). RTL landed (7268c219a8): fork CRM
+  CSS still uses physical ml-/mr- — cosmetic in RTL locales only.
+- Verification (worktree): tsc 0 (real run; upstream tsconfig already maps
+  `@opal/*` to source — no dist build needed), oxlint 0 i18n errors (4 pre-existing
+  jsx-a11y on main), jest 142 suites/1300 tests at `--maxWorkers=3` (default
+  workers → 7 spurious timeout failures; ALWAYS use `--maxWorkers=3`), ruff clean,
+  pytest 9341 pass / 48 env (3 new diagnosed: gitbook fixture cp1252, HF
+  tokenizer network, langfuse venv skew 3.10 vs 4.14.4 pinned). Main: see the
+  post-sync section below.
+- Codex sanity check: deferred to the whole-sync review (below).
+
+## Post-sync (2026-09-08) — main at 0 behind upstream (94271d7e11)
+
+- Dev venv rebuilt from pinned requirements (default+dev+ee; model_server.txt not
+  installed → `model_server/test_embedding.py` ×2 fail on huggingface-hub 1.26 vs
+  transformers' `<1.0` pin: env skew, fork does not touch model_server).
+- `sync-verify.sh --full`: conflict markers PASS, commits behind 0, tsc 0,
+  `next build` compiles, 5 fork feature suites PASS, ruff PASS, alembic single head
+  (1794c56fdb7c), oxfmt SKIP (CRLF). Full unit tests: 9359 pass / 48 fail / 33 skip
+  — all 48 environmental: the documented Windows set (simple_job_terminate ×2,
+  save_chat csv, craft sandbox/session/nextjs_dev ×37, pptx docs, process_isolation
+  ×2, sandbox_proxy ×2) + gitbook `test_parser_coverage_fixture` (upstream fixture
+  opened without `encoding=` → cp1252) + model_server embedding ×2 (venv skew above).
+  Secrets grep: hits are all upstream template defaults (`docker-compose.template`
+  `${…:-minioadmin}`, `mint_api_key.sh` `ONYX_ADMIN_PASSWORD='...'`, ods regex test
+  fixtures using `AKIAIOSFODNN7EXAMPLE`) — benign.
+- Whole-sync Codex review (gpt-6-astra, MEDIUM): first attempt hit the usage limit
+  after ~186k tokens (session 01a0838d-1da2-7a63-91b0-4885cbf65a50); resumed after
+  the 10:18 PM reset — verdict recorded below when available.
+- NOT PUSHED to origin yet.

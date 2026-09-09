@@ -2,7 +2,7 @@
 
 ## Overview
 
-This playbook documents how to sync MattB543/onyx-local with onyx-dot-app/onyx when 100+ commits have accumulated. It was developed and refined during a 438-commit sync across 9 batches (completed March 2026).
+This playbook documents how to sync MattB543/onyx-local with onyx-dot-app/onyx when 100+ commits have accumulated. It was developed and refined during a 438-commit sync across 9 batches (completed March 2026), a 774-commit sync (July 2026), and a 522-commit sync in 4 batches (September 2026).
 
 The approach: merge upstream in adaptively-sized batches (conflict-budget probing, ~25-100 commits) using a staged Opus agent pipeline per batch, with human decision-making between analysis and implementation, and an advisory Codex sanity check after each batch lands.
 
@@ -217,12 +217,17 @@ These files conflict in nearly every batch because our fork adds code in the sam
 | `backend/onyx/chat/prompt_utils.py`                     | `CRM_GUIDANCE` in tool guidance | **MANUAL BLEND.** Upstream uses a list-based `tool_sections` pattern. Add `CRM_GUIDANCE` to the list. Keep `timezone` param. Verify the `CRM_GUIDANCE` import exists. |
 | `backend/onyx/server/query_and_chat/session_loading.py` | CRM tool elif blocks            | **MANUAL BLEND.** Keep our CRM/Calendar elif blocks alongside upstream's new tool blocks (e.g., PythonTool). They're separate branches — no overlap.                  |
 | `backend/onyx/main.py`                                  | `ENABLE_CUSTOM_JOBS` import     | **MANUAL BLEND.** Keep our import + add any new upstream imports (`CACHE_BACKEND`, `DISABLE_VECTOR_DB`, etc.).                                                        |
-| `web/src/hooks/useAppFocus.ts`                          | `"crm"` in AppFocusType union   | **KEEP OURS.** Our version is a superset — has `"crm"` plus all upstream types. Just add any new upstream types to our union.                                         |
+| `web/src/lib/position/hooks.ts` (was `hooks/useAppFocus.ts`, deleted upstream 2026-09) | `"crm"` app position | **MANUAL BLEND.** Keep `"crm"` in the parameterless `AppPositionType` arm, the `hrefFor` case -> `/app/crm`, `isCrm()`, and the `pathname.startsWith("/app/crm")` branch in `useAppPosition()`. `AppSidebar.tsx` CRM tab calls `activeSidebarTab.isCrm()`. |
 | `web/src/app/app/services/lib.tsx`                      | `timezone` in chat payload      | **MANUAL BLEND.** Keep both `timezone` (ours) and `additional_context` (theirs) in the payload. Import conflict: take theirs.                                         |
 | `web/src/refresh-components/inputs/InputComboBox/`      | `onClear` prop                  | **MANUAL BLEND.** Keep both `onClear` (ours) and `showOtherOptions` (theirs) in both `InputComboBox.tsx` and `types.ts`.                                              |
 | `web/src/lib/auth/svcSS.ts`                             | Never-throw auth-metadata fallback | **MANUAL BLEND.** Blended in 5 of 9 batches of the 2026-07 sync. Keep our `buildFallbackAuthTypeMetadata` + try/catch `getAuthTypeMetadataSS`; add any new upstream `AuthTypeMetadata` fields to BOTH the fallback and the success path (required fields break tsc silently otherwise). |
 | `backend/onyx/chat/chat_utils.py`                       | Raw chat-upload token counting  | **MANUAL BLEND.** Fork-only `chat_file_utils.py` provides `get_chat_upload_token_count`/`estimate_token_count_for_text`; upstream refactors of `load_chat_file` tend to delete its call sites — re-add the `if not user_file_id_str:` fallback or raw uploads silently get token_count=0. |
 | `web/next.config.js`                                    | `allowedDevOrigins` (ngrok host) + `"mime"` in `transpilePackages` | **MANUAL BLEND.** Take upstream's file, then re-add both fork entries (commit 4b17ea2b05). Looks cosmetic in the probe but is not. |
+| `backend/onyx/llm/multi_llm.py`                        | Claude `max_tokens` + capacity backoff | **MANUAL BLEND.** Fork delta is `_default_claude_max_tokens`/`auto_max_tokens`, the `BadRequestError` -> `_run_attempts(None)` degrade retry, and the `_is_quota_exhaustion`/`LLM_SERVICE_UNAVAILABLE_*` ladder. Upstream's `request_params` recording must reflect the actual `max_tokens_arg`. Check whether upstream has upstreamed a fork helper before blending (the `_anthropic_*` helpers moved to `model_capabilities.py` in 2026-09). |
+| `backend/onyx/auth/users.py`                            | `current_admin_user` / `current_curator_or_admin_user` | **KEEP OURS.** Since 2026-09 these are `require_permission(Permission.FULL_ADMIN_PANEL_ACCESS)` / `require_permission(Permission.MANAGE_CONNECTORS)` aliases (NOT role checks: `User.role` is a nullable tombstone upstream). ~40 fork call sites (CRM, custom jobs) + test `dependency_overrides` depend on the names. Follow-up to retire: migrate call sites to `require_permission` directly. |
+| `backend/onyx/server/documents/connector.py`            | Google Calendar SA-credential + callback routes | **MANUAL BLEND.** Take upstream's import block; fork routes use `require_permission(Permission.MANAGE_CONNECTORS)` (parity with gmail/gdrive) and `current_user`. Any dependency not accepted by `auth_check.check_router_auth` fails api_server startup. |
+| `backend/onyx/background/celery/apps/{heavy,primary}.py` | `tasks.custom_jobs` registration | **MANUAL BLEND.** Keep the fork include alongside upstream's new task modules. |
+| `web/.oxlintrc.json`, `pyproject.toml` `per-file-ignores` | i18n `no-raw-jsx-text` fork override; C901 fork entries | **KEEP OURS + take upstream additions.** Fork strings are exempt from i18n (5-locale `keyParity.ts` makes catalog keys impractical); extend the override when upstream widens the ratchet globs. |
 
 ## Conflict Resolution Defaults
 
@@ -288,10 +293,17 @@ Keep this as a runnable script (`scripts/sync-verify.sh`) so agents and the Code
 Known baseline (as of 2026-07-29, ruff-clean tree):
 
 - `ruff check backend/` must run from the **repo root** — the per-file-ignores in `pyproject.toml` are rooted there and silently stop matching if run from inside `backend/`. The script does this correctly.
-- Fork code is ruff-clean; a nonzero ruff result after a sync means the merge introduced it. Exception class: `alembic merge heads` emits unused `op`/`sa` imports and the `black` post-write hook is broken in the venv � run `ruff check --fix` + `ruff format` on each new merge migration.
+- Fork code is ruff-clean; a nonzero ruff result after a sync means the merge introduced it. Exception class: `alembic merge heads` emits unused `op`/`sa` imports and the `black` post-write hook is broken in the venv — run `ruff check --fix` + `ruff format` on each new merge migration.
 - On the Windows dev box, ~30 unit tests fail for environmental reasons (symlinks/POSIX file modes, signals, Docker, mimetypes registry, cp1252 default encoding) — in `test_simple_job_terminate.py`, `test_save_chat.py` (csv/TABULAR), `test_confluence_checkpointing.py`, `sandbox_proxy/`, `server/features/craft/sandbox/` (sandbox_daemon, safe_extract, docker_manager_config), `utils/test_process_isolation.py`, `skills/test_pptx_skill_docs.py`. Failures **outside** that set are real regressions. (`ee/server/log_export/test_log_collection.py` is excluded by the script — `os.geteuid` at collection time aborts the whole run on Windows.)
 - Web formatting is `oxfmt` (upstream dropped prettier 2026-07); the check only works on LF checkouts, so the script skips it on Windows — CI is the real gate.
 - `web/` has only `bun.lock` (no package-lock.json) — `npm ci` fails; install with `bun install --frozen-lockfile`.
+- Always run jest with `--maxWorkers=3` (default worker count manufactures ~7 spurious timeout failures) and never concurrently with pytest.
+- Local `oxlint` needs `NODE_OPTIONS=--experimental-strip-types` (its `.ts` plugins); `ods check-getattr` (Linux binary) cannot run locally — annotate fork `getattr` calls with `# ods: ignore[getattr]` by convention.
+- `ruff format --check backend/` is not a gate (72 pre-existing repo-wide diffs); `ruff check` is. `alembic merge heads` leaves unused imports (broken `black` hook) — `ruff check --fix` + `ruff format` the new file.
+- Worktree tsc: `@opal/*` resolves from source via tsconfig `paths`; build `web/node_modules` as a real dir of per-entry junctions to main's, COPY (not junction) newly added packages. Never `bun install` against the junction.
+- After any `refactor(opal): ...scale...` commit, diff every `gap=`/`padding=`/`rounding=` line in fork files against upstream's copy — silent visual regressions produce no conflict, tsc, or lint signal.
+- After a batch, run `ruff check backend/` BEFORE tests: upstream widening `select` (B, PERF, C901 in 2026-09) lands violations only in fork-only code.
+- Cosmetic-conflict signal: `git log --no-merges <merge-base>..main -- <file>` resolving to only `b4a033ab62` (Feb-2026 eslint/memo rewrites) or the cherry-picks `9947837f9f`/`bc324a8070` means TAKE THEIRS. Consider reverting b4a033ab62's cosmetic hunks to stop the recurring noise.
 
 ```
 [ ] git rev-list --count HEAD..upstream/main  → 0
