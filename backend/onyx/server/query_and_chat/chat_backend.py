@@ -67,11 +67,14 @@ from onyx.db.chat import (
     delete_all_chat_sessions_for_user,
     delete_chat_session,
     duplicate_chat_session_for_user_from_slack,
+    fork_chat_session,
     get_chat_message,
     get_chat_messages_by_session,
     get_chat_session_by_id,
     get_chat_sessions_by_user,
+    get_fork_origin_for_owner,
     get_incognito_session_ids_for_user,
+    get_owned_chat_session_for_fork,
     set_as_latest_chat_message,
     set_preferred_response,
     translate_db_message_to_chat_message_detail,
@@ -125,6 +128,8 @@ from onyx.server.query_and_chat.models import (
     ChatSessionSummary,
     ChatSessionUpdateRequest,
     CurrentRunInfo,
+    ForkChatSessionRequest,
+    ForkChatSessionResponse,
     MessageOrigin,
     RenameChatSessionResponse,
     SendMessageRequest,
@@ -438,8 +443,16 @@ def get_chat_session(
         if msg.message_type == MessageType.ASSISTANT
     ]
 
+    # Only the owner learns where a branch came from; a PUBLIC branch must not
+    # leak the private original's id and title.
+    fork_origin = get_fork_origin_for_owner(
+        db_session=db_session, chat_session=chat_session, user_id=user_id
+    )
+
     return ChatSessionDetailResponse(
         chat_session_id=session_id,
+        forked_from_chat_session_id=fork_origin[0] if fork_origin else None,
+        forked_from_description=fork_origin[1] if fork_origin else None,
         description=chat_session.description,
         persona_id=chat_session.persona_id,
         persona_name=chat_session.persona.name if chat_session.persona else None,
@@ -456,6 +469,38 @@ def get_chat_session(
         packets=replay_packet_lists,
         current_run=current_run,
         incognito=chat_session.incognito_record_mode is not None,
+    )
+
+
+@router.post("/fork-chat-session", tags=PUBLIC_API_TAGS)
+def fork_chat_session_endpoint(
+    req: ForkChatSessionRequest,
+    user: User = Depends(require_permission(Permission.WRITE_CHAT)),
+    db_session: Session = Depends(get_session),
+) -> ForkChatSessionResponse:
+    """Branch a new, independent chat from a message in one the caller owns."""
+    # Ownership first so non-owners cannot tell an active session from a
+    # missing one.
+    source = get_owned_chat_session_for_fork(
+        db_session=db_session, user=user, chat_session_id=req.chat_session_id
+    )
+    # Reserved assistant rows hold placeholder text while a run streams.
+    if get_processing_run_id(source.id, get_cache_backend()) is not None:
+        raise OnyxError(
+            OnyxErrorCode.CONFLICT, "Wait for the current response to finish"
+        )
+
+    result = fork_chat_session(
+        db_session=db_session,
+        user=user,
+        source=source,
+        fork_at_message_id=req.message_id,
+    )
+    return ForkChatSessionResponse(
+        chat_session_id=result.chat_session.id,
+        prefill_message=result.prefill_message,
+        prefill_files=result.prefill_files,
+        prefill_skipped_file_count=result.prefill_skipped_file_count,
     )
 
 

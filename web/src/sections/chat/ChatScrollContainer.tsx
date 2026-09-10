@@ -300,6 +300,12 @@ const ChatScrollContainer = memo(
 
         if (!shouldScroll) {
           prevAnchorSelectorRef.current = anchorSelector ?? null;
+          // No anchor to scroll to (e.g. a branch that copied nothing but the
+          // origin banner). Reveal the content anyway, otherwise it stays
+          // visibility:hidden until a first message provides an anchor.
+          if (!anchorSelector) {
+            setIsScrollReady(true);
+          }
           return;
         }
 

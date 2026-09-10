@@ -9474,6 +9474,16 @@
           "text": "El usuario detuvo la generación"
         }
       },
+      "branch": {
+        "error": "No se pudo crear la rama. Inténtalo de nuevo.",
+        "origin": {
+          "label": "Ramificado desde {title}",
+          "link": "Ver original",
+          "untitled": "un chat anterior"
+        },
+        "toast": "Nuevo chat creado a partir de este mensaje.",
+        "toastFilesSkipped": "Nuevo chat creado. {count, plural, one {# archivo adjunto} other {# archivos adjuntos}} no se pudieron volver a adjuntar."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "¡Copiado!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "Ramificar desde aquí"
+        },
         "editButton": {
           "tooltip": "Editar"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "Ramificar desde aquí"
+        },
         "dislikeButton": {
           "removeTooltip": "Quitar no me gusta",
           "tooltip": "Mala respuesta"

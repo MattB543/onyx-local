@@ -9474,6 +9474,16 @@
           "text": "L'utilisateur a arrêté la génération"
         }
       },
+      "branch": {
+        "error": "Impossible de créer la branche. Veuillez réessayer.",
+        "origin": {
+          "label": "Branche de {title}",
+          "link": "Voir l'original",
+          "untitled": "une discussion précédente"
+        },
+        "toast": "Nouvelle discussion créée à partir de ce message.",
+        "toastFilesSkipped": "Nouvelle discussion créée. {count, plural, one {# pièce jointe n'a pas pu être rattachée} other {# pièces jointes n'ont pas pu être rattachées}}."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "Copié !",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "Créer une branche à partir d'ici"
+        },
         "editButton": {
           "tooltip": "Modifier"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "Créer une branche à partir d'ici"
+        },
         "dislikeButton": {
           "removeTooltip": "Retirer le je n'aime pas",
           "tooltip": "Mauvaise réponse"

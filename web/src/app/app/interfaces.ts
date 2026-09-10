@@ -212,6 +212,10 @@ export interface BackendChatSession {
   current_run?: { run_id: number } | null;
   // True for sessions pinned to an incognito record mode.
   incognito?: boolean;
+  // Set only for the owner, and only while the chat this one was branched
+  // from still exists.
+  forked_from_chat_session_id?: string | null;
+  forked_from_description?: string | null;
 }
 
 export function toChatSession(backend: BackendChatSession): ChatSession {

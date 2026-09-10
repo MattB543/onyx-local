@@ -9474,6 +9474,16 @@
           "text": "O usuário interrompeu a geração"
         }
       },
+      "branch": {
+        "error": "Não foi possível criar a ramificação. Tente novamente.",
+        "origin": {
+          "label": "Ramificado de {title}",
+          "link": "Ver original",
+          "untitled": "um chat anterior"
+        },
+        "toast": "Novo chat criado a partir desta mensagem.",
+        "toastFilesSkipped": "Novo chat criado. {count, plural, one {# anexo} other {# anexos}} não puderam ser reanexados."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "Copiado!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "Ramificar a partir daqui"
+        },
         "editButton": {
           "tooltip": "Editar"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "Ramificar a partir daqui"
+        },
         "dislikeButton": {
           "removeTooltip": "Remover descurtida",
           "tooltip": "Resposta ruim"

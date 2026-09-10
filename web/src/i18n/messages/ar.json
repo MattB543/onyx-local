@@ -9474,6 +9474,16 @@
           "text": "أوقف المستخدم التوليد"
         }
       },
+      "branch": {
+        "error": "تعذّر إنشاء الفرع. يُرجى المحاولة مرة أخرى.",
+        "origin": {
+          "label": "متفرّع من {title}",
+          "link": "عرض الأصل",
+          "untitled": "محادثة سابقة"
+        },
+        "toast": "تم إنشاء محادثة جديدة من هذه الرسالة.",
+        "toastFilesSkipped": "تم إنشاء محادثة جديدة. تعذّر إعادة إرفاق {count, plural, one {مرفق واحد} other {# مرفقات}}."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "تم النسخ!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "تفريع من هنا"
+        },
         "editButton": {
           "tooltip": "تعديل"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "تفريع من هنا"
+        },
         "dislikeButton": {
           "removeTooltip": "إزالة عدم الإعجاب",
           "tooltip": "إجابة سيئة"

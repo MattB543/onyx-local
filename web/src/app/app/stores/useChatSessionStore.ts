@@ -15,6 +15,19 @@ import {
   getMessageByMessageId,
   MessageTreeState,
 } from "../services/messageTree";
+import type { ProjectFile } from "@/lib/projects/types";
+
+export interface ForkOrigin {
+  chatSessionId: string;
+  description: string | null;
+}
+
+// Input-bar contents handed to a freshly branched chat, resolved before the
+// navigation and consumed once by the page that renders that session.
+export interface PendingPrefill {
+  message: string;
+  files: ProjectFile[];
+}
 
 interface ChatSessionData {
   sessionId: string;
@@ -44,6 +57,8 @@ interface ChatSessionData {
   personaId?: number;
   // Pinned at creation server-side, so it outlives the live UI toggle.
   incognito?: boolean;
+  // The chat this one was branched from. Null once the origin is deleted.
+  forkedFrom: ForkOrigin | null;
 
   // Streaming duration tracking
   streamingStartTime?: number;
@@ -68,6 +83,11 @@ interface ChatSessionStore {
   // Session management
   currentSessionId: string | null;
   sessions: Map<string, ChatSessionData>;
+  // Keyed by the branched session's id; set before navigating to it.
+  pendingPrefill: Map<string, PendingPrefill>;
+  setPendingPrefill: (sessionId: string, prefill: PendingPrefill) => void;
+  // Removes and returns the entry so it is applied exactly once.
+  takePendingPrefill: (sessionId: string) => PendingPrefill | null;
 
   // Actions - Session Management
   setCurrentSession: (sessionId: string | null) => void;
@@ -204,6 +224,7 @@ const createInitialSessionData = (
 
   lastAccessed: new Date(),
   isLoaded: false,
+  forkedFrom: null,
   queuedMessages: [],
   latestMessageRenderComplete: true,
   isStreamDraining: false,
@@ -216,6 +237,27 @@ export const useChatSessionStore = create<ChatSessionStore>()((set, get) => ({
   // Initial state
   currentSessionId: null,
   sessions: new Map<string, ChatSessionData>(),
+  pendingPrefill: new Map<string, PendingPrefill>(),
+
+  setPendingPrefill: (sessionId: string, prefill: PendingPrefill) => {
+    set((state) => {
+      const pendingPrefill = new Map(state.pendingPrefill);
+      pendingPrefill.set(sessionId, prefill);
+      return { pendingPrefill };
+    });
+  },
+
+  takePendingPrefill: (sessionId: string) => {
+    const entry = get().pendingPrefill.get(sessionId) ?? null;
+    if (entry) {
+      set((state) => {
+        const pendingPrefill = new Map(state.pendingPrefill);
+        pendingPrefill.delete(sessionId);
+        return { pendingPrefill };
+      });
+    }
+    return entry;
+  },
 
   // Session Management Actions
   setCurrentSession: (sessionId: string | null) => {
@@ -617,6 +659,12 @@ export const useChatSessionStore = create<ChatSessionStore>()((set, get) => ({
       description: backendSession?.description,
       personaId: backendSession?.persona_id,
       incognito: backendSession?.incognito ?? false,
+      forkedFrom: backendSession?.forked_from_chat_session_id
+        ? {
+            chatSessionId: backendSession.forked_from_chat_session_id,
+            description: backendSession.forked_from_description ?? null,
+          }
+        : null,
     };
 
     const existingSession = get().sessions.get(sessionId);
@@ -732,6 +780,24 @@ export const useCurrentSessionPersonaId = () =>
       ? sessions.get(currentSessionId)
       : null;
     return currentSession?.personaId ?? null;
+  });
+
+export const useCurrentSessionForkedFrom = () =>
+  useChatSessionStore((state) => {
+    const { currentSessionId, sessions } = state;
+    const currentSession = currentSessionId
+      ? sessions.get(currentSessionId)
+      : null;
+    return currentSession?.forkedFrom ?? null;
+  });
+
+export const useCurrentSessionIncognito = () =>
+  useChatSessionStore((state) => {
+    const { currentSessionId, sessions } = state;
+    const currentSession = currentSessionId
+      ? sessions.get(currentSessionId)
+      : null;
+    return currentSession?.incognito ?? false;
   });
 
 export const useSelectedNodeForDocDisplay = () =>

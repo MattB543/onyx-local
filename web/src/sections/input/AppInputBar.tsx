@@ -80,6 +80,9 @@ export interface AppInputBarHandle {
 
 export interface AppInputBarProps {
   initialMessage?: string;
+  /** Changes when the same `initialMessage` must be applied again, e.g. two
+   * branches prefilled with identical text in a row. */
+  initialMessageKey?: number;
   stopGenerating: () => void;
   onSubmit: (message: string) => void;
   llmManager: LlmManager;
@@ -111,6 +114,7 @@ export interface AppInputBarProps {
 const AppInputBar = React.memo(
   ({
     initialMessage = "",
+    initialMessageKey,
     stopGenerating,
     onSubmit,
     chatState,
@@ -327,7 +331,7 @@ const AppInputBar = React.memo(
       if (initialMessage) {
         setMessage(initialMessage);
       }
-    }, [initialMessage]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [initialMessage, initialMessageKey]); // eslint-disable-line react-hooks/exhaustive-deps
     const shouldShowRecordingWaveformBelow =
       isRecording &&
       !isVoicePlaybackActive &&

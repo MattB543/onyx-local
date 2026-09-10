@@ -359,6 +359,64 @@ class ChatSessionManager:
         ]
 
     @staticmethod
+    def get_chat_session_detail(
+        chat_session: DATestChatSession,
+        user_performing_action: DATestUser,
+        is_shared: bool = False,
+    ) -> dict[str, Any]:
+        """Full session payload (messages, packets, and session-level fields).
+        `get_chat_history` drops everything but the messages."""
+        response = client.get(
+            f"{API_SERVER_URL}/chat/get-chat-session/{chat_session.id}",
+            params={"is_shared": is_shared},
+            headers=user_performing_action.headers,
+        )
+        response.raise_for_status()
+        return cast(dict[str, Any], response.json())
+
+    @staticmethod
+    def fork(
+        chat_session: DATestChatSession,
+        message_id: int,
+        user_performing_action: DATestUser,
+    ) -> tuple[DATestChatSession, dict[str, Any]]:
+        """Branch a new session from `message_id`. Returns the new session and
+        the parsed response so callers can read `prefill_*`."""
+        response = client.post(
+            f"{API_SERVER_URL}/chat/fork-chat-session",
+            json={"chat_session_id": str(chat_session.id), "message_id": message_id},
+            headers=user_performing_action.headers,
+        )
+        response.raise_for_status()
+        body = cast(dict[str, Any], response.json())
+        detail_response = client.get(
+            f"{API_SERVER_URL}/chat/get-chat-session/{body['chat_session_id']}",
+            headers=user_performing_action.headers,
+        )
+        detail_response.raise_for_status()
+        detail = detail_response.json()
+        new_session = DATestChatSession(
+            id=body["chat_session_id"],
+            persona_id=detail["persona_id"],
+            description=detail["description"],
+        )
+        return new_session, body
+
+    @staticmethod
+    def fork_expect_error(
+        chat_session_id: UUID,
+        message_id: int,
+        user_performing_action: DATestUser,
+    ) -> int:
+        """Attempt a fork and return the HTTP status code."""
+        response = client.post(
+            f"{API_SERVER_URL}/chat/fork-chat-session",
+            json={"chat_session_id": str(chat_session_id), "message_id": message_id},
+            headers=user_performing_action.headers,
+        )
+        return response.status_code
+
+    @staticmethod
     def create_chat_message_feedback(
         message_id: int,
         is_positive: bool,

@@ -9474,6 +9474,16 @@
           "text": "User has stopped generation"
         }
       },
+      "branch": {
+        "error": "Couldn't create a branch. Please try again.",
+        "origin": {
+          "label": "Branched from {title}",
+          "link": "View original",
+          "untitled": "an earlier chat"
+        },
+        "toast": "New chat created from this message.",
+        "toastFilesSkipped": "New chat created. {count, plural, one {# attachment} other {# attachments}} could not be re-attached."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "Copied!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "Branch from here"
+        },
         "editButton": {
           "tooltip": "Edit"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "Branch from here"
+        },
         "dislikeButton": {
           "removeTooltip": "Remove Dislike",
           "tooltip": "Bad Response"

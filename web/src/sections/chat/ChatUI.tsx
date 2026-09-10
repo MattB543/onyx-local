@@ -18,10 +18,17 @@ import {
   useCurrentChatState,
   useCurrentMessageHistory,
   useCurrentMessageTree,
+  useCurrentSessionForkedFrom,
+  useCurrentSessionIncognito,
   useLoadingError,
   useUncaughtError,
 } from "@/app/app/stores/useChatSessionStore";
+import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
 import { cn } from "@opal/utils";
+import { Text } from "@opal/components";
+import { SvgBranch } from "@opal/icons";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 /** Width constraint for normal (non-multi-model) messages. */
 // Reading-width cap only applies at md and up — below that the window is too
@@ -56,6 +63,10 @@ export interface ChatUIProps {
 
   onResubmit: () => void;
 
+  /** Opens a new chat branched from a message. Absent in read-only or
+   * incognito contexts; hidden while a response is in flight. */
+  onBranch?: (messageId: number) => void;
+
   /**
    * Node ID of the message to use as scroll anchor.
    * Used by DynamicBottomSpacer to position the push-up effect.
@@ -80,16 +91,25 @@ const ChatUI = React.memo(
     deepResearchEnabled,
     currentMessageFiles,
     onResubmit,
+    onBranch,
     anchorNodeId,
     selectedModels,
     fullWidthChat,
   }: ChatUIProps) => {
+    const t = useTranslations("chat.messages");
     // Get messages and error state from store
     const messages = useCurrentMessageHistory();
     const messageTree = useCurrentMessageTree();
     const error = useUncaughtError();
     const loadError = useLoadingError();
     const chatState = useCurrentChatState();
+    const forkedFrom = useCurrentSessionForkedFrom();
+    const sessionIncognito = useCurrentSessionIncognito();
+    // Branching copies persisted rows, so it waits for the current answer.
+    const branchHandler =
+      onBranch && chatState === "input" && !sessionIncognito
+        ? onBranch
+        : undefined;
     // Stable fallbacks to avoid changing prop identities on each render
     const emptyDocs = useMemo<OnyxDocument[]>(() => [], []);
     const emptyChildrenIds = useMemo<number[]>(() => [], []);
@@ -177,6 +197,31 @@ const ChatUI = React.memo(
             !fullWidthChat && "md:pe-1"
           )}
         >
+          {forkedFrom && (
+            <div
+              data-testid="ChatUI/branch-origin"
+              className={cn(
+                "flex flex-row items-center gap-2 w-full self-center px-1",
+                msgWidth
+              )}
+            >
+              <SvgBranch className="size-3 text-text-03 shrink-0" />
+              <Text font="secondary-body" color="text-03">
+                {t("branch.origin.label", {
+                  title: forkedFrom.description || t("branch.origin.untitled"),
+                })}
+              </Text>
+              <Link
+                href={`/app?${SEARCH_PARAM_NAMES.CHAT_ID}=${forkedFrom.chatSessionId}`}
+                className="underline"
+                data-testid="ChatUI/branch-origin-link"
+              >
+                <Text font="secondary-body" color="text-03">
+                  {t("branch.origin.link")}
+                </Text>
+              </Link>
+            </div>
+          )}
           {messages.map((message, i) => {
             const messageReactComponentKey = `message-${message.nodeId}`;
             const parentMessage = message.parentNodeId
@@ -205,6 +250,7 @@ const ChatUI = React.memo(
                       messageId={message.messageId}
                       nodeId={message.nodeId}
                       onEdit={handleEditWithMessageId}
+                      onBranch={branchHandler}
                       otherMessagesCanSwitchTo={
                         parentMessage?.childrenNodeIds ?? emptyChildrenIds
                       }
@@ -225,6 +271,7 @@ const ChatUI = React.memo(
                       }}
                       llmManager={llmManager}
                       onRegenerate={createRegenerator}
+                      onBranch={branchHandler}
                       parentMessage={message}
                       otherMessagesCanSwitchTo={
                         parentMessage?.childrenNodeIds ?? emptyChildrenIds
@@ -293,6 +340,7 @@ const ChatUI = React.memo(
                     }
                     onMessageSelection={onMessageSelection}
                     onRegenerate={createRegenerator}
+                    onBranch={branchHandler}
                     parentMessage={previousMessage}
                     processingDurationSeconds={
                       message.processingDurationSeconds

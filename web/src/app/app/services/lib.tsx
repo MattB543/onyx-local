@@ -332,6 +332,36 @@ export async function nameChatSession(chatSessionId: string) {
   return response;
 }
 
+export interface ForkChatSessionResponse {
+  chat_session_id: string;
+  // Set when the fork point was a user message: the branch stops at its
+  // parent and the client prefills the input bar with these.
+  prefill_message: string | null;
+  // Only UserFile-backed attachments; raw copies are not made for a prefill.
+  prefill_files: FileDescriptor[];
+  prefill_skipped_file_count: number;
+}
+
+export async function forkChatSession(
+  chatSessionId: string,
+  messageId: number
+): Promise<ForkChatSessionResponse> {
+  const response = await fetch("/api/chat/fork-chat-session", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chat_session_id: chatSessionId,
+      message_id: messageId,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to branch chat - ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function patchMessageToBeLatest(messageId: number) {
   const response = await fetch("/api/chat/set-message-as-latest", {
     method: "PUT",

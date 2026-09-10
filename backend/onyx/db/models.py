@@ -3275,6 +3275,15 @@ class ChatSession(Base):
         "UserProject", back_populates="chat_sessions", foreign_keys=[project_id]
     )
 
+    # Bookmark only: the session this chat was branched from. Never synced.
+    # SET NULL on delete so deleting the original never blocks and the branch
+    # keeps working.
+    forked_from_chat_session_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("chat_session.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # the latest "overrides" specified by the user. These take precedence over
     # the attached persona. However, overrides specified directly in the
     # `send-message` call will take precedence over these.

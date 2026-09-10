@@ -1,7 +1,8 @@
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import Row, delete, desc, func, nullsfirst, or_, select, update
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql.expression import ColumnElement
 
 from onyx.configs.chat_configs import HARD_DELETE_CHATS
-from onyx.configs.constants import MessageType
+from onyx.configs.constants import DEFAULT_PERSONA_ID, FileOrigin, MessageType
 from onyx.context.search.models import (
     InferenceSection,
     SavedSearchDoc,
@@ -29,8 +30,10 @@ from onyx.db.models import (
     UserFile,
 )
 from onyx.db.models import SearchDoc as DBSearchDoc
-from onyx.db.persona import get_best_persona_id_for_user
-from onyx.file_store.file_store import get_default_file_store
+from onyx.db.persona import get_best_persona_id_for_user, user_can_access_persona
+from onyx.error_handling.error_codes import OnyxErrorCode
+from onyx.error_handling.exceptions import OnyxError
+from onyx.file_store.file_store import FileStore, get_default_file_store
 from onyx.file_store.models import FileDescriptor
 from onyx.file_store.utils import plaintext_file_name_for_id
 from onyx.llm.override_models import LLMOverride, PromptOverride
@@ -1226,3 +1229,472 @@ def update_db_session_with_messages(
         db_session.flush()
 
     return chat_message
+
+
+# --- Chat forking ("Branch from here") ---
+
+_FORK_TITLE_MAX_LEN = 200
+_FORK_UNTITLED_LABEL = "New Chat"
+
+
+@dataclass(frozen=True)
+class ForkResult:
+    chat_session: ChatSession
+    # Set only when the fork point was a USER message: the branch stops at its
+    # parent and the client prefills the input bar with these. Only UserFile-
+    # backed attachments are returned; raw uploads are counted as skipped.
+    prefill_message: str | None = None
+    prefill_files: list[FileDescriptor] = field(default_factory=list)
+    prefill_skipped_file_count: int = 0
+
+
+def _fork_title(description: str | None) -> str:
+    return f"Branch of {description or _FORK_UNTITLED_LABEL}"[:_FORK_TITLE_MAX_LEN]
+
+
+def _remap_file_ids(text: str | None, file_map: dict[str, str]) -> str | None:
+    """Point embedded file links (code-interpreter outputs) at the fork's copies.
+    Ids are UUIDs, so a plain substring replace is exact."""
+    if not text:
+        return text
+    for old_id, new_id in file_map.items():
+        text = text.replace(old_id, new_id)
+    return text
+
+
+def _copy_raw_file(file_store: FileStore, old_id: str, new_id: str) -> None:
+    """Copy a blob (and its plaintext companion, if any) to `new_id`. The caller
+    registers `new_id` first so a partial copy is still cleaned up on failure."""
+    record = file_store.read_file_record(old_id)
+    file_metadata = (
+        dict(record.file_metadata) if isinstance(record.file_metadata, dict) else None
+    )
+    with file_store.read_file(old_id, mode="b", use_tempfile=True) as content:
+        file_store.save_file(
+            content=content,
+            display_name=record.display_name,
+            file_origin=record.file_origin,
+            file_type=record.file_type,
+            file_metadata=file_metadata,
+            file_id=new_id,
+        )
+
+    old_plaintext_id = plaintext_file_name_for_id(old_id)
+    if file_store.has_file(old_plaintext_id, FileOrigin.PLAINTEXT_CACHE, "text/plain"):
+        with file_store.read_file(
+            old_plaintext_id, mode="b", use_tempfile=True
+        ) as plaintext:
+            file_store.save_file(
+                content=plaintext,
+                display_name=f"Plaintext for {new_id}",
+                file_origin=FileOrigin.PLAINTEXT_CACHE,
+                file_type="text/plain",
+                file_id=plaintext_file_name_for_id(new_id),
+            )
+
+
+def _delete_copied_files(file_store: FileStore, file_map: dict[str, str]) -> None:
+    """Best-effort removal of blob copies after a failed fork. Entries may be
+    partial (raw saved, companion not) or not yet written at all."""
+    for new_id in file_map.values():
+        for file_id in (new_id, plaintext_file_name_for_id(new_id)):
+            try:
+                file_store.delete_file(file_id, error_on_missing=False)
+            except Exception:
+                logger.warning("Could not delete fork file copy %s", file_id)
+
+
+def _copied_descriptors(
+    files: list[FileDescriptor] | None,
+    file_map: dict[str, str],
+    file_store: FileStore,
+) -> list[FileDescriptor] | None:
+    """Descriptors for the fork. UserFile-backed files stay shared; raw blobs
+    are copied once per fork and re-pointed at the copy."""
+    out: list[FileDescriptor] = []
+    for descriptor in files or []:
+        if descriptor.get("user_file_id"):
+            out.append(descriptor)
+            continue
+        old_id = descriptor["id"]
+        if old_id not in file_map:
+            # Register before writing so a failed copy is still cleaned up.
+            file_map[old_id] = str(uuid4())
+            _copy_raw_file(file_store, old_id, file_map[old_id])
+        out.append({**descriptor, "id": file_map[old_id]})
+    return out or None
+
+
+def _clone_search_doc(
+    db_session: Session, doc: DBSearchDoc, doc_map: dict[int, int]
+) -> int:
+    if doc.id in doc_map:
+        return doc_map[doc.id]
+    new_doc = create_search_doc_from_saved_search_doc(
+        translate_db_search_doc_to_saved_search_doc(doc)
+    )
+    db_session.add(new_doc)
+    db_session.flush()
+    doc_map[doc.id] = new_doc.id
+    return new_doc.id
+
+
+def _clone_tool_call(
+    db_session: Session,
+    tool_call: ToolCall,
+    new_session_id: UUID,
+    new_message_id: int | None,
+    new_parent_tool_call_id: int | None,
+    children_by_parent: dict[int, list[ToolCall]],
+    doc_map: dict[int, int],
+    file_map: dict[str, str],
+) -> list[int]:
+    """Clone one tool call and its descendants. Returns every cloned search doc
+    id linked under it so the caller can also link them to the message."""
+    new_tool_call = ToolCall(
+        chat_session_id=new_session_id,
+        parent_chat_message_id=new_message_id,
+        parent_tool_call_id=new_parent_tool_call_id,
+        turn_number=tool_call.turn_number,
+        tab_index=tool_call.tab_index,
+        tool_id=tool_call.tool_id,
+        tool_call_id=tool_call.tool_call_id,
+        reasoning_tokens=tool_call.reasoning_tokens,
+        tool_call_arguments=tool_call.tool_call_arguments,
+        # Replay reads generated-file ids out of the response text.
+        tool_call_response=_remap_file_ids(tool_call.tool_call_response, file_map),
+        tool_call_tokens=tool_call.tool_call_tokens,
+        # Generated image blobs are shared by reference.
+        generated_images=tool_call.generated_images,
+    )
+    db_session.add(new_tool_call)
+    db_session.flush()
+
+    doc_ids = [
+        _clone_search_doc(db_session, doc, doc_map) for doc in tool_call.search_docs
+    ]
+    add_search_docs_to_tool_call(
+        tool_call_id=new_tool_call.id, search_doc_ids=doc_ids, db_session=db_session
+    )
+
+    for child in sorted(
+        children_by_parent.get(tool_call.id, []),
+        key=lambda tc: (tc.turn_number, tc.tab_index),
+    ):
+        doc_ids.extend(
+            _clone_tool_call(
+                db_session=db_session,
+                tool_call=child,
+                new_session_id=new_session_id,
+                new_message_id=None,
+                new_parent_tool_call_id=new_tool_call.id,
+                children_by_parent=children_by_parent,
+                doc_map=doc_map,
+                file_map=file_map,
+            )
+        )
+    return doc_ids
+
+
+def _fork_path(
+    messages_by_id: dict[int, ChatMessage], fork_point: ChatMessage
+) -> list[ChatMessage]:
+    """Walk parent pointers from the fork point to the root. Returns the path
+    in chronological order without the root SYSTEM row."""
+    path: list[ChatMessage] = []
+    seen: set[int] = set()
+    current = fork_point
+    while current.parent_message_id is not None:
+        seen.add(current.id)
+        path.append(current)
+        parent = messages_by_id.get(current.parent_message_id)
+        if parent is None or parent.id in seen:
+            raise OnyxError(
+                OnyxErrorCode.INTERNAL_ERROR,
+                f"Broken message chain above message {current.id}",
+            )
+        current = parent
+    if current.message_type != MessageType.SYSTEM:
+        raise OnyxError(
+            OnyxErrorCode.INTERNAL_ERROR,
+            f"Message chain does not end at a system root ({current.id})",
+        )
+    path.reverse()
+    for previous, message in zip(path, path[1:], strict=False):
+        if (
+            previous.message_type == MessageType.ASSISTANT
+            and message.message_type == MessageType.ASSISTANT
+        ):
+            raise OnyxError(
+                OnyxErrorCode.BAD_REQUEST,
+                "Invalid message chain, cannot have two assistant messages in a row",
+            )
+    return path
+
+
+def get_owned_chat_session_for_fork(
+    db_session: Session, user: User, chat_session_id: UUID
+) -> ChatSession:
+    """The source of a fork: must exist, be live, and belong to `user`.
+    Non-owners get the same 404 as a missing session."""
+    source = db_session.get(ChatSession, chat_session_id)
+    if source is None or source.deleted or source.user_id != user.id:
+        raise OnyxError(OnyxErrorCode.NOT_FOUND, "Chat session not found")
+    if source.incognito_record_mode is not None:
+        raise OnyxError(OnyxErrorCode.BAD_REQUEST, "Incognito chats cannot be branched")
+    return source
+
+
+def fork_chat_session(
+    db_session: Session,
+    user: User,
+    source: ChatSession,
+    fork_at_message_id: int,
+) -> ForkResult:
+    """Copy the active path up to `fork_at_message_id` into a new session.
+
+    `source` comes from `get_owned_chat_session_for_fork`. Branching at a USER
+    message copies the history before it and returns the message for the
+    client to prefill. All session rows are one transaction. Blob copies (and
+    their file records) are written by the file store as they go and are
+    deleted best-effort if the fork fails.
+    """
+    messages_by_id = {
+        message.id: message
+        for message in db_session.scalars(
+            select(ChatMessage).where(ChatMessage.chat_session_id == source.id)
+        ).all()
+    }
+    fork_point = messages_by_id.get(fork_at_message_id)
+    if (
+        fork_point is None
+        or fork_point.message_type not in (MessageType.USER, MessageType.ASSISTANT)
+        or fork_point.last_summarized_message_id is not None
+    ):
+        raise OnyxError(
+            OnyxErrorCode.BAD_REQUEST, "Message cannot be used as a branch point"
+        )
+
+    path = _fork_path(messages_by_id, fork_point)
+    prefill_source: ChatMessage | None = None
+    if fork_point.message_type == MessageType.USER:
+        prefill_source = path.pop()
+    path_ids = {message.id for message in path}
+
+    if path_ids:
+        # Populates the relationships on the already-loaded instances.
+        db_session.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.id.in_(path_ids))
+            .options(
+                selectinload(ChatMessage.search_docs),
+                selectinload(ChatMessage.tool_calls).selectinload(ToolCall.search_docs),
+            )
+        ).unique().all()
+    children_by_parent: dict[int, list[ToolCall]] = {}
+    for nested in db_session.scalars(
+        select(ToolCall)
+        .where(
+            ToolCall.chat_session_id == source.id,
+            ToolCall.parent_tool_call_id.isnot(None),
+        )
+        .options(selectinload(ToolCall.search_docs))
+    ).all():
+        if nested.parent_tool_call_id is not None:
+            children_by_parent.setdefault(nested.parent_tool_call_id, []).append(nested)
+
+    # Local import: compression pulls in the LLM stack.
+    from onyx.chat.compression import find_summary_for_branch
+
+    summary = find_summary_for_branch(db_session, path) if path else None
+    if summary is not None and (
+        summary.parent_message_id not in path_ids
+        or summary.last_summarized_message_id not in path_ids
+    ):
+        summary = None
+
+    persona_id = DEFAULT_PERSONA_ID
+    if source.persona_id is not None and user_can_access_persona(
+        db_session, source.persona_id, user, get_editable=False
+    ):
+        persona_id = source.persona_id
+
+    new_session = ChatSession(
+        user_id=user.id,
+        persona_id=persona_id,
+        description=_fork_title(source.description),
+        llm_override=source.llm_override,
+        prompt_override=source.prompt_override,
+        project_id=source.project_id,
+        temperature_override=source.temperature_override,
+        reasoning_effort_override=source.reasoning_effort_override,
+        current_alternate_model=source.current_alternate_model,
+        onyxbot_flow=False,
+        slack_thread_id=None,
+        incognito_record_mode=None,
+        forked_from_chat_session_id=source.id,
+    )
+    db_session.add(new_session)
+    db_session.flush()
+
+    root = ChatMessage(
+        chat_session_id=new_session.id,
+        parent_message_id=None,
+        latest_child_message_id=None,
+        message="",
+        token_count=0,
+        message_type=MessageType.SYSTEM,
+    )
+    db_session.add(root)
+    db_session.flush()
+
+    file_store = get_default_file_store()
+    file_map: dict[str, str] = {}
+    try:
+        _copy_fork_path(
+            db_session=db_session,
+            file_store=file_store,
+            file_map=file_map,
+            path=path,
+            summary=summary,
+            new_session_id=new_session.id,
+            root=root,
+            children_by_parent=children_by_parent,
+        )
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        _delete_copied_files(file_store, file_map)
+        raise
+
+    prefill_message: str | None = None
+    prefill_files: list[FileDescriptor] = []
+    prefill_skipped_file_count = 0
+    if prefill_source is not None:
+        prefill_message = prefill_source.message
+        # Only UserFile-backed attachments can be re-attached by the client.
+        # A raw copy would have no message to hang its access check on.
+        source_files = prefill_source.files or []
+        prefill_files = [fd for fd in source_files if fd.get("user_file_id")]
+        prefill_skipped_file_count = len(source_files) - len(prefill_files)
+
+    return ForkResult(
+        chat_session=new_session,
+        prefill_message=prefill_message,
+        prefill_files=prefill_files,
+        prefill_skipped_file_count=prefill_skipped_file_count,
+    )
+
+
+def _copy_fork_path(
+    db_session: Session,
+    file_store: FileStore,
+    file_map: dict[str, str],
+    path: list[ChatMessage],
+    summary: ChatMessage | None,
+    new_session_id: UUID,
+    root: ChatMessage,
+    children_by_parent: dict[int, list[ToolCall]],
+) -> None:
+    """Copy the path messages (docs, tool calls, files) and the summary into
+    the new session. Flushes only; the caller commits."""
+    doc_map: dict[int, int] = {}
+    msg_map: dict[int, ChatMessage] = {}
+    previous_new = root
+    for src in path:
+        # Copy files first: the message text may link to them by id.
+        copied_files = _copied_descriptors(src.files, file_map, file_store)
+        new_msg = create_new_chat_message(
+            chat_session_id=new_session_id,
+            parent_message=previous_new,
+            message=_remap_file_ids(src.message, file_map) or "",
+            token_count=src.token_count,
+            message_type=src.message_type,
+            files=copied_files,
+            error=src.error,
+            reasoning_tokens=src.reasoning_tokens,
+            db_session=db_session,
+            commit=False,
+        )
+        new_msg.time_sent = src.time_sent
+        new_msg.is_clarification = src.is_clarification
+        new_msg.processing_duration_seconds = src.processing_duration_seconds
+        new_msg.model_display_name = src.model_display_name
+        new_msg.request_params = src.request_params
+
+        message_doc_ids = [
+            _clone_search_doc(db_session, doc, doc_map) for doc in src.search_docs
+        ]
+        if src.citations:
+            new_msg.citations = {
+                num: doc_map[old_id]
+                for num, old_id in src.citations.items()
+                if old_id in doc_map
+            }
+        for tool_call in sorted(
+            src.tool_calls or [], key=lambda tc: (tc.turn_number, tc.tab_index)
+        ):
+            message_doc_ids.extend(
+                _clone_tool_call(
+                    db_session=db_session,
+                    tool_call=tool_call,
+                    new_session_id=new_session_id,
+                    new_message_id=new_msg.id,
+                    new_parent_tool_call_id=None,
+                    children_by_parent=children_by_parent,
+                    doc_map=doc_map,
+                    file_map=file_map,
+                )
+            )
+        # Tool-call docs are also linked to the message: orphan cleanup only
+        # looks at chat_message__search_doc.
+        add_search_docs_to_chat_message(
+            chat_message_id=new_msg.id,
+            search_doc_ids=list(dict.fromkeys(message_doc_ids)),
+            db_session=db_session,
+        )
+
+        if (
+            previous_new.message_type == MessageType.USER
+            and new_msg.message_type == MessageType.ASSISTANT
+        ):
+            # Exactly one child survives the fork, so it is the preferred one.
+            previous_new.preferred_response_id = new_msg.id
+
+        msg_map[src.id] = new_msg
+        previous_new = new_msg
+
+    if (
+        summary is not None
+        and summary.parent_message_id is not None
+        and summary.last_summarized_message_id is not None
+    ):
+        # Summaries live off the latest_child chain by design.
+        db_session.add(
+            ChatMessage(
+                chat_session_id=new_session_id,
+                parent_message_id=msg_map[summary.parent_message_id].id,
+                last_summarized_message_id=msg_map[
+                    summary.last_summarized_message_id
+                ].id,
+                message_type=MessageType.ASSISTANT,
+                message=summary.message,
+                token_count=summary.token_count,
+                time_sent=summary.time_sent,
+            )
+        )
+    db_session.flush()
+
+
+def get_fork_origin_for_owner(
+    db_session: Session, chat_session: ChatSession, user_id: UUID | None
+) -> tuple[UUID, str | None] | None:
+    """Origin (id, title) of a branch, only for its owner and only while the
+    origin still exists. Hidden from non-owners viewing a shared branch."""
+    origin_id = chat_session.forked_from_chat_session_id
+    if origin_id is None or user_id is None or chat_session.user_id != user_id:
+        return None
+    origin = db_session.get(ChatSession, origin_id)
+    if origin is None or origin.deleted:
+        return None
+    return origin.id, origin.description

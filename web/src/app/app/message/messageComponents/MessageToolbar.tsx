@@ -21,9 +21,14 @@ import MessageSwitcher from "@/app/app/message/MessageSwitcher";
 import { useIncognitoOptional } from "@/providers/IncognitoProvider";
 import SourceTag from "@/refresh-components/buttons/source-tag/SourceTag";
 import { citationsToSourceInfoArray } from "@/refresh-components/buttons/source-tag/sourceTagUtils";
-import { CopyButton, OpenButton, SelectButton } from "@opal/components";
+import { Button, CopyButton, OpenButton, SelectButton } from "@opal/components";
 import ModelSelector from "@/sections/model-selector/ModelSelector";
-import { SvgRefreshCw, SvgThumbsDown, SvgThumbsUp } from "@opal/icons";
+import {
+  SvgBranch,
+  SvgRefreshCw,
+  SvgThumbsDown,
+  SvgThumbsUp,
+} from "@opal/icons";
 import { LlmManager } from "@/lib/hooks";
 import { RegenerationFactory } from "@/app/app/message/messageComponents/AgentMessage";
 import useFeedbackController from "@/hooks/useFeedbackController";
@@ -118,6 +123,9 @@ export interface MessageToolbarProps {
   onRegenerate?: RegenerationFactory;
   parentMessage?: Message | null;
   llmManager: LlmManager | null;
+
+  // Opens a new chat branched from this message
+  onBranch?: (messageId: number) => void;
   currentModelName?: string;
   /** Provider slug for `currentModelName`, used to resolve the model icon in
    * the read-only footer chip shown when there's no `llmManager`. */
@@ -143,6 +151,7 @@ export default function MessageToolbar({
   onRegenerate,
   parentMessage,
   llmManager,
+  onBranch,
   currentModelName,
   currentModelProvider,
   citations,
@@ -320,6 +329,18 @@ export default function MessageToolbar({
                 />
               </>
             )}
+            {onBranch &&
+              messageId !== undefined &&
+              !incognitoEnabled &&
+              llmManager && (
+                <Button
+                  icon={SvgBranch}
+                  prominence="tertiary"
+                  tooltip={t("toolbar.branchButton.tooltip")}
+                  onClick={() => onBranch(messageId)}
+                  data-testid="AgentMessage/branch-button"
+                />
+              )}
             {ttsEnabled && (
               <TTSButton
                 text={

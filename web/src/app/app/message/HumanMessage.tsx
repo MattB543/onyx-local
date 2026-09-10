@@ -9,7 +9,7 @@ import { cn } from "@opal/utils";
 import useScreenSize from "@/hooks/useScreenSize";
 import { CopyButton } from "@opal/components";
 import { Button } from "@opal/components";
-import { SvgEdit } from "@opal/icons";
+import { SvgBranch, SvgEdit } from "@opal/icons";
 import { Hoverable } from "@opal/core";
 import FileDisplay from "./FileDisplay";
 import { useTranslations } from "next-intl";
@@ -102,6 +102,9 @@ interface HumanMessageProps {
   // Editing functionality - takes (editedContent, messageId) to allow stable callback reference
   onEdit?: (editedContent: string, messageId: number) => void;
 
+  // Opens a new chat branched from this message
+  onBranch?: (messageId: number) => void;
+
   // Streaming and generation
   stopGenerating?: () => void;
   disableSwitchingForStreaming?: boolean;
@@ -119,7 +122,8 @@ function arePropsEqual(
     prev.files === next.files &&
     prev.disableSwitchingForStreaming === next.disableSwitchingForStreaming &&
     prev.otherMessagesCanSwitchTo === next.otherMessagesCanSwitchTo &&
-    prev.onEdit === next.onEdit
+    prev.onEdit === next.onEdit &&
+    prev.onBranch === next.onBranch
     // Skip: stopGenerating, onMessageSelection (inline function props)
   );
 }
@@ -131,6 +135,7 @@ const HumanMessage = React.memo(function HumanMessage({
   messageId,
   otherMessagesCanSwitchTo,
   onEdit,
+  onBranch,
   onMessageSelection,
   stopGenerating = () => null,
   disableSwitchingForStreaming = false,
@@ -193,9 +198,18 @@ const HumanMessage = React.memo(function HumanMessage({
             data-testid="HumanMessage/edit-button"
           />
         )}
+        {onBranch && messageId != null && (
+          <Button
+            icon={SvgBranch}
+            prominence="tertiary"
+            tooltip={t("humanMessage.branchButton.tooltip")}
+            onClick={() => onBranch(messageId)}
+            data-testid="HumanMessage/branch-button"
+          />
+        )}
       </div>
     ),
-    [content, onEdit, t]
+    [content, onEdit, onBranch, messageId, t]
   );
 
   const copyEditButton = (

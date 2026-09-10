@@ -4,7 +4,13 @@ import { useCallback } from "react";
 import { Button } from "@opal/components";
 import { Text } from "@opal/components";
 import { ContentAction } from "@opal/layouts";
-import { SvgChevronLeft, SvgChevronRight, SvgEyeOff, SvgX } from "@opal/icons";
+import {
+  SvgBranch,
+  SvgChevronLeft,
+  SvgChevronRight,
+  SvgEyeOff,
+  SvgX,
+} from "@opal/icons";
 import { getModelIcon } from "@/lib/languageModels";
 import AgentMessage, {
   AgentMessageProps,
@@ -35,6 +41,13 @@ export interface MultiModelPanelProps {
   onDeselect?: () => void;
   /** Callback to hide/show this panel */
   onToggleVisibility: () => void;
+  /** Opens a new chat branched from this response. Lives in the header so a
+   * non-preferred card, whose footer is hidden, keeps it. */
+  onBranch?: () => void;
+  /** Which header edge holds the branch button. In selection mode the track
+   * clips a neighbour's outer edge, so a card right of the preferred one
+   * carries it at the start. */
+  branchPlacement?: "start" | "end";
   /** Props to pass through to AgentMessage */
   agentMessageProps: AgentMessageProps;
   /** Error message when this model failed */
@@ -86,6 +99,8 @@ export default function MultiModelPanel({
   onSelect,
   onDeselect,
   onToggleVisibility,
+  onBranch,
+  branchPlacement = "end",
   agentMessageProps,
   errorMessage,
   errorCode,
@@ -126,7 +141,22 @@ export default function MultiModelPanel({
     canSelect && "cursor-pointer hover:bg-background-tint-02"
   );
 
-  const headerContent = (
+  const branchButton =
+    onBranch && !isHidden ? (
+      <Button
+        prominence="tertiary"
+        icon={SvgBranch}
+        size="md"
+        onClick={(e) => {
+          e.stopPropagation();
+          onBranch();
+        }}
+        tooltip={t("toolbar.branchButton.tooltip")}
+        data-testid="MultiModelPanel/branch-button"
+      />
+    ) : null;
+
+  const contentAction = (
     <>
       <ContentAction
         sizePreset="main-ui"
@@ -138,7 +168,10 @@ export default function MultiModelPanel({
           readOnly ? (
             isPreferred ? (
               <div className="flex items-center px-2">
-                <span className="text-action-selection-05 shrink-0">
+                <span
+                  className="text-action-selection-05 shrink-0"
+                  data-testid="MultiModelPanel/preferred-label"
+                >
                   <Text
                     font="secondary-body"
                     color="inherit"
@@ -154,7 +187,10 @@ export default function MultiModelPanel({
             <div className="flex items-center gap-1 px-2">
               {isPreferred && (
                 <>
-                  <span className="text-action-selection-05 shrink-0">
+                  <span
+                    className="text-action-selection-05 shrink-0"
+                    data-testid="MultiModelPanel/preferred-label"
+                  >
                     <Text
                       font="secondary-body"
                       color="inherit"
@@ -167,6 +203,7 @@ export default function MultiModelPanel({
                     <Button
                       prominence="tertiary"
                       icon={SvgX}
+                      data-testid="MultiModelPanel/deselect-button"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -191,6 +228,7 @@ export default function MultiModelPanel({
                   </Button>
                 </span>
               )}
+              {branchPlacement === "end" && branchButton}
               {!isPreferred && (
                 <Button
                   prominence="tertiary"
@@ -213,6 +251,17 @@ export default function MultiModelPanel({
       />
     </>
   );
+
+  const headerContent =
+    branchPlacement === "start" && branchButton ? (
+      // raw-ok: ContentAction has only a trailing slot; this row seats the branch button on the leading edge
+      <div className="flex items-center gap-1 pl-1">
+        {branchButton}
+        <div className="flex-1 min-w-0">{contentAction}</div>
+      </div>
+    ) : (
+      contentAction
+    );
 
   // The header holds its own buttons, so a selectable header stays a div with
   // button semantics rather than a <button> wrapping a <button>.
@@ -280,6 +329,7 @@ export default function MultiModelPanel({
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- raw-ok: panel column with min-w-0 shrink semantics no Section preset provides, and the card click is a pointer-only convenience while the header carries the focusable role=button
     <div
+      data-testid="MultiModelPanel"
       className={cn(
         "group/mm-panel flex flex-col gap-3 min-w-0 rounded-16 transition-colors",
         canSelect && "cursor-pointer hover:bg-background-tint-01"

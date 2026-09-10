@@ -415,6 +415,7 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
   const {
     onSubmit,
     stopGenerating,
+    onBranchFromMessage,
     handleMessageSpecificFileUpload,
     availableContextTokens,
   } = useChatController({
@@ -446,6 +447,38 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
     refreshChatSessions,
     onSubmit,
   });
+
+  // A branch made at a user message hands that message and its resolved
+  // attachments to the new session's input bar. The entry is consumed once,
+  // on arrival, after the session switch above has cleared the bar. The
+  // applied text is kept per session: an effect replay finds no entry and
+  // must not clear it, and `key` bumps so the bar re-applies identical text
+  // for a second branch.
+  const takePendingPrefill = useChatSessionStore(
+    (state) => state.takePendingPrefill
+  );
+  const [appliedPrefill, setAppliedPrefill] = useState<{
+    sessionId: string;
+    message: string;
+    key: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!currentChatSessionId) return;
+    const prefill = takePendingPrefill(currentChatSessionId);
+    if (!prefill) return;
+    setAppliedPrefill((prev) => ({
+      sessionId: currentChatSessionId,
+      message: prefill.message,
+      key: (prev?.key ?? 0) + 1,
+    }));
+    if (prefill.files.length > 0) {
+      setCurrentMessageFiles(prefill.files);
+    }
+  }, [currentChatSessionId, takePendingPrefill, setCurrentMessageFiles]);
+  const branchPrefillMessage =
+    appliedPrefill && appliedPrefill.sessionId === currentChatSessionId
+      ? appliedPrefill.message
+      : "";
 
   // A link can arrive carrying both a prompt and a search scope. Declared here
   // because it submits, so it needs `onSubmit` above it.
@@ -822,6 +855,9 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         onMessageSelection={onMessageSelection}
                         stopGenerating={stopGenerating}
                         onResubmit={handleResubmitLastMessage}
+                        onBranch={
+                          incognitoEnabled ? undefined : onBranchFromMessage
+                        }
                         anchorNodeId={anchorNodeId}
                         selectedModels={multiModel.selectedModels}
                         fullWidthChat={fullWidthActive}
@@ -1005,9 +1041,11 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
                         isMultiModelActive={multiModel.isMultiModelActive}
                         llmManager={llmManager}
                         initialMessage={
+                          branchPrefillMessage ||
                           searchParams?.get(SEARCH_PARAM_NAMES.USER_PROMPT) ||
                           ""
                         }
+                        initialMessageKey={appliedPrefill?.key}
                         stopGenerating={stopGenerating}
                         onSubmit={handleAppInputBarSubmit}
                         chatState={currentChatState}

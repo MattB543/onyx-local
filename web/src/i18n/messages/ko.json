@@ -9474,6 +9474,16 @@
           "text": "사용자가 생성을 중지했습니다"
         }
       },
+      "branch": {
+        "error": "분기를 만들 수 없습니다. 다시 시도해 주세요.",
+        "origin": {
+          "label": "{title}에서 분기됨",
+          "link": "원본 보기",
+          "untitled": "이전 채팅"
+        },
+        "toast": "이 메시지에서 새 채팅을 만들었습니다.",
+        "toastFilesSkipped": "새 채팅을 만들었습니다. {count, plural, one {첨부 파일 #개} other {첨부 파일 #개}}를 다시 첨부할 수 없습니다."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "복사됨!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "여기서 분기"
+        },
         "editButton": {
           "tooltip": "편집"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "여기서 분기"
+        },
         "dislikeButton": {
           "removeTooltip": "싫어요 취소",
           "tooltip": "나쁜 응답"

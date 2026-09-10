@@ -2,6 +2,7 @@
 
 import {
   buildChatUrl,
+  forkChatSession,
   getAvailableContextTokens,
   nameChatSession,
   setPreferredResponse,
@@ -14,7 +15,10 @@ import {
   getMultiModelChildren,
   getUnresolvedMultiModelTurn,
 } from "@/app/app/message/multiModel";
-import { getMaxSelectedDocumentTokens } from "@/lib/projects/svc";
+import {
+  getMaxSelectedDocumentTokens,
+  getRecentFiles,
+} from "@/lib/projects/svc";
 import { DEFAULT_CONTEXT_TOKENS } from "@/lib/constants";
 import { StreamStopInfo } from "@/lib/search/interfaces";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -61,6 +65,7 @@ import {
 } from "@/app/app/services/currentMessageFIFO";
 import { buildFilters } from "@/lib/searchFilters/utils";
 import { toast } from "@opal/layouts";
+import { useTranslations } from "next-intl";
 import {
   ReadonlyURLSearchParams,
   usePathname,
@@ -81,6 +86,7 @@ import { Packet, MessageStart } from "@/app/app/services/streamingModels";
 import { SelectedModel } from "@/sections/model-selector/MultiModelSelector";
 import type { ToolConfigurationHandle } from "@/lib/tools/hooks";
 import { ProjectFile, useProjectsContext } from "@/lib/projects/providers";
+import { useActiveProject } from "@/lib/projects/hooks";
 import { useIncognito } from "@/providers/IncognitoProvider";
 import { projectFilesToFileDescriptors } from "@/lib/projects/utils";
 import { useSharedSearchFilters } from "@/lib/searchFilters/providers";
@@ -139,6 +145,32 @@ async function stopChatSession(chatSessionId: string): Promise<void> {
   }
 }
 
+// Maps a branch's prefill attachments to the ProjectFile rows the input bar
+// shows. Anything without a match, or the whole list on a fetch error, counts
+// as unresolved so the toast can say so.
+async function resolvePrefillFiles(
+  descriptors: FileDescriptor[]
+): Promise<{ files: ProjectFile[]; unresolvedCount: number }> {
+  const userFileIds = descriptors
+    .map((f) => f.user_file_id)
+    .filter((id): id is string => !!id);
+  if (userFileIds.length === 0) {
+    return { files: [], unresolvedCount: descriptors.length };
+  }
+  let recentFiles: ProjectFile[];
+  try {
+    recentFiles = await getRecentFiles();
+  } catch (error) {
+    console.error("Failed to resolve branch attachments:", error);
+    return { files: [], unresolvedCount: descriptors.length };
+  }
+  const byId = new Map(recentFiles.map((f) => [f.id, f]));
+  const files = userFileIds
+    .map((id) => byId.get(id))
+    .filter((f): f is ProjectFile => f !== undefined);
+  return { files, unresolvedCount: descriptors.length - files.length };
+}
+
 export default function useChatController({
   llmManager,
   toolConfiguration,
@@ -148,6 +180,7 @@ export default function useChatController({
   selectedDocuments,
   resetInputBar,
 }: UseChatControllerProps) {
+  const t = useTranslations("chat.messages");
   const searchFilters = useSharedSearchFilters();
   const pathname = usePathname();
   const router = useRouter();
@@ -204,6 +237,9 @@ export default function useChatController({
   const setIsReady = useChatSessionStore((state) => state.setIsReady);
   const setStreamingStartTime = useChatSessionStore(
     (state) => state.setStreamingStartTime
+  );
+  const setPendingPrefill = useChatSessionStore(
+    (state) => state.setPendingPrefill
   );
 
   // Use custom hooks for accessing store data
@@ -1711,10 +1747,100 @@ export default function useChatController({
     }
   }, []);
 
+  // A click can land twice before the request returns; one fork per click.
+  const branchInFlight = useRef(false);
+
+  // A chat URL drops `projectId` once the chat opens, so the owning project
+  // comes from the project list. Read through a ref at click time so the
+  // branch callback's identity does not track it.
+  const activeProject = useActiveProject();
+  const activeProjectIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    activeProjectIdRef.current = activeProject?.id ?? null;
+  }, [activeProject]);
+
+  // Creates an independent chat from the history up to `messageId` and opens
+  // it. A user-message fork stops at its parent and prefills the input bar.
+  const onBranchFromMessage = useCallback(
+    async (messageId: number) => {
+      const sourceSessionId = getCurrentSessionId();
+      if (!sourceSessionId || branchInFlight.current) return;
+      // Read at click time so the callback identity does not track the store;
+      // a new identity would re-render every memoized message.
+      const session = useChatSessionStore
+        .getState()
+        .sessions.get(sourceSessionId);
+      if (session && session.chatState !== "input") return;
+      if (incognitoEnabledRef.current || session?.incognito) return;
+
+      branchInFlight.current = true;
+      try {
+        const {
+          chat_session_id: newSessionId,
+          prefill_message: prefillMessage,
+          prefill_files: prefillFiles,
+          prefill_skipped_file_count: skippedFileCount,
+        } = await forkChatSession(sourceSessionId, messageId);
+
+        // Resolve attachments before navigating so the input bar receives the
+        // text and files together, once, when the new session mounts.
+        let unresolvedFileCount = skippedFileCount;
+        if (prefillMessage !== null) {
+          const resolved = await resolvePrefillFiles(prefillFiles);
+          unresolvedFileCount += resolved.unresolvedCount;
+          setPendingPrefill(newSessionId, {
+            message: prefillMessage,
+            files: resolved.files,
+          });
+        }
+
+        addPendingChatSession({
+          chatSessionId: newSessionId,
+          personaId: activeAgent?.id || 0,
+          projectId: activeProjectIdRef.current,
+        });
+
+        const newUrl = buildChatUrl(searchParams, newSessionId, null);
+        // SAFETY: buildChatUrl only ever produces "/app?..." which is a
+        // registered route; the query string is not part of the Route type.
+        router.push(newUrl as Route, { scroll: false });
+        refreshChatSessions();
+        fetchProjects();
+
+        if (unresolvedFileCount > 0) {
+          toast.success(
+            t("branch.toastFilesSkipped", { count: unresolvedFileCount })
+          );
+        } else {
+          toast.success(t("branch.toast"));
+        }
+      } catch (error) {
+        console.error("Failed to branch chat:", error);
+        toast.error(t("branch.error"));
+      } finally {
+        branchInFlight.current = false;
+      }
+    },
+    [
+      currentSessionId,
+      existingChatSessionId,
+      incognitoEnabledRef,
+      searchParams,
+      activeAgent,
+      addPendingChatSession,
+      setPendingPrefill,
+      router,
+      refreshChatSessions,
+      fetchProjects,
+      t,
+    ]
+  );
+
   return {
     // actions
     onSubmit,
     stopGenerating,
+    onBranchFromMessage,
     handleMessageSpecificFileUpload,
     // data
     availableContextTokens,

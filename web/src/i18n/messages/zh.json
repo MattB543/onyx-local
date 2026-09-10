@@ -9474,6 +9474,16 @@
           "text": "用户已停止生成"
         }
       },
+      "branch": {
+        "error": "无法创建分支。请重试。",
+        "origin": {
+          "label": "分支自 {title}",
+          "link": "查看原聊天",
+          "untitled": "较早的聊天"
+        },
+        "toast": "已根据此消息创建新聊天。",
+        "toastFilesSkipped": "已创建新聊天。{count, plural, one {# 个附件} other {# 个附件}}无法重新附加。"
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "已复制！",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "从此处分支"
+        },
         "editButton": {
           "tooltip": "编辑"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "从此处分支"
+        },
         "dislikeButton": {
           "removeTooltip": "取消踩",
           "tooltip": "回复不佳"

@@ -9474,6 +9474,16 @@
           "text": "Der Benutzer hat die Generierung gestoppt"
         }
       },
+      "branch": {
+        "error": "Zweig konnte nicht erstellt werden. Bitte versuche es erneut.",
+        "origin": {
+          "label": "Verzweigt von {title}",
+          "link": "Original anzeigen",
+          "untitled": "einem früheren Chat"
+        },
+        "toast": "Neuer Chat aus dieser Nachricht erstellt.",
+        "toastFilesSkipped": "Neuer Chat erstellt. {count, plural, one {# Anhang konnte} other {# Anhänge konnten}} nicht erneut angehängt werden."
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "Kopiert!",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "Ab hier verzweigen"
+        },
         "editButton": {
           "tooltip": "Bearbeiten"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "Ab hier verzweigen"
+        },
         "dislikeButton": {
           "removeTooltip": "Gefällt mir nicht entfernen",
           "tooltip": "Schlechte Antwort"

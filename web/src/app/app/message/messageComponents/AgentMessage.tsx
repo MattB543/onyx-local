@@ -49,6 +49,8 @@ export interface AgentMessageProps {
   onRegenerate?: RegenerationFactory;
   // Parent message needed to construct regeneration request
   parentMessage?: Message | null;
+  // Opens a new chat branched from this message
+  onBranch?: (messageId: number) => void;
   // Duration in seconds for processing this message (agent messages only)
   processingDurationSeconds?: number;
   /** Hide the feedback/toolbar footer (used in multi-model non-preferred panels) */
@@ -81,6 +83,7 @@ function arePropsEqual(
     prev.chatState.researchType === next.chatState.researchType &&
     prev.otherMessagesCanSwitchTo === next.otherMessagesCanSwitchTo &&
     prev.onRegenerate === next.onRegenerate &&
+    prev.onBranch === next.onBranch &&
     prev.parentMessage?.messageId === next.parentMessage?.messageId &&
     prev.llmManager?.isLoadingProviders ===
       next.llmManager?.isLoadingProviders &&
@@ -104,6 +107,7 @@ const AgentMessage = React.memo(function AgentMessage({
   onMessageSelection,
   onRegenerate,
   parentMessage,
+  onBranch,
   processingDurationSeconds,
   hideFooter,
   disableTTS,
@@ -379,6 +383,7 @@ const AgentMessage = React.memo(function AgentMessage({
           onRegenerate={onRegenerate}
           parentMessage={parentMessage}
           llmManager={llmManager}
+          onBranch={onBranch}
           currentModelName={chatState.overriddenModel}
           currentModelProvider={chatState.overriddenModelProvider}
           citations={citations}

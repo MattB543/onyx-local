@@ -9474,6 +9474,16 @@
           "text": "ユーザーが生成を停止しました"
         }
       },
+      "branch": {
+        "error": "分岐を作成できませんでした。もう一度お試しください。",
+        "origin": {
+          "label": "{title} から分岐",
+          "link": "元のチャットを表示",
+          "untitled": "以前のチャット"
+        },
+        "toast": "このメッセージから新しいチャットを作成しました。",
+        "toastFilesSkipped": "新しいチャットを作成しました。{count, plural, one {# 件の添付ファイル} other {# 件の添付ファイル}}を再添付できませんでした。"
+      },
       "codeBlock": {
         "copyButton": {
           "copiedLabel": "コピーしました！",
@@ -9596,6 +9606,9 @@
         }
       },
       "humanMessage": {
+        "branchButton": {
+          "tooltip": "ここから分岐"
+        },
         "editButton": {
           "tooltip": "編集"
         }
@@ -9935,6 +9948,9 @@
         }
       },
       "toolbar": {
+        "branchButton": {
+          "tooltip": "ここから分岐"
+        },
         "dislikeButton": {
           "removeTooltip": "低評価を取り消す",
           "tooltip": "良くない応答"

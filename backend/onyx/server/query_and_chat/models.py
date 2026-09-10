@@ -289,6 +289,24 @@ class ChatSessionDetailResponse(BaseModel):
     # True for sessions pinned to an incognito record mode, so a reload can
     # restore the incognito UI state.
     incognito: bool = False
+    # Set for the owner of a branch while the original session still exists.
+    forked_from_chat_session_id: UUID | None = None
+    forked_from_description: str | None = None
+
+
+class ForkChatSessionRequest(BaseModel):
+    chat_session_id: UUID
+    message_id: int
+
+
+class ForkChatSessionResponse(BaseModel):
+    chat_session_id: UUID
+    # Set when the fork point was a user message: the branch stops at its
+    # parent and the client prefills the input bar with these. Only UserFile-
+    # backed attachments are returned; the rest are counted as skipped.
+    prefill_message: str | None = None
+    prefill_files: list[FileDescriptor] = []
+    prefill_skipped_file_count: int = 0
 
 
 class AdminSearchRequest(BaseModel):

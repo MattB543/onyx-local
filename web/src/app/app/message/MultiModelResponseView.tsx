@@ -29,6 +29,8 @@ export interface MultiModelResponseViewProps {
   llmManager: LlmManager | null;
   onRegenerate?: RegenerationFactory;
   parentMessage?: Message | null;
+  /** Opens a new chat branched from one model's response. */
+  onBranch?: (messageId: number) => void;
   otherMessagesCanSwitchTo?: number[];
   onMessageSelection?: (nodeId: number) => void;
   /** Called whenever the set of hidden panel indices changes */
@@ -86,6 +88,7 @@ export default function MultiModelResponseView({
   llmManager,
   onRegenerate,
   parentMessage,
+  onBranch,
   otherMessagesCanSwitchTo,
   onMessageSelection,
   onHiddenPanelsChange,
@@ -573,38 +576,43 @@ export default function MultiModelResponseView({
 
   // Build panel props — isHidden reflects actual hidden state
   const buildPanelProps = useCallback(
-    (response: MultiModelResponse, isNonPreferred: boolean) => ({
-      provider: response.provider,
-      modelName: response.modelName,
-      displayName: response.displayName,
-      isPreferred: preferredIndex === response.modelIndex,
-      isHidden: hiddenPanels.has(response.modelIndex),
-      isNonPreferredInSelection: isNonPreferred,
-      readOnly,
-      onSelect: () => handleSelectPreferred(response.modelIndex),
-      onDeselect: handleDeselectPreferred,
-      onToggleVisibility: () => toggleVisibility(response.modelIndex),
-      agentMessageProps: {
-        rawPackets: response.packets,
-        packetCount: response.packetCount,
-        chatState,
-        nodeId: response.nodeId,
-        messageId: response.messageId,
-        currentFeedback: response.currentFeedback,
-        llmManager,
-        otherMessagesCanSwitchTo,
-        onMessageSelection,
-        onRegenerate,
-        parentMessage,
-      },
-      errorMessage: response.errorMessage,
-      errorCode: response.errorCode,
-      isRetryable: response.isRetryable,
-      errorStackTrace: response.errorStackTrace,
-      errorDetails: response.errorDetails,
-      isGenerating,
-      selectionDisabled,
-    }),
+    (response: MultiModelResponse, isNonPreferred: boolean) => {
+      const messageId = response.messageId;
+      return {
+        provider: response.provider,
+        modelName: response.modelName,
+        displayName: response.displayName,
+        isPreferred: preferredIndex === response.modelIndex,
+        isHidden: hiddenPanels.has(response.modelIndex),
+        isNonPreferredInSelection: isNonPreferred,
+        readOnly,
+        onSelect: () => handleSelectPreferred(response.modelIndex),
+        onDeselect: handleDeselectPreferred,
+        onToggleVisibility: () => toggleVisibility(response.modelIndex),
+        agentMessageProps: {
+          rawPackets: response.packets,
+          packetCount: response.packetCount,
+          chatState,
+          nodeId: response.nodeId,
+          messageId: response.messageId,
+          currentFeedback: response.currentFeedback,
+          llmManager,
+          otherMessagesCanSwitchTo,
+          onMessageSelection,
+          onRegenerate,
+          parentMessage,
+        },
+        onBranch:
+          onBranch && messageId != null ? () => onBranch(messageId) : undefined,
+        errorMessage: response.errorMessage,
+        errorCode: response.errorCode,
+        isRetryable: response.isRetryable,
+        errorStackTrace: response.errorStackTrace,
+        errorDetails: response.errorDetails,
+        isGenerating,
+        selectionDisabled,
+      };
+    },
     [
       preferredIndex,
       hiddenPanels,
@@ -619,6 +627,7 @@ export default function MultiModelResponseView({
       onMessageSelection,
       onRegenerate,
       parentMessage,
+      onBranch,
       isGenerating,
     ]
   );
@@ -744,7 +753,12 @@ export default function MultiModelResponseView({
                   style={{ width: `${finalW}px` }}
                   className={cn(isNonPref && "opacity-50")}
                 >
-                  <MultiModelPanel {...buildPanelProps(r, isNonPref)} />
+                  <MultiModelPanel
+                    {...buildPanelProps(r, isNonPref)}
+                    branchPlacement={
+                      isNonPref && i > preferredIdx ? "start" : "end"
+                    }
+                  />
                 </div>
               </div>
             );
