@@ -809,6 +809,9 @@ export default function AppPage({ firstMessage }: ChatPageProps) {
             handleMessageSpecificFileUpload(acceptedFiles)
           }
           noClick
+          // The chat input handles Ctrl/Cmd+V itself; react-dropzone >= 20
+          // also listens for paste on the root, which double-uploaded files.
+          noPaste
         >
           {({ getRootProps }) => (
             <div
