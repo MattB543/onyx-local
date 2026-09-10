@@ -1,4 +1,6 @@
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import litellm
@@ -21,8 +23,39 @@ def configure_litellm_settings() -> None:
     remove_litellm_native_log_handlers()
 
 
+@contextmanager
+def _skip_ollama_runtime_model_lookup() -> Iterator[None]:
+    """Make LiteLLM's Ollama model-info lookup fail fast while registering models.
+
+    Since litellm 1.89+, ``register_model`` calls ``get_model_info`` for every key,
+    and for ``ollama``/``ollama_chat`` that performs a live ``POST /api/show`` against
+    OLLAMA_API_BASE (default localhost:11434). With no Ollama server, each of the
+    ~76 entries below waits on a refused/unreachable connect (multi-second on
+    Windows), stalling the first chat request for minutes. ``register_model``
+    already treats a lookup failure as "no built-in info", so raising immediately
+    yields the same registration result without the network round trips.
+    """
+    from litellm.llms.ollama.common_utils import OllamaModelInfo
+
+    original = OllamaModelInfo.get_model_info
+
+    def _raise(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("Ollama runtime model lookup skipped during registration")
+
+    OllamaModelInfo.get_model_info = _raise  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        OllamaModelInfo.get_model_info = original  # type: ignore[method-assign]
+
+
 # TODO: We might not need to register ollama_chat in addition to ollama but let's just do it for good measure for now.
 def register_ollama_models() -> None:
+    with _skip_ollama_runtime_model_lookup():
+        _register_ollama_models()
+
+
+def _register_ollama_models() -> None:
     litellm.register_model(
         model_cost={
             # GPT-OSS models
