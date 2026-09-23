@@ -5683,6 +5683,7 @@ class CrmOrganization(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5744,6 +5745,7 @@ class CrmContact(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5831,6 +5833,7 @@ class CrmInteraction(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5862,9 +5865,10 @@ class CrmInteractionAttendee(Base):
         ForeignKey("crm_interaction.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # CASCADE, not SET NULL: a NULL user_id would violate the one-target CHECK.
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("user.id", ondelete="SET NULL"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=True,
     )
     contact_id: Mapped[UUID | None] = mapped_column(
@@ -5899,6 +5903,12 @@ class CrmInteractionAttendee(Base):
             "interaction_id",
             "contact_id",
             unique=True,
+            postgresql_where=text("contact_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_crm_interaction_attendee_contact_interaction",
+            "contact_id",
+            "interaction_id",
             postgresql_where=text("contact_id IS NOT NULL"),
         ),
     )
