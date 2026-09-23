@@ -823,20 +823,15 @@ class LitellmLLM(LLM):
         # The chat loop passes its own context-aware allowance (min of the
         # model's output limit and the room left in the context window, see
         # chat/token_budget.py), so the default only fills in for callers that
-        # pass none. auto_max_tokens marks the value as ours (not caller-set)
-        # so a context-overflow 400 can degrade back to the provider default.
+        # pass none; caller-set values are sent as-is. auto_max_tokens marks
+        # the value as ours (not caller-set) so a context-overflow 400 can
+        # degrade back to the provider default.
         auto_max_tokens = False
-        if is_claude_model:
-            if max_tokens is None:
-                max_tokens = _default_claude_max_tokens(
-                    model_identity_names, self.config.model_provider
-                )
-                auto_max_tokens = max_tokens is not None
-            else:
-                # The operator ceiling (cost, Bedrock admission quotas) bounds
-                # caller-set values too. min() only lowers, so a smaller
-                # context-aware allowance from the caller always wins.
-                max_tokens = min(max_tokens, ANTHROPIC_MAX_OUTPUT_TOKENS)
+        if max_tokens is None and is_claude_model:
+            max_tokens = _default_claude_max_tokens(
+                model_identity_names, self.config.model_provider
+            )
+            auto_max_tokens = max_tokens is not None
 
         if stream and not is_vertex_model_rejecting_stream_options:
             optional_kwargs["stream_options"] = {"include_usage": True}

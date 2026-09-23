@@ -528,21 +528,18 @@ class TestClaudeDefaultMaxTokens:
     def test_explicit_caller_value_is_preserved(self) -> None:
         assert self._sent_max_tokens(self._llm("claude-opus-5"), 1234) == 1234
 
-    def test_chat_loop_allowance_is_capped_by_operator_ceiling(self) -> None:
-        # The chat loop passes the model's full output limit (128K for Opus 5)
-        # when the context has room; ANTHROPIC_MAX_OUTPUT_TOKENS still bounds
-        # what reaches the provider.
-        assert self._sent_max_tokens(self._llm("claude-opus-5"), 128_000) == 100_000
+    def test_chat_loop_allowance_above_operator_ceiling_is_preserved(self) -> None:
+        # The chat loop passes its own context-aware allowance (up to the
+        # model's full output limit, 128K for Opus 5). ANTHROPIC_MAX_OUTPUT_TOKENS
+        # only governs the default for callers that pass none.
+        assert self._sent_max_tokens(self._llm("claude-opus-5"), 128_000) == 128_000
 
-    def test_operator_ceiling_is_configurable_for_caller_values(
+    def test_operator_ceiling_bounds_only_the_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr("onyx.llm.multi_llm.ANTHROPIC_MAX_OUTPUT_TOKENS", 32_000)
-        assert self._sent_max_tokens(self._llm("claude-opus-5"), 64_000) == 32_000
         assert self._sent_max_tokens(self._llm("claude-opus-5")) == 32_000
-
-    def test_operator_ceiling_leaves_non_claude_caller_values_alone(self) -> None:
-        assert self._sent_max_tokens(self._llm("gpt-4o"), 128_000) == 128_000
+        assert self._sent_max_tokens(self._llm("claude-opus-5"), 64_000) == 64_000
 
     def test_claude_identity_in_deployment_name_resolves_limits(self) -> None:
         # Foundry-style: opaque model_name, canonical id in deployment alias.
