@@ -1046,6 +1046,26 @@ export const connectorConfigs: Record<
         optional: true,
         description: `Specify 0 or more Teams to index. For example, specifying the Team 'Support' for the 'onyxai' Org will cause us to only index messages sent in channels belonging to the 'Support' Team. If no Teams are specified, all Teams in your organization will be indexed.`,
       },
+      buildIncludeAttachmentsOption(
+        false,
+        "Index the files in each channel's Files tab as their own documents, " +
+          "with the readers SharePoint grants them. Needs a certificate " +
+          "credential, Files.Read.All or Sites.Read.All on Graph, and " +
+          "Sites.FullControl.All on the SharePoint API to read each file's " +
+          "readers. With Sites.Selected, grant the app full control on each " +
+          "channel site."
+      ),
+      {
+        type: "checkbox",
+        query: "Include inline images?",
+        label: "Include Inline Images",
+        name: "include_inline_images",
+        description:
+          "Index the images pasted into channel messages with their thread. " +
+          "Needs no extra permission. Nothing is downloaded while image " +
+          "extraction and analysis is off in the search settings.",
+        default: false,
+      },
     ],
     advanced_values: [
       {
@@ -1092,6 +1112,16 @@ export const connectorConfigs: Record<
         false,
         "Index the text of file attachments. Inline images, nested items and cloud links are skipped."
       ),
+      {
+        type: "checkbox",
+        query: "Include calendar events?",
+        label: "Include Calendar",
+        name: "include_calendar",
+        description:
+          "Index the calendar of each mailbox as well as its mail. " +
+          "Needs the Calendars.Read application permission.",
+        default: false,
+      },
     ],
     advanced_values: [
       {
@@ -1103,6 +1133,31 @@ export const connectorConfigs: Record<
         description:
           "Folder names to skip in every mailbox, in addition to Junk Email, " +
           "Deleted Items, Drafts and Outbox, which are always skipped.",
+      },
+      {
+        type: "number",
+        query: "Days of past calendar to index:",
+        label: "Calendar Past Days",
+        name: "calendar_past_days",
+        optional: true,
+        default: 365,
+        description:
+          "Used when Include Calendar is on. How far back the calendar window " +
+          "reaches. Events older than this leave the index at the next prune as " +
+          "the window moves forward. Widening it later needs a re-index, since " +
+          "unchanged events do not re-enter on their own.",
+      },
+      {
+        type: "number",
+        query: "Days of future calendar to index:",
+        label: "Calendar Future Days",
+        name: "calendar_future_days",
+        optional: true,
+        default: 180,
+        description:
+          "Used when Include Calendar is on. How far ahead the calendar window " +
+          "reaches. Widening it later needs a re-index, since unchanged events " +
+          "do not re-enter on their own.",
       },
       {
         type: "text",
@@ -2285,6 +2340,8 @@ export interface SharepointConfig {
 
 export interface TeamsConfig {
   teams?: string[];
+  include_attachments?: boolean;
+  include_inline_images?: boolean;
   authority_host?: string;
   graph_api_host?: string;
 }

@@ -43,7 +43,8 @@ describe("openDocument", () => {
 
     expect(windowOpen).toHaveBeenCalledWith(
       "https://example.com/doc.pdf",
-      "_blank"
+      "_blank",
+      "noopener,noreferrer"
     );
     expect(updatePresentingDocument).not.toHaveBeenCalled();
   });

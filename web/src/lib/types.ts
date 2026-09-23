@@ -688,6 +688,7 @@ export const validAutoSyncSources = [
   ValidSources.Sharepoint,
   ValidSources.Teams,
   ValidSources.GoogleCalendar,
+  ValidSources.Outlook,
   ValidSources.Canvas,
   ValidSources.Box,
 ] as const;

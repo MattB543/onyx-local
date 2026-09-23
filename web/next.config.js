@@ -17,6 +17,11 @@ const nextConfig = {
   // Hosts allowed to load Next.js dev resources (e.g. HMR) cross-origin.
   // Needed when accessing the local dev server through a tunnel like ngrok.
   allowedDevOrigins: ["cataract-brunette-icon.ngrok-free.dev"],
+  experimental: {
+    // TypeScript 7 has no classic JS API, so `next build` must type-check
+    // through the `tsc` CLI.
+    useTypeScriptCli: true,
+  },
   transpilePackages: ["@onyx-ai/opal", "@onyx-ai/shared", "mime"],
   typedRoutes: true,
   // `next dev` otherwise appends its own managed block to web/AGENTS.md on every

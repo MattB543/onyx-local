@@ -23,5 +23,6 @@ export const autoSyncConfigBySource: Record<
   salesforce: {},
   sharepoint: {},
   teams: {},
+  outlook: {},
   canvas: {},
 };

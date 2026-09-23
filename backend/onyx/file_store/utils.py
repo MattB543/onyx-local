@@ -378,24 +378,27 @@ def verify_user_files(
 
         user_file_id = file_descriptor.get("user_file_id")
         if user_file_id:
-            parsed_user_file_id: UUID | None = None
             try:
                 parsed_user_file_id = UUID(user_file_id)
-            except (ValueError, TypeError):
-                parsed_user_file_id = None
+            except (ValueError, TypeError) as e:
+                raise ValueError("Invalid user_file_id in file descriptor") from e
 
-            if parsed_user_file_id is not None:
-                user_file = (
-                    db_session.query(UserFile)
-                    .filter(UserFile.id == parsed_user_file_id)
-                    .first()
-                )
-                if user_file is not None:
-                    if user_file.user_id != user_id:
-                        raise ValueError(
-                            f"User {user_id} does not have access to file {user_file.id}"
-                        )
-                    continue
+            user_file = get_user_file_by_id(parsed_user_file_id, db_session)
+            if user_file is not None:
+                if user_file.user_id != user_id:
+                    raise ValueError(
+                        f"User {user_id} does not have access to file {user_file.id}"
+                    )
+                # The descriptor's storage id must be the owned record's file,
+                # otherwise an owned user_file_id could vouch for a foreign file.
+                if user_file.file_id != file_id:
+                    raise ValueError(
+                        f"File descriptor id does not match user file {user_file.id}"
+                    )
+                continue
+            # Fork (per-chat uploads): a well-formed user_file_id with no
+            # UserFile row falls through, so the storage file_id itself must
+            # validate as an owned raw chat upload or a project file below.
 
         raw_chat_upload = get_chat_upload_file_record(
             file_id=file_id,
