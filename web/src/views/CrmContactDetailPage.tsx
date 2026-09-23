@@ -28,7 +28,6 @@ import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
 import Card from "@/refresh-components/cards/Card";
-import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
@@ -40,6 +39,7 @@ import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/views/crm/components/ActivityTimeline";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
 import CrmBreadcrumbs from "@/views/crm/components/CrmBreadcrumbs";
+import CrmCategoryField from "@/views/crm/components/CrmCategoryField";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
 import DetailField from "@/views/crm/components/DetailField";
 import LogInteractionModal from "@/views/crm/components/LogInteractionModal";
@@ -693,10 +693,9 @@ export default function CrmContactDetailPage({
                                 >
                                   Category
                                 </Text>
-                                <InputComboBoxField
+                                <CrmCategoryField
                                   name="category"
                                   options={categoryOptions}
-                                  mode="open"
                                   placeholder="Category"
                                 />
                               </div>

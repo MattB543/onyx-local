@@ -15,7 +15,6 @@ import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";
 import { Button, InputImage, Modal } from "@opal/components";
-import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
@@ -32,6 +31,7 @@ import {
   formatCrmLabel,
   optionalText,
 } from "@/views/crm/crmOptions";
+import CrmCategoryField from "@/views/crm/components/CrmCategoryField";
 import OrganizationPicker from "@/views/crm/components/OrganizationPicker";
 
 import { SvgUser } from "@opal/icons";
@@ -294,10 +294,9 @@ export default function CreateContactModal({
                         ))}
                       </InputSelect.Content>
                     </InputSelectField>
-                    <InputComboBoxField
+                    <CrmCategoryField
                       name="category"
                       options={categoryOptions}
-                      mode="open"
                       placeholder="Category"
                     />
                     <InputTypeInField
