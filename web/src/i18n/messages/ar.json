@@ -840,6 +840,9 @@
         "gmail": {
           "description": "بريد Google"
         },
+        "googleCalendar": {
+          "description": "أحداث تقويم Google"
+        },
         "bookstack": {
           "description": "ويكي مستضاف ذاتيًا"
         },

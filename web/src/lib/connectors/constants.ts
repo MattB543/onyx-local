@@ -33,6 +33,8 @@ export const SOURCE_DESCRIPTION_KEYS = {
   [ValidSources.Slack]: "sources.slack.description",
   [ValidSources.GoogleDrive]: "sources.googleDrive.description",
   [ValidSources.Gmail]: "sources.gmail.description",
+  // FORK-LOCAL (onyx-local): Google Calendar connector.
+  [ValidSources.GoogleCalendar]: "sources.googleCalendar.description",
   [ValidSources.Bookstack]: "sources.bookstack.description",
   [ValidSources.Outline]: "sources.outline.description",
   [ValidSources.Confluence]: "sources.confluence.description",

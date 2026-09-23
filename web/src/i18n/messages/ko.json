@@ -840,6 +840,9 @@
         "gmail": {
           "description": "Google 이메일"
         },
+        "googleCalendar": {
+          "description": "Google 캘린더 일정"
+        },
         "bookstack": {
           "description": "자체 호스팅 위키"
         },

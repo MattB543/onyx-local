@@ -840,6 +840,9 @@
         "gmail": {
           "description": "Google 邮箱"
         },
+        "googleCalendar": {
+          "description": "Google 日历活动"
+        },
         "bookstack": {
           "description": "自托管维基"
         },

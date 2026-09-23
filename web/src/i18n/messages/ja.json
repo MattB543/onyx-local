@@ -840,6 +840,9 @@
         "gmail": {
           "description": "Google のメール"
         },
+        "googleCalendar": {
+          "description": "Google カレンダーの予定"
+        },
         "bookstack": {
           "description": "セルフホスト型 Wiki"
         },

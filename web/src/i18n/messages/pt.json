@@ -840,6 +840,9 @@
         "gmail": {
           "description": "E-mail do Google"
         },
+        "googleCalendar": {
+          "description": "Eventos do Google Agenda"
+        },
         "bookstack": {
           "description": "Wiki auto-hospedada"
         },
