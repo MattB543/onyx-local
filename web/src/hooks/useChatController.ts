@@ -1807,6 +1807,13 @@ export default function useChatController({
       if (session && session.chatState !== "input") return;
       if (incognitoEnabledRef.current || session?.incognito) return;
 
+      // Snapshot the source chat's configuration and project before the first
+      // await: navigating to another chat while the fork request is in flight
+      // would otherwise hand the branch that other chat's filters.
+      const handOffSourceConfiguration =
+        toolConfigurationRef.current.handOffTo;
+      const sourceProjectId = activeProjectIdRef.current;
+
       branchInFlight.current = true;
       try {
         const {
@@ -1831,12 +1838,12 @@ export default function useChatController({
         addPendingChatSession({
           chatSessionId: newSessionId,
           personaId: activeAgent?.id || 0,
-          projectId: activeProjectIdRef.current,
+          projectId: sourceProjectId,
         });
 
         // Copy (not move) the parent's filters and tool states onto the
         // branch before it mounts; the parent keeps its own.
-        toolConfigurationRef.current.handOffTo(newSessionId);
+        handOffSourceConfiguration(newSessionId);
 
         const newUrl = buildChatUrl(searchParams, newSessionId, null);
         // SAFETY: buildChatUrl only ever produces "/app?..." which is a
