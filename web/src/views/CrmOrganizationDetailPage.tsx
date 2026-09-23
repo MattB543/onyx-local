@@ -23,7 +23,6 @@ import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useUser } from "@/providers/UserProvider";
-import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
@@ -209,9 +208,8 @@ export default function CrmOrganizationDetailPage({
               ) : (
                 <div className="flex items-center gap-2">
                   {isAdmin && (
-                    <IconButton
-                      main
-                      tertiary
+                    <Button
+                      prominence="tertiary"
                       icon={SvgTrash}
                       tooltip="Delete organization"
                       onClick={() => setDeleteModalOpen(true)}

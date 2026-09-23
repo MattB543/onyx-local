@@ -133,7 +133,7 @@
         "src/refresh-components/inputs/InputMultiSelect.tsx",
         "src/views/admin/ChatPreferencesPage.tsx",
         "src/sections/sidebar/AppSidebar.tsx",
-        "src/refresh-components/inputs/InputComboBox/components/OptionsList.tsx",
+        "lib/opal/src/components/inputs/input-combo-box/components/OptionsList.tsx",
         "src/sections/cards/FileCard.tsx"
       ],
       "rules": {

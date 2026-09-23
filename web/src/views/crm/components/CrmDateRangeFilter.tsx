@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "next-intl";
 
 import {
   getFormattedDateRangeString,
   isAfterDate,
   normalizeDate,
 } from "@/lib/dateUtils";
-import { Button, Popover } from "@opal/components";
-import InputDatePicker from "@/refresh-components/inputs/InputDatePicker";
+import { Button, InputDatePicker, Popover } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
 import { SvgCalendar } from "@opal/icons";
@@ -63,17 +63,17 @@ export function dateRangeToParams(v: CrmDateRangeValue): {
   return { updated_after: fromIso, updated_before: toIso };
 }
 
-function buildTriggerLabel(value: CrmDateRangeValue): string {
+function buildTriggerLabel(value: CrmDateRangeValue, locale: string): string {
   const prefix = value.field === "created" ? "Created" : "Updated";
-  const range = getFormattedDateRangeString(value.from, value.to);
+  const range = getFormattedDateRangeString(value.from, value.to, locale);
   if (range) {
     return `${prefix}: ${range}`;
   }
   if (value.from) {
-    return `${prefix}: from ${value.from.toLocaleDateString()}`;
+    return `${prefix}: from ${value.from.toLocaleDateString(locale)}`;
   }
   if (value.to) {
-    return `${prefix}: until ${value.to.toLocaleDateString()}`;
+    return `${prefix}: until ${value.to.toLocaleDateString(locale)}`;
   }
   return `${prefix}: any date`;
 }
@@ -82,6 +82,7 @@ export default function CrmDateRangeFilter({
   value,
   onChange,
 }: CrmDateRangeFilterProps) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const today = new Date();
 
@@ -113,7 +114,7 @@ export default function CrmDateRangeFilter({
     <Popover open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <Button variant="action" prominence="secondary" icon={SvgCalendar}>
-          {buildTriggerLabel(value)}
+          {buildTriggerLabel(value, locale)}
         </Button>
       </Popover.Trigger>
       <Popover.Content align="start">
@@ -135,8 +136,8 @@ export default function CrmDateRangeFilter({
                 From
               </Text>
               <InputDatePicker
-                selectedDate={value.from}
-                setSelectedDate={handleFromChange}
+                value={value.from}
+                onChange={handleFromChange}
                 maxDate={today}
               />
             </div>
@@ -145,8 +146,9 @@ export default function CrmDateRangeFilter({
                 To
               </Text>
               <InputDatePicker
-                selectedDate={value.to}
-                setSelectedDate={handleToChange}
+                value={value.to}
+                onChange={handleToChange}
+                minDate={value.from ?? undefined}
                 maxDate={today}
               />
             </div>

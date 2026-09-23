@@ -27,13 +27,11 @@ import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useUser } from "@/providers/UserProvider";
-import IconButton from "@/refresh-components/buttons/IconButton";
 import Card from "@/refresh-components/cards/Card";
 import InputComboBoxField from "@/refresh-components/form/InputComboBoxField";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
-import InputImage from "@/refresh-components/inputs/InputImage";
 import InputMultiSelect, {
   InputMultiSelectOption,
 } from "@/refresh-components/inputs/InputMultiSelect";
@@ -59,7 +57,7 @@ import {
 } from "@/views/crm/crmOptions";
 
 import { Disabled } from "@opal/core";
-import { Button } from "@opal/components";
+import { Button, InputImage } from "@opal/components";
 import { SvgEdit, SvgTrash, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
@@ -317,9 +315,8 @@ export default function CrmContactDetailPage({
               ) : (
                 <div className="flex items-center gap-2">
                   {isAdmin && (
-                    <IconButton
-                      main
-                      tertiary
+                    <Button
+                      prominence="tertiary"
                       icon={SvgTrash}
                       tooltip="Delete contact"
                       onClick={() => setContactDeleteModalOpen(true)}

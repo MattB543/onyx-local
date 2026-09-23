@@ -1,7 +1,7 @@
 import { CrmInteraction } from "@/app/app/crm/crmService";
-import IconButton from "@/refresh-components/buttons/IconButton";
 import Text from "@/refresh-components/texts/Text";
 
+import { Button } from "@opal/components";
 import { SvgEdit, SvgTrash } from "@opal/icons";
 
 import { formatDateTime } from "./crmDateUtils";
@@ -92,9 +92,8 @@ export default function TimelineInteractionCard({
         {((canEdit && onEdit) || (canDelete && onDelete)) && (
           <div className="absolute right-0 top-0 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             {canEdit && onEdit && (
-              <IconButton
-                main
-                tertiary
+              <Button
+                prominence="tertiary"
                 icon={SvgEdit}
                 tooltip="Edit interaction"
                 onClick={(event) => {
@@ -104,9 +103,8 @@ export default function TimelineInteractionCard({
               />
             )}
             {canDelete && onDelete && (
-              <IconButton
-                main
-                tertiary
+              <Button
+                prominence="tertiary"
                 icon={SvgTrash}
                 tooltip="Delete interaction"
                 onClick={(event) => {

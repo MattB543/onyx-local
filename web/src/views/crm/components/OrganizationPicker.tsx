@@ -4,9 +4,7 @@ import { useDeferredValue, useMemo } from "react";
 
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
-import InputComboBox, {
-  ComboBoxOption,
-} from "@/refresh-components/inputs/InputComboBox";
+import { InputComboBox, type ComboBoxOption } from "@opal/components";
 import Text from "@/refresh-components/texts/Text";
 
 interface OrganizationPickerProps {

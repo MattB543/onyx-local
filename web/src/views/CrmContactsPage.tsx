@@ -20,12 +20,12 @@ import { useUser } from "@/providers/UserProvider";
 import {
   Button,
   EmptyMessageCard,
+  InputComboBox,
   InputTypeIn,
   Popover,
+  type ComboBoxOption,
 } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import InputComboBox from "@/refresh-components/inputs/InputComboBox";
-import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";

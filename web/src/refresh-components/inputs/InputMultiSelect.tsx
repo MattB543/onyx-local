@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Button } from "@opal/components";
-import InputComboBox from "@/refresh-components/inputs/InputComboBox";
+import { Button, InputComboBox } from "@opal/components";
 
 export interface InputMultiSelectOption {
   value: string;
