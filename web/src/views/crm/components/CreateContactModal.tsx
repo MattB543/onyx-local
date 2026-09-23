@@ -255,12 +255,6 @@ export default function CreateContactModal({
                     <OrganizationPicker
                       selectedOrganizationId={values.organization_id || null}
                       inputValue={values.organization_name}
-                      onInputChange={(nextOrganizationName) => {
-                        setFieldValue("organization_name", nextOrganizationName);
-                        if (values.organization_id) {
-                          setFieldValue("organization_id", "");
-                        }
-                      }}
                       onOrganizationChange={(
                         nextOrganizationId,
                         nextOrganizationName
@@ -303,7 +297,7 @@ export default function CreateContactModal({
                     <InputComboBoxField
                       name="category"
                       options={categoryOptions}
-                      strict={false}
+                      mode="open"
                       placeholder="Category"
                     />
                     <InputTypeInField

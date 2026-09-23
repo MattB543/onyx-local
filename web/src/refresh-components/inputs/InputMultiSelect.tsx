@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import { Button, InputComboBox } from "@opal/components";
+import { InputSingleSelect } from "@opal/components";
 
 export interface InputMultiSelectOption {
   value: string;
@@ -45,8 +45,6 @@ export default function InputMultiSelect({
   disabled = false,
   allowCustom = false,
 }: InputMultiSelectProps) {
-  const [draft, setDraft] = useState("");
-
   const selectedValues = useMemo(() => normalizeList(value), [value]);
   const selectedSet = useMemo(
     () => new Set(selectedValues.map((entry) => entry.toLowerCase())),
@@ -104,7 +102,6 @@ export default function InputMultiSelect({
       return;
     }
     onChange([...selectedValues, resolved]);
-    setDraft("");
   };
 
   const removeValue = (valueToRemove: string) => {
@@ -115,12 +112,6 @@ export default function InputMultiSelect({
       )
     );
   };
-
-  const addableValue = resolveDraftValue(draft);
-  const canAdd =
-    !disabled &&
-    addableValue !== null &&
-    !selectedSet.has(addableValue.toLowerCase());
 
   return (
     <div className="flex w-full flex-col gap-2">
@@ -150,40 +141,21 @@ export default function InputMultiSelect({
         </div>
       )}
 
-      <div
-        className={
-          allowCustom ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : "w-full"
-        }
-      >
-        <InputComboBox
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value);
-          }}
+      <div className="w-full">
+        {/* The select only picks; the chips above hold the selection. It stays
+            empty (value="") like upstream's GenericMultiSelect, so typing is
+            transient filter text. With allowCustom, mode="open" adds a create
+            row that commits the typed text through onValueChange. */}
+        <InputSingleSelect
+          value=""
           onValueChange={(selectedValue) => {
             appendValue(selectedValue);
           }}
           options={availableOptions}
-          strict={!allowCustom}
+          mode={allowCustom ? "open" : "closed"}
           placeholder={placeholder}
           disabled={disabled}
         />
-        {/* The "Add" button only commits free-text entries. When selecting
-            from the dropdown (strict mode), choosing an option adds it
-            immediately, so the button is only needed for custom values. */}
-        {allowCustom && (
-          <Button
-            variant="action"
-            prominence="secondary"
-            type="button"
-            disabled={!canAdd}
-            onClick={() => {
-              appendValue(draft);
-            }}
-          >
-            Add
-          </Button>
-        )}
       </div>
     </div>
   );

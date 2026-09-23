@@ -20,10 +20,10 @@ import { useUser } from "@/providers/UserProvider";
 import {
   Button,
   EmptyMessageCard,
-  InputComboBox,
+  InputSingleSelect,
   InputTypeIn,
   Popover,
-  type ComboBoxOption,
+  type SelectOption,
 } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
 import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
@@ -90,7 +90,6 @@ export default function CrmContactsPage() {
   );
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [orgFilterText, setOrgFilterText] = useState("");
   const [orgFilterId, setOrgFilterId] = useState<string | undefined>(undefined);
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<CrmDateRangeValue>({
@@ -142,7 +141,7 @@ export default function CrmContactsPage() {
     () => new Map(orgLookup.map((o) => [o.id, o.name])),
     [orgLookup],
   );
-  const orgOptions = useMemo<ComboBoxOption[]>(
+  const orgOptions = useMemo<SelectOption[]>(
     () => orgLookup.map((o) => ({ value: o.id, label: o.name })),
     [orgLookup],
   );
@@ -221,7 +220,6 @@ export default function CrmContactsPage() {
     // Do NOT clear organizationIdFilter (URL-driven, has its own banner link).
     if (!organizationIdFilter) {
       setOrgFilterId(undefined);
-      setOrgFilterText("");
     }
     setTagFilterIds([]);
     setDateRange({ field: "created", from: null, to: null });
@@ -333,28 +331,22 @@ export default function CrmContactsPage() {
               searchIcon
             />
 
-            <InputComboBox
-              value={orgFilterText}
+            <InputSingleSelect
+              value={orgFilterId ?? ""}
               onChange={(e) => {
-                setOrgFilterText(e.target.value);
-                if (!e.target.value) {
+                // Emptying the text clears the filter; re-picking the
+                // selected org in the dropdown also toggles it off ("").
+                if (!e.target.value && orgFilterId) {
                   setOrgFilterId(undefined);
                   setPageNum(0);
                 }
               }}
               onValueChange={(value) => {
-                setOrgFilterId(value);
-                setOrgFilterText(orgNameById.get(value) ?? "");
-                setPageNum(0);
-              }}
-              onClear={() => {
-                setOrgFilterId(undefined);
-                setOrgFilterText("");
+                setOrgFilterId(value || undefined);
                 setPageNum(0);
               }}
               options={orgOptions}
               placeholder="Filter by org"
-              strict
               searchIcon
               isError={false}
               disabled={!!organizationIdFilter}
