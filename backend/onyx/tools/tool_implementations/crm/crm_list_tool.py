@@ -107,7 +107,7 @@ class CrmListTool(Tool[None]):
                     "properties": {
                         "entity_type": {
                             "type": "string",
-                            "enum": sorted(list(CRM_LIST_ENTITY_TYPES)),
+                            "enum": sorted(CRM_LIST_ENTITY_TYPES),
                             "description": "Which CRM entity type to list.",
                         },
                         "status": {

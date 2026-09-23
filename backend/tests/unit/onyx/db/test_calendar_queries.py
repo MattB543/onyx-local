@@ -125,7 +125,7 @@ def test_search_calendar_events_applies_identity_and_attendee_filters() -> None:
 
     paged_stmt = db_session.scalars.call_args.args[0]
     compiled = paged_stmt.compile()
-    params = set(str(v) for v in compiled.params.values())
+    params = {str(v) for v in compiled.params.values()}
     assert "owner@example.com" in params
     assert any("primary" in param for param in params)
     assert any("confirmed" in param for param in params)

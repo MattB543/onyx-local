@@ -39,30 +39,30 @@ from onyx.server.manage.custom_jobs.models import (
 def _make_fake_job(**overrides):
     """Return a SimpleNamespace that looks like a CustomJob ORM model."""
     now = datetime.now(timezone.utc)
-    defaults = dict(
-        id=uuid4(),
-        name="Test Job",
-        workflow_key="weekly_slack_digest",
-        enabled=True,
-        trigger_type=CustomJobTriggerType.WEEKLY,
-        day_of_week=0,
-        hour=9,
-        minute=0,
-        timezone="America/New_York",
-        next_run_at=now,
-        last_scheduled_at=None,
-        trigger_source_type=None,
-        trigger_source_config=None,
-        job_config={},
-        persona_id=None,
-        slack_bot_id=None,
-        slack_channel_id=None,
-        retention_days=90,
-        created_by=uuid4(),
-        updated_by=uuid4(),
-        created_at=now,
-        updated_at=now,
-    )
+    defaults = {
+        "id": uuid4(),
+        "name": "Test Job",
+        "workflow_key": "weekly_slack_digest",
+        "enabled": True,
+        "trigger_type": CustomJobTriggerType.WEEKLY,
+        "day_of_week": 0,
+        "hour": 9,
+        "minute": 0,
+        "timezone": "America/New_York",
+        "next_run_at": now,
+        "last_scheduled_at": None,
+        "trigger_source_type": None,
+        "trigger_source_config": None,
+        "job_config": {},
+        "persona_id": None,
+        "slack_bot_id": None,
+        "slack_channel_id": None,
+        "retention_days": 90,
+        "created_by": uuid4(),
+        "updated_by": uuid4(),
+        "created_at": now,
+        "updated_at": now,
+    }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
 
@@ -70,20 +70,20 @@ def _make_fake_job(**overrides):
 def _make_fake_run(**overrides):
     """Return a SimpleNamespace that looks like a CustomJobRun ORM model."""
     now = datetime.now(timezone.utc)
-    defaults = dict(
-        id=uuid4(),
-        custom_job_id=uuid4(),
-        status=CustomJobRunStatus.SUCCESS,
-        scheduled_for=None,
-        trigger_event_id=None,
-        idempotency_key=None,
-        started_at=now,
-        finished_at=now,
-        error_message=None,
-        metrics_json=None,
-        output_preview=None,
-        created_at=now,
-    )
+    defaults = {
+        "id": uuid4(),
+        "custom_job_id": uuid4(),
+        "status": CustomJobRunStatus.SUCCESS,
+        "scheduled_for": None,
+        "trigger_event_id": None,
+        "idempotency_key": None,
+        "started_at": now,
+        "finished_at": now,
+        "error_message": None,
+        "metrics_json": None,
+        "output_preview": None,
+        "created_at": now,
+    }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
 
@@ -91,18 +91,18 @@ def _make_fake_run(**overrides):
 def _make_fake_step(**overrides):
     """Return a SimpleNamespace that looks like a CustomJobRunStep ORM model."""
     now = datetime.now(timezone.utc)
-    defaults = dict(
-        id=uuid4(),
-        run_id=uuid4(),
-        step_index=0,
-        step_id="fetch_content",
-        step_key="fetch_weekly_chat_content",
-        status=CustomJobStepStatus.SUCCESS,
-        started_at=now,
-        finished_at=now,
-        error_message=None,
-        output_json=None,
-    )
+    defaults = {
+        "id": uuid4(),
+        "run_id": uuid4(),
+        "step_index": 0,
+        "step_id": "fetch_content",
+        "step_key": "fetch_weekly_chat_content",
+        "status": CustomJobStepStatus.SUCCESS,
+        "started_at": now,
+        "finished_at": now,
+        "error_message": None,
+        "output_json": None,
+    }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
 

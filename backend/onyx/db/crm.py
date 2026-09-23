@@ -1619,7 +1619,7 @@ def export_all_organizations(db_session: Session) -> list[dict]:
         user_rows = db_session.execute(
             select(User.id, User.email).where(User.id.in_(creator_ids))
         ).all()
-        creator_emails = {uid: email for uid, email in user_rows}
+        creator_emails = dict(user_rows)
 
     results: list[dict] = [
         {
@@ -1668,7 +1668,7 @@ def export_all_contacts(db_session: Session) -> list[dict]:
                 CrmOrganization.id.in_(org_ids)
             )
         ).all()
-        org_names = {oid: name for oid, name in org_rows}
+        org_names = dict(org_rows)
 
     # Bulk-fetch owner emails keyed by contact ID
     owner_rows = db_session.execute(
@@ -1699,7 +1699,7 @@ def export_all_contacts(db_session: Session) -> list[dict]:
         user_rows = db_session.execute(
             select(User.id, User.email).where(User.id.in_(creator_ids))
         ).all()
-        creator_emails = {uid: email for uid, email in user_rows}
+        creator_emails = dict(user_rows)
 
     results: list[dict] = [
         {
@@ -1770,7 +1770,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
                 CrmOrganization.id.in_(org_ids)
             )
         ).all()
-        org_names = {oid: name for oid, name in org_rows}
+        org_names = dict(org_rows)
 
     # Bulk-fetch logger emails
     logger_ids = list({i.logged_by for i in interactions if i.logged_by is not None})
@@ -1779,7 +1779,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
         user_rows = db_session.execute(
             select(User.id, User.email).where(User.id.in_(logger_ids))
         ).all()
-        logger_emails = {uid: email for uid, email in user_rows}
+        logger_emails = dict(user_rows)
 
     # Bulk-fetch all attendees for exported interactions
     interaction_ids = [i.id for i in interactions]
@@ -1800,7 +1800,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
         rows = db_session.execute(
             select(User.id, User.email).where(User.id.in_(attendee_user_ids))
         ).all()
-        attendee_user_emails = {uid: email for uid, email in rows}
+        attendee_user_emails = dict(rows)
 
     attendee_contact_ids = list(
         {a.contact_id for a in attendees if a.contact_id is not None}
@@ -1812,7 +1812,7 @@ def export_all_interactions(db_session: Session) -> list[dict]:
                 CrmContact.id.in_(attendee_contact_ids)
             )
         ).all()
-        attendee_contact_emails = {cid: email for cid, email in rows}
+        attendee_contact_emails = dict(rows)
 
     # Group attendees by interaction_id
     attendees_by_interaction: dict[UUID, list[CrmInteractionAttendee]] = {}

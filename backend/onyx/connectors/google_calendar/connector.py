@@ -90,7 +90,7 @@ def _parse_rfc3339(timestamp: str | None) -> datetime | None:
     if not timestamp:
         return None
     try:
-        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return datetime.fromisoformat(timestamp)
     except ValueError:
         return None
 

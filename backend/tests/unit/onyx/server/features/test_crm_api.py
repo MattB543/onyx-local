@@ -1545,7 +1545,7 @@ def test_import_contacts_without_policy_columns_still_succeeds() -> None:
 
 
 def _contact_import_row(headers: list[str], **values: str) -> str:
-    row = {h: "" for h in headers}
+    row = dict.fromkeys(headers, "")
     row.update(values)
     return ",".join(row[h] for h in headers)
 

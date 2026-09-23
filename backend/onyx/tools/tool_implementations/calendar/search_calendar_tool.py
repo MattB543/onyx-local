@@ -172,7 +172,7 @@ class SearchCalendarTool(Tool[None]):
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": sorted(list(CALENDAR_EVENT_STATUSES)),
+                                "enum": sorted(CALENDAR_EVENT_STATUSES),
                             },
                             "description": "Optional event statuses to include.",
                         },
@@ -182,12 +182,12 @@ class SearchCalendarTool(Tool[None]):
                         },
                         "sort_by": {
                             "type": "string",
-                            "enum": sorted(list(SORT_BY_OPTIONS)),
+                            "enum": sorted(SORT_BY_OPTIONS),
                             "description": "Primary sort field.",
                         },
                         "sort_order": {
                             "type": "string",
-                            "enum": sorted(list(SORT_ORDER_OPTIONS)),
+                            "enum": sorted(SORT_ORDER_OPTIONS),
                             "description": "Sort order.",
                         },
                         "page_num": {

@@ -123,7 +123,7 @@ class CrmCreateTool(Tool[None]):
                     "properties": {
                         "entity_type": {
                             "type": "string",
-                            "enum": sorted(list(CRM_CREATE_ENTITY_TYPES)),
+                            "enum": sorted(CRM_CREATE_ENTITY_TYPES),
                             "description": "Which CRM entity to create.",
                         },
                         "contact": {

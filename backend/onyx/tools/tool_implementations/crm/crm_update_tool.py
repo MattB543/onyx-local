@@ -117,7 +117,7 @@ class CrmUpdateTool(Tool[None]):
                     "properties": {
                         "entity_type": {
                             "type": "string",
-                            "enum": sorted(list(CRM_UPDATE_ENTITY_TYPES)),
+                            "enum": sorted(CRM_UPDATE_ENTITY_TYPES),
                             "description": "Whether to update a 'contact', 'organization', or 'interaction'.",
                         },
                         "entity_id": {

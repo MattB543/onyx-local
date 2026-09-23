@@ -84,7 +84,7 @@ class CrmSearchTool(Tool[None]):
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": sorted(list(CRM_SEARCH_ENTITY_TYPES)),
+                                "enum": sorted(CRM_SEARCH_ENTITY_TYPES),
                             },
                             "description": "Entity types to search.",
                         },
@@ -162,7 +162,7 @@ class CrmSearchTool(Tool[None]):
         payload = {
             "status": "ok",
             "query": query,
-            "entity_types": entity_types or sorted(list(CRM_SEARCH_ENTITY_TYPES)),
+            "entity_types": entity_types or sorted(CRM_SEARCH_ENTITY_TYPES),
             "page_num": page_num,
             "page_size": page_size,
             "total_items": total_items,

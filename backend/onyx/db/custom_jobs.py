@@ -954,7 +954,7 @@ def count_trigger_events_by_status(
         .where(CustomJobTriggerEvent.custom_job_id == custom_job_id)
         .group_by(CustomJobTriggerEvent.status)
     ).all()
-    return {status: count for status, count in rows}
+    return dict(rows)
 
 
 def try_create_run_for_trigger_event(

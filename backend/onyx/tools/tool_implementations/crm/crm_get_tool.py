@@ -95,7 +95,7 @@ class CrmGetTool(Tool[None]):
                     "properties": {
                         "entity_type": {
                             "type": "string",
-                            "enum": sorted(list(CRM_GET_ENTITY_TYPES)),
+                            "enum": sorted(CRM_GET_ENTITY_TYPES),
                             "description": "The type of CRM entity to retrieve.",
                         },
                         "entity_id": {
@@ -106,7 +106,7 @@ class CrmGetTool(Tool[None]):
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": sorted(list(CRM_GET_INCLUDE_OPTIONS)),
+                                "enum": sorted(CRM_GET_INCLUDE_OPTIONS),
                             },
                             "description": (
                                 "Related data to include. Options: "
