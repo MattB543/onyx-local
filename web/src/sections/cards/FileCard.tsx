@@ -6,7 +6,7 @@ import type { ProjectFile } from "@/lib/projects/types";
 import { UserFileStatus } from "@/lib/projects/types";
 import { isImageFile } from "@/lib/utils";
 import { cn } from "@opal/utils";
-import { Checkbox } from "@opal/components";
+import { InputCheckbox } from "@opal/components";
 import { SvgFileText, SvgX, SvgSimpleLoader } from "@opal/icons";
 import { Interactive, Hoverable } from "@opal/core";
 import { AttachmentItemButton } from "@opal/components";
@@ -241,7 +241,7 @@ export function FileCard({
     <div className="flex flex-col gap-1">
       {cardContent}
       <label className="flex items-center gap-1 px-1 text-xs text-text-03">
-        <Checkbox
+        <InputCheckbox
           checked={Boolean(file.index_for_later)}
           onCheckedChange={(checked) => onToggleIndexForLater(file.id, checked)}
           aria-label={`Index ${file.name} for later`}

@@ -35,6 +35,7 @@ const buildOnyxDocumentFromFile = (
     metadata: {},
     updated_at: null,
     is_internet: false,
+    image: null,
   };
 };
 
