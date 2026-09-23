@@ -853,4 +853,78 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
   `DROPBOX_CONNECTOR_SIZE_THRESHOLD`; `StreamingError.stack_trace` only sent in DEV_MODE.
 - Post-batch on main: 63ec2361f2 reverts the batch-2 caller-set Claude max_tokens cap
   (Codex batch-2 SHOULD-FIX 1); tests lock "default only when None".
-- Codex sanity check: PENDING
+- Codex sanity check (astra medium): 3 SHOULD-FIX, no blockers.
+  1. (sync-introduced) email→CRM anonymous execution: private/unlisted personas now fail
+     (`chat_utils.py` enforces persona access; `persona.py` needs public AND listed for
+     anonymous), and search is limited to anonymous-accessible docs. Making the persona
+     public+listed does NOT restore private-document search. Suggested: run as a configured
+     service user (separate attribution, explicit grants) or the persona owner (less config,
+     attributes CRM changes to that person). No other fork background caller runs as
+     anonymous or passes removed params. → DECISION FOR MATT.
+  2. (sync-introduced) branching loses parent search filters/tool states — a restricted
+     parent can yield an UNRESTRICTED branch search. Fix: `handOffTo(newSessionId)` before
+     navigation, read through a ref at click time (callback identity must stay stable).
+  3. (PRE-EXISTING) CRM/Calendar tools keep `sessionmaker(bind=db_session.get_bind())`; for
+     multi-tenant / non-default-schema sessions the bind is a Connection that
+     `construct_tools()` closes before execution → `ResourceClosedError` (reproduced).
+     Engine-bound default-schema sessions (our single-tenant deploys) are unaffected.
+     Follow-up: open tenant-scoped sessions at execution time.
+  Verified OK: 12 authz cases — foreign raw uploads / USER_FILE records rejected with
+  absent/None/nonexistent `user_file_id`, id mismatches rejected, upload ownership from
+  server-written metadata, branch copies server-stored descriptors after source-ownership
+  check; empty-answer persistence fallback intact (fresh session); PSE image path uses the
+  bounded/encoded request; next.config.js keeps upstream headers.
+
+## Batch 4 — 5094e0f37f = upstream tip (2026-09-23, 35 commits, 35→0 behind; ~22 min) + b62b665e5a
+
+- Conflicts: 10 (as probed). TAKE THEIRS: `litellm_singleton/config.py` — fork Ollama
+  fail-fast fix (167df04c38) RETIRED: upstream #14964 seeds `model_cost` keys before
+  `register_model` (no live `/api/show` probe) and tests it
+  (`test_register_ollama_models_needs_one_pass_and_no_server`); measured 0.00s seeded vs
+  ~2s per refused connect unseeded. Opal input-select unification (#14646/#14970) deleted
+  InputComboBox → accepted deletes of `input-combo-box/{InputComboBox,OptionsList,types}`,
+  take theirs on `SelectDropdown.tsx`, `input-single-select/validation.ts`,
+  `InputComboBoxField.tsx` — fork opal deltas (`onClear`, `showAddPrefix`, isOpen
+  validation skip) dropped; the only fork diff left in `web/lib/opal/` is a cosmetic
+  `useClickOutside` default. Blends: `multi_llm.py` (fork kept; upstream `"stream"` in
+  request_params; #14954 non-streaming `invoke()` still goes through `_completion`, so the
+  Claude default + degrade retry apply), `packetProcessor.ts`/`streamingModels.ts`
+  (import rename only).
+- Out-of-marker fixes: fork CRM pickers migrated to `InputSingleSelect` (f9d2b0b56d:
+  CrmContactsPage org filter uses id + upstream toggle-off to clear; OrganizationPicker
+  keeps typed text local for server search, closed-set select; category fields
+  `strict={false}` → `mode="open"`; fork InputMultiSelect `value=""`, `allowCustom` →
+  `mode="open"`); connector catalog (#14993) `SOURCE_DESCRIPTION_KEYS` must cover every
+  `ValidSources` → `googleCalendar` description in all 9 catalogs (460dd7fcbb).
+- UX changes to eyeball: no explicit "Clear filter" row on the CRM org filter (toggle-off
+  / empty text instead); OrganizationPicker reverts to the previous org if you type and
+  leave without picking; upstream quirk — in open-mode category fields, typing an exact
+  existing category and pressing Enter toggles it off to "".
+- Then merged b62b665e5a (#15023, chrome extension only, 0 conflicts) on main → 0 behind.
+- Verification: ruff clean; tsc 0 (TS 7.0.2); pytest 1265/1265 (fork suites + all
+  llm); jest 277/279 (2 upstream opal tests timed out under load, 7/7 in isolation);
+  `get_application()` + `check_router_auth` 566 routes; alembic single head `3f146f01df77`.
+- DEPLOY FLAGS: image captioning no longer falls back to any vision model (#14965) — set a
+  default vision model under Index Settings if prod relied on it; route
+  `/admin/indexing/status` → `/admin/indexing-status` (redirect); optional env
+  `PORT_SWAP_VERIFY_DOCS_PER_UNIT`, `PORT_SWAP_VERIFY_RETRY_DELAY_S`; Vercel AI Gateway
+  provider; no migrations, no dependency changes.
+- Post-batch on main: 42f18acdf3 carries per-chat search filters/tool states into a
+  branched chat (Codex batch-3 SHOULD-FIX 2).
+- Codex sanity check (astra medium): 1 sync-introduced + 2 pre-existing SHOULD-FIX.
+  1. (sync-introduced) CRM category fields: `InputComboBoxField` commits every keystroke to
+     Formik, so `InputSingleSelect` sees the typed text as the selection and Enter on a
+     matching option toggles it OFF to "" (reproduced: "Journalist"→Enter→"", "Custom
+     Category"→Enter→""). Create drops the category; edit silently keeps the old one.
+     Upstream's own VoicePage has the same quirk. → fixed after the sync (see Post-sync).
+  2. (PRE-EXISTING, upstream code) admin provider list/get/update serialization can reach
+     `litellm.supports_reasoning` for unknown Ollama names → one live `/api/show` POST
+     (~2s each) against `OLLAMA_API_BASE`, and the False result is cached without expiry.
+     Retirement of fork 167df04c38 itself verified: fresh init 0.258s, zero POSTs, zero on
+     re-registration and token-limit/image lookups. Follow-up only.
+  3. (PRE-EXISTING) clearing an existing contact's category doesn't persist:
+     `optionalText("")` → undefined → omitted → backend `exclude_unset=True` keeps the old
+     value. → fixed after the sync (see Post-sync).
+  Verified OK: 259 backend + 60 web targeted tests (catalog key parity), org clearing,
+  remote org search selection + id mapping, non-streaming Claude invoke retries exactly
+  once (100000 → None, stream=False, request metadata correct), Calendar routing.
