@@ -3345,6 +3345,8 @@ class ChatMessage(Base):
         # failed-session check, retention/GC deletes and the cascade delete of
         # a session's messages), which otherwise seq-scan chat_message.
         Index("ix_chat_message_chat_session_id", "chat_session_id"),
+        # FORK (custom jobs): created by migration e1f2a3b4c5d6.
+        Index("ix_chat_message_time_sent", "time_sent"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -3471,8 +3473,6 @@ class ChatMessage(Base):
         secondary=ChatMessage__StandardAnswer.__table__,
         back_populates="chat_messages",
     )
-
-    __table_args__ = (Index("ix_chat_message_time_sent", "time_sent"),)
 
 
 class ToolCall(Base):
