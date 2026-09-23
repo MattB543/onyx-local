@@ -1066,6 +1066,46 @@ export const connectorConfigs: Record<
           "extraction and analysis is off in the search settings.",
         default: false,
       },
+      {
+        type: "checkbox",
+        query: "Include meeting transcripts?",
+        label: "Include Meeting Transcripts",
+        name: "include_meeting_transcripts",
+        description:
+          "Index the transcripts of scheduled meetings as their own documents, " +
+          "readable by the organizer and the attendees. Needs the " +
+          "OnlineMeetingTranscript.Read.All, OnlineMeetings.Read.All and " +
+          "User.Read.All application permissions, the tenant setting that " +
+          "allows Graph API access to transcripts, and an application access " +
+          "policy granted to the organizers. Channel meetings are not covered. " +
+          "Transcripts from the last six months are indexed, and a transcript " +
+          "leaves the index once it is older than that.",
+        default: false,
+      },
+      {
+        type: "checkbox",
+        query: "Include meeting chats?",
+        label: "Include Meeting Chats",
+        name: "include_meeting_chats",
+        description:
+          "Index what people write in the chat of a scheduled meeting, a " +
+          "document per day, readable by the members of the chat. Needs the " +
+          "Chat.Read.All and User.Read.All application permissions. Covers " +
+          "meetings organized in this tenant: Microsoft does not serve the " +
+          "chat of a meeting another organization set up.",
+        default: false,
+      },
+      {
+        type: "list",
+        query: "Enter meeting organizers to include:",
+        label: "Meeting Organizers",
+        name: "meeting_organizers",
+        optional: true,
+        description:
+          "User principal names of the organizers whose meeting transcripts " +
+          "and chats to index. Leave empty to include every enabled user with " +
+          "a Teams license.",
+      },
     ],
     advanced_values: [
       {
@@ -2342,6 +2382,9 @@ export interface TeamsConfig {
   teams?: string[];
   include_attachments?: boolean;
   include_inline_images?: boolean;
+  include_meeting_transcripts?: boolean;
+  include_meeting_chats?: boolean;
+  meeting_organizers?: string[];
   authority_host?: string;
   graph_api_host?: string;
 }

@@ -1,53 +1,40 @@
 "use client";
 
 import { useField } from "formik";
-import type { ChangeEvent, FocusEvent } from "react";
-import { InputComboBox, type InputComboBoxProps } from "@opal/components";
 import {
-  useOnBlurEvent,
-  useOnChangeEvent,
-  useOnChangeValue,
-} from "@/hooks/formHooks";
+  InputSingleSelect,
+  type InputSingleSelectProps,
+} from "@opal/components";
+import { useOnChangeEvent, useOnChangeValue } from "@/hooks/formHooks";
 
 /**
- * Formik-bound version of `InputComboBox`. Use this inside a `<Formik>` form
+ * Formik-bound version of `InputSingleSelect`. Use this inside a `<Formik>` form
  * when you need a combo box (free-text input with dropdown suggestions).
- * For a plain combo box without Formik binding, use `InputComboBox` directly.
+ * For a plain combo box without Formik binding, use `InputSingleSelect` directly.
  */
-export interface InputComboBoxFieldProps
-  extends Omit<
-    InputComboBoxProps,
-    "value" | "onChange" | "onValueChange" | "isError"
-  > {
+export type InputComboBoxFieldProps = Omit<InputSingleSelectProps, "value"> & {
   name: string;
-  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
-  onValueChange?: (value: string) => void;
-  onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
-}
+};
 
 export default function InputComboBoxField({
   name,
   onChange: onChangeProp,
   onValueChange: onValueChangeProp,
-  onBlur: onBlurProp,
   ...inputProps
 }: InputComboBoxFieldProps) {
   const [field, meta] = useField<string>(name);
   const onChange = useOnChangeEvent(name, onChangeProp);
   const onValueChange = useOnChangeValue(name, onValueChangeProp);
-  const onBlur = useOnBlurEvent(name, onBlurProp);
-  const hasError = !!(meta.touched && meta.error);
+  const hasError = meta.touched && meta.error;
 
   return (
-    <InputComboBox
+    <InputSingleSelect
       {...inputProps}
-      id={name}
       name={name}
       value={field.value ?? ""}
       onChange={onChange}
       onValueChange={onValueChange}
-      onBlur={onBlur}
-      isError={hasError}
+      isError={hasError ? true : inputProps.isError}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { OnyxDocument } from "@/lib/search/interfaces";
+import { OnyxDocument } from "@/lib/search/types";
 import type { JsonObject } from "@/lib/json";
 
 // Base interface for all streaming objects

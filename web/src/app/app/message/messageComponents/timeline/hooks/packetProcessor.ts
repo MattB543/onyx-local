@@ -20,7 +20,7 @@ import {
   ToolCallArgumentDelta,
   isCodeInterpreterToolType,
 } from "@/app/app/services/streamingModels";
-import { OnyxDocument } from "@/lib/search/interfaces";
+import { OnyxDocument } from "@/lib/search/types";
 
 // Re-export parseToolKey for consumers that import from this module
 export { parseToolKey };

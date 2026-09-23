@@ -1,6 +1,5 @@
 import json
-from collections.abc import Iterator
-from contextlib import contextmanager
+import threading
 from pathlib import Path
 
 import litellm
@@ -28,127 +27,100 @@ def configure_litellm_settings() -> None:
     remove_litellm_native_log_handlers()
 
 
-@contextmanager
-def _skip_ollama_runtime_model_lookup() -> Iterator[None]:
-    """Make LiteLLM's Ollama model-info lookup fail fast while registering models.
-
-    Since litellm 1.89+, ``register_model`` calls ``get_model_info`` for every key,
-    and for ``ollama``/``ollama_chat`` that performs a live ``POST /api/show`` against
-    OLLAMA_API_BASE (default localhost:11434). With no Ollama server, each of the
-    ~76 entries below waits on a refused/unreachable connect (multi-second on
-    Windows), stalling the first chat request for minutes. ``register_model``
-    already treats a lookup failure as "no built-in info", so raising immediately
-    yields the same registration result without the network round trips.
-    """
-    from litellm.llms.ollama.common_utils import OllamaModelInfo
-
-    original = OllamaModelInfo.get_model_info
-
-    def _raise(*_args: object, **_kwargs: object) -> None:
-        raise RuntimeError("Ollama runtime model lookup skipped during registration")
-
-    OllamaModelInfo.get_model_info = _raise  # type: ignore[method-assign]
-    try:
-        yield
-    finally:
-        OllamaModelInfo.get_model_info = original  # type: ignore[method-assign]
-
-
 # TODO: We might not need to register ollama_chat in addition to ollama but let's just do it for good measure for now.
 def register_ollama_models() -> None:
-    with _skip_ollama_runtime_model_lookup():
-        _register_ollama_models()
+    model_cost: dict[str, dict[str, bool]] = {
+        # GPT-OSS models
+        "ollama_chat/gpt-oss:120b-cloud": {"supports_function_calling": True},
+        "ollama_chat/gpt-oss:120b": {"supports_function_calling": True},
+        "ollama_chat/gpt-oss:20b-cloud": {"supports_function_calling": True},
+        "ollama_chat/gpt-oss:20b": {"supports_function_calling": True},
+        "ollama/gpt-oss:120b-cloud": {"supports_function_calling": True},
+        "ollama/gpt-oss:120b": {"supports_function_calling": True},
+        "ollama/gpt-oss:20b-cloud": {"supports_function_calling": True},
+        "ollama/gpt-oss:20b": {"supports_function_calling": True},
+        # DeepSeek models
+        "ollama_chat/deepseek-r1:latest": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:1.5b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:7b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:8b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:14b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:32b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:70b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-r1:671b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-v3.1:latest": {"supports_function_calling": True},
+        "ollama_chat/deepseek-v3.1:671b": {"supports_function_calling": True},
+        "ollama_chat/deepseek-v3.1:671b-cloud": {"supports_function_calling": True},
+        "ollama/deepseek-r1:latest": {"supports_function_calling": True},
+        "ollama/deepseek-r1:1.5b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:7b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:8b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:14b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:32b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:70b": {"supports_function_calling": True},
+        "ollama/deepseek-r1:671b": {"supports_function_calling": True},
+        "ollama/deepseek-v3.1:latest": {"supports_function_calling": True},
+        "ollama/deepseek-v3.1:671b": {"supports_function_calling": True},
+        "ollama/deepseek-v3.1:671b-cloud": {"supports_function_calling": True},
+        # Gemma3 models
+        "ollama_chat/gemma3:latest": {"supports_function_calling": True},
+        "ollama_chat/gemma3:270m": {"supports_function_calling": True},
+        "ollama_chat/gemma3:1b": {"supports_function_calling": True},
+        "ollama_chat/gemma3:4b": {"supports_function_calling": True},
+        "ollama_chat/gemma3:12b": {"supports_function_calling": True},
+        "ollama_chat/gemma3:27b": {"supports_function_calling": True},
+        "ollama/gemma3:latest": {"supports_function_calling": True},
+        "ollama/gemma3:270m": {"supports_function_calling": True},
+        "ollama/gemma3:1b": {"supports_function_calling": True},
+        "ollama/gemma3:4b": {"supports_function_calling": True},
+        "ollama/gemma3:12b": {"supports_function_calling": True},
+        "ollama/gemma3:27b": {"supports_function_calling": True},
+        # Qwen models
+        "ollama_chat/qwen3-coder:latest": {"supports_function_calling": True},
+        "ollama_chat/qwen3-coder:30b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-coder:480b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-coder:480b-cloud": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:latest": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:2b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:4b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:8b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:30b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:32b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:235b": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:235b-cloud": {"supports_function_calling": True},
+        "ollama_chat/qwen3-vl:235b-instruct-cloud": {"supports_function_calling": True},
+        "ollama/qwen3-coder:latest": {"supports_function_calling": True},
+        "ollama/qwen3-coder:30b": {"supports_function_calling": True},
+        "ollama/qwen3-coder:480b": {"supports_function_calling": True},
+        "ollama/qwen3-coder:480b-cloud": {"supports_function_calling": True},
+        "ollama/qwen3-vl:latest": {"supports_function_calling": True},
+        "ollama/qwen3-vl:2b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:4b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:8b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:30b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:32b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:235b": {"supports_function_calling": True},
+        "ollama/qwen3-vl:235b-cloud": {"supports_function_calling": True},
+        "ollama/qwen3-vl:235b-instruct-cloud": {"supports_function_calling": True},
+        # Kimi
+        "ollama_chat/kimi-k2:1t": {"supports_function_calling": True},
+        "ollama_chat/kimi-k2:1t-cloud": {"supports_function_calling": True},
+        "ollama/kimi-k2:1t": {"supports_function_calling": True},
+        "ollama/kimi-k2:1t-cloud": {"supports_function_calling": True},
+        # GLM
+        "ollama_chat/glm-4.6:cloud": {"supports_function_calling": True},
+        "ollama_chat/glm-4.6": {"supports_function_calling": True},
+        "ollama/glm-4.6": {"supports_function_calling": True},
+        "ollama/glm-4.6-cloud": {"supports_function_calling": True},
+    }
 
-
-def _register_ollama_models() -> None:
-    litellm.register_model(
-        model_cost={
-            # GPT-OSS models
-            "ollama_chat/gpt-oss:120b-cloud": {"supports_function_calling": True},
-            "ollama_chat/gpt-oss:120b": {"supports_function_calling": True},
-            "ollama_chat/gpt-oss:20b-cloud": {"supports_function_calling": True},
-            "ollama_chat/gpt-oss:20b": {"supports_function_calling": True},
-            "ollama/gpt-oss:120b-cloud": {"supports_function_calling": True},
-            "ollama/gpt-oss:120b": {"supports_function_calling": True},
-            "ollama/gpt-oss:20b-cloud": {"supports_function_calling": True},
-            "ollama/gpt-oss:20b": {"supports_function_calling": True},
-            # DeepSeek models
-            "ollama_chat/deepseek-r1:latest": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:1.5b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:7b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:8b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:14b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:32b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:70b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-r1:671b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-v3.1:latest": {"supports_function_calling": True},
-            "ollama_chat/deepseek-v3.1:671b": {"supports_function_calling": True},
-            "ollama_chat/deepseek-v3.1:671b-cloud": {"supports_function_calling": True},
-            "ollama/deepseek-r1:latest": {"supports_function_calling": True},
-            "ollama/deepseek-r1:1.5b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:7b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:8b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:14b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:32b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:70b": {"supports_function_calling": True},
-            "ollama/deepseek-r1:671b": {"supports_function_calling": True},
-            "ollama/deepseek-v3.1:latest": {"supports_function_calling": True},
-            "ollama/deepseek-v3.1:671b": {"supports_function_calling": True},
-            "ollama/deepseek-v3.1:671b-cloud": {"supports_function_calling": True},
-            # Gemma3 models
-            "ollama_chat/gemma3:latest": {"supports_function_calling": True},
-            "ollama_chat/gemma3:270m": {"supports_function_calling": True},
-            "ollama_chat/gemma3:1b": {"supports_function_calling": True},
-            "ollama_chat/gemma3:4b": {"supports_function_calling": True},
-            "ollama_chat/gemma3:12b": {"supports_function_calling": True},
-            "ollama_chat/gemma3:27b": {"supports_function_calling": True},
-            "ollama/gemma3:latest": {"supports_function_calling": True},
-            "ollama/gemma3:270m": {"supports_function_calling": True},
-            "ollama/gemma3:1b": {"supports_function_calling": True},
-            "ollama/gemma3:4b": {"supports_function_calling": True},
-            "ollama/gemma3:12b": {"supports_function_calling": True},
-            "ollama/gemma3:27b": {"supports_function_calling": True},
-            # Qwen models
-            "ollama_chat/qwen3-coder:latest": {"supports_function_calling": True},
-            "ollama_chat/qwen3-coder:30b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-coder:480b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-coder:480b-cloud": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:latest": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:2b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:4b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:8b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:30b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:32b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:235b": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:235b-cloud": {"supports_function_calling": True},
-            "ollama_chat/qwen3-vl:235b-instruct-cloud": {
-                "supports_function_calling": True
-            },
-            "ollama/qwen3-coder:latest": {"supports_function_calling": True},
-            "ollama/qwen3-coder:30b": {"supports_function_calling": True},
-            "ollama/qwen3-coder:480b": {"supports_function_calling": True},
-            "ollama/qwen3-coder:480b-cloud": {"supports_function_calling": True},
-            "ollama/qwen3-vl:latest": {"supports_function_calling": True},
-            "ollama/qwen3-vl:2b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:4b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:8b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:30b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:32b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:235b": {"supports_function_calling": True},
-            "ollama/qwen3-vl:235b-cloud": {"supports_function_calling": True},
-            "ollama/qwen3-vl:235b-instruct-cloud": {"supports_function_calling": True},
-            # Kimi
-            "ollama_chat/kimi-k2:1t": {"supports_function_calling": True},
-            "ollama_chat/kimi-k2:1t-cloud": {"supports_function_calling": True},
-            "ollama/kimi-k2:1t": {"supports_function_calling": True},
-            "ollama/kimi-k2:1t-cloud": {"supports_function_calling": True},
-            # GLM
-            "ollama_chat/glm-4.6:cloud": {"supports_function_calling": True},
-            "ollama_chat/glm-4.6": {"supports_function_calling": True},
-            "ollama/glm-4.6": {"supports_function_calling": True},
-            "ollama/glm-4.6-cloud": {"supports_function_calling": True},
-        }
-    )
+    # Seed the keys first. litellm treats a model it does not already know as a
+    # live Ollama deployment: it POSTs to the Ollama server for each name, then
+    # stores the result under the prefix-stripped key. One pass would leave
+    # every ollama_chat/* model without function calling.
+    for model_name in model_cost:
+        litellm.model_cost.setdefault(model_name, {})
+    litellm.register_model(model_cost=model_cost)
 
 
 def load_model_metadata_enrichments() -> None:
@@ -197,7 +169,25 @@ def load_model_metadata_enrichments() -> None:
         logger.error("Failed to load model metadata enrichments: %s", e)
 
 
+_INIT_LOCK = threading.Lock()
+_initialized = False
+
+
 def initialize_litellm() -> None:
-    configure_litellm_settings()
-    register_ollama_models()
-    load_model_metadata_enrichments()
+    """Configure the process-wide litellm module. Safe to call from any thread.
+
+    Runs once per process. Repeat calls are not free: they re-register every
+    Ollama model, which rebuilds litellm's model lookup maps and clears its
+    model-info caches, and they mutate litellm.model_cost while other threads
+    iterate it.
+    """
+    global _initialized
+    if _initialized:
+        return
+    with _INIT_LOCK:
+        if _initialized:
+            return
+        configure_litellm_settings()
+        register_ollama_models()
+        load_model_metadata_enrichments()
+        _initialized = True

@@ -1285,7 +1285,7 @@ export default function ChatPreferencesPage() {
                         </Section>
 
                         <Button
-                          href="/admin/indexing/status"
+                          href="/admin/indexing-status"
                           prominence="tertiary"
                           rightIcon={SvgExternalLink}
                         >
