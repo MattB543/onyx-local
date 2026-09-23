@@ -501,9 +501,7 @@ class TestClaudeDefaultMaxTokens:
     registry output limit) — otherwise LiteLLM/Bedrock apply a 4096-token
     default that truncates answers and empties hard-thinking responses."""
 
-    def _llm(
-        self, model_name: str, deployment_name: str | None = None
-    ) -> LitellmLLM:
+    def _llm(self, model_name: str, deployment_name: str | None = None) -> LitellmLLM:
         return LitellmLLM(
             api_key="test_key",
             timeout=30,
@@ -558,6 +556,59 @@ class TestClaudeDefaultMaxTokens:
             list(llm.stream(messages, reasoning_effort=ReasoningEffort.MEDIUM))
             sent = mock_completion.call_args.kwargs["max_tokens"]
             assert sent is not None and sent >= 8192
+
+    def _complete_with_max_tokens_rejection(
+        self, llm: LitellmLLM, max_tokens: int | None = None
+    ) -> list[int | None]:
+        """Run _completion against a provider that 400s any explicit
+        max_tokens; return the max_tokens each attempt sent."""
+        from litellm.exceptions import BadRequestError
+
+        sent: list[int | None] = []
+
+        def completion(**kwargs: Any) -> Any:
+            sent.append(kwargs["max_tokens"])
+            if kwargs["max_tokens"] is not None:
+                raise BadRequestError(
+                    message="prompt tokens + max_tokens exceeds the context window",
+                    model="m",
+                    llm_provider="anthropic",
+                )
+            return "ok"
+
+        with patch(
+            "onyx.llm.litellm_singleton.litellm.completion", side_effect=completion
+        ):
+            assert (
+                llm._completion(
+                    prompt=[UserMessage(content="Hi")],
+                    tools=None,
+                    tool_choice=None,
+                    stream=False,
+                    parallel_tool_calls=False,
+                    max_tokens=max_tokens,
+                )
+                == "ok"
+            )
+        return sent
+
+    def test_rejected_auto_max_tokens_degrades_to_provider_default(self) -> None:
+        # One retry with max_tokens=None, and the recorded request params
+        # describe the call that succeeded (not the rejected one).
+        from onyx.llm.request_context import get_llm_request_params
+
+        sent = self._complete_with_max_tokens_rejection(self._llm("claude-opus-5"))
+        assert sent == [100_000, None]
+        params = get_llm_request_params()
+        assert params is not None and params["max_tokens"] is None
+
+    def test_rejected_caller_max_tokens_is_not_degraded(self) -> None:
+        from litellm.exceptions import BadRequestError
+
+        with pytest.raises(BadRequestError):
+            self._complete_with_max_tokens_rejection(
+                self._llm("claude-opus-5"), max_tokens=1234
+            )
 
 
 def test_claude_only_in_deployment_name_omits_temperature_and_reasons() -> None:

@@ -1175,9 +1175,7 @@ class LitellmLLM(LLM):
                             sorted(_BEST_EFFORT_KWARG_KEYS & attempts[i + 1].keys()),
                             e,
                         )
-                raise RuntimeError(
-                    "unreachable: retry ladder always returns or raises"
-                )
+                raise RuntimeError("unreachable: retry ladder always returns or raises")
 
             try:
                 return _run_attempts(max_tokens)
