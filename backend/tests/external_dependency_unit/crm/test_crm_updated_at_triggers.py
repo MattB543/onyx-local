@@ -8,9 +8,13 @@ go backwards.
 import asyncio
 import importlib.util
 import io
+import threading
+import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -34,6 +38,7 @@ from onyx.db.models import (
     CrmInteraction,
     CrmInteractionAttendee,
     CrmOrganization,
+    CrmOrganization__Tag,
     CrmTag,
     User,
     User__UserGroup,
@@ -109,21 +114,46 @@ def test_owner_change_bumps_contact(db_session: Session, crm: CrmRecords) -> Non
 def test_link_row_update_bumps_old_and_new_parent(
     db_session: Session, crm: CrmRecords
 ) -> None:
-    old_contact = crm.contact()
-    new_contact = crm.contact()
     tag = crm.tag()
+    user = crm.user()
+    old_contact, new_contact = crm.contact(), crm.contact()
+    old_org, new_org = crm.org(), crm.org()
     add_tag_to_contact(db_session, contact_id=old_contact.id, tag_id=tag.id)
-
-    cutoff = db_clock(db_session)
-    db_session.execute(
-        update(CrmContact__Tag)
-        .where(CrmContact__Tag.contact_id == old_contact.id)
-        .values(contact_id=new_contact.id)
-    )
+    add_tag_to_organization(db_session, organization_id=old_org.id, tag_id=tag.id)
+    db_session.add(CrmContactOwner(contact_id=old_contact.id, user_id=user.id))
     db_session.commit()
 
-    assert stamp(db_session, CrmContact, old_contact.id) > cutoff
-    assert stamp(db_session, CrmContact, new_contact.id) > cutoff
+    for statement, model, old_id, new_id in (
+        (
+            update(CrmContact__Tag)
+            .where(CrmContact__Tag.contact_id == old_contact.id)
+            .values(contact_id=new_contact.id),
+            CrmContact,
+            old_contact.id,
+            new_contact.id,
+        ),
+        (
+            update(CrmContactOwner)
+            .where(CrmContactOwner.contact_id == old_contact.id)
+            .values(contact_id=new_contact.id),
+            CrmContact,
+            old_contact.id,
+            new_contact.id,
+        ),
+        (
+            update(CrmOrganization__Tag)
+            .where(CrmOrganization__Tag.organization_id == old_org.id)
+            .values(organization_id=new_org.id),
+            CrmOrganization,
+            old_org.id,
+            new_org.id,
+        ),
+    ):
+        cutoff = db_clock(db_session)
+        db_session.execute(statement)
+        db_session.commit()
+        assert stamp(db_session, model, old_id) > cutoff
+        assert stamp(db_session, model, new_id) > cutoff
 
 
 def test_interaction_changes_bump_primary_attendee_and_org(
@@ -197,26 +227,36 @@ def test_attendee_changes_bump_attendee_and_interaction_only(
         )
     )
     db_session.commit()
-    added = stamp(db_session, CrmContact, attendee.id)
-    assert added > cutoff
+    assert stamp(db_session, CrmContact, attendee.id) > cutoff
     assert stamp(db_session, CrmInteraction, interaction.id) > cutoff
 
-    db_session.execute(
-        update(CrmInteractionAttendee)
-        .where(CrmInteractionAttendee.contact_id == attendee.id)
-        .values(role=CrmAttendeeRole.ORGANIZER)
-    )
-    db_session.commit()
-    role_changed = stamp(db_session, CrmContact, attendee.id)
-    assert role_changed > added
-
-    db_session.execute(
-        delete(CrmInteractionAttendee).where(
-            CrmInteractionAttendee.contact_id == attendee.id
-        )
-    )
-    db_session.commit()
-    assert stamp(db_session, CrmContact, attendee.id) > role_changed
+    other = crm.contact()
+    for statement, touched_contact_ids in (
+        (
+            update(CrmInteractionAttendee)
+            .where(CrmInteractionAttendee.contact_id == attendee.id)
+            .values(role=CrmAttendeeRole.ORGANIZER),
+            [attendee.id],
+        ),
+        (
+            update(CrmInteractionAttendee)
+            .where(CrmInteractionAttendee.contact_id == attendee.id)
+            .values(contact_id=other.id),
+            [attendee.id, other.id],
+        ),
+        (
+            delete(CrmInteractionAttendee).where(
+                CrmInteractionAttendee.contact_id == other.id
+            ),
+            [other.id],
+        ),
+    ):
+        cutoff = db_clock(db_session)
+        db_session.execute(statement)
+        db_session.commit()
+        assert stamp(db_session, CrmInteraction, interaction.id) > cutoff
+        for contact_id in touched_contact_ids:
+            assert stamp(db_session, CrmContact, contact_id) > cutoff
 
     # The interaction touch does not chain on to its primary contact or org.
     assert stamp(db_session, CrmContact, primary.id) == primary_before
@@ -251,14 +291,22 @@ def test_contact_insert_move_and_delete_bump_organizations(
     assert stamp(db_session, CrmOrganization, other_org.id) > cutoff
 
 
-def test_user_delete_cascades_attendee_rows_and_bumps(
+def test_user_delete_cascades_bump_linked_records(
     db_session: Session, crm: CrmRecords
 ) -> None:
     user = crm.user()
     owned = crm.contact()
     db_session.add(CrmContactOwner(contact_id=owned.id, user_id=user.id))
     db_session.commit()
-    interaction = crm.interaction(attendee_user_ids=[user.id])
+    created = crm.contact(created_by=user.id)
+    attended = crm.interaction(attendee_user_ids=[user.id])
+    logged_primary = crm.contact()
+    logged_org = crm.org()
+    crm.interaction(
+        logged_by=user.id,
+        contact_id=logged_primary.id,
+        organization_id=logged_org.id,
+    )
     user_id = user.id
 
     cutoff = db_clock(db_session)
@@ -275,7 +323,10 @@ def test_user_delete_cascades_attendee_rows_and_bumps(
     )
     assert remaining == 0
     assert stamp(db_session, CrmContact, owned.id) > cutoff
-    assert stamp(db_session, CrmInteraction, interaction.id) > cutoff
+    assert stamp(db_session, CrmContact, created.id) > cutoff
+    assert stamp(db_session, CrmInteraction, attended.id) > cutoff
+    assert stamp(db_session, CrmContact, logged_primary.id) > cutoff
+    assert stamp(db_session, CrmOrganization, logged_org.id) > cutoff
 
 
 def test_tag_delete_bumps_tagged_records(db_session: Session, crm: CrmRecords) -> None:
@@ -386,6 +437,123 @@ def test_concurrent_transactions_never_move_updated_at_backwards(
     assert stamp(db_session, CrmContact, contact.id) > late_stamp
 
 
+def _wait_until_blocked(db_session: Session, pid: int) -> None:
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        wait_type = db_session.execute(
+            text("SELECT wait_event_type FROM pg_stat_activity WHERE pid = :pid"),
+            {"pid": pid},
+        ).scalar()
+        db_session.commit()
+        if wait_type == "Lock":
+            return
+        time.sleep(0.05)
+    raise AssertionError("The second writer never waited on a lock.")
+
+
+def _run_blocked_writer(
+    db_session: Session,
+    holder: Session,
+    writer: Session,
+    write: Callable[[Session], Any],
+    holder_write: Callable[[Session], Any] | None = None,
+) -> None:
+    """Run write(writer) in a thread until it waits on holder's row locks.
+    Then run holder_write(holder), commit holder, and require the writer to
+    finish without an error (a deadlock would fail one of them)."""
+    errors: list[BaseException] = []
+    writer.execute(text("SET LOCAL lock_timeout = '10s'"))
+    writer_pid = writer.execute(text("SELECT pg_backend_pid()")).scalar_one()
+
+    def target() -> None:
+        try:
+            write(writer)
+            writer.commit()
+        except BaseException as e:
+            errors.append(e)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    try:
+        _wait_until_blocked(db_session, writer_pid)
+        if holder_write is not None:
+            holder_write(holder)
+    finally:
+        holder.commit()
+        thread.join(timeout=15)
+    assert not thread.is_alive()
+    assert errors == []
+
+
+def test_waiting_writer_stamps_after_the_committed_value(
+    db_session: Session, crm: CrmRecords
+) -> None:
+    contact = crm.contact()
+
+    with (
+        get_session_with_current_tenant() as first,
+        get_session_with_current_tenant() as second,
+    ):
+        first.execute(
+            update(CrmContact).where(CrmContact.id == contact.id).values(notes="1")
+        )
+        first_stamp = stamp(first, CrmContact, contact.id)
+        _run_blocked_writer(
+            db_session,
+            holder=first,
+            writer=second,
+            write=lambda session: session.execute(
+                update(CrmContact).where(CrmContact.id == contact.id).values(notes="2")
+            ),
+        )
+
+    assert stamp(db_session, CrmContact, contact.id) > first_stamp
+
+
+def test_interaction_edit_and_attendee_change_do_not_deadlock(
+    db_session: Session, crm: CrmRecords
+) -> None:
+    """Every trigger locks the interaction before its contacts. If the attendee
+    trigger locked the contact first, the editor's touch of that contact
+    would deadlock with the waiting attendee change."""
+    attendee = crm.contact()
+    interaction = crm.interaction(attendee_contact_ids=[attendee.id])
+
+    with (
+        get_session_with_current_tenant() as editor,
+        get_session_with_current_tenant() as attendee_writer,
+    ):
+        editor.execute(text("SET LOCAL lock_timeout = '10s'"))
+        # The row lock an ordinary UPDATE takes.
+        editor.execute(
+            select(CrmInteraction.id)
+            .where(CrmInteraction.id == interaction.id)
+            .with_for_update(key_share=True)
+        )
+        _run_blocked_writer(
+            db_session,
+            holder=editor,
+            writer=attendee_writer,
+            write=lambda session: session.execute(
+                update(CrmInteractionAttendee)
+                .where(CrmInteractionAttendee.contact_id == attendee.id)
+                .values(role=CrmAttendeeRole.ORGANIZER)
+            ),
+            holder_write=lambda session: session.execute(
+                update(CrmInteraction)
+                .where(CrmInteraction.id == interaction.id)
+                .values(summary="edited")
+            ),
+        )
+
+    role = db_session.scalar(
+        select(CrmInteractionAttendee.role).where(
+            CrmInteractionAttendee.contact_id == attendee.id
+        )
+    )
+    assert role == CrmAttendeeRole.ORGANIZER
+
+
 def test_two_changes_in_one_transaction_get_increasing_stamps(
     db_session: Session, crm: CrmRecords
 ) -> None:
@@ -487,27 +655,78 @@ def _trigger_names(db_session: Session) -> set[str]:
     )
 
 
-def _attendee_user_fk_action(db_session: Session) -> str:
+def _crm_functions(db_session: Session) -> set[str]:
+    return set(
+        db_session.scalars(
+            text(
+                "SELECT p.proname FROM pg_proc p "
+                "JOIN pg_namespace n ON n.oid = p.pronamespace "
+                "WHERE n.nspname = current_schema() AND p.proname LIKE 'crm\\_%'"
+            )
+        )
+    )
+
+
+def _attendee_user_fks(db_session: Session) -> list[tuple[str, str]]:
+    rows = db_session.execute(
+        text(
+            "SELECT con.conname, con.confdeltype FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid "
+            "AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' "
+            "AND con.conrelid = 'crm_interaction_attendee'::regclass "
+            "AND att.attname = 'user_id'"
+        )
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
+def _attendee_contact_index(db_session: Session) -> str | None:
     return db_session.execute(
         text(
-            "SELECT confdeltype FROM pg_constraint "
-            "WHERE conname = 'crm_interaction_attendee_user_id_fkey' "
-            "AND conrelid = 'crm_interaction_attendee'::regclass"
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() "
+            "AND indexname = 'ix_crm_interaction_attendee_contact_interaction'"
         )
-    ).scalar_one()
+    ).scalar()
 
 
 def test_migration_downgrade_and_upgrade_round_trip() -> None:
-    """Runs downgrade() then upgrade() in one transaction and rolls it back."""
+    """Runs downgrade() then upgrade() in one transaction and rolls it back.
+    The FK is renamed in between, as older production schemas name it
+    differently."""
     migration = _load_migration()
     with get_session_with_current_tenant() as session:
         connection = session.connection()
         with Operations.context(MigrationContext.configure(connection)):
             migration.downgrade()
             assert _trigger_names(session).isdisjoint(CRM_TRIGGERS)
-            assert _attendee_user_fk_action(session) == "n"
+            assert _crm_functions(session) == set()
+            assert _attendee_contact_index(session) is None
+            assert _attendee_user_fks(session) == [
+                ("crm_interaction_attendee_user_id_fkey", "n")
+            ]
 
+            session.execute(
+                text(
+                    "ALTER TABLE crm_interaction_attendee RENAME CONSTRAINT "
+                    "crm_interaction_attendee_user_id_fkey TO legacy_attendee_user_fk"
+                )
+            )
             migration.upgrade()
             assert CRM_TRIGGERS <= _trigger_names(session)
-            assert _attendee_user_fk_action(session) == "c"
+            assert _crm_functions(session) == {
+                "crm_set_updated_at",
+                "crm_touch_rows",
+                "crm_touch_link_parent",
+                "crm_interaction_touch_related",
+                "crm_interaction_attendee_touch_related",
+                "crm_contact_touch_organization",
+            }
+            assert _attendee_user_fks(session) == [
+                ("crm_interaction_attendee_user_id_fkey", "c")
+            ]
+            index_def = _attendee_contact_index(session)
+            assert index_def is not None
+            assert "(contact_id, interaction_id)" in index_def
+            assert "WHERE (contact_id IS NOT NULL)" in index_def
         session.rollback()

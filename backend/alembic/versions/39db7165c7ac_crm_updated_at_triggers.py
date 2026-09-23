@@ -124,6 +124,8 @@ def upgrade() -> None:
     # Touch = no-op UPDATE, which fires crm_set_updated_at. IDs are
     # de-duplicated and touched in sorted order to reduce deadlocks. A row
     # deleted earlier in the same statement (cascade) matches 0 rows.
+    # Across tables, every function locks interactions, then contacts, then
+    # organizations; a different order lets two writers deadlock.
     op.execute(
         f"""
         CREATE OR REPLACE FUNCTION "{s}".crm_touch_rows(target regclass, ids uuid[])
@@ -220,10 +222,10 @@ def upgrade() -> None:
                 contact_ids := contact_ids || NEW.contact_id;
                 interaction_ids := interaction_ids || NEW.interaction_id;
             END IF;
-            PERFORM "{s}".crm_touch_rows('"{s}".crm_contact'::regclass, contact_ids);
             PERFORM "{s}".crm_touch_rows(
                 '"{s}".crm_interaction'::regclass, interaction_ids
             );
+            PERFORM "{s}".crm_touch_rows('"{s}".crm_contact'::regclass, contact_ids);
             RETURN NULL;
         END;
         $$ LANGUAGE plpgsql;
