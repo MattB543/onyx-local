@@ -1,4 +1,4 @@
-"""Strict input validation shared by the CRM write tools.
+"""Strict input validation shared by the CRM tools.
 
 Every check raises ToolCallException with a message that names the offending
 fields or values, so the model can correct the call instead of having input
@@ -37,6 +37,18 @@ MAX_PAGE_SIZE = 25
 
 def _describe(value: Any) -> str:
     return json.dumps(value, default=str)
+
+
+def parse_entity_type(value: Any, allowed: Collection[str], tool_name: str) -> str:
+    entity_type = value.strip().lower() if isinstance(value, str) else ""
+    if entity_type not in allowed:
+        raise ToolCallException(
+            message=f"Unsupported entity_type in {tool_name}: {value!r}",
+            llm_facing_message=(
+                f"'entity_type' must be one of: {', '.join(sorted(allowed))}."
+            ),
+        )
+    return entity_type
 
 
 def reject_unknown_keys(
@@ -203,8 +215,9 @@ class CrmWrite:
 @contextmanager
 def crm_write_errors(action: str) -> Iterator[CrmWrite]:
     """Wrap the write phase of a CRM tool call, up to and including its
-    commit. On failure the session rolls back, files stored during the write
-    are deleted, and database errors become model-facing tool errors."""
+    commit. On failure, files stored during the write are deleted and database
+    errors become model-facing tool errors. The caller's session context does
+    the rollback."""
     write = CrmWrite()
     try:
         try:

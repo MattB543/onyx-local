@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
     get_contact_names,
     get_contact_owner_ids,
@@ -26,7 +28,17 @@ from onyx.db.models import (
     CrmTag,
 )
 from onyx.file_store.utils import build_frontend_file_url
-from onyx.tools.models import ToolCallException
+from onyx.server.query_and_chat.placement import Placement
+from onyx.server.query_and_chat.streaming_models import (
+    CrmCreateToolDelta,
+    CrmGetToolDelta,
+    CrmListToolDelta,
+    CrmLogInteractionToolDelta,
+    CrmSearchToolDelta,
+    CrmUpdateToolDelta,
+    Packet,
+)
+from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_json
 from onyx.tools.tool_implementations.payload_utils import (
     compact_tool_payload_for_model as compact_tool_payload_for_model,
@@ -45,6 +57,32 @@ REQUIRED_CRM_TABLES = {
     "crm_contact__tag",
     "crm_organization__tag",
 }
+
+
+CrmToolDelta = (
+    CrmCreateToolDelta
+    | CrmGetToolDelta
+    | CrmListToolDelta
+    | CrmLogInteractionToolDelta
+    | CrmSearchToolDelta
+    | CrmUpdateToolDelta
+)
+
+
+def crm_tool_response(
+    emitter: Emitter,
+    placement: Placement,
+    payload: dict[str, Any],
+    delta_type: type[CrmToolDelta],
+) -> ToolResponse:
+    """Stream the compacted payload and return it as the tool response. The
+    model sees the same compacted payload as the UI."""
+    compact_payload = compact_tool_payload_for_model(payload)
+    emitter.emit(Packet(placement=placement, obj=delta_type(payload=compact_payload)))
+    return ToolResponse(
+        rich_response=json.dumps(payload, default=str),
+        llm_facing_response=as_llm_json(compact_payload, already_compacted=True),
+    )
 
 
 def is_crm_schema_available(db_session: Session) -> bool:

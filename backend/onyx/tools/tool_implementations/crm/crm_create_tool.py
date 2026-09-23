@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -32,8 +31,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
     parse_enum_maybe,
     parse_stage_maybe,
@@ -45,6 +43,7 @@ from onyx.tools.tool_implementations.crm.models import (
 from onyx.tools.tool_implementations.crm.validation import (
     crm_write_errors,
     delete_file_best_effort,
+    parse_entity_type,
     parse_uuid_list,
     reject_unknown_keys,
     require_tags,
@@ -610,15 +609,9 @@ class CrmCreateTool(Tool[None]):
             ("entity_type", *CREATE_FIELDS_BY_ENTITY_TYPE),
             "crm_create arguments",
         )
-        entity_type_raw = llm_kwargs.get("entity_type")
-        entity_type = (
-            entity_type_raw.strip().lower() if isinstance(entity_type_raw, str) else ""
+        entity_type = parse_entity_type(
+            llm_kwargs.get("entity_type"), CRM_CREATE_ENTITY_TYPES, self.name
         )
-        if entity_type not in CRM_CREATE_ENTITY_TYPES:
-            raise ToolCallException(
-                message=f"Unsupported entity_type in {self.name}: {entity_type_raw}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, tag.",
-            )
 
         misplaced = sorted(
             key
@@ -653,17 +646,4 @@ class CrmCreateTool(Tool[None]):
             else:
                 payload = self._create_tag(db_session, data)
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmCreateToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmCreateToolDelta)

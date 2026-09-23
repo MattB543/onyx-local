@@ -26,8 +26,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
     serialize_contacts,
     serialize_interactions,
@@ -35,6 +34,7 @@ from onyx.tools.tool_implementations.crm.models import (
     serialize_tag,
 )
 from onyx.tools.tool_implementations.crm.validation import (
+    parse_entity_type,
     parse_uuid,
     reject_unknown_keys,
 )
@@ -176,15 +176,9 @@ class CrmGetTool(Tool[None]):
         reject_unknown_keys(
             llm_kwargs, ("entity_type", "entity_id", "include"), "crm_get arguments"
         )
-        entity_type_raw = llm_kwargs.get("entity_type")
-        entity_type = (
-            entity_type_raw.strip().lower() if isinstance(entity_type_raw, str) else ""
+        entity_type = parse_entity_type(
+            llm_kwargs.get("entity_type"), CRM_GET_ENTITY_TYPES, self.name
         )
-        if entity_type not in CRM_GET_ENTITY_TYPES:
-            raise ToolCallException(
-                message=f"Unsupported entity_type in {self.name}: {entity_type_raw}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, interaction, tag.",
-            )
 
         entity_id = parse_uuid(llm_kwargs.get("entity_id"), "entity_id")
         includes = self._parse_includes(entity_type, llm_kwargs.get("include"))
@@ -199,20 +193,7 @@ class CrmGetTool(Tool[None]):
             else:
                 payload = self._get_tag(db_session, entity_id)
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmGetToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmGetToolDelta)
 
     def _recent_interactions(
         self,

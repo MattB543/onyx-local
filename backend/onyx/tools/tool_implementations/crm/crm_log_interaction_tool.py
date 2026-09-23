@@ -25,8 +25,7 @@ from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.attendee_resolution import resolve_attendees
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
     parse_datetime_maybe,
     parse_enum_maybe,
@@ -318,17 +317,6 @@ class CrmLogInteractionTool(Tool[None]):
                     _unresolved_attendee_warning(item) for item in unresolved_attendees
                 ]
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmLogInteractionToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
+        return crm_tool_response(
+            self.emitter, placement, payload, CrmLogInteractionToolDelta
         )

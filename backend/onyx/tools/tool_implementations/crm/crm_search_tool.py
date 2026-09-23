@@ -17,11 +17,14 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
 )
-from onyx.tools.tool_implementations.crm.validation import MAX_PAGE_SIZE, parse_page
+from onyx.tools.tool_implementations.crm.validation import (
+    MAX_PAGE_SIZE,
+    parse_page,
+    reject_unknown_keys,
+)
 
 CRM_SEARCH_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 
@@ -113,6 +116,11 @@ class CrmSearchTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        reject_unknown_keys(
+            llm_kwargs,
+            ("query", "entity_types", "page_num", "page_size"),
+            "crm_search arguments",
+        )
         query = llm_kwargs.get("query")
         if not isinstance(query, str) or not query.strip():
             raise ToolCallException(
@@ -179,17 +187,4 @@ class CrmSearchTool(Tool[None]):
             ],
         }
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmSearchToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmSearchToolDelta)

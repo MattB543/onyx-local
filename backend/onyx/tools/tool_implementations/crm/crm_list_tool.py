@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -29,8 +28,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
     parse_datetime_maybe,
     parse_enum_maybe,
@@ -42,6 +40,7 @@ from onyx.tools.tool_implementations.crm.models import (
 )
 from onyx.tools.tool_implementations.crm.validation import (
     MAX_PAGE_SIZE,
+    parse_entity_type,
     parse_page,
     parse_uuid,
     parse_uuid_list,
@@ -244,15 +243,9 @@ class CrmListTool(Tool[None]):
         args = {key: value for key, value in llm_kwargs.items() if value is not None}
         reject_unknown_keys(args, ALL_FIELDS, "crm_list arguments")
 
-        entity_type_raw = args.get("entity_type")
-        entity_type = (
-            entity_type_raw.strip().lower() if isinstance(entity_type_raw, str) else ""
+        entity_type = parse_entity_type(
+            args.get("entity_type"), CRM_LIST_ENTITY_TYPES, self.name
         )
-        if entity_type not in CRM_LIST_ENTITY_TYPES:
-            raise ToolCallException(
-                message=f"Unsupported entity_type in {self.name}: {entity_type_raw}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, interaction, tag.",
-            )
 
         allowed = FILTERS_BY_ENTITY_TYPE[entity_type]
         inapplicable = sorted(
@@ -290,20 +283,7 @@ class CrmListTool(Tool[None]):
             else:
                 payload = self._list_tags(db_session, args, page_num, page_size)
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmListToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmListToolDelta)
 
     def _parse_datetime(self, args: dict[str, Any], field: str) -> datetime | None:
         raw = args.get(field)

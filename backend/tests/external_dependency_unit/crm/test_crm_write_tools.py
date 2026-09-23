@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from psycopg2.errors import DeadlockDetected, LockNotAvailable
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,7 @@ from onyx.tools.tool_implementations.crm.crm_get_tool import CrmGetTool
 from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
     CrmLogInteractionTool,
 )
+from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
 from onyx.tools.tool_implementations.crm.validation import crm_write_errors
 from tests.external_dependency_unit.crm.conftest import CrmRecords, stamp
@@ -575,31 +576,28 @@ def test_log_rejects_unknown_attendee_fields(
     )
 
 
-def _open_transactions_elsewhere() -> int:
-    with get_session_with_current_tenant() as session:
-        return session.execute(
-            text(
-                "SELECT count(*) FROM pg_stat_activity "
-                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
-                "AND state LIKE 'idle in transaction%'"
-            )
-        ).scalar_one()
-
-
 def test_picture_download_holds_no_transaction_and_failed_write_deletes_it(
-    db_session: Session, crm: CrmRecords, tools: CrmTools
+    crm: CrmRecords, tools: CrmTools
 ) -> None:
     taken_email = f"taken-{uuid4().hex[:8]}@example.com"
     crm.contact(email=taken_email)
     contact = crm.contact()
-    db_session.commit()
-    open_during_download: list[int] = []
+    tool_sessions: list[Session] = []
+    make_session = tools.update._session_factory
+
+    def recording_session_factory() -> Session:
+        session = make_session()
+        tool_sessions.append(session)
+        return session
+
+    in_transaction_during_download: list[bool] = []
 
     def fake_download(*_args: Any, **_kwargs: Any) -> str:
-        open_during_download.append(_open_transactions_elsewhere())
+        in_transaction_during_download.append(tool_sessions[-1].in_transaction())
         return "file-downloaded"
 
     with (
+        patch.object(tools.update, "_session_factory", recording_session_factory),
         patch(
             "onyx.tools.tool_implementations.crm.crm_update_tool.save_file_from_url",
             side_effect=fake_download,
@@ -619,7 +617,7 @@ def test_picture_download_holds_no_transaction_and_failed_write_deletes_it(
         )
 
     assert "already exists" in message
-    assert open_during_download == [0]
+    assert in_transaction_during_download == [False]
     file_store.return_value.delete_file.assert_called_once_with(
         "file-downloaded", error_on_missing=False
     )
@@ -649,3 +647,9 @@ def test_attendee_replacement_locks_the_interaction(
             )
         assert isinstance(exc_info.value.orig, LockNotAvailable)
         writer.rollback()
+
+
+def test_search_rejects_unknown_arguments(db_session: Session) -> None:
+    search = CrmSearchTool(5, db_session, Emitter(Queue()))
+    message = call_error(search, query="Acme", entity_type="contact")
+    assert "entity_type" in message

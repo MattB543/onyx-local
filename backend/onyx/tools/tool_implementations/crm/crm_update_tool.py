@@ -43,8 +43,7 @@ from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.attendee_resolution import resolve_attendees
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
     parse_datetime_maybe,
     parse_enum_maybe,
@@ -56,6 +55,7 @@ from onyx.tools.tool_implementations.crm.models import (
 )
 from onyx.tools.tool_implementations.crm.validation import (
     crm_write_errors,
+    parse_entity_type,
     parse_uuid_list,
     reject_unknown_keys,
     require_tags,
@@ -726,15 +726,9 @@ class CrmUpdateTool(Tool[None]):
     ) -> ToolResponse:
         reject_unknown_keys(llm_kwargs, TOP_LEVEL_FIELDS, "crm_update arguments")
 
-        entity_type_raw = llm_kwargs.get("entity_type")
-        entity_type = (
-            entity_type_raw.strip().lower() if isinstance(entity_type_raw, str) else ""
+        entity_type = parse_entity_type(
+            llm_kwargs.get("entity_type"), CRM_UPDATE_ENTITY_TYPES, self.name
         )
-        if entity_type not in CRM_UPDATE_ENTITY_TYPES:
-            raise ToolCallException(
-                message=f"Unsupported entity_type in {self.name}: {entity_type_raw}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, interaction.",
-            )
 
         entity_id = parse_uuid_maybe(llm_kwargs.get("entity_id"), "entity_id")
         if not entity_id:
@@ -771,17 +765,4 @@ class CrmUpdateTool(Tool[None]):
             else:
                 payload = self._update_interaction(db_session, entity_id, updates)
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmUpdateToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmUpdateToolDelta)
