@@ -799,4 +799,58 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
   removed (bun install); no migrations.
 - Worktree gotcha: the Agent tool's worktree was created at origin/main (622a5eb889), not
   local main, in BOTH batches — step 0 (`merge-base --is-ancestor main HEAD` → reset) caught it.
+- Codex sanity check (astra medium): 2 SHOULD-FIX, no blockers.
+  1. (sync-introduced) REVERT the new caller-set `min(max_tokens, ANTHROPIC_MAX_OUTPUT_TOKENS)`
+     Claude cap — the setting's documented contract (`model_configs.py`) is "when callers omit
+     max_tokens"; the cap silently lowers valid explicit allowances (128K → 100K). Keep
+     `_default_claude_max_tokens` for None callers. → reverted on main in 63ec2361f2.
+  2. (PRE-EXISTING) the degrade retry doesn't reliably recover on context overflow: it only
+     fires on error text containing `max_tokens` (LiteLLM maps "Input is too long" to
+     `ContextWindowExceededError`), and `None` ≠ 4096 — LiteLLM 1.93 resolves Sonnet 4.5 to
+     64000 for Anthropic/Vertex/Bedrock, so `[64000, None]` can fail twice. Upstream's
+     near-full-context `None` path inherits the same gap. Follow-up: compute a smaller explicit
+     allowance on overflow, refit thinking, test real provider error mappings. NOT fixed.
+  Verified OK: 64000 thinking assertion correct for Sonnet 4.5; #14743/#14744 lookups intact;
+  IMAP TLS + timeout on every attempt, login after verification, no STARTTLS path; Calendar
+  credential template matches backend keys; chat-fork callbacks/prefill/single paste intact;
+  CRM `isJsonObject` guards accept backend payloads; 354 targeted tests + tsc pass.
+
+## Batch 3 — 017c4ef89f (2026-09-23, 65 commits, 100→35 behind; ~16 min)
+
+- Conflicts: 9 (as probed; #14849 search receipts + its revert #14938 net-zero).
+  KEEP OURS: `auth/users.py` (import line only; fork aliases intact). Take theirs:
+  `google_site.ts`, `oauth/api.ts` (b4a033ab62-only, confirmed via full diff). Blends:
+  `file_store/utils.py` (fork per-chat scoping + upstream #14824 file-reference validation:
+  unparseable `user_file_id` now rejected; existing user file must be owned AND match the
+  descriptor id; missing-row valid UUID still falls through to raw-upload/project check),
+  `multi_llm.py` (import block only), `google_pse_client.py` (upstream FURB162
+  `fromisoformat` + fork image extraction), `next.config.js` (upstream
+  `experimental.useTypeScriptCli` + fork `allowedDevOrigins`/`mime`), `useChatController.ts`
+  (upstream chat-scoped `selectedSearchSources`, `useSharedSearchFilters` provider deleted
+  upstream; all fork chat-fork/raw-upload/incognito behavior kept), `types.ts`
+  (`validAutoSyncSources` has fork GoogleCalendar + upstream Outlook).
+- Out-of-marker fixes: (1) upstream #14943 removed `bypass_acl`; fork
+  `custom_jobs/steps/process_email_crm.py` still passed it → TypeError on EVERY email→CRM
+  run, hidden by a mocked unit test (379f4c5936; test now asserts the kwarg is absent).
+  (2) upstream #14779 enabled ruff C4/FURB → 24 violations, all fork files, autofixed
+  (4e991be91c). (3) upstream test fixture needed fork-required `OnyxDocument.image`.
+- NEW PATTERN — removed kwargs: upstream deletes "dead" parameters that only fork callers
+  still pass; mocked fork tests hide it. After each batch, grep fork code for kwargs removed
+  in the range.
+- DEPLOY RISK (not fixed): upstream #14671 now enforces persona access for the ANONYMOUS
+  user (`_add_user_filters`: `is_public AND is_listed`). Email→CRM runs as
+  `get_anonymous_user()`, so the CRM persona in the step's `persona_id` must be public +
+  listed on FLI/FLF/Wrenly or every run fails with "User does not have access to persona";
+  with `bypass_acl` gone, its internal search only sees anonymous-accessible docs.
+- Chat fork: upstream #14846 stores search filters per chat (localStorage, with tool
+  states); a branched chat opens with neutral tools/filters. One-line option:
+  `toolConfiguration.handOffTo(newSessionId)` before `router.push` in `onBranchFromMessage`.
+- Verification: ruff clean; tsc 0 (TS 7.0.2 compiler from main's node_modules — web now
+  pins `typescript@7.1.0-dev.20260916.1`); pytest 1450/1450 targeted; jest 55/55;
+  alembic single head `3f146f01df77`.
+- DEPLOY FLAGS: bun install (TS 7 nightly, opal builds with tsdown); venv rebuild (anyio
+  4.14.2); new optional env `AIRTABLE_ATTACHMENT_SIZE_THRESHOLD`,
+  `DROPBOX_CONNECTOR_SIZE_THRESHOLD`; `StreamingError.stack_trace` only sent in DEV_MODE.
+- Post-batch on main: 63ec2361f2 reverts the batch-2 caller-set Claude max_tokens cap
+  (Codex batch-2 SHOULD-FIX 1); tests lock "default only when None".
 - Codex sanity check: PENDING
