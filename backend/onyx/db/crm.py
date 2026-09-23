@@ -1120,6 +1120,13 @@ def replace_interaction_attendees(
     rows that differ are written, so an unchanged set fires no updated_at
     triggers. Returns True if any attendee row changed.
     """
+    # Lock the interaction first, so concurrent replacements of the same
+    # attendee list apply one after the other, not from the same stale read.
+    db_session.execute(
+        select(CrmInteraction.id)
+        .where(CrmInteraction.id == interaction_id)
+        .with_for_update(key_share=True)
+    )
     desired: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
     for user_id, contact_id, role in attendees:
         key = (user_id, contact_id)

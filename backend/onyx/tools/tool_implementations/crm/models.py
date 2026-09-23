@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
 from sqlalchemy import inspect
@@ -31,6 +31,8 @@ from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_
 from onyx.tools.tool_implementations.payload_utils import (
     compact_tool_payload_for_model as compact_tool_payload_for_model,
 )
+
+E = TypeVar("E", bound=Enum)
 
 REQUIRED_CRM_TABLES = {
     "crm_settings",
@@ -102,7 +104,7 @@ def parse_datetime_maybe(value: Any, field_name: str) -> datetime | None:
         )
 
 
-def parse_enum_maybe(enum_cls: type[Enum], value: Any, field_name: str) -> Enum | None:
+def parse_enum_maybe(enum_cls: type[E], value: Any, field_name: str) -> E | None:
     if value is None:
         return None
     if isinstance(value, enum_cls):

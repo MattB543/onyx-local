@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Collection, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
@@ -23,7 +24,11 @@ from onyx.db.crm import (
     get_tags_by_ids,
 )
 from onyx.db.models import CrmTag
+from onyx.file_store.file_store import get_default_file_store
 from onyx.tools.models import ToolCallException
+from onyx.utils.logger import setup_logger
+
+logger = setup_logger()
 
 # The payload compactor keeps at most 25 array items, so a larger page would
 # silently lose rows and break offset paging.
@@ -76,8 +81,8 @@ def parse_uuid(value: Any, field_name: str) -> UUID:
 
 
 def parse_uuid_list(value: Any, field_name: str) -> list[UUID]:
-    """A list of UUID strings; null, blank, or malformed entries are errors.
-    Repeated IDs collapse."""
+    """A list of UUID strings; null, blank, malformed, or repeated entries
+    are errors."""
     if not isinstance(value, list):
         raise ToolCallException(
             message=f"{field_name} is not a list: {type(value)}",
@@ -97,7 +102,15 @@ def parse_uuid_list(value: Any, field_name: str) -> list[UUID]:
                 f"'{field_name}' has invalid UUID entries: {', '.join(invalid)}."
             ),
         )
-    return list(dict.fromkeys(parsed))
+    repeated = sorted({str(u) for u in parsed if parsed.count(u) > 1})
+    if repeated:
+        raise ToolCallException(
+            message=f"Repeated UUIDs in {field_name}: {repeated}",
+            llm_facing_message=(
+                f"'{field_name}' lists these IDs more than once: {', '.join(repeated)}."
+            ),
+        )
+    return parsed
 
 
 def require_tags(
@@ -173,12 +186,33 @@ def resolve_owner_ids(db_session: Session, value: Any, field_name: str) -> list[
     return list(dict.fromkeys(resolved))
 
 
-@contextmanager
-def crm_write_errors(action: str) -> Iterator[None]:
-    """Turn database errors from a CRM write into model-facing tool errors.
-    The caller's session rolls back, so nothing from the call is saved."""
+def delete_file_best_effort(file_id: str) -> None:
     try:
-        yield
+        get_default_file_store().delete_file(file_id, error_on_missing=False)
+    except Exception:
+        logger.exception("Failed to delete CRM file: %s", file_id)
+
+
+@dataclass
+class CrmWrite:
+    """Files stored during a write; deleted again if the write fails."""
+
+    stored_file_ids: list[str] = field(default_factory=list)
+
+
+@contextmanager
+def crm_write_errors(action: str) -> Iterator[CrmWrite]:
+    """Wrap the write phase of a CRM tool call, up to and including its
+    commit. On failure the session rolls back, files stored during the write
+    are deleted, and database errors become model-facing tool errors."""
+    write = CrmWrite()
+    try:
+        try:
+            yield write
+        except BaseException:
+            for file_id in write.stored_file_ids:
+                delete_file_best_effort(file_id)
+            raise
     except ValueError as e:
         raise ToolCallException(
             message=f"CRM {action} validation failed: {e}",

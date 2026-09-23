@@ -471,11 +471,7 @@ class CrmListTool(Tool[None]):
             page_size=page_size,
             contact_id=self._optional_uuid(args, "contact_id"),
             organization_id=self._optional_uuid(args, "organization_id"),
-            interaction_type=(
-                interaction_type
-                if isinstance(interaction_type, CrmInteractionType)
-                else None
-            ),
+            interaction_type=interaction_type,
         )
         return self._page(
             "interaction",

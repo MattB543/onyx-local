@@ -44,6 +44,7 @@ from onyx.tools.tool_implementations.crm.models import (
 )
 from onyx.tools.tool_implementations.crm.validation import (
     crm_write_errors,
+    delete_file_best_effort,
     parse_uuid_list,
     reject_unknown_keys,
     require_tags,
@@ -434,50 +435,57 @@ class CrmCreateTool(Tool[None]):
         email = contact_data.get("email")
 
         warnings: list[str] = []
-        profile_picture_file_id: str | None = None
-        if picture_url and not (
-            isinstance(email, str) and get_contact_by_email(email, db_session)
-        ):
-            # End the read transaction: no connection is held during the download.
-            db_session.commit()
-            profile_picture_file_id, warning = self._download_profile_picture(
-                picture_url
-            )
-            if warning:
-                warnings.append(warning)
+        with crm_write_errors("create") as write:
+            profile_picture_file_id: str | None = None
+            if picture_url and not (
+                isinstance(email, str) and get_contact_by_email(email, db_session)
+            ):
+                # End the read transaction: no connection is held during the
+                # download.
+                db_session.commit()
+                profile_picture_file_id, warning = self._download_profile_picture(
+                    picture_url
+                )
+                if warning:
+                    warnings.append(warning)
+                if profile_picture_file_id:
+                    write.stored_file_ids.append(profile_picture_file_id)
 
-        contact, created = create_contact(
-            db_session=db_session,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone=contact_data.get("phone"),
-            title=contact_data.get("title"),
-            organization_id=organization_id,
-            owner_ids=owner_ids,
-            source=source,
-            status=status,
-            category=contact_data.get("category"),
-            party_affiliation=contact_data.get("party_affiliation"),
-            us_state=contact_data.get("us_state"),
-            principal=contact_data.get("principal"),
-            notes=contact_data.get("notes"),
-            linkedin_url=contact_data.get("linkedin_url"),
-            location=contact_data.get("location"),
-            profile_picture_file_id=profile_picture_file_id,
-            created_by=parse_uuid_maybe(self._user_id, "user_id"),
-            commit=False,
-        )
-        tags_added = [
-            tag
-            for tag in tags
-            if add_tag_to_contact(
-                db_session, contact_id=contact.id, tag_id=tag.id, commit=False
+            contact, created = create_contact(
+                db_session=db_session,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                phone=contact_data.get("phone"),
+                title=contact_data.get("title"),
+                organization_id=organization_id,
+                owner_ids=owner_ids,
+                source=source,
+                status=status,
+                category=contact_data.get("category"),
+                party_affiliation=contact_data.get("party_affiliation"),
+                us_state=contact_data.get("us_state"),
+                principal=contact_data.get("principal"),
+                notes=contact_data.get("notes"),
+                linkedin_url=contact_data.get("linkedin_url"),
+                location=contact_data.get("location"),
+                profile_picture_file_id=profile_picture_file_id,
+                created_by=parse_uuid_maybe(self._user_id, "user_id"),
+                commit=False,
             )
-        ]
-        # Commit expires loaded rows, so the serializer re-reads updated_at as
-        # the triggers left it.
-        db_session.commit()
+            tags_added = [
+                tag
+                for tag in tags
+                if add_tag_to_contact(
+                    db_session, contact_id=contact.id, tag_id=tag.id, commit=False
+                )
+            ]
+            # Commit expires loaded rows, so the serializer re-reads updated_at as
+            # the triggers left it.
+            db_session.commit()
+            if not created and profile_picture_file_id:
+                # Another call created the contact first; the picture is unused.
+                delete_file_best_effort(profile_picture_file_id)
 
         payload: dict[str, Any] = {
             "status": "created" if created else "already_exists",
@@ -518,29 +526,30 @@ class CrmCreateTool(Tool[None]):
             db_session, organization_data, "organization.tag_ids"
         )
 
-        organization, created = create_organization(
-            db_session=db_session,
-            name=name,
-            website=organization_data.get("website"),
-            type=organization_type,
-            sector=organization_data.get("sector"),
-            location=organization_data.get("location"),
-            size=organization_data.get("size"),
-            notes=organization_data.get("notes"),
-            created_by=parse_uuid_maybe(self._user_id, "user_id"),
-            commit=False,
-        )
-        tags_added = [
-            tag
-            for tag in tags
-            if add_tag_to_organization(
-                db_session,
-                organization_id=organization.id,
-                tag_id=tag.id,
+        with crm_write_errors("create"):
+            organization, created = create_organization(
+                db_session=db_session,
+                name=name,
+                website=organization_data.get("website"),
+                type=organization_type,
+                sector=organization_data.get("sector"),
+                location=organization_data.get("location"),
+                size=organization_data.get("size"),
+                notes=organization_data.get("notes"),
+                created_by=parse_uuid_maybe(self._user_id, "user_id"),
                 commit=False,
             )
-        ]
-        db_session.commit()
+            tags_added = [
+                tag
+                for tag in tags
+                if add_tag_to_organization(
+                    db_session,
+                    organization_id=organization.id,
+                    tag_id=tag.id,
+                    commit=False,
+                )
+            ]
+            db_session.commit()
 
         payload: dict[str, Any] = {
             "status": "created" if created else "already_exists",
@@ -571,13 +580,14 @@ class CrmCreateTool(Tool[None]):
                 llm_facing_message="'tag.name' is required to create a tag.",
             )
 
-        tag, created = create_tag(
-            db_session=db_session,
-            name=name,
-            color=tag_data.get("color"),
-            commit=False,
-        )
-        db_session.commit()
+        with crm_write_errors("create"):
+            tag, created = create_tag(
+                db_session=db_session,
+                name=name,
+                color=tag_data.get("color"),
+                commit=False,
+            )
+            db_session.commit()
 
         payload: dict[str, Any] = {
             "status": "created" if created else "already_exists",
@@ -635,7 +645,7 @@ class CrmCreateTool(Tool[None]):
                 ),
             )
 
-        with self._session_factory() as db_session, crm_write_errors("create"):
+        with self._session_factory() as db_session:
             if entity_type == "contact":
                 payload = self._create_contact(db_session, data)
             elif entity_type == "organization":

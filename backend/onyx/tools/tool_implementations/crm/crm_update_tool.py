@@ -189,7 +189,8 @@ class CrmUpdateTool(Tool[None]):
                         "updates": {
                             "type": "object",
                             "description": (
-                                "Only the fields to change; null clears a field. "
+                                "Only the fields to change; null clears an "
+                                "optional field. "
                                 + " ".join(
                                     f"{entity_type.capitalize()} fields: "
                                     f"{', '.join(fields)}."
@@ -527,43 +528,49 @@ class CrmUpdateTool(Tool[None]):
     def _update_contact(
         self, db_session: Session, contact: CrmContact, updates: dict[str, Any]
     ) -> dict[str, Any]:
-        tags_to_add, tags_to_remove = self._parse_tag_changes(db_session, updates)
-        owner_ids = (
-            resolve_owner_ids(db_session, updates["owner_ids"], "updates.owner_ids")
-            if "owner_ids" in updates
-            else None
-        )
-        self._require_organization(
-            db_session,
-            parse_uuid_maybe(updates.get("organization_id"), "updates.organization_id"),
-        )
-        if updates.get("profile_picture_url"):
-            # End the read transaction: no connection is held during the download.
-            db_session.commit()
-        patches = self._normalize_contact_updates(updates)
-        if owner_ids is not None:
-            patches["owner_ids"] = owner_ids
+        with crm_write_errors("update") as write:
+            tags_to_add, tags_to_remove = self._parse_tag_changes(db_session, updates)
+            owner_ids = (
+                resolve_owner_ids(db_session, updates["owner_ids"], "updates.owner_ids")
+                if "owner_ids" in updates
+                else None
+            )
+            self._require_organization(
+                db_session,
+                parse_uuid_maybe(
+                    updates.get("organization_id"), "updates.organization_id"
+                ),
+            )
+            if updates.get("profile_picture_url"):
+                # End the read transaction: no connection is held during the
+                # download.
+                db_session.commit()
+            patches = self._normalize_contact_updates(updates)
+            if patches.get("profile_picture_file_id"):
+                write.stored_file_ids.append(patches["profile_picture_file_id"])
+            if owner_ids is not None:
+                patches["owner_ids"] = owner_ids
 
-        _, changed = update_contact(
-            db_session=db_session, contact=contact, patches=patches, commit=False
-        )
-        tags_added = [
-            tag
-            for tag in tags_to_add
-            if add_tag_to_contact(
-                db_session, contact_id=contact.id, tag_id=tag.id, commit=False
+            _, changed = update_contact(
+                db_session=db_session, contact=contact, patches=patches, commit=False
             )
-        ]
-        tags_removed = [
-            tag
-            for tag in tags_to_remove
-            if remove_tag_from_contact(
-                db_session, contact_id=contact.id, tag_id=tag.id, commit=False
-            )
-        ]
-        # Commit expires loaded rows, so the serializers re-read updated_at as
-        # the triggers left it.
-        db_session.commit()
+            tags_added = [
+                tag
+                for tag in tags_to_add
+                if add_tag_to_contact(
+                    db_session, contact_id=contact.id, tag_id=tag.id, commit=False
+                )
+            ]
+            tags_removed = [
+                tag
+                for tag in tags_to_remove
+                if remove_tag_from_contact(
+                    db_session, contact_id=contact.id, tag_id=tag.id, commit=False
+                )
+            ]
+            # Commit expires loaded rows, so the serializers re-read updated_at
+            # as the triggers left it.
+            db_session.commit()
         return {
             "status": "updated"
             if changed or tags_added or tags_removed
@@ -580,36 +587,37 @@ class CrmUpdateTool(Tool[None]):
         organization: CrmOrganization,
         updates: dict[str, Any],
     ) -> dict[str, Any]:
-        tags_to_add, tags_to_remove = self._parse_tag_changes(db_session, updates)
-        patches = self._normalize_organization_updates(updates)
+        with crm_write_errors("update"):
+            tags_to_add, tags_to_remove = self._parse_tag_changes(db_session, updates)
+            patches = self._normalize_organization_updates(updates)
 
-        _, changed = update_organization(
-            db_session=db_session,
-            organization=organization,
-            patches=patches,
-            commit=False,
-        )
-        tags_added = [
-            tag
-            for tag in tags_to_add
-            if add_tag_to_organization(
-                db_session,
-                organization_id=organization.id,
-                tag_id=tag.id,
+            _, changed = update_organization(
+                db_session=db_session,
+                organization=organization,
+                patches=patches,
                 commit=False,
             )
-        ]
-        tags_removed = [
-            tag
-            for tag in tags_to_remove
-            if remove_tag_from_organization(
-                db_session,
-                organization_id=organization.id,
-                tag_id=tag.id,
-                commit=False,
-            )
-        ]
-        db_session.commit()
+            tags_added = [
+                tag
+                for tag in tags_to_add
+                if add_tag_to_organization(
+                    db_session,
+                    organization_id=organization.id,
+                    tag_id=tag.id,
+                    commit=False,
+                )
+            ]
+            tags_removed = [
+                tag
+                for tag in tags_to_remove
+                if remove_tag_from_organization(
+                    db_session,
+                    organization_id=organization.id,
+                    tag_id=tag.id,
+                    commit=False,
+                )
+            ]
+            db_session.commit()
         return {
             "status": "updated"
             if changed or tags_added or tags_removed
@@ -684,21 +692,22 @@ class CrmUpdateTool(Tool[None]):
                 for attendee in resolved_attendees
             ]
 
-        _, changed = update_interaction(
-            db_session=db_session,
-            interaction=interaction,
-            patches=patches,
-            commit=False,
-        )
-        if attendees_present:
-            attendees_changed = replace_interaction_attendees(
+        with crm_write_errors("update"):
+            _, changed = update_interaction(
                 db_session=db_session,
-                interaction_id=interaction.id,
-                attendees=attendee_tuples,
+                interaction=interaction,
+                patches=patches,
                 commit=False,
             )
-            changed = changed or attendees_changed
-        db_session.commit()
+            if attendees_present:
+                attendees_changed = replace_interaction_attendees(
+                    db_session=db_session,
+                    interaction_id=interaction.id,
+                    attendees=attendee_tuples,
+                    commit=False,
+                )
+                changed = changed or attendees_changed
+            db_session.commit()
 
         payload: dict[str, Any] = {
             "status": "updated" if changed else "no_changes",
@@ -742,7 +751,7 @@ class CrmUpdateTool(Tool[None]):
             )
         self._validate_updates(entity_type, updates)
 
-        with self._session_factory() as db_session, crm_write_errors("update"):
+        with self._session_factory() as db_session:
             if entity_type == "contact":
                 contact = get_contact_by_id(entity_id, db_session)
                 if contact is None:

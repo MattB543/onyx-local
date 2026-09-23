@@ -248,7 +248,7 @@ class CrmLogInteractionTool(Tool[None]):
                 llm_facing_message="'attendees' must be an array.",
             )
 
-        with self._session_factory() as db_session, crm_write_errors("log"):
+        with self._session_factory() as db_session:
             if contact_id and get_contact_by_id(contact_id, db_session) is None:
                 raise ToolCallException(
                     message=f"Contact not found: {contact_id}",
@@ -285,26 +285,27 @@ class CrmLogInteractionTool(Tool[None]):
 
             # Unresolved attendees do not block the interaction; they are
             # reported as warnings so the caller can follow up with crm_update.
-            interaction = create_interaction(
-                db_session=db_session,
-                contact_id=contact_id,
-                organization_id=organization_id,
-                logged_by=actor_user_id,
-                interaction_type=interaction_type,
-                title=title,
-                summary=summary,
-                occurred_at=occurred_at,
-                commit=False,
-            )
-            replace_interaction_attendees(
-                db_session=db_session,
-                interaction_id=interaction.id,
-                attendees=attendee_tuples,
-                commit=False,
-            )
-            # Commit expires loaded rows, so the serializer re-reads updated_at
-            # as the triggers left it.
-            db_session.commit()
+            with crm_write_errors("log"):
+                interaction = create_interaction(
+                    db_session=db_session,
+                    contact_id=contact_id,
+                    organization_id=organization_id,
+                    logged_by=actor_user_id,
+                    interaction_type=interaction_type,
+                    title=title,
+                    summary=summary,
+                    occurred_at=occurred_at,
+                    commit=False,
+                )
+                replace_interaction_attendees(
+                    db_session=db_session,
+                    interaction_id=interaction.id,
+                    attendees=attendee_tuples,
+                    commit=False,
+                )
+                # Commit expires loaded rows, so the serializer re-reads updated_at
+                # as the triggers left it.
+                db_session.commit()
 
             payload: dict[str, Any] = {
                 "status": "created",

@@ -10,12 +10,14 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
-from psycopg2.errors import DeadlockDetected
-from sqlalchemy import func, select
+from psycopg2.errors import DeadlockDetected, LockNotAvailable
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from onyx.chat.emitter import Emitter
+from onyx.db.crm import replace_interaction_attendees
+from onyx.db.engine.sql_engine import get_session_with_current_tenant
 from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
 from onyx.db.models import (
     CrmContact,
@@ -170,7 +172,9 @@ def test_report_sequence_for_contact_and_organization(
     assert ts(fetched["organization"]["updated_at"]) > org_removed
 
 
-def test_update_reports_no_changes(crm: CrmRecords, tools: CrmTools) -> None:
+def test_update_reports_no_changes(
+    db_session: Session, crm: CrmRecords, tools: CrmTools
+) -> None:
     tag = crm.tag()
     contact = crm.contact(last_name="Same")
     call(
@@ -179,6 +183,7 @@ def test_update_reports_no_changes(crm: CrmRecords, tools: CrmTools) -> None:
         entity_id=str(contact.id),
         updates={"add_tag_ids": [str(tag.id)]},
     )
+    before = stamp(db_session, CrmContact, contact.id)
 
     result = call(
         tools.update,
@@ -189,6 +194,7 @@ def test_update_reports_no_changes(crm: CrmRecords, tools: CrmTools) -> None:
 
     assert result["status"] == "no_changes"
     assert result["tags_added"] == []
+    assert stamp(db_session, CrmContact, contact.id) == before
 
 
 @pytest.mark.parametrize(
@@ -199,10 +205,23 @@ def test_update_reports_no_changes(crm: CrmRecords, tools: CrmTools) -> None:
         ({"add_tag_ids": [None, " "]}, "null"),
         ({"add_tag_ids": ["not-a-uuid"]}, "not-a-uuid"),
         ({"profile_picture_file_id": "file-1"}, "profile_picture_file_id"),
+        (
+            {
+                "add_tag_ids": [
+                    "11111111-1111-1111-1111-111111111111",
+                    "11111111-1111-1111-1111-111111111111",
+                ]
+            },
+            "more than once",
+        ),
     ],
 )
 def test_update_rejects_bad_input(
-    crm: CrmRecords, tools: CrmTools, updates: dict[str, Any], expected: str
+    db_session: Session,
+    crm: CrmRecords,
+    tools: CrmTools,
+    updates: dict[str, Any],
+    expected: str,
 ) -> None:
     contact = crm.contact()
     message = call_error(
@@ -212,6 +231,10 @@ def test_update_rejects_bad_input(
         updates={"notes": "must not be saved", **updates},
     )
     assert expected in message
+    notes = db_session.scalar(
+        select(CrmContact.notes).where(CrmContact.id == contact.id)
+    )
+    assert notes is None
 
 
 def test_update_rejects_missing_and_overlapping_tags_before_writing(
@@ -487,3 +510,142 @@ def test_retryable_database_errors_become_tool_errors() -> None:
             raise OperationalError("UPDATE", {}, DeadlockDetected("deadlock"))
 
     assert "Retry the same call" in exc_info.value.llm_facing_message
+
+
+def test_create_rolls_back_when_a_later_write_fails(
+    db_session: Session, crm: CrmRecords, tools: CrmTools
+) -> None:
+    tag = crm.tag()
+    email = f"rollback-{uuid4().hex[:8]}@example.com"
+
+    with patch(
+        "onyx.tools.tool_implementations.crm.crm_create_tool.add_tag_to_contact",
+        side_effect=IntegrityError("INSERT", {}, Exception("fk")),
+    ):
+        message = call_error(
+            tools.create,
+            entity_type="contact",
+            contact={"first_name": "Roll", "email": email, "tag_ids": [str(tag.id)]},
+        )
+
+    assert "Nothing was saved" in message
+    assert (
+        db_session.scalar(select(CrmContact.id).where(CrmContact.email == email))
+        is None
+    )
+
+
+def test_log_rolls_back_when_attendee_write_fails(
+    db_session: Session, tools: CrmTools
+) -> None:
+    title = f"Rolled back {uuid4().hex[:8]}"
+
+    with patch(
+        "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.replace_interaction_attendees",
+        side_effect=IntegrityError("INSERT", {}, Exception("fk")),
+    ):
+        call_error(tools.log, title=title)
+
+    assert (
+        db_session.scalar(
+            select(CrmInteraction.id).where(CrmInteraction.title == title)
+        )
+        is None
+    )
+
+
+def test_log_rejects_unknown_attendee_fields(
+    db_session: Session, crm: CrmRecords, tools: CrmTools
+) -> None:
+    contact = crm.contact()
+    title = f"Misspelled {uuid4().hex[:8]}"
+
+    message = call_error(
+        tools.log,
+        title=title,
+        attendees=[{"contact_id": str(contact.id), "rol": "organizer"}],
+    )
+
+    assert "rol" in message
+    assert (
+        db_session.scalar(
+            select(CrmInteraction.id).where(CrmInteraction.title == title)
+        )
+        is None
+    )
+
+
+def _open_transactions_elsewhere() -> int:
+    with get_session_with_current_tenant() as session:
+        return session.execute(
+            text(
+                "SELECT count(*) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                "AND state LIKE 'idle in transaction%'"
+            )
+        ).scalar_one()
+
+
+def test_picture_download_holds_no_transaction_and_failed_write_deletes_it(
+    db_session: Session, crm: CrmRecords, tools: CrmTools
+) -> None:
+    taken_email = f"taken-{uuid4().hex[:8]}@example.com"
+    crm.contact(email=taken_email)
+    contact = crm.contact()
+    db_session.commit()
+    open_during_download: list[int] = []
+
+    def fake_download(*_args: Any, **_kwargs: Any) -> str:
+        open_during_download.append(_open_transactions_elsewhere())
+        return "file-downloaded"
+
+    with (
+        patch(
+            "onyx.tools.tool_implementations.crm.crm_update_tool.save_file_from_url",
+            side_effect=fake_download,
+        ),
+        patch(
+            "onyx.tools.tool_implementations.crm.validation.get_default_file_store"
+        ) as file_store,
+    ):
+        message = call_error(
+            tools.update,
+            entity_type="contact",
+            entity_id=str(contact.id),
+            updates={
+                "profile_picture_url": "https://example.com/p.png",
+                "email": taken_email,
+            },
+        )
+
+    assert "already exists" in message
+    assert open_during_download == [0]
+    file_store.return_value.delete_file.assert_called_once_with(
+        "file-downloaded", error_on_missing=False
+    )
+
+
+def test_attendee_replacement_locks_the_interaction(
+    crm: CrmRecords,
+) -> None:
+    attendee = crm.contact()
+    interaction = crm.interaction()
+
+    with (
+        get_session_with_current_tenant() as writer,
+        get_session_with_current_tenant() as other,
+    ):
+        replace_interaction_attendees(
+            writer,
+            interaction_id=interaction.id,
+            attendees=[(None, attendee.id, CrmAttendeeRole.ATTENDEE)],
+            commit=False,
+        )
+        with pytest.raises(OperationalError) as exc_info:
+            other.execute(
+                select(CrmInteraction.id)
+                .where(CrmInteraction.id == interaction.id)
+                .with_for_update(key_share=True, nowait=True)
+            )
+        assert isinstance(exc_info.value.orig, LockNotAvailable)
+        writer.rollback()

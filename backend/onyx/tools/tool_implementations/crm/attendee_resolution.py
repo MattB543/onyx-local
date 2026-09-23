@@ -17,6 +17,10 @@ from onyx.tools.tool_implementations.crm.models import (
     parse_enum_maybe,
     parse_uuid_maybe,
 )
+from onyx.tools.tool_implementations.crm.validation import reject_unknown_keys
+
+# 'id' and 'token' are older aliases for a free-text email or name.
+ATTENDEE_FIELDS = ("email", "name", "contact_id", "user_id", "role", "id", "token")
 
 
 def serialize_contact_candidate(contact: Any) -> dict[str, Any]:
@@ -203,6 +207,7 @@ def resolve_attendees(
         if isinstance(attendee, str):
             token_for_resolution = attendee
         elif isinstance(attendee, dict):
+            reject_unknown_keys(attendee, ATTENDEE_FIELDS, "attendees[]")
             role_raw = attendee.get("role")
             parsed_role = parse_enum_maybe(
                 CrmAttendeeRole, role_raw, "attendees[].role"
