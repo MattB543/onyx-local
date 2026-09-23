@@ -1,4 +1,5 @@
 import { OnyxDocument } from "@/lib/search/interfaces";
+import type { JsonObject } from "@/lib/json";
 
 // Base interface for all streaming objects
 interface BaseObj {
@@ -255,7 +256,7 @@ export interface CrmSearchToolStart extends BaseObj {
 
 export interface CrmSearchToolDelta extends BaseObj {
   type: "crm_search_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CrmCreateToolStart extends BaseObj {
@@ -264,7 +265,7 @@ export interface CrmCreateToolStart extends BaseObj {
 
 export interface CrmCreateToolDelta extends BaseObj {
   type: "crm_create_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CrmUpdateToolStart extends BaseObj {
@@ -273,7 +274,7 @@ export interface CrmUpdateToolStart extends BaseObj {
 
 export interface CrmUpdateToolDelta extends BaseObj {
   type: "crm_update_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CrmLogInteractionToolStart extends BaseObj {
@@ -282,7 +283,7 @@ export interface CrmLogInteractionToolStart extends BaseObj {
 
 export interface CrmLogInteractionToolDelta extends BaseObj {
   type: "crm_log_interaction_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CrmListToolStart extends BaseObj {
@@ -291,7 +292,7 @@ export interface CrmListToolStart extends BaseObj {
 
 export interface CrmListToolDelta extends BaseObj {
   type: "crm_list_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CrmGetToolStart extends BaseObj {
@@ -300,7 +301,7 @@ export interface CrmGetToolStart extends BaseObj {
 
 export interface CrmGetToolDelta extends BaseObj {
   type: "crm_get_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 export interface CalendarSearchToolStart extends BaseObj {
@@ -309,7 +310,7 @@ export interface CalendarSearchToolStart extends BaseObj {
 
 export interface CalendarSearchToolDelta extends BaseObj {
   type: "calendar_search_tool_delta";
-  payload: Record<string, unknown>;
+  payload: JsonObject;
 }
 
 // File Reader Packets

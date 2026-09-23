@@ -199,9 +199,52 @@ async function getJson<T>(path: string, action: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+type CrmSettingsPatchBody = Partial<
+  Pick<
+    CrmSettings,
+    | "enabled"
+    | "tier2_enabled"
+    | "tier3_deals"
+    | "tier3_custom_fields"
+    | "contact_stage_options"
+    | "contact_category_suggestions"
+  >
+>;
+
+type CrmOrganizationCreateBody = Partial<CrmOrganization> &
+  Pick<CrmOrganization, "name">;
+
+type CrmInteractionCreateBody = Omit<Partial<CrmInteraction>, "attendees"> &
+  Pick<CrmInteraction, "title" | "type"> & {
+    attendees?:
+      | {
+          user_id?: string | null;
+          contact_id?: string | null;
+          role?: CrmAttendeeRole;
+        }[]
+      | null;
+  };
+
+interface CrmTagCreateBody {
+  name: string;
+  color?: string | null;
+}
+
+/** Every JSON body the CRM endpoints below accept. */
+type CrmRequestBody =
+  | CrmSettingsPatchBody
+  | CrmContactCreateBody
+  | CrmContactPatchBody
+  | CrmOrganizationCreateBody
+  | Partial<CrmOrganization>
+  | CrmInteractionCreateBody
+  | CrmInteractionPatchBody
+  | CrmTagCreateBody
+  | Record<string, never>;
+
 async function postJson<T>(
   path: string,
-  body: unknown,
+  body: CrmRequestBody,
   action: string,
   method: "POST" | "PATCH" = "POST"
 ): Promise<T> {
@@ -236,17 +279,7 @@ export async function getCrmSettings(): Promise<CrmSettings> {
 }
 
 export async function patchCrmSettings(
-  patch: Partial<
-    Pick<
-      CrmSettings,
-      | "enabled"
-      | "tier2_enabled"
-      | "tier3_deals"
-      | "tier3_custom_fields"
-      | "contact_stage_options"
-      | "contact_category_suggestions"
-    >
-  >
+  patch: CrmSettingsPatchBody
 ): Promise<CrmSettings> {
   return postJson<CrmSettings>(
     "/api/user/crm/settings",
@@ -405,7 +438,7 @@ export async function getCrmOrganization(
 }
 
 export async function createCrmOrganization(
-  body: Partial<CrmOrganization> & Pick<CrmOrganization, "name">
+  body: CrmOrganizationCreateBody
 ): Promise<CrmOrganization> {
   return postJson(
     "/api/user/crm/organizations",
@@ -458,16 +491,7 @@ export async function listCrmInteractions(args?: {
 }
 
 export async function createCrmInteraction(
-  body: Omit<Partial<CrmInteraction>, "attendees"> &
-    Pick<CrmInteraction, "title" | "type"> & {
-      attendees?:
-        | {
-            user_id?: string | null;
-            contact_id?: string | null;
-            role?: CrmAttendeeRole;
-          }[]
-        | null;
-    }
+  body: CrmInteractionCreateBody
 ): Promise<CrmInteraction> {
   return postJson("/api/user/crm/interactions", body, "Create CRM interaction");
 }
@@ -522,10 +546,7 @@ export async function listCrmTags(args?: {
   return getJson(path, "Fetch CRM tags");
 }
 
-export async function createCrmTag(body: {
-  name: string;
-  color?: string | null;
-}): Promise<CrmTag> {
+export async function createCrmTag(body: CrmTagCreateBody): Promise<CrmTag> {
   return postJson("/api/user/crm/tags", body, "Create CRM tag");
 }
 

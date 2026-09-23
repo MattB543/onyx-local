@@ -16,7 +16,7 @@ export function useInvalidateCrmCache() {
 
   return useCallback(async () => {
     await mutate(
-      (key: unknown) =>
+      (key) =>
         Array.isArray(key) &&
         typeof key[0] === "string" &&
         CRM_CACHE_KEYS.has(key[0]),

@@ -11,6 +11,12 @@ import {
   CrmToolPacket,
   PacketType,
 } from "@/app/app/services/streamingModels";
+import {
+  isJsonArray,
+  isJsonObject,
+  type JsonObject,
+  type JsonValue,
+} from "@/lib/json";
 import Text from "@/refresh-components/texts/Text";
 
 import { SvgUser } from "@opal/icons";
@@ -70,8 +76,21 @@ function formatPayloadKey(key: string): string {
     .join(" ");
 }
 
-function summarizePayloadValue(value: unknown): string {
-  if (value === null || value === undefined) {
+/** An object's `title` or `name`, whichever is a string first. */
+function objectLabel(value: JsonObject): string | null {
+  const title = value["title"];
+  if (typeof title === "string") {
+    return title;
+  }
+  const name = value["name"];
+  if (typeof name === "string") {
+    return name;
+  }
+  return null;
+}
+
+function summarizePayloadValue(value: JsonValue): string {
+  if (value === null) {
     return "None";
   }
   if (typeof value === "string") {
@@ -80,28 +99,21 @@ function summarizePayloadValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  if (Array.isArray(value)) {
+  if (isJsonArray(value)) {
     if (value.length === 0) {
       return "No items";
     }
     const preview = value
       .slice(0, 2)
       .map((item) => {
-        if (item === null || item === undefined) {
+        if (item === null) {
           return "None";
         }
         if (typeof item === "string" || typeof item === "number") {
           return String(item);
         }
-        if (typeof item === "object") {
-          const objectItem = item as Record<string, unknown>;
-          if (typeof objectItem["title"] === "string") {
-            return objectItem["title"] as string;
-          }
-          if (typeof objectItem["name"] === "string") {
-            return objectItem["name"] as string;
-          }
-          return "Item";
+        if (isJsonObject(item)) {
+          return objectLabel(item) ?? "Item";
         }
         return "Item";
       })
@@ -110,21 +122,10 @@ function summarizePayloadValue(value: unknown): string {
     return `${preview}${remainder}`;
   }
 
-  if (typeof value === "object") {
-    const objectValue = value as Record<string, unknown>;
-    if (typeof objectValue["title"] === "string") {
-      return objectValue["title"] as string;
-    }
-    if (typeof objectValue["name"] === "string") {
-      return objectValue["name"] as string;
-    }
-    return `${Object.keys(objectValue).length} fields`;
-  }
-
-  return String(value);
+  return objectLabel(value) ?? `${Object.keys(value).length} fields`;
 }
 
-function renderPayload(payload: Record<string, unknown>): JSX.Element {
+function renderPayload(payload: JsonObject): JSX.Element {
   const entries = Object.entries(payload);
 
   if (entries.length === 0) {
@@ -185,12 +186,12 @@ export const CrmToolRenderer: MessageRenderer<
   const payload =
     deltaPacket &&
     "payload" in deltaPacket.obj &&
-    typeof deltaPacket.obj.payload === "object"
+    isJsonObject(deltaPacket.obj.payload)
       ? deltaPacket.obj.payload
       : null;
 
   const content = payload ? (
-    renderPayload(payload as Record<string, unknown>)
+    renderPayload(payload)
   ) : !stopPacketSeen ? (
     <BlinkingDot />
   ) : (
