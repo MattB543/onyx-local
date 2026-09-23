@@ -44,6 +44,7 @@ from onyx.db.crm import (
     get_organization_by_name,
     get_organization_tags,
     get_tag_by_id,
+    list_contact_principals,
     list_contacts,
     list_interactions,
     list_organizations,
@@ -101,6 +102,7 @@ from onyx.server.features.crm.models import (
     CrmOrganizationCreateRequest,
     CrmOrganizationPatchRequest,
     CrmOrganizationSnapshot,
+    CrmPrincipalSummary,
     CrmSearchResultItem,
     CrmSettingsPatchRequest,
     CrmSettingsSnapshot,
@@ -363,6 +365,10 @@ def get_contacts(
     organization_id: UUID | None = Query(
         None, description="Filter by CRM organization."
     ),
+    principal: str | None = Query(
+        None,
+        description="Filter by principal (case-insensitive exact match).",
+    ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
     owner_ids: list[UUID] | None = Query(
         None, description="Filter to contacts owned by any of these user ids."
@@ -432,6 +438,7 @@ def get_contacts(
         status=normalized_status,
         category=normalized_category,
         organization_id=organization_id,
+        principal=principal,
         tag_ids=tag_ids,
         owner_ids=owner_ids,
         sort_by=normalized_sort_by,
@@ -445,6 +452,17 @@ def get_contacts(
         items=[_serialize_contact(contact, db_session) for contact in contacts],
         total_items=total_items,
     )
+
+
+@router.get("/contacts/principals")
+def get_contact_principals(
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_user),
+) -> list[CrmPrincipalSummary]:
+    return [
+        CrmPrincipalSummary(name=row.name, contact_count=row.contact_count)
+        for row in list_contact_principals(db_session)
+    ]
 
 
 @router.post("/contacts")

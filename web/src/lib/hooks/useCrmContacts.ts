@@ -14,6 +14,7 @@ interface UseCrmContactsParams {
   status?: CrmContactStage;
   category?: string;
   organizationId?: string;
+  principal?: string;
   ownerIds?: string[];
   tagIds?: string[];
   createdAfter?: string;
@@ -31,6 +32,7 @@ export function useCrmContacts({
   status,
   category,
   organizationId,
+  principal,
   ownerIds,
   tagIds,
   createdAfter,
@@ -51,6 +53,7 @@ export function useCrmContacts({
       status ?? "",
       category ?? "",
       organizationId ?? "",
+      principal ?? "",
       ownerIds?.join(",") ?? "",
       tagIds?.join(",") ?? "",
       createdAfter ?? "",
@@ -68,6 +71,7 @@ export function useCrmContacts({
         status,
         category,
         organization_id: organizationId,
+        principal: principal || undefined,
         owner_ids: ownerIds?.length ? ownerIds : undefined,
         tag_ids: tagIds?.length ? tagIds : undefined,
         created_after: createdAfter,

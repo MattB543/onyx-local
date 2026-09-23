@@ -6,6 +6,7 @@ import { useSWRConfig } from "swr";
 const CRM_CACHE_KEYS = new Set([
   "crm-contact",
   "crm-contacts",
+  "crm-contact-principals",
   "crm-organization",
   "crm-organizations",
   "crm-interactions",

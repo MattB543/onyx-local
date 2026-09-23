@@ -12,6 +12,7 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { SettingsLayouts } from "@opal/layouts";
+import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
 import { useCrmOrganizations } from "@/lib/hooks/useCrmOrganizations";
@@ -31,6 +32,7 @@ import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
+import ContactRoleLine from "@/views/crm/components/ContactRoleLine";
 import CreateContactModal from "@/views/crm/components/CreateContactModal";
 import ImportCsvModal from "@/views/crm/components/ImportCsvModal";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
@@ -74,24 +76,31 @@ export default function CrmContactsPage() {
       crmSettings?.contact_stage_options?.length
         ? crmSettings.contact_stage_options
         : DEFAULT_CRM_STAGE_OPTIONS,
-    [crmSettings?.contact_stage_options],
+    [crmSettings?.contact_stage_options]
   );
   const categoryOptions = useMemo(
     () =>
       crmSettings?.contact_category_suggestions?.length
         ? crmSettings.contact_category_suggestions
         : DEFAULT_CRM_CATEGORY_SUGGESTIONS,
-    [crmSettings?.contact_category_suggestions],
+    [crmSettings?.contact_category_suggestions]
   );
 
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrmContactStage | "all">(
-    "all",
+    "all"
   );
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [orgFilterText, setOrgFilterText] = useState("");
   const [orgFilterId, setOrgFilterId] = useState<string | undefined>(undefined);
+  // Seeded from ?principal= so contact detail pages can link to the filter.
+  const [principalFilter, setPrincipalFilter] = useState<string | undefined>(
+    () => searchParams.get("principal") || undefined
+  );
+  const [principalFilterText, setPrincipalFilterText] = useState(
+    () => searchParams.get("principal") ?? ""
+  );
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<CrmDateRangeValue>({
     field: "created",
@@ -99,7 +108,7 @@ export default function CrmContactsPage() {
     to: null,
   });
   const [sortValue, setSortValue] = useState<CrmSortValue>(
-    DEFAULT_CRM_SORT_VALUE,
+    DEFAULT_CRM_SORT_VALUE
   );
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
@@ -127,7 +136,7 @@ export default function CrmContactsPage() {
 
   const tagOptions = useMemo(
     () => allTags.map((t) => ({ value: t.id, label: t.name })),
-    [allTags],
+    [allTags]
   );
 
   const { organizations: orgLookup } = useCrmOrganizations({
@@ -136,16 +145,18 @@ export default function CrmContactsPage() {
   });
   const selectedOrganizationId = organizationIdFilter ?? orgFilterId;
   const { organization: selectedOrganization } = useCrmOrganization(
-    selectedOrganizationId ?? null,
+    selectedOrganizationId ?? null
   );
   const orgNameById = useMemo(
     () => new Map(orgLookup.map((o) => [o.id, o.name])),
-    [orgLookup],
+    [orgLookup]
   );
   const orgOptions = useMemo<ComboBoxOption[]>(
     () => orgLookup.map((o) => ({ value: o.id, label: o.name })),
-    [orgLookup],
+    [orgLookup]
   );
+
+  const { principalOptions } = useCrmContactPrincipals();
 
   const ownerOptions = useMemo(
     () =>
@@ -155,7 +166,7 @@ export default function CrmContactsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id],
+    [usersData, user?.id]
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -173,6 +184,7 @@ export default function CrmContactsPage() {
       status: statusFilter === "all" ? undefined : statusFilter,
       category: categoryFilter === "all" ? undefined : categoryFilter,
       organizationId: organizationIdFilter ?? orgFilterId,
+      principal: principalFilter,
       ownerIds: ownerFilterId ? [ownerFilterId] : undefined,
       tagIds: tagFilterIds.length ? tagFilterIds : undefined,
       createdAfter: dateParams.created_after,
@@ -187,7 +199,7 @@ export default function CrmContactsPage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems],
+    [totalItems]
   );
 
   const hasActiveFilters = useMemo(
@@ -198,6 +210,7 @@ export default function CrmContactsPage() {
       ownerFilter !== "all" ||
       Boolean(orgFilterId) ||
       Boolean(organizationIdFilter) ||
+      Boolean(principalFilter) ||
       tagFilterIds.length > 0 ||
       Boolean(dateRange.from) ||
       Boolean(dateRange.to),
@@ -208,9 +221,10 @@ export default function CrmContactsPage() {
       ownerFilter,
       orgFilterId,
       organizationIdFilter,
+      principalFilter,
       tagFilterIds,
       dateRange,
-    ],
+    ]
   );
 
   const handleClearFilters = useCallback(() => {
@@ -223,6 +237,8 @@ export default function CrmContactsPage() {
       setOrgFilterId(undefined);
       setOrgFilterText("");
     }
+    setPrincipalFilter(undefined);
+    setPrincipalFilterText("");
     setTagFilterIds([]);
     setDateRange({ field: "created", from: null, to: null });
     setSortValue(DEFAULT_CRM_SORT_VALUE);
@@ -322,7 +338,7 @@ export default function CrmContactsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_240px_240px]">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -358,6 +374,32 @@ export default function CrmContactsPage() {
               searchIcon
               isError={false}
               disabled={!!organizationIdFilter}
+            />
+
+            <InputComboBox
+              value={principalFilterText}
+              onChange={(e) => {
+                setPrincipalFilterText(e.target.value);
+                if (!e.target.value) {
+                  setPrincipalFilter(undefined);
+                  setPageNum(0);
+                }
+              }}
+              onValueChange={(value) => {
+                setPrincipalFilter(value);
+                setPrincipalFilterText(value);
+                setPageNum(0);
+              }}
+              onClear={() => {
+                setPrincipalFilter(undefined);
+                setPrincipalFilterText("");
+                setPageNum(0);
+              }}
+              options={principalOptions}
+              placeholder="Filter by principal"
+              strict
+              searchIcon
+              isError={false}
             />
           </div>
 
@@ -541,15 +583,11 @@ export default function CrmContactsPage() {
                               No email
                             </span>
                           )}
-                          <span className="truncate text-sm text-text-03">
-                            {contact.title
-                              ? orgName
-                                ? `${contact.title} at ${orgName}`
-                                : contact.title
-                              : orgName
-                                ? `at ${orgName}`
-                                : "No title"}
-                          </span>
+                          <ContactRoleLine
+                            title={contact.title}
+                            organizationName={orgName}
+                            principal={contact.principal}
+                          />
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <StatusBadge status={contact.status} />

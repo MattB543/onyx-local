@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
+    find_similar_principals,
     get_allowed_contact_stages,
     get_contact_category_options,
     get_organization_tags,
@@ -57,7 +58,14 @@ TIMESTAMP_FILTERS = (
     "updated_before",
 )
 FILTERS_BY_ENTITY_TYPE: dict[str, tuple[str, ...]] = {
-    "contact": ("status", "category", "organization_id", "tag_ids", *TIMESTAMP_FILTERS),
+    "contact": (
+        "status",
+        "category",
+        "organization_id",
+        "principal",
+        "tag_ids",
+        *TIMESTAMP_FILTERS,
+    ),
     "organization": ("tag_ids", *TIMESTAMP_FILTERS),
     "interaction": ("contact_id", "organization_id", "interaction_type"),
     "tag": (),
@@ -154,6 +162,16 @@ class CrmListTool(Tool[None]):
                                 "Organization UUID. Contacts: members of the "
                                 "organization. Interactions: linked directly to "
                                 "it (not its contacts' interactions)."
+                            ),
+                        },
+                        "principal": {
+                            "type": "string",
+                            "description": (
+                                "Staffers of this official: contacts whose "
+                                "principal matches (case-insensitive, exact "
+                                "spelling). With no match, the result lists "
+                                "similar existing spellings. "
+                                f"{_applies_to('principal')}"
                             ),
                         },
                         "contact_id": {
@@ -392,6 +410,16 @@ class CrmListTool(Tool[None]):
                 )
             category = category_raw.strip()
 
+        principal_raw = args.get("principal")
+        principal: str | None = None
+        if principal_raw is not None:
+            if not isinstance(principal_raw, str) or not principal_raw.strip():
+                raise ToolCallException(
+                    message=f"Invalid principal in {self.name}: {principal_raw!r}",
+                    llm_facing_message="'principal' must be a non-empty string.",
+                )
+            principal = principal_raw.strip()
+
         contacts, total = list_contacts(
             db_session=db_session,
             page_num=page_num,
@@ -399,17 +427,31 @@ class CrmListTool(Tool[None]):
             status=status,
             category=category,
             organization_id=self._optional_uuid(args, "organization_id"),
+            principal=principal,
             tag_ids=self._parse_tag_ids(args),
             **self._parse_list_filters(args),
         )
 
-        return self._page(
+        payload = self._page(
             "contact",
             page_num,
             page_size,
             total,
             serialize_contacts(db_session, contacts),
         )
+        if principal is not None and total == 0:
+            similar = find_similar_principals(db_session, principal)
+            if similar:
+                payload["similar_principals"] = [
+                    {"name": row.name, "contact_count": row.contact_count}
+                    for row in similar
+                ]
+                payload["note"] = (
+                    "No contact has this exact principal. If one of "
+                    "similar_principals is the same official, list again with "
+                    "that spelling."
+                )
+        return payload
 
     def _list_organizations(
         self,

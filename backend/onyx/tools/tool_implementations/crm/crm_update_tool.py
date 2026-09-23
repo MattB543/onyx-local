@@ -43,6 +43,7 @@ from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.attendee_resolution import resolve_attendees
 from onyx.tools.tool_implementations.crm.models import (
+    add_similar_principals,
     crm_tool_response,
     is_crm_schema_available,
     parse_datetime_maybe,
@@ -245,7 +246,9 @@ class CrmUpdateTool(Tool[None]):
                                 "principal": {
                                     "type": "string",
                                     "description": (
-                                        "For staffers, the official they work for."
+                                        "For staffers, the official they work "
+                                        "for. Reuse the exact spelling other "
+                                        "contacts already use for that official."
                                     ),
                                 },
                                 "notes": {"type": "string"},
@@ -571,7 +574,7 @@ class CrmUpdateTool(Tool[None]):
             # Commit expires loaded rows, so the serializers re-read updated_at
             # as the triggers left it.
             db_session.commit()
-        return {
+        payload: dict[str, Any] = {
             "status": "updated"
             if changed or tags_added or tags_removed
             else "no_changes",
@@ -580,6 +583,8 @@ class CrmUpdateTool(Tool[None]):
             "tags_removed": _tag_refs(tags_removed),
             "contact": serialize_contacts(db_session, [contact])[0],
         }
+        add_similar_principals(db_session, payload, updates.get("principal"))
+        return payload
 
     def _update_organization(
         self,

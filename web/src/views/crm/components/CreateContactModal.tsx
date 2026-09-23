@@ -11,6 +11,7 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { toast } from "@opal/layouts";
+import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";
@@ -74,6 +75,7 @@ export default function CreateContactModal({
 }: CreateContactModalProps) {
   const { user } = useUser();
   const { crmSettings } = useCrmSettings();
+  const { principalOptions } = useCrmContactPrincipals();
   const invalidateCrmCache = useInvalidateCrmCache();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [pendingProfilePictureFile, setPendingProfilePictureFile] =
@@ -257,7 +259,10 @@ export default function CreateContactModal({
                       selectedOrganizationId={values.organization_id || null}
                       inputValue={values.organization_name}
                       onInputChange={(nextOrganizationName) => {
-                        setFieldValue("organization_name", nextOrganizationName);
+                        setFieldValue(
+                          "organization_name",
+                          nextOrganizationName
+                        );
                         if (values.organization_id) {
                           setFieldValue("organization_id", "");
                         }
@@ -315,8 +320,10 @@ export default function CreateContactModal({
                       name="us_state"
                       placeholder="US State (e.g. CA)"
                     />
-                    <InputTypeInField
+                    <InputComboBoxField
                       name="principal"
+                      options={principalOptions}
+                      strict={false}
                       placeholder="Principal (e.g. Sen. Jane Smith)"
                     />
                   </div>

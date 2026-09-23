@@ -95,7 +95,10 @@ EU Member State Policy Maker, Other International Policy Maker. Never use a gene
 always pick the specific policy-maker variant.
 - Contacts also have three optional fields: **party_affiliation** (political party, e.g. Democrat, Republican, \
 Social Democrat), **us_state** (2-letter state abbreviation, for US House/Senate members and state-level policy \
-makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for).
+makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for). \
+Reuse the exact principal spelling other contacts already use for the same official; `crm_create` and `crm_update` \
+return `similar_principals` when a spelling differs. To find an official's staffers, use `crm_list` with the \
+`principal` filter.
 - **Organizations** represent companies or entities. Multiple contacts can belong to one organization.
 - **Interactions** are logged events (calls, meetings, emails, notes, events) linked to a contact and/or organization. \
 They can have **attendees** (team members or external contacts).

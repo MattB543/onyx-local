@@ -58,6 +58,12 @@ class CrmSearchResult:
     sort_at: datetime | None
 
 
+@dataclass(frozen=True)
+class CrmPrincipalCount:
+    name: str
+    contact_count: int
+
+
 def _normalize_page(page_num: int, page_size: int) -> tuple[int, int]:
     return max(0, page_num), min(max(1, page_size), MAX_PAGE_SIZE)
 
@@ -397,6 +403,7 @@ def list_contacts(
     status: str | None = None,
     category: str | None = None,
     organization_id: UUID | None = None,
+    principal: str | None = None,
     tag_ids: list[UUID] | None = None,
     owner_ids: list[UUID] | None = None,
     sort_by: str | None = None,
@@ -421,6 +428,7 @@ def list_contacts(
                     CrmContact.search_tsv.op("@@")(ts_query),
                     full_name.ilike(like_q, escape="\\"),
                     CrmContact.email.ilike(like_q, escape="\\"),
+                    CrmContact.principal.ilike(like_q, escape="\\"),
                 )
             )
 
@@ -432,6 +440,12 @@ def list_contacts(
 
     if organization_id:
         stmt = stmt.where(CrmContact.organization_id == organization_id)
+
+    normalized_principal = _normalize_lookup_name(principal)
+    if normalized_principal:
+        stmt = stmt.where(
+            func.lower(func.btrim(CrmContact.principal)) == normalized_principal
+        )
 
     if tag_ids:
         # Require ALL selected tags (intersection): one EXISTS per distinct tag.
@@ -477,6 +491,78 @@ def list_contacts(
         )
     )
     return items, int(total)
+
+
+def list_contact_principals(db_session: Session) -> list[CrmPrincipalCount]:
+    """Distinct contact principals, matched like the list_contacts filter
+    (trimmed, case-insensitive). Each group shows its most common spelling."""
+    trimmed = func.btrim(CrmContact.principal)
+    display_name = func.mode().within_group(trimmed.asc())
+    rows = db_session.execute(
+        select(display_name, func.count())
+        .where(func.nullif(trimmed, "").is_not(None))
+        .group_by(func.lower(trimmed))
+        .order_by(func.lower(display_name))
+    ).all()
+    return [CrmPrincipalCount(name=name, contact_count=count) for name, count in rows]
+
+
+# Honorifics and titles that do not identify the official.
+_PRINCIPAL_TITLE_WORDS = frozenset(
+    {
+        "the",
+        "hon",
+        "honorable",
+        "rep",
+        "representative",
+        "congressman",
+        "congresswoman",
+        "congressmember",
+        "sen",
+        "senator",
+        "gov",
+        "governor",
+        "dr",
+        "mr",
+        "mrs",
+        "ms",
+        "jr",
+        "sr",
+        "office",
+        "of",
+    }
+)
+
+
+def _principal_surname(principal: str) -> str | None:
+    words = [
+        word
+        for word in "".join(
+            char if char.isalnum() else " " for char in principal.lower()
+        ).split()
+        if word not in _PRINCIPAL_TITLE_WORDS
+    ]
+    return words[-1] if words else None
+
+
+def find_similar_principals(
+    db_session: Session, principal: str, limit: int = 5
+) -> list[CrmPrincipalCount]:
+    """Existing principals that may be the same official under another spelling
+    (e.g. "Rep. Sara Jacobs" and "Sara Jacobs"): the same surname once titles
+    are removed. The exact (case-insensitive) spelling is excluded."""
+    normalized = _normalize_lookup_name(principal)
+    surname = _principal_surname(normalized) if normalized else None
+    if surname is None:
+        return []
+    similar = [
+        row
+        for row in list_contact_principals(db_session)
+        if row.name.strip().lower() != normalized
+        and _principal_surname(row.name) == surname
+    ]
+    similar.sort(key=lambda row: -row.contact_count)
+    return similar[:limit]
 
 
 def create_contact(

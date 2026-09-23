@@ -73,6 +73,9 @@ Perform the following workflow using the available CRM tools:
      for US House/Senate members and state-level policy makers), and
      `principal` (for staffers, the name of the Senator/Representative or other
      official they work for). Leave any of these unset if unclear.
+   - Reuse the exact `principal` spelling other contacts already use for the
+     same official. If the tool response lists `similar_principals` and one is
+     the same official, update the contact to that spelling.
 7. Search for the relevant external organization(s). An abbreviation or short
    name alone may not match; try multiple search terms:
    - The full company name and any abbreviations or acronyms.
@@ -147,6 +150,7 @@ After completing all steps, reply with a short summary of what you did."""
 def _get_internal_domains() -> list[str]:
     """Return the list of internal/team email domains from configuration."""
     from onyx.configs.app_configs import VALID_EMAIL_DOMAINS
+
     return VALID_EMAIL_DOMAINS
 
 
@@ -248,9 +252,7 @@ class ProcessEmailCrmStep(BaseStep):
         )
         email_data = context.previous_outputs.get(input_step_id)
         if email_data is None:
-            return StepResult.failure(
-                f"Missing required step output: {input_step_id}"
-            )
+            return StepResult.failure(f"Missing required step output: {input_step_id}")
 
         # ------------------------------------------------------------------
         # 3. Build the user message prompt
@@ -294,9 +296,7 @@ class ProcessEmailCrmStep(BaseStep):
             response = gather_stream_full(packets, state_container)
         except Exception as e:
             logger.exception("ProcessEmailCrmStep: chat pipeline error")
-            return StepResult.failure(
-                f"Chat pipeline raised an exception: {e}"
-            )
+            return StepResult.failure(f"Chat pipeline raised an exception: {e}")
 
         # ------------------------------------------------------------------
         # 6. Check for errors in the response
@@ -324,9 +324,7 @@ class ProcessEmailCrmStep(BaseStep):
                 "tool_calls": _summarize_tool_calls(tool_call_dicts),
                 "tool_call_count": len(response.tool_calls),
                 "chat_session_id": (
-                    str(response.chat_session_id)
-                    if response.chat_session_id
-                    else None
+                    str(response.chat_session_id) if response.chat_session_id else None
                 ),
                 "message_id": response.message_id,
             }

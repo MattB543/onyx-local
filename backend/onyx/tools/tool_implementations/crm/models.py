@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
+    find_similar_principals,
     get_contact_names,
     get_contact_owner_ids,
     get_contact_tags,
@@ -82,6 +83,25 @@ def crm_tool_response(
     return ToolResponse(
         rich_response=json.dumps(payload, default=str),
         llm_facing_response=as_llm_json(compact_payload, already_compacted=True),
+    )
+
+
+def add_similar_principals(
+    db_session: Session, payload: dict[str, Any], principal: Any
+) -> None:
+    """Flag other spellings of the principal that was just written, so the
+    model can switch to the one other contacts already use."""
+    if not isinstance(principal, str) or not principal.strip():
+        return
+    similar = find_similar_principals(db_session, principal)
+    if not similar:
+        return
+    payload["similar_principals"] = [
+        {"name": row.name, "contact_count": row.contact_count} for row in similar
+    ]
+    payload["principal_note"] = (
+        "Other contacts use a similar principal. If one of similar_principals "
+        "is the same official, call crm_update to use that exact spelling."
     )
 
 

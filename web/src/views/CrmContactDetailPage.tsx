@@ -16,12 +16,9 @@ import {
   uploadContactProfilePicture,
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
-import {
-  ConfirmationModalLayout,
-  SettingsLayouts,
-  toast,
-} from "@opal/layouts";
+import { ConfirmationModalLayout, SettingsLayouts, toast } from "@opal/layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
+import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
@@ -55,6 +52,7 @@ import {
   DEFAULT_CRM_CATEGORY_SUGGESTIONS,
   DEFAULT_CRM_STAGE_OPTIONS,
   formatCrmLabel,
+  formatPrincipalOffice,
   optionalText,
 } from "@/views/crm/crmOptions";
 
@@ -105,7 +103,7 @@ export default function CrmContactDetailPage({
   const [isDeletingContact, setIsDeletingContact] = useState(false);
   const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
-    INTERACTION_PAGE_SIZE,
+    INTERACTION_PAGE_SIZE
   );
   const [pendingProfilePictureFile, setPendingProfilePictureFile] =
     useState<File | null>(null);
@@ -131,6 +129,7 @@ export default function CrmContactDetailPage({
   const { organization: linkedOrganization } =
     useCrmOrganization(linkedOrganizationId);
   const { crmSettings } = useCrmSettings();
+  const { principalOptions } = useCrmContactPrincipals();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
 
   const stageOptions = useMemo(
@@ -138,7 +137,7 @@ export default function CrmContactDetailPage({
       crmSettings?.contact_stage_options?.length
         ? crmSettings.contact_stage_options
         : DEFAULT_CRM_STAGE_OPTIONS,
-    [crmSettings],
+    [crmSettings]
   );
   const categoryOptions = useMemo(
     () =>
@@ -149,7 +148,7 @@ export default function CrmContactDetailPage({
         value: category,
         label: category,
       })),
-    [crmSettings],
+    [crmSettings]
   );
   const ownerOptions = useMemo<InputMultiSelectOption[]>(
     () =>
@@ -157,7 +156,7 @@ export default function CrmContactDetailPage({
         value: candidate.id,
         label: candidate.email,
       })),
-    [usersData],
+    [usersData]
   );
   const ownerLabelById = useMemo(
     () =>
@@ -165,34 +164,34 @@ export default function CrmContactDetailPage({
         ownerOptions.map((ownerOption) => [
           ownerOption.value,
           ownerOption.label,
-        ]),
+        ])
       ),
-    [ownerOptions],
+    [ownerOptions]
   );
   const visibleOwnerIds = useMemo(
     () =>
       (contact?.owner_ids || []).filter(
-        (ownerId) => ownerId !== SYSTEM_OWNER_ID,
+        (ownerId) => ownerId !== SYSTEM_OWNER_ID
       ),
-    [contact?.owner_ids],
+    [contact?.owner_ids]
   );
   const hiddenOwnerIds = useMemo(
     () =>
       (contact?.owner_ids || []).filter(
-        (ownerId) => ownerId === SYSTEM_OWNER_ID,
+        (ownerId) => ownerId === SYSTEM_OWNER_ID
       ),
-    [contact?.owner_ids],
+    [contact?.owner_ids]
   );
   const unresolvableOwnerIds = useMemo(
     () => visibleOwnerIds.filter((ownerId) => !ownerLabelById.has(ownerId)),
-    [visibleOwnerIds, ownerLabelById],
+    [visibleOwnerIds, ownerLabelById]
   );
   const attendeeUserNameById = useMemo(
     () =>
       new Map(
-        (usersData || []).map((candidate) => [candidate.id, candidate.email]),
+        (usersData || []).map((candidate) => [candidate.id, candidate.email])
       ),
-    [usersData],
+    [usersData]
   );
   const attendeeContactNameById = useMemo(() => {
     const labelById = new Map<string, string>();
@@ -215,7 +214,7 @@ export default function CrmContactDetailPage({
       { label: "Contacts", href: "/app/crm/contacts" },
       { label: contact?.full_name || contact?.first_name || "Contact" },
     ],
-    [contact?.first_name, contact?.full_name],
+    [contact?.first_name, contact?.full_name]
   );
   const activeProfilePictureUrl =
     profilePicturePreviewUrl ||
@@ -379,6 +378,20 @@ export default function CrmContactDetailPage({
                           </Link>
                         </>
                       )}
+                      {contact.principal?.trim() && (
+                        <>
+                          <span>·</span>
+                          <Link
+                            href={`/app/crm/contacts?principal=${encodeURIComponent(
+                              contact.principal.trim()
+                            )}`}
+                            className="truncate hover:underline"
+                            title="Show all contacts with this principal"
+                          >
+                            {formatPrincipalOffice(contact.principal)}
+                          </Link>
+                        </>
+                      )}
                     </div>
                     <TagManager
                       entityType="contact"
@@ -431,7 +444,7 @@ export default function CrmContactDetailPage({
                           us_state: contact.us_state || "",
                           principal: contact.principal || "",
                           owner_ids: visibleOwnerIds.filter((id) =>
-                            ownerLabelById.has(id),
+                            ownerLabelById.has(id)
                           ),
                           source: contact.source || "",
                           notes: contact.notes || "",
@@ -449,7 +462,7 @@ export default function CrmContactDetailPage({
                             !values.organization_id
                           ) {
                             setStatus(
-                              "Choose a valid organization from the list or clear the organization field.",
+                              "Choose a valid organization from the list or clear the organization field."
                             );
                             return;
                           }
@@ -466,7 +479,7 @@ export default function CrmContactDetailPage({
                               status: values.status,
                               category: optionalText(values.category),
                               party_affiliation: optionalText(
-                                values.party_affiliation,
+                                values.party_affiliation
                               ),
                               us_state: optionalText(values.us_state),
                               principal: optionalText(values.principal),
@@ -475,7 +488,7 @@ export default function CrmContactDetailPage({
                                   ...values.owner_ids,
                                   ...hiddenOwnerIds,
                                   ...unresolvableOwnerIds,
-                                ]),
+                                ])
                               ),
                               source: values.source || undefined,
                               notes: optionalText(values.notes),
@@ -490,7 +503,7 @@ export default function CrmContactDetailPage({
                             if (pendingProfilePictureFile) {
                               await uploadContactProfilePicture(
                                 contact.id,
-                                pendingProfilePictureFile,
+                                pendingProfilePictureFile
                               );
                             } else if (
                               removeProfilePicture &&
@@ -501,7 +514,7 @@ export default function CrmContactDetailPage({
                           } catch (error) {
                             console.error(
                               "Failed to update CRM contact profile picture:",
-                              error,
+                              error
                             );
                             profilePictureWarning =
                               "Contact details saved, but the profile picture could not be updated.";
@@ -623,7 +636,7 @@ export default function CrmContactDetailPage({
                                   onInputChange={(nextOrganizationName) => {
                                     setFieldValue(
                                       "organization_name",
-                                      nextOrganizationName,
+                                      nextOrganizationName
                                     );
                                     if (values.organization_id) {
                                       setFieldValue("organization_id", "");
@@ -631,15 +644,15 @@ export default function CrmContactDetailPage({
                                   }}
                                   onOrganizationChange={(
                                     nextOrganizationId,
-                                    nextOrganizationName,
+                                    nextOrganizationName
                                   ) => {
                                     setFieldValue(
                                       "organization_id",
-                                      nextOrganizationId || "",
+                                      nextOrganizationId || ""
                                     );
                                     setFieldValue(
                                       "organization_name",
-                                      nextOrganizationName,
+                                      nextOrganizationName
                                     );
                                   }}
                                   placeholder="Organization"
@@ -749,8 +762,10 @@ export default function CrmContactDetailPage({
                                 >
                                   Principal
                                 </Text>
-                                <InputTypeInField
+                                <InputComboBoxField
                                   name="principal"
+                                  options={principalOptions}
+                                  strict={false}
                                   placeholder="e.g. Sen. Jane Smith"
                                 />
                               </div>
@@ -949,10 +964,10 @@ export default function CrmContactDetailPage({
                             visibleOwnerIds.length > 0
                               ? visibleOwnerIds
                                   .filter((ownerId) =>
-                                    ownerLabelById.has(ownerId),
+                                    ownerLabelById.has(ownerId)
                                   )
-                                  .map(
-                                    (ownerId) => ownerLabelById.get(ownerId)!,
+                                  .map((ownerId) =>
+                                    ownerLabelById.get(ownerId)!
                                   )
                                   .join(", ") || null
                               : null
@@ -1019,7 +1034,7 @@ export default function CrmContactDetailPage({
                         }}
                         onLoadMore={() =>
                           setInteractionPageSize(
-                            (value) => value + INTERACTION_PAGE_SIZE,
+                            (value) => value + INTERACTION_PAGE_SIZE
                           )
                         }
                         onLogInteraction={() =>

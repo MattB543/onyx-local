@@ -151,6 +151,11 @@ export interface CrmSearchResultItem {
   sort_at: string | null;
 }
 
+export interface CrmPrincipalSummary {
+  name: string;
+  contact_count: number;
+}
+
 export interface CrmSettings {
   enabled: boolean;
   tier2_enabled: boolean;
@@ -276,6 +281,7 @@ export async function listCrmContacts(args?: {
   status?: CrmContactStage;
   category?: string;
   organization_id?: string;
+  principal?: string;
   tag_ids?: string[];
   owner_ids?: string[];
   created_after?: string;
@@ -292,6 +298,7 @@ export async function listCrmContacts(args?: {
     status: args?.status,
     category: args?.category,
     organization_id: args?.organization_id,
+    principal: args?.principal,
     tag_ids: args?.tag_ids,
     owner_ids: args?.owner_ids,
     created_after: args?.created_after,
@@ -304,6 +311,15 @@ export async function listCrmContacts(args?: {
     page_size: args?.page_size ?? 25,
   });
   return getJson(path, "Fetch CRM contacts");
+}
+
+export async function listCrmContactPrincipals(): Promise<
+  CrmPrincipalSummary[]
+> {
+  return getJson(
+    "/api/user/crm/contacts/principals",
+    "Fetch CRM contact principals"
+  );
 }
 
 export async function getCrmContact(contactId: string): Promise<CrmContact> {

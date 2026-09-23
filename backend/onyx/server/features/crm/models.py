@@ -115,9 +115,7 @@ class CrmContactCreateRequest(BaseModel):
         if not (self.first_name and self.first_name.strip()) and not (
             self.last_name and self.last_name.strip()
         ):
-            raise ValueError(
-                "A contact requires at least a first name or a last name."
-            )
+            raise ValueError("A contact requires at least a first name or a last name.")
         return self
 
 
@@ -380,6 +378,11 @@ class CrmImportResult(BaseModel):
     updated: int = 0
     skipped: int = 0
     errors: list[CrmImportError] = []
+
+
+class CrmPrincipalSummary(BaseModel):
+    name: str
+    contact_count: int
 
 
 class CrmSearchResultItem(BaseModel):

@@ -31,6 +31,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
+    add_similar_principals,
     crm_tool_response,
     is_crm_schema_available,
     parse_enum_maybe,
@@ -246,7 +247,9 @@ class CrmCreateTool(Tool[None]):
                                     "type": "string",
                                     "description": (
                                         "For staffers: the name of the principal they "
-                                        "work for, e.g. the Senator or Representative."
+                                        "work for, e.g. the Senator or Representative. "
+                                        "Reuse the exact spelling other contacts "
+                                        "already use for the same official."
                                     ),
                                 },
                                 "notes": {
@@ -499,6 +502,8 @@ class CrmCreateTool(Tool[None]):
             payload["note"] = (
                 "A contact with this email already exists. Use crm_update to change it."
             )
+        else:
+            add_similar_principals(db_session, payload, contact_data.get("principal"))
         if warnings:
             payload["warnings"] = warnings
         return payload
