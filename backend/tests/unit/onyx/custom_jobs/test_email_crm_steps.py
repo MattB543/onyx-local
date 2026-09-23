@@ -334,7 +334,8 @@ def test_process_email_crm_success_uses_context_db_session_and_legacy_fallbacks(
     handle_kwargs = mock_handle.call_args.kwargs
     assert "db_session" not in handle_kwargs
     assert handle_kwargs["user"] is fake_user
-    assert handle_kwargs["bypass_acl"] is True
+    # Upstream removed the bypass_acl kwarg (#14943); passing it would TypeError.
+    assert "bypass_acl" not in handle_kwargs
 
     req = handle_kwargs["new_msg_req"]
     assert "From: alice@example.com" in req.message

@@ -282,13 +282,14 @@ class ProcessEmailCrmStep(BaseStep):
         state_container = ChatStateContainer()
 
         try:
-            # Background automation has no real user context; bypass ACL so the
-            # CRM persona and its tools are accessible without user-level
-            # permissions.
+            # Background automation has no real user context, so it runs as the
+            # anonymous user. Upstream removed `bypass_acl` (#14943) and now
+            # checks persona access for anonymous users too (#14671): the CRM
+            # persona must be public + listed, and any internal search it runs
+            # sees only documents the anonymous user can access.
             packets = handle_stream_message_objects(
                 new_msg_req=new_message_request,
                 user=user,
-                bypass_acl=True,
                 external_state_container=state_container,
             )
             response = gather_stream_full(packets, state_container)
