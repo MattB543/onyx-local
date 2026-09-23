@@ -5701,6 +5701,7 @@ class CrmOrganization(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5750,6 +5751,13 @@ class CrmContact(Base):
     party_affiliation: Mapped[str | None] = mapped_column(String, nullable=True)
     us_state: Mapped[str | None] = mapped_column(String, nullable=True)
     principal: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The official's own contact. When set, `principal` holds a copy of the
+    # official's full name (kept in sync by db/crm.py).
+    principal_contact_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -5762,6 +5770,7 @@ class CrmContact(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5774,6 +5783,7 @@ class CrmContact(Base):
             "setweight(to_tsvector('english', coalesce(first_name, '')), 'A') || "
             "setweight(to_tsvector('english', coalesce(last_name, '')), 'A') || "
             "setweight(to_tsvector('english', coalesce(email, '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(principal, '')), 'B') || "
             "setweight(to_tsvector('english', coalesce(title, '')), 'C') || "
             "setweight(to_tsvector('english', coalesce(notes, '')), 'D')",
             persisted=True,
@@ -5788,10 +5798,15 @@ class CrmContact(Base):
     __table_args__ = (
         Index("ix_crm_contact_organization_id", "organization_id"),
         Index("ix_crm_contact_status", "status"),
+        Index("ix_crm_contact_principal_contact_id", "principal_contact_id"),
         CheckConstraint(
             "NULLIF(btrim(first_name), '') IS NOT NULL "
             "OR NULLIF(btrim(last_name), '') IS NOT NULL",
             name="ck_crm_contact_has_name",
+        ),
+        CheckConstraint(
+            "principal_contact_id <> id",
+            name="ck_crm_contact_principal_not_self",
         ),
     )
 
@@ -5849,6 +5864,7 @@ class CrmInteraction(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # DB triggers also advance this on related changes (migration 39db7165c7ac).
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -5880,9 +5896,10 @@ class CrmInteractionAttendee(Base):
         ForeignKey("crm_interaction.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # CASCADE, not SET NULL: a NULL user_id would violate the one-target CHECK.
     user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("user.id", ondelete="SET NULL"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=True,
     )
     contact_id: Mapped[UUID | None] = mapped_column(
@@ -5917,6 +5934,12 @@ class CrmInteractionAttendee(Base):
             "interaction_id",
             "contact_id",
             unique=True,
+            postgresql_where=text("contact_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_crm_interaction_attendee_contact_interaction",
+            "contact_id",
+            "interaction_id",
             postgresql_where=text("contact_id IS NOT NULL"),
         ),
     )

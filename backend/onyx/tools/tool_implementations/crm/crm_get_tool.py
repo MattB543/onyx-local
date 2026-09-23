@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import override
@@ -9,9 +10,6 @@ from typing_extensions import override
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
     get_contact_by_id,
-    get_contact_owner_ids,
-    get_contact_tags,
-    get_interaction_attendees,
     get_interaction_by_id,
     get_organization_by_id,
     get_organization_tags,
@@ -28,29 +26,47 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
-    parse_uuid_maybe,
-    serialize_contact,
-    serialize_interaction,
+    serialize_contacts,
+    serialize_interactions,
     serialize_organization,
     serialize_tag,
 )
+from onyx.tools.tool_implementations.crm.validation import (
+    parse_entity_type,
+    parse_uuid,
+    reject_unknown_keys,
+)
 
 CRM_GET_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
-CRM_GET_INCLUDE_OPTIONS = {"tags", "interactions", "organization", "attendees", "contacts"}
+# Related records each entity type can expand (latest 10 of each).
+INCLUDES_BY_ENTITY_TYPE: dict[str, tuple[str, ...]] = {
+    "contact": ("organization", "interactions", "staff"),
+    "organization": ("contacts", "interactions"),
+    "interaction": (),
+    "tag": (),
+}
+# Always returned; accepted in 'include' as no-ops.
+ALWAYS_INCLUDED: dict[str, tuple[str, ...]] = {
+    "contact": ("tags",),
+    "organization": ("tags",),
+    "interaction": ("attendees",),
+    "tag": (),
+}
+CRM_GET_INCLUDE_OPTIONS = sorted(
+    {option for options in INCLUDES_BY_ENTITY_TYPE.values() for option in options}
+)
+RELATED_PAGE_SIZE = 10
 
 
 class CrmGetTool(Tool[None]):
     NAME = "crm_get"
     DISPLAY_NAME = "CRM Get"
     DESCRIPTION = (
-        "Fetch the full details of a specific CRM entity by its UUID. Use this after finding an "
-        "entity via crm_search or crm_list to get complete information. Optionally include related "
-        "data: 'tags' for a contact/org's tags, 'interactions' for recent interactions, "
-        "'organization' to expand a contact's linked org, 'attendees' for an interaction's attendees, "
-        "'contacts' to list contacts belonging to an organization."
+        "Get a CRM record by UUID. Contacts include tags and owners; organizations "
+        "include tags; interactions include attendees and their linked contact/org. "
+        "Use include for related records (latest 10); use crm_list to see more."
     )
 
     def __init__(
@@ -96,25 +112,23 @@ class CrmGetTool(Tool[None]):
                         "entity_type": {
                             "type": "string",
                             "enum": sorted(CRM_GET_ENTITY_TYPES),
-                            "description": "The type of CRM entity to retrieve.",
                         },
                         "entity_id": {
                             "type": "string",
-                            "description": "The UUID of the entity to retrieve.",
+                            "description": "UUID of the record.",
                         },
                         "include": {
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": sorted(CRM_GET_INCLUDE_OPTIONS),
+                                "enum": CRM_GET_INCLUDE_OPTIONS,
                             },
                             "description": (
-                                "Related data to include. Options: "
-                                "'tags' (for contacts/orgs), "
-                                "'interactions' (recent interactions for a contact/org), "
-                                "'organization' (expand a contact's linked org), "
-                                "'attendees' (for an interaction), "
-                                "'contacts' (list contacts at an org)."
+                                "Contact: 'organization', 'interactions' (including "
+                                "ones it attended), 'staff' (contacts whose "
+                                "principal_contact_id is this contact). "
+                                "Organization: 'contacts', 'interactions' (linked "
+                                "to the org itself)."
                             ),
                         },
                     },
@@ -126,41 +140,50 @@ class CrmGetTool(Tool[None]):
     def emit_start(self, placement: Placement) -> None:
         self.emitter.emit(Packet(placement=placement, obj=CrmGetToolStart()))
 
+    def _parse_includes(self, entity_type: str, include_raw: Any) -> set[str]:
+        if include_raw is None:
+            return set()
+        if not isinstance(include_raw, list):
+            raise ToolCallException(
+                message=f"Invalid include in {self.name}: {include_raw!r}",
+                llm_facing_message="'include' must be an array of strings.",
+            )
+        normalized: list[Any] = [
+            value.strip().lower() if isinstance(value, str) else value
+            for value in include_raw
+        ]
+        allowed = INCLUDES_BY_ENTITY_TYPE[entity_type]
+        invalid = [
+            json.dumps(value)
+            for value in normalized
+            if value not in allowed and value not in ALWAYS_INCLUDED[entity_type]
+        ]
+        if invalid:
+            raise ToolCallException(
+                message=f"Invalid include for {entity_type} in {self.name}: {invalid}",
+                llm_facing_message=(
+                    f"'include' value(s) {', '.join(invalid)} do not apply to "
+                    f"entity_type '{entity_type}'. Allowed: "
+                    f"{', '.join(allowed) or 'none'}."
+                ),
+            )
+        return {str(value) for value in normalized if value in allowed}
+
     def run(
         self,
         placement: Placement,
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
-        entity_type_raw = llm_kwargs.get("entity_type")
-        if not isinstance(entity_type_raw, str):
-            raise ToolCallException(
-                message=f"Missing/invalid entity_type in {self.name}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, interaction, tag.",
-            )
+        reject_unknown_keys(
+            llm_kwargs, ("entity_type", "entity_id", "include"), "crm_get arguments"
+        )
+        entity_type = parse_entity_type(
+            llm_kwargs.get("entity_type"), CRM_GET_ENTITY_TYPES, self.name
+        )
 
-        entity_type = entity_type_raw.strip().lower()
-        if entity_type not in CRM_GET_ENTITY_TYPES:
-            raise ToolCallException(
-                message=f"Unsupported entity_type in {self.name}: {entity_type}",
-                llm_facing_message="'entity_type' must be one of: contact, organization, interaction, tag.",
-            )
-
-        entity_id = parse_uuid_maybe(llm_kwargs.get("entity_id"), "entity_id")
-        if not entity_id:
-            raise ToolCallException(
-                message=f"Missing/invalid entity_id in {self.name}",
-                llm_facing_message="'entity_id' must be a valid UUID.",
-            )
-
-        include_raw = llm_kwargs.get("include", [])
-        if not isinstance(include_raw, list):
-            include_raw = []
-        includes = {
-            s.strip().lower()
-            for s in include_raw
-            if isinstance(s, str) and s.strip().lower() in CRM_GET_INCLUDE_OPTIONS
-        }
+        entity_id = parse_uuid(llm_kwargs.get("entity_id"), "entity_id")
+        includes = self._parse_includes(entity_type, llm_kwargs.get("include"))
 
         with self._session_factory() as db_session:
             if entity_type == "contact":
@@ -168,29 +191,35 @@ class CrmGetTool(Tool[None]):
             elif entity_type == "organization":
                 payload = self._get_organization(db_session, entity_id, includes)
             elif entity_type == "interaction":
-                payload = self._get_interaction(db_session, entity_id, includes)
+                payload = self._get_interaction(db_session, entity_id)
             else:
                 payload = self._get_tag(db_session, entity_id)
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmGetToolDelta(payload=compact_payload),
-            )
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmGetToolDelta)
 
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
+    def _recent_interactions(
+        self,
+        db_session: Session,
+        *,
+        contact_id: UUID | None = None,
+        organization_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        interactions, total = list_interactions(
+            db_session=db_session,
+            page_num=0,
+            page_size=RELATED_PAGE_SIZE,
+            contact_id=contact_id,
+            organization_id=organization_id,
         )
+        return {
+            "total": total,
+            "items": serialize_interactions(db_session, interactions),
+        }
 
     def _get_contact(
         self,
         db_session: Session,
-        entity_id: Any,
+        entity_id: UUID,
         includes: set[str],
     ) -> dict[str, Any]:
         contact = get_contact_by_id(entity_id, db_session)
@@ -200,38 +229,34 @@ class CrmGetTool(Tool[None]):
                 llm_facing_message="Could not find a contact with that ID.",
             )
 
-        tags = get_contact_tags(contact.id, db_session)
         result: dict[str, Any] = {
             "status": "ok",
             "entity_type": "contact",
-            "contact": serialize_contact(
-                contact,
-                owner_ids=get_contact_owner_ids(contact.id, db_session),
-                tags=tags,
-            ),
+            "contact": serialize_contacts(db_session, [contact])[0],
         }
 
         if "organization" in includes and contact.organization_id:
             org = get_organization_by_id(contact.organization_id, db_session)
             if org:
-                org_tags = get_organization_tags(org.id, db_session)
-                result["organization"] = serialize_organization(org, tags=org_tags)
+                result["organization"] = serialize_organization(
+                    org, tags=get_organization_tags(org.id, db_session)
+                )
 
         if "interactions" in includes:
-            interactions, total = list_interactions(
+            result["recent_interactions"] = self._recent_interactions(
+                db_session, contact_id=contact.id
+            )
+
+        if "staff" in includes:
+            staff, total = list_contacts(
                 db_session=db_session,
                 page_num=0,
-                page_size=10,
-                contact_id=contact.id,
+                page_size=RELATED_PAGE_SIZE,
+                principal_contact_id=contact.id,
             )
-            result["recent_interactions"] = {
+            result["staff"] = {
                 "total": total,
-                "items": [
-                    serialize_interaction(
-                        i, attendees=get_interaction_attendees(i.id, db_session)
-                    )
-                    for i in interactions
-                ],
+                "items": serialize_contacts(db_session, staff),
             }
 
         return result
@@ -239,7 +264,7 @@ class CrmGetTool(Tool[None]):
     def _get_organization(
         self,
         db_session: Session,
-        entity_id: Any,
+        entity_id: UUID,
         includes: set[str],
     ) -> dict[str, Any]:
         org = get_organization_by_id(entity_id, db_session)
@@ -249,57 +274,34 @@ class CrmGetTool(Tool[None]):
                 llm_facing_message="Could not find an organization with that ID.",
             )
 
-        tags = get_organization_tags(org.id, db_session)
         result: dict[str, Any] = {
             "status": "ok",
             "entity_type": "organization",
-            "organization": serialize_organization(org, tags=tags),
+            "organization": serialize_organization(
+                org, tags=get_organization_tags(org.id, db_session)
+            ),
         }
 
         if "contacts" in includes:
             contacts, total = list_contacts(
                 db_session=db_session,
                 page_num=0,
-                page_size=10,
+                page_size=RELATED_PAGE_SIZE,
                 organization_id=org.id,
             )
             result["contacts"] = {
                 "total": total,
-                "items": [
-                    serialize_contact(
-                        c,
-                        owner_ids=get_contact_owner_ids(c.id, db_session),
-                        tags=get_contact_tags(c.id, db_session),
-                    )
-                    for c in contacts
-                ],
+                "items": serialize_contacts(db_session, contacts),
             }
 
         if "interactions" in includes:
-            interactions, total = list_interactions(
-                db_session=db_session,
-                page_num=0,
-                page_size=10,
-                organization_id=org.id,
+            result["recent_interactions"] = self._recent_interactions(
+                db_session, organization_id=org.id
             )
-            result["recent_interactions"] = {
-                "total": total,
-                "items": [
-                    serialize_interaction(
-                        i, attendees=get_interaction_attendees(i.id, db_session)
-                    )
-                    for i in interactions
-                ],
-            }
 
         return result
 
-    def _get_interaction(
-        self,
-        db_session: Session,
-        entity_id: Any,
-        includes: set[str],  # noqa: ARG002
-    ) -> dict[str, Any]:
+    def _get_interaction(self, db_session: Session, entity_id: UUID) -> dict[str, Any]:
         interaction = get_interaction_by_id(entity_id, db_session)
         if interaction is None:
             raise ToolCallException(
@@ -307,22 +309,16 @@ class CrmGetTool(Tool[None]):
                 llm_facing_message="Could not find an interaction with that ID.",
             )
 
-        attendees = get_interaction_attendees(interaction.id, db_session)
         result: dict[str, Any] = {
             "status": "ok",
             "entity_type": "interaction",
-            "interaction": serialize_interaction(interaction, attendees=attendees),
+            "interaction": serialize_interactions(db_session, [interaction])[0],
         }
 
-        # Always include linked contact/org details for context
         if interaction.contact_id:
             contact = get_contact_by_id(interaction.contact_id, db_session)
             if contact:
-                result["contact"] = serialize_contact(
-                    contact,
-                    owner_ids=get_contact_owner_ids(contact.id, db_session),
-                    tags=get_contact_tags(contact.id, db_session),
-                )
+                result["contact"] = serialize_contacts(db_session, [contact])[0]
 
         if interaction.organization_id:
             org = get_organization_by_id(interaction.organization_id, db_session)
@@ -336,7 +332,7 @@ class CrmGetTool(Tool[None]):
     def _get_tag(
         self,
         db_session: Session,
-        entity_id: Any,
+        entity_id: UUID,
     ) -> dict[str, Any]:
         tag = get_tag_by_id(entity_id, db_session)
         if tag is None:

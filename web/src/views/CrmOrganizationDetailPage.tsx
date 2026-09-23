@@ -13,11 +13,7 @@ import {
   deleteCrmOrganization,
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
-import {
-  ConfirmationModalLayout,
-  SettingsLayouts,
-  toast,
-} from "@opal/layouts";
+import { ConfirmationModalLayout, SettingsLayouts, toast } from "@opal/layouts";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -34,6 +30,7 @@ import CrmBreadcrumbs from "@/views/crm/components/CrmBreadcrumbs";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
 import DetailField from "@/views/crm/components/DetailField";
 import LogInteractionModal from "@/views/crm/components/LogInteractionModal";
+import OrganizationOfficesCard from "@/views/crm/components/OrganizationOfficesCard";
 import OrgAvatar from "@/views/crm/components/OrgAvatar";
 import TagManager from "@/views/crm/components/TagManager";
 import TypeBadge from "@/views/crm/components/TypeBadge";
@@ -87,7 +84,7 @@ export default function CrmOrganizationDetailPage({
     useState<CrmInteraction | null>(null);
   const [isDeletingInteraction, setIsDeletingInteraction] = useState(false);
   const [interactionPageSize, setInteractionPageSize] = useState(
-    INTERACTION_PAGE_SIZE,
+    INTERACTION_PAGE_SIZE
   );
 
   const { organization, isLoading, error, refreshOrganization } =
@@ -104,12 +101,15 @@ export default function CrmOrganizationDetailPage({
     pageNum: 0,
     pageSize: interactionPageSize,
   });
-  const { contacts: linkedContacts, isLoading: linkedContactsLoading } =
-    useCrmContacts({
-      organizationId,
-      pageNum: 0,
-      pageSize: LINKED_CONTACTS_PAGE_SIZE,
-    });
+  const {
+    contacts: linkedContacts,
+    totalItems: linkedContactsTotal,
+    isLoading: linkedContactsLoading,
+  } = useCrmContacts({
+    organizationId,
+    pageNum: 0,
+    pageSize: LINKED_CONTACTS_PAGE_SIZE,
+  });
 
   const hasMoreInteractions = interactions.length < totalInteractions;
 
@@ -119,7 +119,7 @@ export default function CrmOrganizationDetailPage({
       { label: "Organizations", href: "/app/crm/organizations" },
       { label: organization?.name || "Organization" },
     ],
-    [organization?.name],
+    [organization?.name]
   );
 
   async function handleDeleteOrganization() {
@@ -581,6 +581,11 @@ export default function CrmOrganizationDetailPage({
                       </div>
                     </Card>
                   )}
+
+                  <OrganizationOfficesCard
+                    organizationId={organization.id}
+                    contactCount={linkedContactsTotal}
+                  />
                 </div>
 
                 <div className="flex min-w-0 flex-[8] flex-col gap-4">
@@ -610,7 +615,7 @@ export default function CrmOrganizationDetailPage({
                         }}
                         onLoadMore={() =>
                           setInteractionPageSize(
-                            (value) => value + INTERACTION_PAGE_SIZE,
+                            (value) => value + INTERACTION_PAGE_SIZE
                           )
                         }
                         onLogInteraction={() =>

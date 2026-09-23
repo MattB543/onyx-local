@@ -33,6 +33,7 @@ import {
 } from "@/views/crm/crmOptions";
 import CrmCategoryField from "@/views/crm/components/CrmCategoryField";
 import OrganizationPicker from "@/views/crm/components/OrganizationPicker";
+import PrincipalPicker from "@/views/crm/components/PrincipalPicker";
 
 import { SvgUser } from "@opal/icons";
 
@@ -47,6 +48,7 @@ interface ContactCreateValues {
   party_affiliation: string;
   us_state: string;
   principal: string;
+  principal_contact_id: string;
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
@@ -149,6 +151,7 @@ export default function CreateContactModal({
             party_affiliation: "",
             us_state: "",
             principal: "",
+            principal_contact_id: "",
             owner_ids: initialOwnerIds,
             source: "",
             notes: "",
@@ -178,6 +181,7 @@ export default function CreateContactModal({
                 party_affiliation: optionalText(values.party_affiliation),
                 us_state: optionalText(values.us_state),
                 principal: optionalText(values.principal),
+                principal_contact_id: values.principal_contact_id || undefined,
                 owner_ids: values.owner_ids,
                 source: values.source || undefined,
                 notes: optionalText(values.notes),
@@ -307,8 +311,16 @@ export default function CreateContactModal({
                       name="us_state"
                       placeholder="US State (e.g. CA)"
                     />
-                    <InputTypeInField
-                      name="principal"
+                    <PrincipalPicker
+                      principal={values.principal}
+                      principalContactId={values.principal_contact_id || null}
+                      onChange={(nextPrincipal, nextPrincipalContactId) => {
+                        setFieldValue("principal", nextPrincipal);
+                        setFieldValue(
+                          "principal_contact_id",
+                          nextPrincipalContactId ?? ""
+                        );
+                      }}
                       placeholder="Principal (e.g. Sen. Jane Smith)"
                     />
                   </div>

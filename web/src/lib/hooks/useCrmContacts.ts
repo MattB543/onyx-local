@@ -11,9 +11,13 @@ import {
 
 interface UseCrmContactsParams {
   q?: string;
+  /** Full-name contains match (ignores email and principal). */
+  name?: string;
   status?: CrmContactStage;
   category?: string;
   organizationId?: string;
+  principal?: string;
+  principalContactId?: string;
   ownerIds?: string[];
   tagIds?: string[];
   createdAfter?: string;
@@ -28,9 +32,12 @@ interface UseCrmContactsParams {
 
 export function useCrmContacts({
   q,
+  name,
   status,
   category,
   organizationId,
+  principal,
+  principalContactId,
   ownerIds,
   tagIds,
   createdAfter,
@@ -48,9 +55,12 @@ export function useCrmContacts({
     [
       "crm-contacts",
       q ?? "",
+      name ?? "",
       status ?? "",
       category ?? "",
       organizationId ?? "",
+      principal ?? "",
+      principalContactId ?? "",
       ownerIds?.join(",") ?? "",
       tagIds?.join(",") ?? "",
       createdAfter ?? "",
@@ -65,9 +75,12 @@ export function useCrmContacts({
     () =>
       listCrmContacts({
         q: q || undefined,
+        name: name || undefined,
         status,
         category,
         organization_id: organizationId,
+        principal: principal || undefined,
+        principal_contact_id: principalContactId,
         owner_ids: ownerIds?.length ? ownerIds : undefined,
         tag_ids: tagIds?.length ? tagIds : undefined,
         created_after: createdAfter,

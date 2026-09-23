@@ -42,16 +42,14 @@ export const contactValidationSchema = Yup.object().shape(
       .trim()
       .when("last_name", {
         is: (last_name?: string) => !last_name || !last_name.trim(),
-        then: (schema) =>
-          schema.required("Enter a first name or a last name."),
+        then: (schema) => schema.required("Enter a first name or a last name."),
         otherwise: (schema) => schema.optional(),
       }),
     last_name: Yup.string()
       .trim()
       .when("first_name", {
         is: (first_name?: string) => !first_name || !first_name.trim(),
-        then: (schema) =>
-          schema.required("Enter a first name or a last name."),
+        then: (schema) => schema.required("Enter a first name or a last name."),
         otherwise: (schema) => schema.optional(),
       }),
     email: Yup.string().trim().email("Enter a valid email.").optional(),
@@ -91,6 +89,12 @@ export function formatCrmLabel(value: string): string {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+/** "Office of <principal>", without doubling a prefix the value already has. */
+export function formatPrincipalOffice(principal: string): string {
+  const trimmed = principal.trim();
+  return /^office of\b/i.test(trimmed) ? trimmed : `Office of ${trimmed}`;
 }
 
 export function optionalText(value: string): string | undefined {

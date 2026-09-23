@@ -311,11 +311,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ) as mock_create_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
         ):
@@ -401,11 +401,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
         ):
@@ -453,20 +453,17 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
                 "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url",
                 side_effect=Exception("boom"),
             ),
-            patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact"
-            ) as mock_update_contact,
         ):
             payload = tool._create_contact(
                 db_session=mocked_db_session,
@@ -479,7 +476,9 @@ class TestCrmToolRun:
 
         assert payload["status"] == "created"
         assert payload["contact"]["profile_picture_file_id"] is None
-        mock_update_contact.assert_not_called()
+        assert len(payload["warnings"]) == 1
+        assert "https://example.com/avatar.png" in payload["warnings"][0]
+        assert "boom" in payload["warnings"][0]
 
     def test_crm_create_contact_downloads_profile_picture_when_created(
         self, emitter: Emitter, db_session
@@ -491,36 +490,28 @@ class TestCrmToolRun:
             user_id=str(uuid4()),
         )
         db_session_mock = MagicMock()
-        contact = CrmContact(first_name="Alice", status="lead")
-        contact.id = uuid4()
-        updated_contact = CrmContact(
-            first_name="Alice",
-            status="lead",
-            profile_picture_file_id="file-123",
+        contact = CrmContact(
+            first_name="Alice", status="lead", profile_picture_file_id="file-123"
         )
-        updated_contact.id = contact.id
+        contact.id = uuid4()
 
         with (
             patch(
                 "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
                 return_value=(contact, True),
-            ),
+            ) as mock_create_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
                 "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url",
                 return_value="file-123",
             ) as mock_save_file,
-            patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact",
-                return_value=(updated_contact, True),
-            ) as mock_update_contact,
         ):
             payload = tool._create_contact(
                 db_session=db_session_mock,
@@ -533,16 +524,16 @@ class TestCrmToolRun:
 
         mock_save_file.assert_called_once_with(
             "https://example.com/avatar.png",
-            display_name=f"crm_profile_{contact.id}",
+            display_name="crm_profile_picture",
             file_origin=FileOrigin.CRM_UPLOAD,
             require_image=True,
         )
-        mock_update_contact.assert_called_once_with(
-            db_session=db_session_mock,
-            contact=contact,
-            patches={"profile_picture_file_id": "file-123"},
+        assert (
+            mock_create_contact.call_args.kwargs["profile_picture_file_id"]
+            == "file-123"
         )
         assert payload["contact"]["profile_picture_file_id"] == "file-123"
+        assert "warnings" not in payload
 
     def test_crm_create_contact_existing_contact_does_not_download_profile_picture(
         self, emitter: Emitter, db_session
@@ -558,36 +549,42 @@ class TestCrmToolRun:
 
         with (
             patch(
+                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_by_email",
+                return_value=contact,
+            ),
+            patch(
                 "onyx.tools.tool_implementations.crm.crm_create_tool.create_contact",
                 return_value=(contact, False),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
                 "onyx.tools.tool_implementations.crm.crm_create_tool.save_file_from_url"
             ) as mock_save_file,
-            patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.update_contact"
-            ) as mock_update_contact,
         ):
             payload = tool._create_contact(
                 db_session=MagicMock(),
                 contact_data={
                     "first_name": "Alice",
+                    "email": "alice@example.com",
                     "owner_ids": [],
                     "profile_picture_url": "https://example.com/avatar.png",
                 },
             )
 
         assert payload["status"] == "already_exists"
+        assert payload["not_applied_fields"] == [
+            "first_name",
+            "owner_ids",
+            "profile_picture_url",
+        ]
         mock_save_file.assert_not_called()
-        mock_update_contact.assert_not_called()
 
     def test_crm_update_run_emits_delta(
         self, emitter: Emitter, db_session, placement: Placement
@@ -613,10 +610,10 @@ class TestCrmToolRun:
                 "onyx.tools.tool_implementations.crm.crm_update_tool.update_contact"
             ) as mock_update_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_owner_ids"
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids"
             ) as mock_get_contact_owner_ids,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_tags"
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags"
             ) as mock_get_tags,
         ):
             mock_get_contact.return_value = contact
@@ -770,10 +767,10 @@ class TestCrmToolRun:
                 "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.create_interaction"
             ) as mock_create_interaction,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.add_interaction_attendees"
+                "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.replace_interaction_attendees"
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.get_interaction_attendees"
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees"
             ) as mock_get_attendees,
         ):
             mock_create_interaction.return_value = interaction
@@ -813,7 +810,7 @@ class TestCrmToolRun:
                 return_value=(interaction, True),
             ) as mock_update_interaction,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees",
                 return_value=[],
             ),
             patch(
@@ -881,7 +878,7 @@ class TestCrmToolRun:
                 return_value=(interaction, False),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees",
                 return_value=[],
             ),
             patch(

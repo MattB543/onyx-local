@@ -19,6 +19,7 @@ const CONTACT: ContactEditValues = {
   party_affiliation: "Independent",
   us_state: "CA",
   principal: "Sen. Jane Smith",
+  principal_contact_id: "official-1",
   owner_ids: ["u1", "u2"],
   source: "manual",
   notes: "Met at conference",
@@ -62,6 +63,7 @@ describe("buildContactPatchBody", () => {
       party_affiliation: "Independent",
       us_state: "CA",
       principal: "Sen. Jane Smith",
+      principal_contact_id: "official-1",
       owner_ids: ["u1", "u2", "hidden"],
       source: "manual",
       notes: "Met at conference",
@@ -81,6 +83,7 @@ describe("buildContactPatchBody", () => {
       party_affiliation: "",
       us_state: "",
       principal: "",
+      principal_contact_id: "",
       notes: "  ",
       organization_id: "",
     };
@@ -97,6 +100,7 @@ describe("buildContactPatchBody", () => {
       "party_affiliation",
       "us_state",
       "principal",
+      "principal_contact_id",
       "notes",
       "organization_id",
     ]) {

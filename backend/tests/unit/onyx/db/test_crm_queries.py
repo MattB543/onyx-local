@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -156,9 +156,7 @@ def test_create_contact_rejects_no_names() -> None:
     db_session = MagicMock()
     db_session.scalar.return_value = None
 
-    with pytest.raises(
-        ValueError, match="at least a first name or a last name"
-    ):
+    with pytest.raises(ValueError, match="at least a first name or a last name"):
         create_contact(
             db_session=db_session,
             first_name="   ",
@@ -292,9 +290,7 @@ def test_update_contact_rejects_clearing_only_first_name() -> None:
     contact = CrmContact(first_name="Alice", last_name=None, status="lead")
     contact.id = uuid4()
 
-    with pytest.raises(
-        ValueError, match="at least a first name or a last name"
-    ):
+    with pytest.raises(ValueError, match="at least a first name or a last name"):
         update_contact(
             db_session=db_session,
             contact=contact,
@@ -319,9 +315,7 @@ def test_update_contact_rejects_clearing_both_names_in_one_patch(
     contact = CrmContact(first_name="Alice", last_name="Smith", status="lead")
     contact.id = uuid4()
 
-    with pytest.raises(
-        ValueError, match="at least a first name or a last name"
-    ):
+    with pytest.raises(ValueError, match="at least a first name or a last name"):
         update_contact(
             db_session=db_session,
             contact=contact,
@@ -335,9 +329,7 @@ def test_update_contact_rejects_clearing_last_when_no_first() -> None:
     contact = CrmContact(first_name=None, last_name="Smith", status="lead")
     contact.id = uuid4()
 
-    with pytest.raises(
-        ValueError, match="at least a first name or a last name"
-    ):
+    with pytest.raises(ValueError, match="at least a first name or a last name"):
         update_contact(
             db_session=db_session,
             contact=contact,
@@ -957,16 +949,26 @@ def test_update_interaction_changes_type() -> None:
     assert interaction.type == CrmInteractionType.CALL
 
 
-def test_replace_interaction_attendees_replaces_set() -> None:
+def _attendee(
+    interaction_id: UUID,
+    *,
+    user_id: UUID | None = None,
+    contact_id: UUID | None = None,
+    role: CrmAttendeeRole = CrmAttendeeRole.ATTENDEE,
+) -> CrmInteractionAttendee:
+    return CrmInteractionAttendee(
+        interaction_id=interaction_id, user_id=user_id, contact_id=contact_id, role=role
+    )
+
+
+def test_replace_interaction_attendees_adds_deduped_rows() -> None:
     db_session = MagicMock()
+    db_session.scalars.return_value = []
     interaction_id = uuid4()
     user_id = uuid4()
     contact_id = uuid4()
 
-    final_attendees = [MagicMock(), MagicMock()]
-    db_session.scalars.return_value = final_attendees
-
-    result = replace_interaction_attendees(
+    changed = replace_interaction_attendees(
         db_session=db_session,
         interaction_id=interaction_id,
         attendees=[
@@ -976,32 +978,89 @@ def test_replace_interaction_attendees_replaces_set() -> None:
         ],
     )
 
-    # delete existing + add deduped rows
-    db_session.execute.assert_called_once()
     added = [call.args[0] for call in db_session.add.call_args_list]
-    assert len(added) == 2
     by_pair = {(a.user_id, a.contact_id): a for a in added}
+    assert len(added) == 2
     assert by_pair[(user_id, None)].role == CrmAttendeeRole.ORGANIZER
     assert by_pair[(None, contact_id)].role == CrmAttendeeRole.ATTENDEE
-    assert all(isinstance(a, CrmInteractionAttendee) for a in added)
+    db_session.delete.assert_not_called()
     db_session.commit.assert_called_once()
-    assert result == final_attendees
+    assert changed is True
+
+
+def test_replace_interaction_attendees_writes_only_differences() -> None:
+    db_session = MagicMock()
+    interaction_id = uuid4()
+    kept = _attendee(interaction_id, contact_id=uuid4())
+    promoted = _attendee(interaction_id, user_id=uuid4())
+    removed = _attendee(interaction_id, contact_id=uuid4())
+    db_session.scalars.return_value = [kept, promoted, removed]
+    new_contact_id = uuid4()
+
+    changed = replace_interaction_attendees(
+        db_session=db_session,
+        interaction_id=interaction_id,
+        attendees=[
+            (None, kept.contact_id, CrmAttendeeRole.ATTENDEE),
+            (promoted.user_id, None, CrmAttendeeRole.ORGANIZER),
+            (None, new_contact_id, CrmAttendeeRole.OBSERVER),
+        ],
+        commit=False,
+    )
+
+    assert changed is True
+    db_session.delete.assert_called_once_with(removed)
+    assert promoted.role == CrmAttendeeRole.ORGANIZER
+    assert kept.role == CrmAttendeeRole.ATTENDEE
+    (added,) = [call.args[0] for call in db_session.add.call_args_list]
+    assert (added.contact_id, added.role) == (new_contact_id, CrmAttendeeRole.OBSERVER)
+    db_session.flush.assert_called_once()
+    db_session.commit.assert_not_called()
+
+
+def test_replace_interaction_attendees_unchanged_set_writes_nothing() -> None:
+    db_session = MagicMock()
+    interaction_id = uuid4()
+    existing = _attendee(
+        interaction_id, user_id=uuid4(), role=CrmAttendeeRole.ORGANIZER
+    )
+    db_session.scalars.return_value = [existing]
+
+    changed = replace_interaction_attendees(
+        db_session=db_session,
+        interaction_id=interaction_id,
+        attendees=[
+            (existing.user_id, None, CrmAttendeeRole.ATTENDEE),
+            (existing.user_id, None, CrmAttendeeRole.ORGANIZER),
+        ],
+    )
+
+    assert changed is False
+    db_session.add.assert_not_called()
+    db_session.delete.assert_not_called()
+    db_session.flush.assert_not_called()
+    db_session.commit.assert_not_called()
 
 
 def test_replace_interaction_attendees_empty_clears_all() -> None:
     db_session = MagicMock()
-    db_session.scalars.return_value = []
+    interaction_id = uuid4()
+    existing = [
+        _attendee(interaction_id, user_id=uuid4()),
+        _attendee(interaction_id, contact_id=uuid4()),
+    ]
+    db_session.scalars.return_value = existing
 
-    result = replace_interaction_attendees(
+    changed = replace_interaction_attendees(
         db_session=db_session,
-        interaction_id=uuid4(),
+        interaction_id=interaction_id,
         attendees=[],
     )
 
-    db_session.execute.assert_called_once()
+    assert changed is True
+    assert [call.args[0] for call in db_session.delete.call_args_list] == existing
     db_session.add.assert_not_called()
     db_session.commit.assert_called_once()
-    assert result == []
 
 
 def test_delete_interaction_commits_by_default() -> None:

@@ -97,7 +97,13 @@ EU Member State Policy Maker, Other International Policy Maker. Never use a gene
 always pick the specific policy-maker variant.
 - Contacts also have three optional fields: **party_affiliation** (political party, e.g. Democrat, Republican, \
 Social Democrat), **us_state** (2-letter state abbreviation, for US House/Senate members and state-level policy \
-makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for).
+makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for). \
+Reuse the exact principal spelling other contacts already use for the same official; `crm_create` and `crm_update` \
+return `similar_principals` when a spelling differs. When the official has their own contact record, also set \
+`principal_contact_id` to that contact's UUID: this links the staffer, and the principal text then follows the \
+official's name. To find an official's staffers, use `crm_list` with the `principal` filter, or `crm_get` on the \
+official with include `staff`. For the history with an office, use `crm_list` with entity_type "interaction" and the \
+`principal` filter.
 - **Organizations** represent companies or entities. Multiple contacts can belong to one organization.
 - **Interactions** are logged events (calls, meetings, emails, notes, events) linked to a contact and/or organization. \
 They can have **attendees** (team members or external contacts).
@@ -121,7 +127,7 @@ when it can be inferred. For US congressional contacts capture `us_state` and `p
 
 ### Common Workflows
 
-**After a meeting:** Search for the contact and org → create if they don't exist → log the interaction with a summary and attendees → apply relevant tags.
+**After a meeting:** Search for the contact and org → create if they don't exist → log the interaction with a summary and attendees → apply relevant tags (`crm_update` with `add_tag_ids`).
 
 **Prepping for a meeting:** Use `crm_get` to pull the contact and org details, then use `crm_list` to find recent interactions and understand the relationship history.
 

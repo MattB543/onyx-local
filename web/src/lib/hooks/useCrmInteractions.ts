@@ -12,6 +12,7 @@ interface UseCrmInteractionsParams {
   contactId?: string;
   organizationId?: string;
   includeContactInteractions?: boolean;
+  principal?: string;
   interactionType?: CrmInteractionType;
   loggedBy?: string;
   pageNum: number;
@@ -22,6 +23,7 @@ export function useCrmInteractions({
   contactId,
   organizationId,
   includeContactInteractions,
+  principal,
   interactionType,
   loggedBy,
   pageNum,
@@ -35,6 +37,7 @@ export function useCrmInteractions({
       contactId ?? "",
       organizationId ?? "",
       includeContactInteractions ?? false,
+      principal ?? "",
       interactionType ?? "",
       loggedBy ?? "",
       pageNum,
@@ -45,6 +48,7 @@ export function useCrmInteractions({
         contact_id: contactId,
         organization_id: organizationId,
         include_contact_interactions: includeContactInteractions,
+        principal: principal || undefined,
         interaction_type: interactionType,
         logged_by: loggedBy || undefined,
         page_num: pageNum,

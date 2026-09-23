@@ -5,11 +5,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, or_, select, text
+from sqlalchemy import case, func, or_, select, text, union, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import delete
+from sqlalchemy.sql import delete, expression
 
+from onyx.configs.constants import (
+    ANONYMOUS_USER_EMAIL,
+    DANSWER_API_KEY_DUMMY_EMAIL_DOMAIN,
+    NO_AUTH_PLACEHOLDER_USER_EMAIL,
+)
 from onyx.db.enums import (
+    AccountType,
     CrmAttendeeRole,
     CrmContactSource,
     CrmInteractionType,
@@ -49,6 +56,12 @@ class CrmSearchResult:
     secondary_text: str | None
     rank: float
     sort_at: datetime | None
+
+
+@dataclass(frozen=True)
+class CrmPrincipalCount:
+    name: str
+    contact_count: int
 
 
 def _normalize_page(page_num: int, page_size: int) -> tuple[int, int]:
@@ -132,13 +145,9 @@ def _normalize_us_state(value: str | None) -> str | None:
     return normalized
 
 
-def _require_at_least_one_name(
-    first_name: str | None, last_name: str | None
-) -> None:
+def _require_at_least_one_name(first_name: str | None, last_name: str | None) -> None:
     if _strip_or_none(first_name) is None and _strip_or_none(last_name) is None:
-        raise ValueError(
-            "A contact requires at least a first name or a last name."
-        )
+        raise ValueError("A contact requires at least a first name or a last name.")
 
 
 def _normalize_stage_options(values: list[str]) -> list[str]:
@@ -204,6 +213,17 @@ def _normalize_lookup_name(value: str | None) -> str | None:
 
 def _escape_like_query(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def contact_full_name(contact: CrmContact) -> str:
+    first_name = (contact.first_name or "").strip()
+    last_name = (contact.last_name or "").strip()
+    return " ".join([part for part in [first_name, last_name] if part]).strip()
+
+
+def _principal_matches(normalized_principal: str) -> Any:
+    """Trimmed, case-insensitive match on a contact's principal text."""
+    return func.lower(func.btrim(CrmContact.principal)) == normalized_principal
 
 
 def get_or_create_crm_settings(
@@ -391,9 +411,12 @@ def list_contacts(
     page_num: int,
     page_size: int,
     query: str | None = None,
+    name: str | None = None,
     status: str | None = None,
     category: str | None = None,
     organization_id: UUID | None = None,
+    principal: str | None = None,
+    principal_contact_id: UUID | None = None,
     tag_ids: list[UUID] | None = None,
     owner_ids: list[UUID] | None = None,
     sort_by: str | None = None,
@@ -418,8 +441,14 @@ def list_contacts(
                     CrmContact.search_tsv.op("@@")(ts_query),
                     full_name.ilike(like_q, escape="\\"),
                     CrmContact.email.ilike(like_q, escape="\\"),
+                    CrmContact.principal.ilike(like_q, escape="\\"),
                 )
             )
+
+    name = _strip_or_none(name)
+    if name:
+        full_name = func.concat_ws(" ", CrmContact.first_name, CrmContact.last_name)
+        stmt = stmt.where(full_name.ilike(f"%{_escape_like_query(name)}%", escape="\\"))
 
     if status:
         stmt = stmt.where(CrmContact.status == status.strip().lower())
@@ -429,6 +458,13 @@ def list_contacts(
 
     if organization_id:
         stmt = stmt.where(CrmContact.organization_id == organization_id)
+
+    normalized_principal = _normalize_lookup_name(principal)
+    if normalized_principal:
+        stmt = stmt.where(_principal_matches(normalized_principal))
+
+    if principal_contact_id:
+        stmt = stmt.where(CrmContact.principal_contact_id == principal_contact_id)
 
     if tag_ids:
         # Require ALL selected tags (intersection): one EXISTS per distinct tag.
@@ -476,6 +512,142 @@ def list_contacts(
     return items, int(total)
 
 
+def list_contact_principals(
+    db_session: Session, organization_id: UUID | None = None
+) -> list[CrmPrincipalCount]:
+    """Distinct contact principals, matched like the list_contacts filter
+    (trimmed, case-insensitive). Each group shows its most common spelling.
+    With organization_id, only that organization's contacts count."""
+    trimmed = func.btrim(CrmContact.principal)
+    display_name = func.mode().within_group(trimmed.asc())
+    stmt = select(display_name, func.count()).where(
+        func.nullif(trimmed, "").is_not(None)
+    )
+    if organization_id:
+        stmt = stmt.where(CrmContact.organization_id == organization_id)
+    rows = db_session.execute(
+        stmt.group_by(func.lower(trimmed)).order_by(func.lower(display_name))
+    ).all()
+    return [CrmPrincipalCount(name=name, contact_count=count) for name, count in rows]
+
+
+# Honorifics and titles that do not identify the official.
+_PRINCIPAL_TITLE_WORDS = frozenset(
+    {
+        "the",
+        "hon",
+        "honorable",
+        "rep",
+        "representative",
+        "congressman",
+        "congresswoman",
+        "congressmember",
+        "sen",
+        "senator",
+        "gov",
+        "governor",
+        "dr",
+        "mr",
+        "mrs",
+        "ms",
+        "jr",
+        "sr",
+        "office",
+        "of",
+    }
+)
+
+
+def _principal_surname(principal: str) -> str | None:
+    words = [
+        word
+        for word in "".join(
+            char if char.isalnum() else " " for char in principal.lower()
+        ).split()
+        if word not in _PRINCIPAL_TITLE_WORDS
+    ]
+    return words[-1] if words else None
+
+
+def find_similar_principals(
+    db_session: Session, principal: str, limit: int = 5
+) -> list[CrmPrincipalCount]:
+    """Existing principals that may be the same official under another spelling
+    (e.g. "Rep. Sara Jacobs" and "Sara Jacobs"): the same surname once titles
+    are removed. The exact (case-insensitive) spelling is excluded."""
+    normalized = _normalize_lookup_name(principal)
+    surname = _principal_surname(normalized) if normalized else None
+    if surname is None:
+        return []
+    similar = [
+        row
+        for row in list_contact_principals(db_session)
+        if row.name.strip().lower() != normalized
+        and _principal_surname(row.name) == surname
+    ]
+    similar.sort(key=lambda row: -row.contact_count)
+    return similar[:limit]
+
+
+def _linked_principal_name(
+    db_session: Session,
+    contact_id: UUID | None,
+    official_id: UUID,
+    *,
+    new_link: bool,
+) -> str:
+    """The principal text of a contact linked to official_id: the official's
+    full name. A new link reads the official FOR SHARE: a concurrent rename
+    then waits and also renames this contact, or it commits first and this
+    read sees the new name."""
+    if official_id == contact_id:
+        raise ValueError("A contact cannot be its own principal.")
+    stmt = (
+        select(CrmContact)
+        .where(CrmContact.id == official_id)
+        .execution_options(populate_existing=True)
+    )
+    if new_link:
+        stmt = stmt.with_for_update(read=True)
+    official = db_session.scalars(stmt).first()
+    if official is None:
+        raise ValueError("The principal contact does not exist.")
+    return contact_full_name(official)
+
+
+def _apply_principal_patches(
+    db_session: Session, contact: CrmContact, patches: dict
+) -> bool:
+    """Apply 'principal' and 'principal_contact_id' together. A link sets the
+    text to the official's name, and new text that names someone else drops
+    the link. Returns True if either field changed."""
+    principal = _strip_or_none(patches.get("principal", contact.principal))
+    official_id = patches.get("principal_contact_id", contact.principal_contact_id)
+    if official_id is not None:
+        official_name = _linked_principal_name(
+            db_session,
+            contact.id,
+            official_id,
+            new_link=official_id != contact.principal_contact_id,
+        )
+        if (
+            "principal_contact_id" in patches
+            or _normalize_lookup_name(principal) == official_name.lower()
+        ):
+            principal = official_name
+        else:
+            official_id = None
+
+    changed = False
+    if _strip_or_none(contact.principal) != principal:
+        contact.principal = principal
+        changed = True
+    if contact.principal_contact_id != official_id:
+        contact.principal_contact_id = official_id
+        changed = True
+    return changed
+
+
 def create_contact(
     db_session: Session,
     *,
@@ -496,6 +668,8 @@ def create_contact(
     party_affiliation: str | None = None,
     us_state: str | None = None,
     principal: str | None = None,
+    principal_contact_id: UUID | None = None,
+    profile_picture_file_id: str | None = None,
     commit: bool = True,
 ) -> tuple[CrmContact, bool]:
     normalized_first_name = _strip_or_none(first_name)
@@ -507,6 +681,12 @@ def create_contact(
         existing = get_contact_by_email(normalized_email, db_session)
         if existing is not None:
             return existing, False
+
+    normalized_principal = _strip_or_none(principal)
+    if principal_contact_id is not None:
+        normalized_principal = _linked_principal_name(
+            db_session, None, principal_contact_id, new_link=True
+        )
 
     normalized_owner_ids = _dedupe_uuid_list(owner_ids or [])
     normalized_status = _normalize_status(status)
@@ -523,10 +703,12 @@ def create_contact(
         category=_strip_or_none(category),
         party_affiliation=_strip_or_none(party_affiliation),
         us_state=_normalize_us_state(us_state),
-        principal=_strip_or_none(principal),
+        principal=normalized_principal,
+        principal_contact_id=principal_contact_id,
         notes=_normalize_text(notes),
         linkedin_url=_strip_or_none(linkedin_url),
         location=_strip_or_none(location),
+        profile_picture_file_id=profile_picture_file_id,
         created_by=created_by,
     )
     db_session.add(contact)
@@ -556,7 +738,8 @@ def update_contact(
     """Update a contact with the given patches.
 
     Returns (contact, changed) where changed indicates whether any
-    field was actually modified.
+    field was actually modified. Renaming a contact also renames the
+    principal text of the staffers linked to it.
     """
     mutable_fields = {
         "first_name",
@@ -571,20 +754,18 @@ def update_contact(
         "category",
         "party_affiliation",
         "us_state",
-        "principal",
         "notes",
         "linkedin_url",
         "location",
         "profile_picture_file_id",
     }
 
-    changed = False
-
     # Enforce the at-least-one-name invariant once, against the post-update
     # state. We compute the effective first/last names the contact will have
     # after applying this patch set (using patched values where present,
     # otherwise the contact's current values). This is order-independent and
     # covers clearing one or both names in a single patch.
+    renamed = False
     if "first_name" in patches or "last_name" in patches:
         effective_first_name = (
             _strip_or_none(patches["first_name"])
@@ -597,6 +778,28 @@ def update_contact(
             else _strip_or_none(contact.last_name)
         )
         _require_at_least_one_name(effective_first_name, effective_last_name)
+        renamed = " ".join(
+            name for name in (effective_first_name, effective_last_name) if name
+        ) != contact_full_name(contact)
+        if renamed:
+            # Linked staffers copy this name (synced below). Lock this contact
+            # and them in id order, as the updated_at triggers do, so the sync
+            # cannot deadlock with an interaction edit.
+            db_session.execute(
+                select(CrmContact.id)
+                .where(
+                    or_(
+                        CrmContact.id == contact.id,
+                        CrmContact.principal_contact_id == contact.id,
+                    )
+                )
+                .order_by(CrmContact.id)
+                .with_for_update(key_share=True)
+            )
+
+    changed = False
+    if "principal" in patches or "principal_contact_id" in patches:
+        changed = _apply_principal_patches(db_session, contact, patches)
 
     for key, value in patches.items():
         if key not in mutable_fields:
@@ -616,7 +819,6 @@ def update_contact(
             "linkedin_url",
             "location",
             "party_affiliation",
-            "principal",
         }:
             normalized = _strip_or_none(value)
             current = getattr(contact, key)  # ods: ignore[getattr]
@@ -692,6 +894,13 @@ def update_contact(
         if getattr(contact, key) != value:  # ods: ignore[getattr]
             setattr(contact, key, value)
             changed = True
+
+    if renamed:
+        db_session.execute(
+            update(CrmContact)
+            .where(CrmContact.principal_contact_id == contact.id)
+            .values(principal=contact_full_name(contact))
+        )
 
     if changed:
         db_session.flush()
@@ -932,6 +1141,29 @@ def delete_organization(
         db_session.flush()
 
 
+def _interaction_ids_for_contacts(contact_condition: Any) -> list[Any]:
+    """Interactions whose primary contact or a contact attendee matches the
+    condition on a contact id column. Each branch has its own index."""
+    return [
+        select(CrmInteraction.id).where(contact_condition(CrmInteraction.contact_id)),
+        select(CrmInteractionAttendee.interaction_id).where(
+            contact_condition(CrmInteractionAttendee.contact_id)
+        ),
+    ]
+
+
+def _office_contact_ids(normalized_principal: str) -> Any:
+    """One office: the staffers whose principal matches, and the officials
+    those staffers link to."""
+    is_staffer = _principal_matches(normalized_principal)
+    return union(
+        select(CrmContact.id).where(is_staffer),
+        select(CrmContact.principal_contact_id).where(
+            is_staffer, CrmContact.principal_contact_id.is_not(None)
+        ),
+    )
+
+
 def list_interactions(
     db_session: Session,
     *,
@@ -940,29 +1172,50 @@ def list_interactions(
     contact_id: UUID | None = None,
     organization_id: UUID | None = None,
     include_contact_interactions: bool = False,
+    principal: str | None = None,
     interaction_type: CrmInteractionType | None = None,
     logged_by: UUID | None = None,
 ) -> tuple[list[CrmInteraction], int]:
+    """A contact's interactions include those where it is only an attendee.
+    With include_contact_interactions, an organization's interactions also
+    include those of its member contacts (as primary contact or attendee).
+    With principal, only interactions with that office: any of its staffers
+    or its linked official, as primary contact or attendee."""
     page_num, page_size = _normalize_page(page_num, page_size)
 
     stmt = select(CrmInteraction)
+    # IN over a UNION of indexed lookups; an OR here scans every interaction.
     if contact_id:
-        stmt = stmt.where(CrmInteraction.contact_id == contact_id)
+        stmt = stmt.where(
+            CrmInteraction.id.in_(
+                union(*_interaction_ids_for_contacts(lambda col: col == contact_id))
+            )
+        )
     if organization_id:
         if include_contact_interactions:
-            contact_ids_subq = (
-                select(CrmContact.id)
-                .where(CrmContact.organization_id == organization_id)
-                .scalar_subquery()
+            member_ids = select(CrmContact.id).where(
+                CrmContact.organization_id == organization_id
             )
             stmt = stmt.where(
-                or_(
-                    CrmInteraction.organization_id == organization_id,
-                    CrmInteraction.contact_id.in_(contact_ids_subq),
+                CrmInteraction.id.in_(
+                    union(
+                        select(CrmInteraction.id).where(
+                            CrmInteraction.organization_id == organization_id
+                        ),
+                        *_interaction_ids_for_contacts(lambda col: col.in_(member_ids)),
+                    )
                 )
             )
         else:
             stmt = stmt.where(CrmInteraction.organization_id == organization_id)
+    normalized_principal = _normalize_lookup_name(principal)
+    if normalized_principal:
+        office_ids = _office_contact_ids(normalized_principal)
+        stmt = stmt.where(
+            CrmInteraction.id.in_(
+                union(*_interaction_ids_for_contacts(lambda col: col.in_(office_ids)))
+            )
+        )
     if interaction_type is not None:
         stmt = stmt.where(CrmInteraction.type == interaction_type)
     if logged_by is not None:
@@ -972,7 +1225,8 @@ def list_interactions(
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     items = list(
         db_session.scalars(
-            stmt.order_by(sort_expr.desc())
+            # The id tie-breaker keeps offset pagination stable on equal times.
+            stmt.order_by(sort_expr.desc(), CrmInteraction.id.desc())
             .offset(page_num * page_size)
             .limit(page_size)
         )
@@ -1086,43 +1340,62 @@ def replace_interaction_attendees(
     interaction_id: UUID,
     attendees: list[tuple[UUID | None, UUID | None, CrmAttendeeRole]],
     commit: bool = True,
-) -> list[CrmInteractionAttendee]:
-    """Replace ALL attendees of an interaction with the given tuples.
+) -> bool:
+    """Make the interaction's attendees exactly the given (user_id, contact_id,
+    role) tuples. An empty list clears all attendees.
 
-    Each tuple is (user_id, contact_id, role). Deletes existing attendee rows
-    then inserts the provided set (deduped by (user_id, contact_id), preferring
-    ORGANIZER role on conflict). An empty list clears all attendees.
+    Duplicate (user_id, contact_id) pairs collapse, preferring ORGANIZER. Only
+    rows that differ are written, so an unchanged set fires no updated_at
+    triggers. Returns True if any attendee row changed.
     """
+    # Lock the interaction first, so concurrent replacements of the same
+    # attendee list apply one after the other, not from the same stale read.
     db_session.execute(
-        delete(CrmInteractionAttendee).where(
-            CrmInteractionAttendee.interaction_id == interaction_id
-        )
+        select(CrmInteraction.id)
+        .where(CrmInteraction.id == interaction_id)
+        .with_for_update(key_share=True)
     )
-
-    deduped: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
+    desired: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
     for user_id, contact_id, role in attendees:
         key = (user_id, contact_id)
-        existing = deduped.get(key)
-        if existing is None or (
-            existing != CrmAttendeeRole.ORGANIZER and role == CrmAttendeeRole.ORGANIZER
+        existing_role = desired.get(key)
+        if existing_role is None or (
+            existing_role != CrmAttendeeRole.ORGANIZER
+            and role == CrmAttendeeRole.ORGANIZER
         ):
-            deduped[key] = role
+            desired[key] = role
 
-    for (user_id, contact_id), role in deduped.items():
-        db_session.add(
-            CrmInteractionAttendee(
-                interaction_id=interaction_id,
-                user_id=user_id,
-                contact_id=contact_id,
-                role=role,
+    current = {
+        (attendee.user_id, attendee.contact_id): attendee
+        for attendee in get_interaction_attendees(interaction_id, db_session)
+    }
+
+    changed = False
+    for key, attendee in current.items():
+        if key not in desired:
+            db_session.delete(attendee)
+            changed = True
+    for (user_id, contact_id), role in desired.items():
+        attendee = current.get((user_id, contact_id))
+        if attendee is None:
+            db_session.add(
+                CrmInteractionAttendee(
+                    interaction_id=interaction_id,
+                    user_id=user_id,
+                    contact_id=contact_id,
+                    role=role,
+                )
             )
-        )
+            changed = True
+        elif attendee.role != role:
+            attendee.role = role
+            changed = True
 
-    db_session.flush()
-    if commit:
-        db_session.commit()
-
-    return get_interaction_attendees(interaction_id, db_session)
+    if changed:
+        db_session.flush()
+        if commit:
+            db_session.commit()
+    return changed
 
 
 def delete_interaction(
@@ -1306,27 +1579,32 @@ def get_organization_tags(organization_id: UUID, db_session: Session) -> list[Cr
     )
 
 
+def get_tags_by_ids(tag_ids: list[UUID], db_session: Session) -> dict[UUID, CrmTag]:
+    if not tag_ids:
+        return {}
+    return {
+        tag.id: tag
+        for tag in db_session.scalars(select(CrmTag).where(CrmTag.id.in_(tag_ids)))
+    }
+
+
 def add_tag_to_contact(
     db_session: Session,
     *,
     contact_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    existing = db_session.scalar(
-        select(CrmContact__Tag).where(
-            and_(
-                CrmContact__Tag.contact_id == contact_id,
-                CrmContact__Tag.tag_id == tag_id,
-            )
-        )
-    )
-    if existing:
-        return
-
-    db_session.add(CrmContact__Tag(contact_id=contact_id, tag_id=tag_id))
+) -> bool:
+    """Returns False if the contact already had the tag."""
+    inserted = db_session.execute(
+        pg_insert(CrmContact__Tag)
+        .values(contact_id=contact_id, tag_id=tag_id)
+        .on_conflict_do_nothing()
+        .returning(CrmContact__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return inserted is not None
 
 
 def remove_tag_from_contact(
@@ -1335,13 +1613,19 @@ def remove_tag_from_contact(
     contact_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    db_session.query(CrmContact__Tag).filter(
-        CrmContact__Tag.contact_id == contact_id,
-        CrmContact__Tag.tag_id == tag_id,
-    ).delete()
+) -> bool:
+    """Returns False if the contact did not have the tag."""
+    removed = db_session.execute(
+        delete(CrmContact__Tag)
+        .where(
+            CrmContact__Tag.contact_id == contact_id,
+            CrmContact__Tag.tag_id == tag_id,
+        )
+        .returning(CrmContact__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return removed is not None
 
 
 def add_tag_to_organization(
@@ -1350,21 +1634,17 @@ def add_tag_to_organization(
     organization_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    existing = db_session.scalar(
-        select(CrmOrganization__Tag).where(
-            and_(
-                CrmOrganization__Tag.organization_id == organization_id,
-                CrmOrganization__Tag.tag_id == tag_id,
-            )
-        )
-    )
-    if existing:
-        return
-
-    db_session.add(CrmOrganization__Tag(organization_id=organization_id, tag_id=tag_id))
+) -> bool:
+    """Returns False if the organization already had the tag."""
+    inserted = db_session.execute(
+        pg_insert(CrmOrganization__Tag)
+        .values(organization_id=organization_id, tag_id=tag_id)
+        .on_conflict_do_nothing()
+        .returning(CrmOrganization__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return inserted is not None
 
 
 def remove_tag_from_organization(
@@ -1373,13 +1653,19 @@ def remove_tag_from_organization(
     organization_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    db_session.query(CrmOrganization__Tag).filter(
-        CrmOrganization__Tag.organization_id == organization_id,
-        CrmOrganization__Tag.tag_id == tag_id,
-    ).delete()
+) -> bool:
+    """Returns False if the organization did not have the tag."""
+    removed = db_session.execute(
+        delete(CrmOrganization__Tag)
+        .where(
+            CrmOrganization__Tag.organization_id == organization_id,
+            CrmOrganization__Tag.tag_id == tag_id,
+        )
+        .returning(CrmOrganization__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return removed is not None
 
 
 def search_crm_entities(
@@ -1480,7 +1766,8 @@ def search_crm_entities(
             f"""
             SELECT entity_type, entity_id, primary_text, secondary_text, sort_at, rank
             FROM ({union_sql}) AS crm_search
-            ORDER BY rank DESC, sort_at DESC NULLS LAST, primary_text ASC
+            ORDER BY rank DESC, sort_at DESC NULLS LAST, primary_text ASC,
+                entity_type ASC, entity_id ASC
             OFFSET :offset
             LIMIT :limit
             """  # noqa: S608 -- union_sql built from static fragments; values are bound params
@@ -1589,6 +1876,87 @@ def find_users_for_attendee_resolution(
             .limit(max_results)
         ).unique()
     )
+
+
+def get_user_names_and_emails(
+    user_ids: set[UUID], db_session: Session
+) -> dict[UUID, tuple[str | None, str]]:
+    if not user_ids:
+        return {}
+    table = User.__table__
+    rows = db_session.execute(
+        select(table.c.id, table.c.personal_name, table.c.email).where(
+            table.c.id.in_(user_ids)
+        )
+    )
+    return {user_id: (personal_name, email) for user_id, personal_name, email in rows}
+
+
+def get_contact_names(contact_ids: set[UUID], db_session: Session) -> dict[UUID, str]:
+    """Full name, else email, for each contact."""
+    if not contact_ids:
+        return {}
+    rows = db_session.execute(
+        select(
+            CrmContact.id,
+            CrmContact.first_name,
+            CrmContact.last_name,
+            CrmContact.email,
+        ).where(CrmContact.id.in_(contact_ids))
+    )
+    return {
+        contact_id: " ".join(
+            part.strip() for part in (first, last) if part and part.strip()
+        )
+        or (email or "")
+        for contact_id, first, last, email in rows
+    }
+
+
+def get_organization_names(
+    organization_ids: set[UUID], db_session: Session
+) -> dict[UUID, str]:
+    if not organization_ids:
+        return {}
+    rows = db_session.execute(
+        select(CrmOrganization.id, CrmOrganization.name).where(
+            CrmOrganization.id.in_(organization_ids)
+        )
+    )
+    return {organization_id: name for organization_id, name in rows}
+
+
+def get_existing_user_ids(user_ids: list[UUID], db_session: Session) -> set[UUID]:
+    if not user_ids:
+        return set()
+    id_col = User.__table__.c.id
+    return set(db_session.scalars(select(id_col).where(id_col.in_(user_ids))))
+
+
+def find_assignable_users_by_email(
+    emails: list[str], db_session: Session
+) -> dict[str, list[User]]:
+    """Exact, case-insensitive email match over the users the CRM owner picker
+    shows (no bots, API-key users, external or system users). Keys are
+    lower-cased emails; more than one user per key means the match is ambiguous.
+    """
+    lowered = {email.strip().lower() for email in emails if email.strip()}
+    if not lowered:
+        return {}
+    email_col = User.__table__.c.email
+    users = db_session.scalars(
+        select(User).where(
+            func.lower(email_col).in_(lowered),
+            expression.not_(email_col.endswith(DANSWER_API_KEY_DUMMY_EMAIL_DOMAIN)),
+            email_col != ANONYMOUS_USER_EMAIL,
+            email_col != NO_AUTH_PLACEHOLDER_USER_EMAIL,
+            User.account_type.not_in([AccountType.BOT, AccountType.EXT_PERM_USER]),
+        )
+    ).unique()
+    matches: dict[str, list[User]] = {}
+    for user in users:
+        matches.setdefault(user.email.lower(), []).append(user)
+    return matches
 
 
 def export_all_organizations(db_session: Session) -> list[dict]:

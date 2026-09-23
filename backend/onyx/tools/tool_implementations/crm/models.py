@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from onyx.chat.emitter import Emitter
+from onyx.db.crm import (
+    contact_full_name,
+    find_similar_principals,
+    get_contact_names,
+    get_contact_owner_ids,
+    get_contact_tags,
+    get_interaction_attendees,
+    get_organization_names,
+    get_user_names_and_emails,
+)
 from onyx.db.models import (
     CrmContact,
     CrmInteraction,
@@ -16,11 +30,23 @@ from onyx.db.models import (
     CrmTag,
 )
 from onyx.file_store.utils import build_frontend_file_url
-from onyx.tools.models import ToolCallException
+from onyx.server.query_and_chat.placement import Placement
+from onyx.server.query_and_chat.streaming_models import (
+    CrmCreateToolDelta,
+    CrmGetToolDelta,
+    CrmListToolDelta,
+    CrmLogInteractionToolDelta,
+    CrmSearchToolDelta,
+    CrmUpdateToolDelta,
+    Packet,
+)
+from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.payload_utils import as_llm_json as as_llm_json
 from onyx.tools.tool_implementations.payload_utils import (
     compact_tool_payload_for_model as compact_tool_payload_for_model,
 )
+
+E = TypeVar("E", bound=Enum)
 
 REQUIRED_CRM_TABLES = {
     "crm_settings",
@@ -33,6 +59,54 @@ REQUIRED_CRM_TABLES = {
     "crm_contact__tag",
     "crm_organization__tag",
 }
+
+
+CrmToolDelta = (
+    CrmCreateToolDelta
+    | CrmGetToolDelta
+    | CrmListToolDelta
+    | CrmLogInteractionToolDelta
+    | CrmSearchToolDelta
+    | CrmUpdateToolDelta
+)
+
+
+def crm_tool_response(
+    emitter: Emitter,
+    placement: Placement,
+    payload: dict[str, Any],
+    delta_type: type[CrmToolDelta],
+) -> ToolResponse:
+    """Stream the compacted payload and return it as the tool response. The
+    model sees the same compacted payload as the UI."""
+    compact_payload = compact_tool_payload_for_model(payload)
+    emitter.emit(Packet(placement=placement, obj=delta_type(payload=compact_payload)))
+    return ToolResponse(
+        rich_response=json.dumps(payload, default=str),
+        llm_facing_response=as_llm_json(compact_payload, already_compacted=True),
+    )
+
+
+def add_similar_principals(
+    db_session: Session, payload: dict[str, Any], contact: CrmContact, principal: Any
+) -> None:
+    """Flag other spellings of the principal text that was just written, so the
+    model can switch to the one other contacts already use. A linked principal
+    is already canonical, so it gets no flag."""
+    if contact.principal_contact_id is not None:
+        return
+    if not isinstance(principal, str) or not principal.strip():
+        return
+    similar = find_similar_principals(db_session, principal)
+    if not similar:
+        return
+    payload["similar_principals"] = [
+        {"name": row.name, "contact_count": row.contact_count} for row in similar
+    ]
+    payload["principal_note"] = (
+        "Other contacts use a similar principal. If one of similar_principals "
+        "is the same official, call crm_update to use that exact spelling."
+    )
 
 
 def is_crm_schema_available(db_session: Session) -> bool:
@@ -92,7 +166,7 @@ def parse_datetime_maybe(value: Any, field_name: str) -> datetime | None:
         )
 
 
-def parse_enum_maybe(enum_cls: type[Enum], value: Any, field_name: str) -> Enum | None:
+def parse_enum_maybe(enum_cls: type[E], value: Any, field_name: str) -> E | None:
     if value is None:
         return None
     if isinstance(value, enum_cls):
@@ -146,10 +220,57 @@ def parse_stage_maybe(
     )
 
 
-def contact_full_name(contact: CrmContact) -> str:
-    first_name = (contact.first_name or "").strip()
-    last_name = (contact.last_name or "").strip()
-    return " ".join([part for part in [first_name, last_name] if part]).strip()
+@dataclass
+class CrmNames:
+    """Display names for the users, contacts and organizations that one tool
+    response refers to, loaded in one batch query per kind."""
+
+    users: dict[UUID, tuple[str | None, str]] = field(default_factory=dict)
+    contacts: dict[UUID, str] = field(default_factory=dict)
+    organizations: dict[UUID, str] = field(default_factory=dict)
+
+    @classmethod
+    def load(
+        cls,
+        db_session: Session,
+        *,
+        contacts: Iterable[CrmContact] = (),
+        owner_ids: Iterable[UUID] = (),
+        interactions: Iterable[CrmInteraction] = (),
+        attendees: Iterable[CrmInteractionAttendee] = (),
+    ) -> CrmNames:
+        user_ids = set(owner_ids)
+        contact_ids: set[UUID] = set()
+        organization_ids = {
+            contact.organization_id for contact in contacts if contact.organization_id
+        }
+        for interaction in interactions:
+            if interaction.contact_id:
+                contact_ids.add(interaction.contact_id)
+            if interaction.organization_id:
+                organization_ids.add(interaction.organization_id)
+            if interaction.logged_by:
+                user_ids.add(interaction.logged_by)
+        for attendee in attendees:
+            if attendee.user_id:
+                user_ids.add(attendee.user_id)
+            if attendee.contact_id:
+                contact_ids.add(attendee.contact_id)
+        return cls(
+            users=get_user_names_and_emails(user_ids, db_session),
+            contacts=get_contact_names(contact_ids, db_session),
+            organizations=get_organization_names(organization_ids, db_session),
+        )
+
+    def user_name(self, user_id: UUID | None) -> str | None:
+        if user_id is None or user_id not in self.users:
+            return None
+        personal_name, email = self.users[user_id]
+        return personal_name or email
+
+    def user_ref(self, user_id: UUID) -> dict[str, Any]:
+        personal_name, email = self.users.get(user_id, (None, None))
+        return {"id": str(user_id), "name": personal_name, "email": email}
 
 
 def serialize_tag(tag: CrmTag) -> dict[str, Any]:
@@ -166,7 +287,9 @@ def serialize_contact(
     *,
     owner_ids: list[UUID] | None = None,
     tags: list[CrmTag] | None = None,
+    names: CrmNames | None = None,
 ) -> dict[str, Any]:
+    names = names or CrmNames()
     return {
         "id": str(contact.id),
         "first_name": contact.first_name,
@@ -178,13 +301,22 @@ def serialize_contact(
         "organization_id": (
             str(contact.organization_id) if contact.organization_id else None
         ),
+        "organization_name": (
+            names.organizations.get(contact.organization_id)
+            if contact.organization_id
+            else None
+        ),
         "owner_ids": [str(owner_id) for owner_id in (owner_ids or [])],
+        "owners": [names.user_ref(owner_id) for owner_id in (owner_ids or [])],
         "source": contact.source.value if contact.source else None,
         "status": contact.status,
         "category": contact.category,
         "party_affiliation": contact.party_affiliation,
         "us_state": contact.us_state,
         "principal": contact.principal,
+        "principal_contact_id": (
+            str(contact.principal_contact_id) if contact.principal_contact_id else None
+        ),
         "notes": contact.notes,
         "linkedin_url": contact.linkedin_url,
         "location": contact.location,
@@ -228,11 +360,18 @@ def serialize_organization(
 
 def serialize_interaction_attendee(
     attendee: CrmInteractionAttendee,
+    names: CrmNames | None = None,
 ) -> dict[str, Any]:
+    names = names or CrmNames()
     return {
         "id": attendee.id,
         "user_id": str(attendee.user_id) if attendee.user_id else None,
         "contact_id": str(attendee.contact_id) if attendee.contact_id else None,
+        "display_name": (
+            names.contacts.get(attendee.contact_id)
+            if attendee.contact_id
+            else names.user_name(attendee.user_id)
+        ),
         "role": attendee.role.value if attendee.role else None,
         "created_at": attendee.created_at.isoformat() if attendee.created_at else None,
     }
@@ -242,14 +381,27 @@ def serialize_interaction(
     interaction: CrmInteraction,
     *,
     attendees: list[CrmInteractionAttendee] | None = None,
+    names: CrmNames | None = None,
 ) -> dict[str, Any]:
+    names = names or CrmNames()
     return {
         "id": str(interaction.id),
         "contact_id": str(interaction.contact_id) if interaction.contact_id else None,
+        "contact_name": (
+            names.contacts.get(interaction.contact_id)
+            if interaction.contact_id
+            else None
+        ),
         "organization_id": (
             str(interaction.organization_id) if interaction.organization_id else None
         ),
+        "organization_name": (
+            names.organizations.get(interaction.organization_id)
+            if interaction.organization_id
+            else None
+        ),
         "logged_by": str(interaction.logged_by) if interaction.logged_by else None,
+        "logged_by_name": names.user_name(interaction.logged_by),
         "type": interaction.type.value if interaction.type else None,
         "title": interaction.title,
         "summary": interaction.summary,
@@ -263,6 +415,52 @@ def serialize_interaction(
             interaction.updated_at.isoformat() if interaction.updated_at else None
         ),
         "attendees": [
-            serialize_interaction_attendee(attendee) for attendee in (attendees or [])
+            serialize_interaction_attendee(attendee, names)
+            for attendee in (attendees or [])
         ],
     }
+
+
+def serialize_contacts(
+    db_session: Session, contacts: list[CrmContact]
+) -> list[dict[str, Any]]:
+    """Contacts with tags, owners and names (one name batch per call)."""
+    owner_ids = {
+        contact.id: get_contact_owner_ids(contact.id, db_session)
+        for contact in contacts
+    }
+    names = CrmNames.load(
+        db_session,
+        contacts=contacts,
+        owner_ids=(owner for owners in owner_ids.values() for owner in owners),
+    )
+    return [
+        serialize_contact(
+            contact,
+            owner_ids=owner_ids[contact.id],
+            tags=get_contact_tags(contact.id, db_session),
+            names=names,
+        )
+        for contact in contacts
+    ]
+
+
+def serialize_interactions(
+    db_session: Session, interactions: list[CrmInteraction]
+) -> list[dict[str, Any]]:
+    """Interactions with attendees and names (one name batch per call)."""
+    attendees = {
+        interaction.id: get_interaction_attendees(interaction.id, db_session)
+        for interaction in interactions
+    }
+    names = CrmNames.load(
+        db_session,
+        interactions=interactions,
+        attendees=(row for rows in attendees.values() for row in rows),
+    )
+    return [
+        serialize_interaction(
+            interaction, attendees=attendees[interaction.id], names=names
+        )
+        for interaction in interactions
+    ]

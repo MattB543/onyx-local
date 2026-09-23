@@ -2,6 +2,7 @@
 
 import { Route } from "next";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -10,10 +11,12 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { SettingsLayouts } from "@opal/layouts";
+import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
 import { Button, EmptyMessageCard, Popover } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
+import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -43,12 +46,21 @@ const INTERACTION_TYPE_OPTIONS: CrmInteractionType[] = [
 ];
 
 export default function CrmInteractionsPage() {
+  const searchParams = useSearchParams();
   const { user, isAdmin } = useUser();
+  const { principalOptions } = useCrmContactPrincipals();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [typeFilter, setTypeFilter] = useState<CrmInteractionType | "all">(
-    "all",
+    "all"
   );
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  // Seeded from ?principal= so office views can link here.
+  const [principalFilter, setPrincipalFilter] = useState<string | undefined>(
+    () => searchParams.get("principal") || undefined
+  );
+  const [principalFilterText, setPrincipalFilterText] = useState(
+    () => searchParams.get("principal") ?? ""
+  );
   const [pageNum, setPageNum] = useState(0);
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -73,7 +85,7 @@ export default function CrmInteractionsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id],
+    [usersData, user?.id]
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -85,17 +97,18 @@ export default function CrmInteractionsPage() {
   const { interactions, totalItems, isLoading, error } = useCrmInteractions({
     pageNum,
     pageSize: PAGE_SIZE,
+    principal: principalFilter,
     interactionType: typeFilter === "all" ? undefined : typeFilter,
     loggedBy: ownerFilterId,
   });
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems],
+    [totalItems]
   );
 
   const emptyDescription =
-    typeFilter !== "all" || ownerFilter !== "all"
+    typeFilter !== "all" || ownerFilter !== "all" || principalFilter
       ? "Try adjusting filters."
       : "Log your first interaction to get started.";
 
@@ -164,7 +177,31 @@ export default function CrmInteractionsPage() {
 
         <SettingsLayouts.Body>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
-            <div />
+            <InputComboBox
+              value={principalFilterText}
+              onChange={(e) => {
+                setPrincipalFilterText(e.target.value);
+                if (!e.target.value) {
+                  setPrincipalFilter(undefined);
+                  setPageNum(0);
+                }
+              }}
+              onValueChange={(value) => {
+                setPrincipalFilter(value);
+                setPrincipalFilterText(value);
+                setPageNum(0);
+              }}
+              onClear={() => {
+                setPrincipalFilter(undefined);
+                setPrincipalFilterText("");
+                setPageNum(0);
+              }}
+              options={principalOptions}
+              placeholder="Filter by principal"
+              strict
+              searchIcon
+              isError={false}
+            />
 
             <InputSelect
               value={typeFilter}
@@ -278,7 +315,7 @@ export default function CrmInteractionsPage() {
                         <div className="flex flex-col items-end gap-0.5 text-sm text-text-03">
                           <span>
                             {formatRelativeDate(
-                              interaction.occurred_at || interaction.created_at,
+                              interaction.occurred_at || interaction.created_at
                             )}
                           </span>
                         </div>

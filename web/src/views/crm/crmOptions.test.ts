@@ -1,8 +1,23 @@
 import {
   CRM_SORT_OPTIONS,
   DEFAULT_CRM_SORT_VALUE,
+  formatPrincipalOffice,
   sortValueToParams,
 } from "./crmOptions";
+
+describe("formatPrincipalOffice", () => {
+  it("prefixes the principal with 'Office of'", () => {
+    expect(formatPrincipalOffice(" Sara Jacobs ")).toBe(
+      "Office of Sara Jacobs"
+    );
+  });
+
+  it("does not double an existing prefix", () => {
+    expect(formatPrincipalOffice("office of Sen. Smith")).toBe(
+      "office of Sen. Smith"
+    );
+  });
+});
 
 describe("CRM_SORT_OPTIONS", () => {
   it("has exactly four options with the expected values and labels", () => {

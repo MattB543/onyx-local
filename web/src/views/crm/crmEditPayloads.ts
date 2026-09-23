@@ -31,6 +31,8 @@ export interface ContactEditValues {
   party_affiliation: string;
   us_state: string;
   principal: string;
+  /** Linked official's contact id; "" when the principal is free text. */
+  principal_contact_id: string;
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
@@ -59,6 +61,8 @@ export function buildContactPatchBody(
     party_affiliation: nullableText(values.party_affiliation),
     us_state: nullableText(values.us_state),
     principal: nullableText(values.principal),
+    // An id, not text: "" means unlinked, so send null to drop a link.
+    principal_contact_id: values.principal_contact_id || null,
     owner_ids: Array.from(new Set([...values.owner_ids, ...preservedOwnerIds])),
     // The source select has no "none" item, so "" only means "never set";
     // leave it out rather than sending null.

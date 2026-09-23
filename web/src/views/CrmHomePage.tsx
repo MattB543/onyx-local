@@ -20,6 +20,7 @@ import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
 import ImportCsvModal from "@/views/crm/components/ImportCsvModal";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
+import ContactRoleLine from "@/views/crm/components/ContactRoleLine";
 import InteractionTypeIcon from "@/views/crm/components/InteractionTypeIcon";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
 import OrgAvatar from "@/views/crm/components/OrgAvatar";
@@ -45,7 +46,7 @@ export default function CrmHomePage() {
     "created_at" | "updated_at"
   >("updated_at");
   const [orgsSortBy, setOrgsSortBy] = useState<"created_at" | "updated_at">(
-    "updated_at",
+    "updated_at"
   );
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
@@ -308,15 +309,11 @@ export default function CrmHomePage() {
                                 No email
                               </span>
                             )}
-                            <span className="truncate text-sm text-text-03">
-                              {contact.title
-                                ? contact.organization_name
-                                  ? `${contact.title} at ${contact.organization_name}`
-                                  : contact.title
-                                : contact.organization_name
-                                  ? `at ${contact.organization_name}`
-                                  : "No title"}
-                            </span>
+                            <ContactRoleLine
+                              title={contact.title}
+                              organizationName={contact.organization_name}
+                              principal={contact.principal}
+                            />
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
                             <StatusBadge status={contact.status} />
@@ -418,14 +415,14 @@ export default function CrmHomePage() {
                                   event.preventDefault();
                                   event.stopPropagation();
                                   const href = organization.website!.startsWith(
-                                    "http",
+                                    "http"
                                   )
                                     ? organization.website!
                                     : `https://${organization.website!}`;
                                   window.open(
                                     href,
                                     "_blank",
-                                    "noopener,noreferrer",
+                                    "noopener,noreferrer"
                                   );
                                 }}
                                 className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"
@@ -527,7 +524,7 @@ export default function CrmHomePage() {
                             <span>
                               {formatRelativeDate(
                                 interaction.occurred_at ||
-                                  interaction.created_at,
+                                  interaction.created_at
                               )}
                             </span>
                           </div>

@@ -17,9 +17,13 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
-    as_llm_json,
-    compact_tool_payload_for_model,
+    crm_tool_response,
     is_crm_schema_available,
+)
+from onyx.tools.tool_implementations.crm.validation import (
+    MAX_PAGE_SIZE,
+    parse_page,
+    reject_unknown_keys,
 )
 
 CRM_SEARCH_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
@@ -29,11 +33,9 @@ class CrmSearchTool(Tool[None]):
     NAME = "crm_search"
     DISPLAY_NAME = "CRM Search"
     DESCRIPTION = (
-        "Search CRM records by text query. Use this to find contacts by name or email, "
-        "organizations by name, interactions by title or summary, or tags by name. "
-        "Always search before creating to avoid duplicates. Use entity_types to narrow "
-        "results (e.g. only contacts). Results are ranked by relevance. "
-        "For structured filtering (by status, org, tags) without a text query, use crm_list instead."
+        "Keyword search across CRM contacts, organizations, interactions, and tags. "
+        "Search before creating to avoid duplicates. To filter by status, tag, org, "
+        "or date, use crm_list."
     )
 
     def __init__(
@@ -86,7 +88,7 @@ class CrmSearchTool(Tool[None]):
                                 "type": "string",
                                 "enum": sorted(CRM_SEARCH_ENTITY_TYPES),
                             },
-                            "description": "Entity types to search.",
+                            "description": "Entity types to search. Default: all.",
                         },
                         "page_num": {
                             "type": "integer",
@@ -96,8 +98,8 @@ class CrmSearchTool(Tool[None]):
                         "page_size": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 50,
-                            "description": "Page size.",
+                            "maximum": MAX_PAGE_SIZE,
+                            "description": f"Default and max {MAX_PAGE_SIZE}.",
                         },
                     },
                     "required": ["query"],
@@ -114,6 +116,11 @@ class CrmSearchTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        reject_unknown_keys(
+            llm_kwargs,
+            ("query", "entity_types", "page_num", "page_size"),
+            "crm_search arguments",
+        )
         query = llm_kwargs.get("query")
         if not isinstance(query, str) or not query.strip():
             raise ToolCallException(
@@ -129,26 +136,27 @@ class CrmSearchTool(Tool[None]):
                     message=f"Invalid entity_types in {self.name}: {entity_types_raw}",
                     llm_facing_message="'entity_types' must be a list of strings.",
                 )
-            entity_types = []
-            for value in entity_types_raw:
-                if not isinstance(value, str):
-                    continue
-                lowered = value.strip().lower()
-                if lowered in CRM_SEARCH_ENTITY_TYPES:
-                    entity_types.append(lowered)
-            if not entity_types:
-                entity_types = None
+            normalized: list[Any] = [
+                value.strip().lower() if isinstance(value, str) else value
+                for value in entity_types_raw
+            ]
+            invalid = [
+                json.dumps(value, default=str)
+                for value in normalized
+                if not isinstance(value, str) or value not in CRM_SEARCH_ENTITY_TYPES
+            ]
+            if invalid:
+                raise ToolCallException(
+                    message=f"Invalid entity_types in {self.name}: {invalid}",
+                    llm_facing_message=(
+                        f"Invalid 'entity_types' value(s): {', '.join(invalid)}. "
+                        f"Allowed: {', '.join(sorted(CRM_SEARCH_ENTITY_TYPES))}; "
+                        "omit to search all."
+                    ),
+                )
+            entity_types = list(dict.fromkeys(str(v) for v in normalized)) or None
 
-        page_num_raw = llm_kwargs.get("page_num", 0)
-        page_size_raw = llm_kwargs.get("page_size", 25)
-        try:
-            page_num = max(0, int(page_num_raw))
-            page_size = min(50, max(1, int(page_size_raw)))
-        except (TypeError, ValueError):
-            raise ToolCallException(
-                message=f"Invalid page_num/page_size in {self.name}",
-                llm_facing_message="'page_num' and 'page_size' must be integers.",
-            )
+        page_num, page_size = parse_page(llm_kwargs, self.name)
 
         with self._session_factory() as db_session:
             search_results, total_items = search_crm_entities(
@@ -179,17 +187,4 @@ class CrmSearchTool(Tool[None]):
             ],
         }
 
-        compact_payload = compact_tool_payload_for_model(payload)
-        self.emitter.emit(
-            Packet(
-                placement=placement,
-                obj=CrmSearchToolDelta(payload=compact_payload),
-            )
-        )
-
-        rich_response = json.dumps(payload, default=str)
-        llm_response = as_llm_json(compact_payload, already_compacted=True)
-        return ToolResponse(
-            rich_response=rich_response,
-            llm_facing_response=llm_response,
-        )
+        return crm_tool_response(self.emitter, placement, payload, CrmSearchToolDelta)

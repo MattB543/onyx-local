@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from onyx.db.crm import (
+    contact_full_name,
     find_contacts_for_attendee_resolution,
     find_users_for_attendee_resolution,
     get_contact_by_id,
@@ -13,17 +14,20 @@ from onyx.db.crm import (
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.models import User
 from onyx.tools.tool_implementations.crm.models import (
-    contact_full_name,
     parse_enum_maybe,
     parse_uuid_maybe,
 )
+from onyx.tools.tool_implementations.crm.validation import reject_unknown_keys
+
+# 'id' and 'token' are older aliases for a free-text email or name.
+ATTENDEE_FIELDS = ("email", "name", "contact_id", "user_id", "role", "id", "token")
 
 
 def serialize_contact_candidate(contact: Any) -> dict[str, Any]:
     return {
         "entity_type": "contact",
         "id": str(contact.id),
-        "label": contact_full_name(contact) or contact.email or str(contact.id),
+        "label": _contact_label(contact),
         "email": contact.email,
     }
 
@@ -32,8 +36,36 @@ def serialize_user_candidate(user: Any) -> dict[str, Any]:
     return {
         "entity_type": "user",
         "id": str(user.id),
-        "label": (user.personal_name or user.email or str(user.id)),
+        "label": _user_label(user),
         "email": user.email,
+    }
+
+
+def _contact_label(contact: Any) -> str:
+    return contact_full_name(contact) or contact.email or str(contact.id)
+
+
+def _user_label(user: Any) -> str:
+    return user.personal_name or user.email or str(user.id)
+
+
+def _contact_match(contact: Any, confidence: str) -> dict[str, Any]:
+    return {
+        "user_id": None,
+        "contact_id": contact.id,
+        "matched_type": "contact",
+        "matched_label": _contact_label(contact),
+        "confidence": confidence,
+    }
+
+
+def _user_match(user: Any, confidence: str) -> dict[str, Any]:
+    return {
+        "user_id": user.id,
+        "contact_id": None,
+        "matched_type": "user",
+        "matched_label": _user_label(user),
+        "confidence": confidence,
     }
 
 
@@ -44,8 +76,10 @@ def resolve_attendee_token(
     """Resolve a free-text attendee token (email or name) to a contact or user.
 
     Returns (resolved, candidates, reason). When resolved is a dict it contains
-    'user_id' and 'contact_id' (exactly one set). When resolution is ambiguous or
-    fails, resolved is None and candidates/reason describe the failure.
+    'user_id' and 'contact_id' (exactly one set), 'matched_type',
+    'matched_label', and 'confidence' ('exact_email', 'exact_name' or
+    'fuzzy_match', named for how the match was actually made). When resolution
+    is ambiguous or fails, resolved is None and candidates/reason describe it.
     """
     normalized = token.strip()
     if not normalized:
@@ -73,14 +107,7 @@ def resolve_attendee_token(
         None,
     )
     if exact_contact_email:
-        return (
-            {
-                "user_id": None,
-                "contact_id": exact_contact_email.id,
-            },
-            [],
-            None,
-        )
+        return _contact_match(exact_contact_email, "exact_email"), [], None
 
     # Priority 2: exact user email
     exact_user_email = next(
@@ -92,14 +119,7 @@ def resolve_attendee_token(
         None,
     )
     if exact_user_email:
-        return (
-            {
-                "user_id": exact_user_email.id,
-                "contact_id": None,
-            },
-            [],
-            None,
-        )
+        return _user_match(exact_user_email, "exact_email"), [], None
 
     # Priority 3: exact contact full-name
     exact_contact_name_matches = [
@@ -108,14 +128,7 @@ def resolve_attendee_token(
         if contact_full_name(contact).lower() == normalized_lower
     ]
     if len(exact_contact_name_matches) == 1:
-        return (
-            {
-                "user_id": None,
-                "contact_id": exact_contact_name_matches[0].id,
-            },
-            [],
-            None,
-        )
+        return _contact_match(exact_contact_name_matches[0], "exact_name"), [], None
     if len(exact_contact_name_matches) > 1:
         return (
             None,
@@ -135,14 +148,7 @@ def resolve_attendee_token(
             fuzzy_contact_matches.append(contact)
 
     if len(fuzzy_contact_matches) == 1:
-        return (
-            {
-                "user_id": None,
-                "contact_id": fuzzy_contact_matches[0].id,
-            },
-            [],
-            None,
-        )
+        return _contact_match(fuzzy_contact_matches[0], "fuzzy_match"), [], None
     if len(fuzzy_contact_matches) > 1:
         return (
             None,
@@ -159,14 +165,13 @@ def resolve_attendee_token(
             fuzzy_user_matches.append(user)
 
     if len(fuzzy_user_matches) == 1:
-        return (
-            {
-                "user_id": fuzzy_user_matches[0].id,
-                "contact_id": None,
-            },
-            [],
-            None,
+        user = fuzzy_user_matches[0]
+        confidence = (
+            "exact_name"
+            if (user.personal_name or "").lower() == normalized_lower
+            else "fuzzy_match"
         )
+        return _user_match(user, confidence), [], None
     if len(fuzzy_user_matches) > 1:
         return (
             None,
@@ -202,6 +207,7 @@ def resolve_attendees(
         if isinstance(attendee, str):
             token_for_resolution = attendee
         elif isinstance(attendee, dict):
+            reject_unknown_keys(attendee, ATTENDEE_FIELDS, "attendees[]")
             role_raw = attendee.get("role")
             parsed_role = parse_enum_maybe(
                 CrmAttendeeRole, role_raw, "attendees[].role"
@@ -263,7 +269,7 @@ def resolve_attendees(
                 {
                     "input": str(user_id),
                     "matched_type": "user",
-                    "matched_label": user.personal_name or user.email or str(user.id),
+                    "matched_label": _user_label(user),
                     "confidence": "exact_id",
                 }
             )
@@ -291,9 +297,7 @@ def resolve_attendees(
                 {
                     "input": str(attendee_contact_id),
                     "matched_type": "contact",
-                    "matched_label": contact_full_name(attendee_contact)
-                    or attendee_contact.email
-                    or str(attendee_contact.id),
+                    "matched_label": _contact_label(attendee_contact),
                     "confidence": "exact_id",
                 }
             )
@@ -312,43 +316,12 @@ def resolve_attendees(
                         "role": role,
                     }
                 )
-                # Determine matched label for resolution details
-                if resolved["contact_id"]:
-                    matched_contact = get_contact_by_id(
-                        resolved["contact_id"], db_session
-                    )
-                    matched_label = (
-                        contact_full_name(matched_contact)
-                        if matched_contact
-                        else str(resolved["contact_id"])
-                    )
-                    matched_type = "contact"
-                else:
-                    matched_user = db_session.get(User, resolved["user_id"])
-                    matched_label = (
-                        (
-                            matched_user.personal_name
-                            or matched_user.email
-                            or str(matched_user.id)
-                        )
-                        if matched_user
-                        else str(resolved["user_id"])
-                    )
-                    matched_type = "user"
-
-                # Map None reason to a confidence level
-                confidence = "fuzzy_match"
-                if "@" in token_for_resolution:
-                    confidence = "exact_email"
-                elif token_for_resolution.lower() == matched_label.lower():
-                    confidence = "exact_name"
-
                 resolution_details.append(
                     {
                         "input": token_for_resolution,
-                        "matched_type": matched_type,
-                        "matched_label": matched_label,
-                        "confidence": confidence,
+                        "matched_type": resolved["matched_type"],
+                        "matched_label": resolved["matched_label"],
+                        "confidence": resolved["confidence"],
                     }
                 )
             else:

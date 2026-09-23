@@ -44,6 +44,7 @@ from onyx.db.crm import (
     get_organization_by_name,
     get_organization_tags,
     get_tag_by_id,
+    list_contact_principals,
     list_contacts,
     list_interactions,
     list_organizations,
@@ -101,6 +102,7 @@ from onyx.server.features.crm.models import (
     CrmOrganizationCreateRequest,
     CrmOrganizationPatchRequest,
     CrmOrganizationSnapshot,
+    CrmPrincipalSummary,
     CrmSearchResultItem,
     CrmSettingsPatchRequest,
     CrmSettingsSnapshot,
@@ -352,6 +354,9 @@ def search_entities(
 @router.get("/contacts")
 def get_contacts(
     q: str | None = Query(None, description="Optional query filter."),
+    name: str | None = Query(
+        None, description="Filter to contacts whose full name contains this text."
+    ),
     status: str | None = Query(
         None,
         description="Filter by CRM contact status.",
@@ -362,6 +367,13 @@ def get_contacts(
     ),
     organization_id: UUID | None = Query(
         None, description="Filter by CRM organization."
+    ),
+    principal: str | None = Query(
+        None,
+        description="Filter by principal (case-insensitive exact match).",
+    ),
+    principal_contact_id: UUID | None = Query(
+        None, description="Filter to staffers linked to this official's contact."
     ),
     tag_ids: list[UUID] | None = Query(None, description="Filter by tag ids."),
     owner_ids: list[UUID] | None = Query(
@@ -429,9 +441,12 @@ def get_contacts(
         page_num=page_num,
         page_size=page_size,
         query=q,
+        name=name,
         status=normalized_status,
         category=normalized_category,
         organization_id=organization_id,
+        principal=principal,
+        principal_contact_id=principal_contact_id,
         tag_ids=tag_ids,
         owner_ids=owner_ids,
         sort_by=normalized_sort_by,
@@ -447,6 +462,20 @@ def get_contacts(
     )
 
 
+@router.get("/contacts/principals")
+def get_contact_principals(
+    organization_id: UUID | None = Query(
+        None, description="Count only this organization's contacts."
+    ),
+    db_session: Session = Depends(get_session),
+    _user: User = Depends(current_user),
+) -> list[CrmPrincipalSummary]:
+    return [
+        CrmPrincipalSummary(name=row.name, contact_count=row.contact_count)
+        for row in list_contact_principals(db_session, organization_id)
+    ]
+
+
 @router.post("/contacts")
 def post_contact(
     contact_create_request: CrmContactCreateRequest,
@@ -455,6 +484,8 @@ def post_contact(
 ) -> CrmContactSnapshot:
     if contact_create_request.organization_id:
         _load_organization_or_404(contact_create_request.organization_id, db_session)
+    if contact_create_request.principal_contact_id:
+        _load_contact_or_404(contact_create_request.principal_contact_id, db_session)
 
     if "owner_ids" in contact_create_request.model_fields_set:
         owner_ids = contact_create_request.owner_ids or []
@@ -497,6 +528,7 @@ def post_contact(
             party_affiliation=contact_create_request.party_affiliation,
             us_state=contact_create_request.us_state,
             principal=contact_create_request.principal,
+            principal_contact_id=contact_create_request.principal_contact_id,
             notes=contact_create_request.notes,
             linkedin_url=contact_create_request.linkedin_url,
             location=contact_create_request.location,
@@ -534,6 +566,8 @@ def patch_contact(
     patches = contact_patch_request.model_dump(exclude_unset=True)
     if "organization_id" in patches and patches["organization_id"] is not None:
         _load_organization_or_404(patches["organization_id"], db_session)
+    if patches.get("principal_contact_id") is not None:
+        _load_contact_or_404(patches["principal_contact_id"], db_session)
 
     if "status" in patches:
         if patches["status"] is None:
@@ -814,6 +848,13 @@ def get_interactions(
     contact_id: UUID | None = Query(None),
     organization_id: UUID | None = Query(None),
     include_contact_interactions: bool = Query(False),
+    principal: str | None = Query(
+        None,
+        description=(
+            "Filter to one office: interactions with any contact whose principal "
+            "matches (case-insensitive), or with the official they link to."
+        ),
+    ),
     interaction_type: CrmInteractionType | None = Query(None),
     logged_by: UUID | None = Query(
         None, description="Filter to interactions logged by this user id."
@@ -830,6 +871,7 @@ def get_interactions(
         contact_id=contact_id,
         organization_id=organization_id,
         include_contact_interactions=include_contact_interactions,
+        principal=principal,
         interaction_type=interaction_type,
         logged_by=logged_by,
     )
@@ -932,6 +974,8 @@ def post_interaction(
             role=role,
         )
 
+    # Attendee triggers moved updated_at after create_interaction's refresh.
+    db_session.refresh(interaction)
     return _serialize_interaction(interaction, db_session)
 
 

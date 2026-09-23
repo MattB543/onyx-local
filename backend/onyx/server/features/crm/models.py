@@ -106,6 +106,7 @@ class CrmContactCreateRequest(BaseModel):
     party_affiliation: str | None = None
     us_state: str | None = None
     principal: str | None = None
+    principal_contact_id: UUID | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -115,9 +116,7 @@ class CrmContactCreateRequest(BaseModel):
         if not (self.first_name and self.first_name.strip()) and not (
             self.last_name and self.last_name.strip()
         ):
-            raise ValueError(
-                "A contact requires at least a first name or a last name."
-            )
+            raise ValueError("A contact requires at least a first name or a last name.")
         return self
 
 
@@ -135,6 +134,7 @@ class CrmContactPatchRequest(BaseModel):
     party_affiliation: str | None = None
     us_state: str | None = None
     principal: str | None = None
+    principal_contact_id: UUID | None = None
     notes: str | None = None
     linkedin_url: str | None = None
     location: str | None = None
@@ -157,6 +157,7 @@ class CrmContactSnapshot(BaseModel):
     party_affiliation: str | None
     us_state: str | None
     principal: str | None
+    principal_contact_id: UUID | None
     notes: str | None
     linkedin_url: str | None
     location: str | None
@@ -194,6 +195,7 @@ class CrmContactSnapshot(BaseModel):
             party_affiliation=contact.party_affiliation,
             us_state=contact.us_state,
             principal=contact.principal,
+            principal_contact_id=contact.principal_contact_id,
             notes=contact.notes,
             linkedin_url=contact.linkedin_url,
             location=contact.location,
@@ -380,6 +382,11 @@ class CrmImportResult(BaseModel):
     updated: int = 0
     skipped: int = 0
     errors: list[CrmImportError] = []
+
+
+class CrmPrincipalSummary(BaseModel):
+    name: str
+    contact_count: int
 
 
 class CrmSearchResultItem(BaseModel):
