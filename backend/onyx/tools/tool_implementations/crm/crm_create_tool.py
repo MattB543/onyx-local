@@ -17,8 +17,6 @@ from onyx.db.crm import (
     get_allowed_contact_stages,
     get_contact_by_email,
     get_contact_category_options,
-    get_contact_owner_ids,
-    get_contact_tags,
     get_organization_by_id,
     get_organization_tags,
 )
@@ -40,7 +38,7 @@ from onyx.tools.tool_implementations.crm.models import (
     parse_enum_maybe,
     parse_stage_maybe,
     parse_uuid_maybe,
-    serialize_contact,
+    serialize_contacts,
     serialize_organization,
     serialize_tag,
 )
@@ -485,11 +483,7 @@ class CrmCreateTool(Tool[None]):
             "status": "created" if created else "already_exists",
             "entity_type": "contact",
             "tags_added": _tag_refs(tags_added),
-            "contact": serialize_contact(
-                contact,
-                owner_ids=get_contact_owner_ids(contact.id, db_session),
-                tags=get_contact_tags(contact.id, db_session),
-            ),
+            "contact": serialize_contacts(db_session, [contact])[0],
         }
         if not created:
             payload["not_applied_fields"] = _not_applied_fields(

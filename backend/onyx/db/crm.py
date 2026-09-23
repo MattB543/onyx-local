@@ -937,6 +937,17 @@ def delete_organization(
         db_session.flush()
 
 
+def _has_contact_attendee(contact_condition: Any) -> Any:
+    return (
+        select(CrmInteractionAttendee.id)
+        .where(
+            CrmInteractionAttendee.interaction_id == CrmInteraction.id,
+            contact_condition,
+        )
+        .exists()
+    )
+
+
 def list_interactions(
     db_session: Session,
     *,
@@ -948,22 +959,31 @@ def list_interactions(
     interaction_type: CrmInteractionType | None = None,
     logged_by: UUID | None = None,
 ) -> tuple[list[CrmInteraction], int]:
+    """A contact's interactions include those where it is only an attendee.
+    With include_contact_interactions, an organization's interactions also
+    include those of its member contacts (as primary contact or attendee)."""
     page_num, page_size = _normalize_page(page_num, page_size)
 
     stmt = select(CrmInteraction)
     if contact_id:
-        stmt = stmt.where(CrmInteraction.contact_id == contact_id)
+        stmt = stmt.where(
+            or_(
+                CrmInteraction.contact_id == contact_id,
+                _has_contact_attendee(CrmInteractionAttendee.contact_id == contact_id),
+            )
+        )
     if organization_id:
         if include_contact_interactions:
-            contact_ids_subq = (
-                select(CrmContact.id)
-                .where(CrmContact.organization_id == organization_id)
-                .scalar_subquery()
+            member_ids = select(CrmContact.id).where(
+                CrmContact.organization_id == organization_id
             )
             stmt = stmt.where(
                 or_(
                     CrmInteraction.organization_id == organization_id,
-                    CrmInteraction.contact_id.in_(contact_ids_subq),
+                    CrmInteraction.contact_id.in_(member_ids),
+                    _has_contact_attendee(
+                        CrmInteractionAttendee.contact_id.in_(member_ids)
+                    ),
                 )
             )
         else:
@@ -977,7 +997,8 @@ def list_interactions(
     total = db_session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     items = list(
         db_session.scalars(
-            stmt.order_by(sort_expr.desc())
+            # The id tie-breaker keeps offset pagination stable on equal times.
+            stmt.order_by(sort_expr.desc(), CrmInteraction.id.desc())
             .offset(page_num * page_size)
             .limit(page_size)
         )
@@ -1619,6 +1640,54 @@ def find_users_for_attendee_resolution(
             .limit(max_results)
         ).unique()
     )
+
+
+def get_user_names_and_emails(
+    user_ids: set[UUID], db_session: Session
+) -> dict[UUID, tuple[str | None, str]]:
+    if not user_ids:
+        return {}
+    table = User.__table__
+    rows = db_session.execute(
+        select(table.c.id, table.c.personal_name, table.c.email).where(
+            table.c.id.in_(user_ids)
+        )
+    )
+    return {user_id: (personal_name, email) for user_id, personal_name, email in rows}
+
+
+def get_contact_names(contact_ids: set[UUID], db_session: Session) -> dict[UUID, str]:
+    """Full name, else email, for each contact."""
+    if not contact_ids:
+        return {}
+    rows = db_session.execute(
+        select(
+            CrmContact.id,
+            CrmContact.first_name,
+            CrmContact.last_name,
+            CrmContact.email,
+        ).where(CrmContact.id.in_(contact_ids))
+    )
+    return {
+        contact_id: " ".join(
+            part.strip() for part in (first, last) if part and part.strip()
+        )
+        or (email or "")
+        for contact_id, first, last, email in rows
+    }
+
+
+def get_organization_names(
+    organization_ids: set[UUID], db_session: Session
+) -> dict[UUID, str]:
+    if not organization_ids:
+        return {}
+    rows = db_session.execute(
+        select(CrmOrganization.id, CrmOrganization.name).where(
+            CrmOrganization.id.in_(organization_ids)
+        )
+    )
+    return {organization_id: name for organization_id, name in rows}
 
 
 def get_existing_user_ids(user_ids: list[UUID], db_session: Session) -> set[UUID]:

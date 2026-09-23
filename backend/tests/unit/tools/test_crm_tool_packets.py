@@ -311,11 +311,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ) as mock_create_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
         ):
@@ -401,11 +401,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
         ):
@@ -453,11 +453,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
@@ -501,11 +501,11 @@ class TestCrmToolRun:
                 return_value=(contact, True),
             ) as mock_create_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
@@ -557,11 +557,11 @@ class TestCrmToolRun:
                 return_value=(contact, False),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_tags",
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags",
                 return_value=[],
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_create_tool.get_contact_owner_ids",
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids",
                 return_value=[],
             ),
             patch(
@@ -610,10 +610,10 @@ class TestCrmToolRun:
                 "onyx.tools.tool_implementations.crm.crm_update_tool.update_contact"
             ) as mock_update_contact,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_owner_ids"
+                "onyx.tools.tool_implementations.crm.models.get_contact_owner_ids"
             ) as mock_get_contact_owner_ids,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_contact_tags"
+                "onyx.tools.tool_implementations.crm.models.get_contact_tags"
             ) as mock_get_tags,
         ):
             mock_get_contact.return_value = contact
@@ -770,7 +770,7 @@ class TestCrmToolRun:
                 "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.replace_interaction_attendees"
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_log_interaction_tool.get_interaction_attendees"
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees"
             ) as mock_get_attendees,
         ):
             mock_create_interaction.return_value = interaction
@@ -810,7 +810,7 @@ class TestCrmToolRun:
                 return_value=(interaction, True),
             ) as mock_update_interaction,
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees",
                 return_value=[],
             ),
             patch(
@@ -878,7 +878,7 @@ class TestCrmToolRun:
                 return_value=(interaction, False),
             ),
             patch(
-                "onyx.tools.tool_implementations.crm.crm_update_tool.get_interaction_attendees",
+                "onyx.tools.tool_implementations.crm.models.get_interaction_attendees",
                 return_value=[],
             ),
             patch(

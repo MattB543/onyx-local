@@ -11,7 +11,6 @@ from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
     create_interaction,
     get_contact_by_id,
-    get_interaction_attendees,
     get_organization_by_id,
     replace_interaction_attendees,
 )
@@ -32,7 +31,7 @@ from onyx.tools.tool_implementations.crm.models import (
     parse_datetime_maybe,
     parse_enum_maybe,
     parse_uuid_maybe,
-    serialize_interaction,
+    serialize_interactions,
 )
 from onyx.tools.tool_implementations.crm.validation import (
     crm_write_errors,
@@ -309,10 +308,7 @@ class CrmLogInteractionTool(Tool[None]):
 
             payload: dict[str, Any] = {
                 "status": "created",
-                "interaction": serialize_interaction(
-                    interaction,
-                    attendees=get_interaction_attendees(interaction.id, db_session),
-                ),
+                "interaction": serialize_interactions(db_session, [interaction])[0],
             }
             if resolution_details:
                 payload["attendee_resolution"] = resolution_details

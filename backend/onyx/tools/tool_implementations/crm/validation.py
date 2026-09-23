@@ -25,6 +25,10 @@ from onyx.db.crm import (
 from onyx.db.models import CrmTag
 from onyx.tools.models import ToolCallException
 
+# The payload compactor keeps at most 25 array items, so a larger page would
+# silently lose rows and break offset paging.
+MAX_PAGE_SIZE = 25
+
 
 def _describe(value: Any) -> str:
     return json.dumps(value, default=str)
@@ -41,6 +45,33 @@ def reject_unknown_keys(
                 f"Unknown field(s) in '{field_name}': {', '.join(unknown)}. "
                 f"Allowed: {', '.join(sorted(allowed))}. Nothing was saved."
             ),
+        )
+
+
+def parse_page(args: dict[str, Any], tool_name: str) -> tuple[int, int]:
+    """page_num and page_size, with page_size capped at MAX_PAGE_SIZE. The
+    response reports the page size actually used."""
+    try:
+        page_num = max(0, int(args.get("page_num", 0)))
+        page_size = min(
+            MAX_PAGE_SIZE, max(1, int(args.get("page_size", MAX_PAGE_SIZE)))
+        )
+    except (TypeError, ValueError):
+        raise ToolCallException(
+            message=f"Invalid page_num/page_size in {tool_name}",
+            llm_facing_message="'page_num' and 'page_size' must be integers.",
+        )
+    return page_num, page_size
+
+
+def parse_uuid(value: Any, field_name: str) -> UUID:
+    """A UUID string; blank or malformed values are errors, not "no value"."""
+    try:
+        return UUID(value.strip())
+    except (AttributeError, ValueError):
+        raise ToolCallException(
+            message=f"Invalid UUID for {field_name}: {value!r}",
+            llm_facing_message=f"'{field_name}' must be a valid UUID string.",
         )
 
 

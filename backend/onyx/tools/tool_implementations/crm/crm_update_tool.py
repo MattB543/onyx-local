@@ -15,9 +15,6 @@ from onyx.db.crm import (
     get_allowed_contact_stages,
     get_contact_by_id,
     get_contact_category_options,
-    get_contact_owner_ids,
-    get_contact_tags,
-    get_interaction_attendees,
     get_interaction_by_id,
     get_organization_by_id,
     get_organization_tags,
@@ -53,8 +50,8 @@ from onyx.tools.tool_implementations.crm.models import (
     parse_enum_maybe,
     parse_stage_maybe,
     parse_uuid_maybe,
-    serialize_contact,
-    serialize_interaction,
+    serialize_contacts,
+    serialize_interactions,
     serialize_organization,
 )
 from onyx.tools.tool_implementations.crm.validation import (
@@ -574,11 +571,7 @@ class CrmUpdateTool(Tool[None]):
             "entity_type": "contact",
             "tags_added": _tag_refs(tags_added),
             "tags_removed": _tag_refs(tags_removed),
-            "contact": serialize_contact(
-                contact,
-                owner_ids=get_contact_owner_ids(contact.id, db_session),
-                tags=get_contact_tags(contact.id, db_session),
-            ),
+            "contact": serialize_contacts(db_session, [contact])[0],
         }
 
     def _update_organization(
@@ -710,10 +703,7 @@ class CrmUpdateTool(Tool[None]):
         payload: dict[str, Any] = {
             "status": "updated" if changed else "no_changes",
             "entity_type": "interaction",
-            "interaction": serialize_interaction(
-                interaction,
-                attendees=get_interaction_attendees(interaction.id, db_session),
-            ),
+            "interaction": serialize_interactions(db_session, [interaction])[0],
         }
         if attendee_resolution_details:
             payload["attendee_resolution"] = attendee_resolution_details
