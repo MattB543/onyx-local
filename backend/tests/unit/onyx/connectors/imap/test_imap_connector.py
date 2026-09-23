@@ -13,11 +13,11 @@ from onyx.connectors.credentials_provider import OnyxStaticCredentialsProvider
 from onyx.connectors.imap.connector import (
     _IMAP_OKAY_STATUS,
     _IMAP_SOCKET_TIMEOUT_SECONDS,
+    ImapConnector,
     _convert_email_headers_and_body_into_document,
     _fetch_email_ids_in_mailbox,
     _parse_addrs,
     _parse_email_body,
-    ImapConnector,
 )
 from onyx.connectors.imap.models import EmailHeaders
 
