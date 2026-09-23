@@ -294,6 +294,7 @@ class DocumentSource(str, Enum):
     DISCORD = "discord"
     FRESHDESK = "freshdesk"
     FIREFLIES = "fireflies"
+    ZOOM = "zoom"
     EGNYTE = "egnyte"
     AIRTABLE = "airtable"
     HIGHSPOT = "highspot"
@@ -831,6 +832,7 @@ DocumentSourceDescription: dict[DocumentSource, str] = {
     DocumentSource.DISCORD: "Chat messages and server discussions",
     DocumentSource.FRESHDESK: "Support tickets and customer queries",
     DocumentSource.FIREFLIES: "Meeting transcripts and recordings",
+    DocumentSource.ZOOM: "Meeting and webinar transcripts and recordings",
     DocumentSource.EGNYTE: "Cloud-stored files and documents",
     DocumentSource.AIRTABLE: "Structured data and records",
     DocumentSource.HIGHSPOT: "Sales enablement content and pitches",

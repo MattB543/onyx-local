@@ -9,8 +9,7 @@ import { cn } from "@opal/utils";
 import { Checkbox } from "@opal/components";
 import { SvgFileText, SvgX, SvgSimpleLoader } from "@opal/icons";
 import { Interactive, Hoverable } from "@opal/core";
-import { AttachmentItemLayout } from "@/layouts/general-layouts";
-import { Spacer } from "@opal/components";
+import { AttachmentItemButton } from "@opal/components";
 
 interface RemovableProps {
   onRemove?: () => void;
@@ -217,7 +216,8 @@ export function FileCard({
     >
       <div className="min-w-0 max-w-48">
         <Interactive.Container border size="fit" width="full">
-          <AttachmentItemLayout
+          <AttachmentItemButton
+            presentational
             icon={isProcessing ? SvgSimpleLoader : SvgFileText}
             title={file.name}
             description={
@@ -228,7 +228,6 @@ export function FileCard({
                 : typeLabel
             }
           />
-          <Spacer orientation="horizontal" rem={0.5} />
         </Interactive.Container>
       </div>
     </Removable>
@@ -250,12 +249,5 @@ export function FileCard({
         <span>Index for later</span>
       </label>
     </div>
-  );
-}
-
-// Skeleton loading component for file cards
-export function FileCardSkeleton() {
-  return (
-    <div className="min-w-[120px] max-w-[240px] h-11 rounded-08 bg-background-tint-02 animate-pulse" />
   );
 }

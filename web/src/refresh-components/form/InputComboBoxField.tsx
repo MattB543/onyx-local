@@ -2,15 +2,12 @@
 
 import { useField } from "formik";
 import type { ChangeEvent, FocusEvent } from "react";
-
+import { InputComboBox, type InputComboBoxProps } from "@opal/components";
 import {
   useOnBlurEvent,
   useOnChangeEvent,
   useOnChangeValue,
 } from "@/hooks/formHooks";
-import InputComboBox, {
-  InputComboBoxProps,
-} from "@/refresh-components/inputs/InputComboBox";
 
 /**
  * Formik-bound version of `InputComboBox`. Use this inside a `<Formik>` form

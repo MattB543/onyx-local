@@ -126,8 +126,10 @@ from onyx.db.enums import (
     SwitchoverType,
     SyncStatus,
     SyncType,
+    SystemUsageAttribution,
     TaskStatus,
     ThemePreference,
+    UsageActorKind,
     UserFileStatus,
 )
 from onyx.db.index_attempt_metrics_models import IndexAttemptStage
@@ -6940,11 +6942,9 @@ class CustomJobAuditLog(Base):
 
 
 class UserUsage(Base):
-    """
-    Daily per-user LLM usage rollup for cost/token attribution and budget checks.
-
-    One accumulating row per (user, window, model, flow, provider, incognito),
-    not per call.
+    """Daily user and system LLM usage rollup. ``user_usage`` is a legacy
+    physical name retained for deployment compatibility; partial indexes
+    provide each actor kind's accumulation key.
     """
 
     __tablename__ = "user_usage"
@@ -6954,6 +6954,15 @@ class UserUsage(Base):
     # No index=True: uq_user_usage_dims (user_id-first) covers user-only lookups.
     user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("user.id", ondelete="SET NULL"), nullable=True
+    )
+    actor_kind: Mapped[UsageActorKind] = mapped_column(
+        Enum(UsageActorKind, native_enum=False),
+        nullable=False,
+        default=UsageActorKind.USER,
+        server_default=UsageActorKind.USER.value,
+    )
+    system_attribution: Mapped[SystemUsageAttribution | None] = mapped_column(
+        Enum(SystemUsageAttribution, native_enum=False), nullable=True
     )
 
     window_start: Mapped[datetime.datetime] = mapped_column(
@@ -6995,9 +7004,14 @@ class UserUsage(Base):
     )
 
     __table_args__ = (
-        # Upsert key: accumulate into one row per dimension tuple per window.
-        # provider is non-null ('' when absent), so a plain unique index dedups
-        # correctly on every Postgres version (no NULLS NOT DISTINCT needed).
+        CheckConstraint(
+            "(actor_kind = 'USER' AND system_attribution IS NULL) OR "
+            "(actor_kind = 'SYSTEM' AND user_id IS NULL "
+            f"AND system_attribution IN ('{SystemUsageAttribution.ATTRIBUTED.value}', "
+            f"'{SystemUsageAttribution.UNATTRIBUTED.value}') "
+            "AND incognito = false)",
+            name="ck_user_usage_actor",
+        ),
         Index(
             "uq_user_usage_dims",
             "user_id",
@@ -7007,6 +7021,17 @@ class UserUsage(Base):
             "provider",
             "incognito",
             unique=True,
+            postgresql_where=text("actor_kind = 'USER'"),
+        ),
+        Index(
+            "uq_system_usage_dims",
+            "system_attribution",
+            "window_start",
+            "model",
+            "flow",
+            "provider",
+            unique=True,
+            postgresql_where=text("actor_kind = 'SYSTEM'"),
         ),
     )
 
