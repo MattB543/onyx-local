@@ -1785,6 +1785,14 @@ export default function useChatController({
     activeProjectIdRef.current = activeProject?.id ?? null;
   }, [activeProject]);
 
+  // Search filters and tool states are stored per chat. A branch must inherit
+  // the parent's (a restricted parent must not yield an unrestricted branch),
+  // read through a ref so the branch callback's identity stays stable.
+  const toolConfigurationRef = useRef(toolConfiguration);
+  useEffect(() => {
+    toolConfigurationRef.current = toolConfiguration;
+  }, [toolConfiguration]);
+
   // Creates an independent chat from the history up to `messageId` and opens
   // it. A user-message fork stops at its parent and prefills the input bar.
   const onBranchFromMessage = useCallback(
@@ -1825,6 +1833,10 @@ export default function useChatController({
           personaId: activeAgent?.id || 0,
           projectId: activeProjectIdRef.current,
         });
+
+        // Copy (not move) the parent's filters and tool states onto the
+        // branch before it mounts; the parent keeps its own.
+        toolConfigurationRef.current.handOffTo(newSessionId);
 
         const newUrl = buildChatUrl(searchParams, newSessionId, null);
         // SAFETY: buildChatUrl only ever produces "/app?..." which is a
