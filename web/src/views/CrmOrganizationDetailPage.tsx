@@ -38,6 +38,10 @@ import OrgAvatar from "@/views/crm/components/OrgAvatar";
 import TagManager from "@/views/crm/components/TagManager";
 import TypeBadge from "@/views/crm/components/TypeBadge";
 import CrmNav from "@/views/crm/CrmNav";
+import {
+  buildOrganizationPatchBody,
+  OrganizationEditValues,
+} from "@/views/crm/crmEditPayloads";
 
 import { Disabled } from "@opal/core";
 import { Button } from "@opal/components";
@@ -54,16 +58,6 @@ const ORGANIZATION_TYPES: CrmOrganizationType[] = [
 const INTERACTION_PAGE_SIZE = 25;
 const LINKED_CONTACTS_PAGE_SIZE = 5;
 
-interface OrganizationEditValues {
-  name: string;
-  website: string;
-  type: CrmOrganizationType | "";
-  sector: string;
-  location: string;
-  size: string;
-  notes: string;
-}
-
 const validationSchema = Yup.object().shape({
   name: Yup.string().trim().required("Organization name is required."),
   website: Yup.string().trim().optional(),
@@ -71,11 +65,6 @@ const validationSchema = Yup.object().shape({
 
 interface CrmOrganizationDetailPageProps {
   organizationId: string;
-}
-
-function optionalText(value: string): string | undefined {
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
 }
 
 function formatLabel(value: string): string {
@@ -302,15 +291,10 @@ export default function CrmOrganizationDetailPage({
                         validationSchema={validationSchema}
                         onSubmit={async (values, { setStatus }) => {
                           try {
-                            await patchCrmOrganization(organization.id, {
-                              name: values.name.trim(),
-                              website: optionalText(values.website),
-                              type: values.type || undefined,
-                              sector: optionalText(values.sector),
-                              location: optionalText(values.location),
-                              size: optionalText(values.size),
-                              notes: optionalText(values.notes),
-                            });
+                            await patchCrmOrganization(
+                              organization.id,
+                              buildOrganizationPatchBody(values),
+                            );
                             await invalidateCrmCache();
                             await refreshOrganization();
                             setIsEditing(false);

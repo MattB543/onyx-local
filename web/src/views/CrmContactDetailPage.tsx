@@ -7,8 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   CrmInteraction,
-  CrmContactSource,
-  CrmContactStage,
   deleteCrmContact,
   deleteCrmInteraction,
   deleteContactProfilePicture,
@@ -53,8 +51,11 @@ import {
   DEFAULT_CRM_CATEGORY_SUGGESTIONS,
   DEFAULT_CRM_STAGE_OPTIONS,
   formatCrmLabel,
-  optionalText,
 } from "@/views/crm/crmOptions";
+import {
+  buildContactPatchBody,
+  ContactEditValues,
+} from "@/views/crm/crmEditPayloads";
 
 import { Disabled } from "@opal/core";
 import { Button, InputImage } from "@opal/components";
@@ -62,26 +63,6 @@ import { SvgEdit, SvgTrash, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
 const SYSTEM_OWNER_ID = "00000000-0000-0000-0000-000000000000";
-
-interface ContactEditValues {
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  title: string;
-  location: string;
-  linkedin_url: string;
-  status: CrmContactStage;
-  category: string;
-  party_affiliation: string;
-  us_state: string;
-  principal: string;
-  owner_ids: string[];
-  source: CrmContactSource | "";
-  notes: string;
-  organization_id: string;
-  organization_name: string;
-}
 
 interface CrmContactDetailPageProps {
   contactId: string;
@@ -452,32 +433,13 @@ export default function CrmContactDetailPage({
                           }
 
                           try {
-                            await patchCrmContact(contact.id, {
-                              first_name: values.first_name.trim() || null,
-                              last_name: values.last_name.trim() || null,
-                              email: optionalText(values.email),
-                              phone: optionalText(values.phone),
-                              title: optionalText(values.title),
-                              location: optionalText(values.location),
-                              linkedin_url: optionalText(values.linkedin_url),
-                              status: values.status,
-                              category: optionalText(values.category),
-                              party_affiliation: optionalText(
-                                values.party_affiliation,
-                              ),
-                              us_state: optionalText(values.us_state),
-                              principal: optionalText(values.principal),
-                              owner_ids: Array.from(
-                                new Set([
-                                  ...values.owner_ids,
-                                  ...hiddenOwnerIds,
-                                  ...unresolvableOwnerIds,
-                                ]),
-                              ),
-                              source: values.source || undefined,
-                              notes: optionalText(values.notes),
-                              organization_id: values.organization_id || null,
-                            });
+                            await patchCrmContact(
+                              contact.id,
+                              buildContactPatchBody(values, [
+                                ...hiddenOwnerIds,
+                                ...unresolvableOwnerIds,
+                              ]),
+                            );
                           } catch {
                             setStatus("Failed to save contact.");
                             return;
