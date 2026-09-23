@@ -5733,6 +5733,13 @@ class CrmContact(Base):
     party_affiliation: Mapped[str | None] = mapped_column(String, nullable=True)
     us_state: Mapped[str | None] = mapped_column(String, nullable=True)
     principal: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The official's own contact. When set, `principal` holds a copy of the
+    # official's full name (kept in sync by db/crm.py).
+    principal_contact_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("crm_contact.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -5773,10 +5780,15 @@ class CrmContact(Base):
     __table_args__ = (
         Index("ix_crm_contact_organization_id", "organization_id"),
         Index("ix_crm_contact_status", "status"),
+        Index("ix_crm_contact_principal_contact_id", "principal_contact_id"),
         CheckConstraint(
             "NULLIF(btrim(first_name), '') IS NOT NULL "
             "OR NULLIF(btrim(last_name), '') IS NOT NULL",
             name="ck_crm_contact_has_name",
+        ),
+        CheckConstraint(
+            "principal_contact_id <> id",
+            name="ck_crm_contact_principal_not_self",
         ),
     )
 

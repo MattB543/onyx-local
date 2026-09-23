@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from onyx.db.crm import (
+    contact_full_name,
     find_contacts_for_attendee_resolution,
     find_users_for_attendee_resolution,
     get_contact_by_id,
@@ -13,7 +14,6 @@ from onyx.db.crm import (
 from onyx.db.enums import CrmAttendeeRole
 from onyx.db.models import User
 from onyx.tools.tool_implementations.crm.models import (
-    contact_full_name,
     parse_enum_maybe,
     parse_uuid_maybe,
 )

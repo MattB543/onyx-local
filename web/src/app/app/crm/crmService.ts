@@ -53,6 +53,7 @@ export interface CrmContact {
   party_affiliation: string | null;
   us_state: string | null;
   principal: string | null;
+  principal_contact_id: string | null;
   notes: string | null;
   linkedin_url: string | null;
   location: string | null;
@@ -78,6 +79,7 @@ export interface CrmContactCreateBody {
   party_affiliation?: string | null;
   us_state?: string | null;
   principal?: string | null;
+  principal_contact_id?: string | null;
   notes?: string | null;
   linkedin_url?: string | null;
   location?: string | null;
@@ -97,6 +99,7 @@ export interface CrmContactPatchBody {
   party_affiliation?: string | null;
   us_state?: string | null;
   principal?: string | null;
+  principal_contact_id?: string | null;
   notes?: string | null;
   linkedin_url?: string | null;
   location?: string | null;
@@ -278,10 +281,12 @@ export async function searchCrmEntities(args: {
 
 export async function listCrmContacts(args?: {
   q?: string;
+  name?: string;
   status?: CrmContactStage;
   category?: string;
   organization_id?: string;
   principal?: string;
+  principal_contact_id?: string;
   tag_ids?: string[];
   owner_ids?: string[];
   created_after?: string;
@@ -295,10 +300,12 @@ export async function listCrmContacts(args?: {
 }): Promise<PaginatedReturn<CrmContact>> {
   const path = withQueryParams("/api/user/crm/contacts", {
     q: args?.q,
+    name: args?.name,
     status: args?.status,
     category: args?.category,
     organization_id: args?.organization_id,
     principal: args?.principal,
+    principal_contact_id: args?.principal_contact_id,
     tag_ids: args?.tag_ids,
     owner_ids: args?.owner_ids,
     created_after: args?.created_after,
@@ -313,13 +320,13 @@ export async function listCrmContacts(args?: {
   return getJson(path, "Fetch CRM contacts");
 }
 
-export async function listCrmContactPrincipals(): Promise<
-  CrmPrincipalSummary[]
-> {
-  return getJson(
-    "/api/user/crm/contacts/principals",
-    "Fetch CRM contact principals"
-  );
+export async function listCrmContactPrincipals(
+  organizationId?: string
+): Promise<CrmPrincipalSummary[]> {
+  const path = withQueryParams("/api/user/crm/contacts/principals", {
+    organization_id: organizationId,
+  });
+  return getJson(path, "Fetch CRM contact principals");
 }
 
 export async function getCrmContact(contactId: string): Promise<CrmContact> {
@@ -455,6 +462,7 @@ export async function listCrmInteractions(args?: {
   contact_id?: string;
   organization_id?: string;
   include_contact_interactions?: boolean;
+  principal?: string;
   interaction_type?: CrmInteractionType;
   logged_by?: string;
   page_num?: number;
@@ -465,6 +473,7 @@ export async function listCrmInteractions(args?: {
     organization_id: args?.organization_id,
     include_contact_interactions:
       args?.include_contact_interactions || undefined,
+    principal: args?.principal,
     interaction_type: args?.interaction_type,
     logged_by: args?.logged_by,
     page_num: args?.page_num ?? 0,

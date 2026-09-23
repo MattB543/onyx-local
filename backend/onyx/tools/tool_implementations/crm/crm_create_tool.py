@@ -47,6 +47,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     parse_entity_type,
     parse_uuid_list,
     reject_unknown_keys,
+    require_contact,
     require_tags,
     resolve_owner_ids,
 )
@@ -68,6 +69,7 @@ CONTACT_CREATE_FIELDS = (
     "party_affiliation",
     "us_state",
     "principal",
+    "principal_contact_id",
     "notes",
     "linkedin_url",
     "location",
@@ -252,6 +254,14 @@ class CrmCreateTool(Tool[None]):
                                         "already use for the same official."
                                     ),
                                 },
+                                "principal_contact_id": {
+                                    "type": "string",
+                                    "description": (
+                                        "For staffers: UUID of the official's own "
+                                        "contact. Sets principal to the official's "
+                                        "name."
+                                    ),
+                                },
                                 "notes": {
                                     "type": "string",
                                     "description": "Free-text notes about this contact.",
@@ -402,6 +412,12 @@ class CrmCreateTool(Tool[None]):
                     message=f"Organization not found: {organization_id}",
                     llm_facing_message="Could not find the provided organization_id.",
                 )
+        principal_contact_id = parse_uuid_maybe(
+            contact_data.get("principal_contact_id"), "contact.principal_contact_id"
+        )
+        require_contact(
+            db_session, principal_contact_id, "contact.principal_contact_id"
+        )
 
         if "owner_ids" in contact_data:
             owner_ids = resolve_owner_ids(
@@ -468,6 +484,7 @@ class CrmCreateTool(Tool[None]):
                 party_affiliation=contact_data.get("party_affiliation"),
                 us_state=contact_data.get("us_state"),
                 principal=contact_data.get("principal"),
+                principal_contact_id=principal_contact_id,
                 notes=contact_data.get("notes"),
                 linkedin_url=contact_data.get("linkedin_url"),
                 location=contact_data.get("location"),
@@ -503,7 +520,9 @@ class CrmCreateTool(Tool[None]):
                 "A contact with this email already exists. Use crm_update to change it."
             )
         else:
-            add_similar_principals(db_session, payload, contact_data.get("principal"))
+            add_similar_principals(
+                db_session, payload, contact, contact_data.get("principal")
+            )
         if warnings:
             payload["warnings"] = warnings
         return payload

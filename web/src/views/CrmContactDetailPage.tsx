@@ -18,7 +18,6 @@ import {
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { ConfirmationModalLayout, SettingsLayouts, toast } from "@opal/layouts";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
-import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useCrmOrganization } from "@/lib/hooks/useCrmOrganization";
@@ -38,11 +37,13 @@ import InputSelect from "@/refresh-components/inputs/InputSelect";
 import Text from "@/refresh-components/texts/Text";
 import ActivityTimeline from "@/views/crm/components/ActivityTimeline";
 import ContactAvatar from "@/views/crm/components/ContactAvatar";
+import ContactStaffCard from "@/views/crm/components/ContactStaffCard";
 import CrmBreadcrumbs from "@/views/crm/components/CrmBreadcrumbs";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
 import DetailField from "@/views/crm/components/DetailField";
 import LogInteractionModal from "@/views/crm/components/LogInteractionModal";
 import OrganizationPicker from "@/views/crm/components/OrganizationPicker";
+import PrincipalPicker from "@/views/crm/components/PrincipalPicker";
 import StatusBadge from "@/views/crm/components/StatusBadge";
 import TagManager from "@/views/crm/components/TagManager";
 import CrmNav from "@/views/crm/CrmNav";
@@ -57,7 +58,7 @@ import {
 } from "@/views/crm/crmOptions";
 
 import { Disabled } from "@opal/core";
-import { Button } from "@opal/components";
+import { Button, Tabs } from "@opal/components";
 import { SvgEdit, SvgTrash, SvgUser } from "@opal/icons";
 
 const INTERACTION_PAGE_SIZE = 25;
@@ -76,6 +77,7 @@ interface ContactEditValues {
   party_affiliation: string;
   us_state: string;
   principal: string;
+  principal_contact_id: string;
   owner_ids: string[];
   source: CrmContactSource | "";
   notes: string;
@@ -111,9 +113,14 @@ export default function CrmContactDetailPage({
     string | null
   >(null);
   const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
+  const [activityScope, setActivityScope] = useState<"contact" | "office">(
+    "contact"
+  );
 
   const { contact, isLoading, error, refreshContact } =
     useCrmContact(contactId);
+  const officePrincipal = contact?.principal?.trim() || undefined;
+  const showOfficeActivity = activityScope === "office" && !!officePrincipal;
   const {
     interactions,
     totalItems: totalInteractions,
@@ -121,7 +128,8 @@ export default function CrmContactDetailPage({
     error: interactionsError,
     refreshInteractions,
   } = useCrmInteractions({
-    contactId,
+    contactId: showOfficeActivity ? undefined : contactId,
+    principal: showOfficeActivity ? officePrincipal : undefined,
     pageNum: 0,
     pageSize: interactionPageSize,
   });
@@ -129,7 +137,6 @@ export default function CrmContactDetailPage({
   const { organization: linkedOrganization } =
     useCrmOrganization(linkedOrganizationId);
   const { crmSettings } = useCrmSettings();
-  const { principalOptions } = useCrmContactPrincipals();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
 
   const stageOptions = useMemo(
@@ -378,17 +385,25 @@ export default function CrmContactDetailPage({
                           </Link>
                         </>
                       )}
-                      {contact.principal?.trim() && (
+                      {officePrincipal && (
                         <>
                           <span>·</span>
                           <Link
-                            href={`/app/crm/contacts?principal=${encodeURIComponent(
-                              contact.principal.trim()
-                            )}`}
+                            href={
+                              contact.principal_contact_id
+                                ? `/app/crm/contacts/${contact.principal_contact_id}`
+                                : `/app/crm/contacts?principal=${encodeURIComponent(
+                                    officePrincipal
+                                  )}`
+                            }
                             className="truncate hover:underline"
-                            title="Show all contacts with this principal"
+                            title={
+                              contact.principal_contact_id
+                                ? "Open the official's contact"
+                                : "Show all contacts with this principal"
+                            }
                           >
-                            {formatPrincipalOffice(contact.principal)}
+                            {formatPrincipalOffice(officePrincipal)}
                           </Link>
                         </>
                       )}
@@ -418,7 +433,7 @@ export default function CrmContactDetailPage({
               </Card>
 
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-4">
                   {isEditing ? (
                     <Card
                       variant="secondary"
@@ -443,6 +458,8 @@ export default function CrmContactDetailPage({
                           party_affiliation: contact.party_affiliation || "",
                           us_state: contact.us_state || "",
                           principal: contact.principal || "",
+                          principal_contact_id:
+                            contact.principal_contact_id || "",
                           owner_ids: visibleOwnerIds.filter((id) =>
                             ownerLabelById.has(id)
                           ),
@@ -483,6 +500,8 @@ export default function CrmContactDetailPage({
                               ),
                               us_state: optionalText(values.us_state),
                               principal: optionalText(values.principal),
+                              principal_contact_id:
+                                values.principal_contact_id || null,
                               owner_ids: Array.from(
                                 new Set([
                                   ...values.owner_ids,
@@ -762,10 +781,22 @@ export default function CrmContactDetailPage({
                                 >
                                   Principal
                                 </Text>
-                                <InputComboBoxField
-                                  name="principal"
-                                  options={principalOptions}
-                                  strict={false}
+                                <PrincipalPicker
+                                  principal={values.principal}
+                                  principalContactId={
+                                    values.principal_contact_id || null
+                                  }
+                                  onChange={(
+                                    nextPrincipal,
+                                    nextPrincipalContactId
+                                  ) => {
+                                    setFieldValue("principal", nextPrincipal);
+                                    setFieldValue(
+                                      "principal_contact_id",
+                                      nextPrincipalContactId ?? ""
+                                    );
+                                  }}
+                                  excludeContactId={contact.id}
                                   placeholder="e.g. Sen. Jane Smith"
                                 />
                               </div>
@@ -950,6 +981,14 @@ export default function CrmContactDetailPage({
                         <DetailField
                           label="Principal"
                           value={contact.principal}
+                          type={
+                            contact.principal_contact_id ? "org-link" : "text"
+                          }
+                          href={
+                            contact.principal_contact_id
+                              ? `/app/crm/contacts/${contact.principal_contact_id}`
+                              : undefined
+                          }
                           layout="stacked"
                         />
                         <DetailField
@@ -997,6 +1036,11 @@ export default function CrmContactDetailPage({
                       </div>
                     </Card>
                   )}
+
+                  <ContactStaffCard
+                    contactId={contact.id}
+                    contactName={contact.full_name}
+                  />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -1018,6 +1062,27 @@ export default function CrmContactDetailPage({
                       variant="secondary"
                       className="h-full [&>div]:items-stretch [&>div]:h-full [&>div]:justify-start"
                     >
+                      {officePrincipal && (
+                        <Tabs
+                          variant="pill"
+                          value={activityScope}
+                          onValueChange={(value) => {
+                            setActivityScope(
+                              value === "office" ? "office" : "contact"
+                            );
+                            setInteractionPageSize(INTERACTION_PAGE_SIZE);
+                          }}
+                        >
+                          <Tabs.List>
+                            <Tabs.Trigger value="contact">
+                              This contact
+                            </Tabs.Trigger>
+                            <Tabs.Trigger value="office">
+                              {formatPrincipalOffice(officePrincipal)}
+                            </Tabs.Trigger>
+                          </Tabs.List>
+                        </Tabs>
+                      )}
                       <ActivityTimeline
                         interactions={interactions}
                         isLoading={interactionsLoading}

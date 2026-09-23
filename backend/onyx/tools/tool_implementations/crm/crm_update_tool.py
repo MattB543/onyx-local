@@ -59,6 +59,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     parse_entity_type,
     parse_uuid_list,
     reject_unknown_keys,
+    require_contact,
     require_tags,
     resolve_owner_ids,
 )
@@ -81,6 +82,7 @@ CONTACT_UPDATE_FIELDS = (
     "party_affiliation",
     "us_state",
     "principal",
+    "principal_contact_id",
     "notes",
     "linkedin_url",
     "location",
@@ -248,7 +250,18 @@ class CrmUpdateTool(Tool[None]):
                                     "description": (
                                         "For staffers, the official they work "
                                         "for. Reuse the exact spelling other "
-                                        "contacts already use for that official."
+                                        "contacts already use for that official. "
+                                        "A different name removes the link to "
+                                        "the official's contact."
+                                    ),
+                                },
+                                "principal_contact_id": {
+                                    "type": "string",
+                                    "description": (
+                                        "For staffers: UUID of the official's own "
+                                        "contact. Sets principal to the official's "
+                                        "name. null removes the link and keeps "
+                                        "the principal text."
                                     ),
                                 },
                                 "notes": {"type": "string"},
@@ -385,11 +398,11 @@ class CrmUpdateTool(Tool[None]):
                         f"{', '.join(self._category_options)}."
                     ),
                 )
-        if "organization_id" in normalized_updates:
-            normalized_updates["organization_id"] = parse_uuid_maybe(
-                normalized_updates.get("organization_id"),
-                "updates.organization_id",
-            )
+        for field_name in ("organization_id", "principal_contact_id"):
+            if field_name in normalized_updates:
+                normalized_updates[field_name] = parse_uuid_maybe(
+                    normalized_updates.get(field_name), f"updates.{field_name}"
+                )
 
         if picture_url is not None:
             normalized_updates["profile_picture_file_id"] = (
@@ -544,6 +557,13 @@ class CrmUpdateTool(Tool[None]):
                     updates.get("organization_id"), "updates.organization_id"
                 ),
             )
+            require_contact(
+                db_session,
+                parse_uuid_maybe(
+                    updates.get("principal_contact_id"), "updates.principal_contact_id"
+                ),
+                "updates.principal_contact_id",
+            )
             if updates.get("profile_picture_url"):
                 # End the read transaction: no connection is held during the
                 # download.
@@ -583,7 +603,7 @@ class CrmUpdateTool(Tool[None]):
             "tags_removed": _tag_refs(tags_removed),
             "contact": serialize_contacts(db_session, [contact])[0],
         }
-        add_similar_principals(db_session, payload, updates.get("principal"))
+        add_similar_principals(db_session, payload, contact, updates.get("principal"))
         return payload
 
     def _update_organization(

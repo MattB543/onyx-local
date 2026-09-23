@@ -76,6 +76,11 @@ Perform the following workflow using the available CRM tools:
    - Reuse the exact `principal` spelling other contacts already use for the
      same official. If the tool response lists `similar_principals` and one is
      the same official, update the contact to that spelling.
+   - After you set a `principal`, search for the official's own contact with
+     `crm_search`. Set `principal_contact_id` to it only if exactly one
+     contact's name matches the official (ignore titles such as "Rep." or
+     "Sen."). Otherwise leave `principal_contact_id` unset. Never create a
+     contact for the official only to link a staffer.
 7. Search for the relevant external organization(s). An abbreviation or short
    name alone may not match; try multiple search terms:
    - The full company name and any abbreviations or acronyms.

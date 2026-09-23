@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from onyx.db.crm import (
     find_assignable_users_by_email,
+    get_contact_by_id,
     get_existing_user_ids,
     get_tags_by_ids,
 )
@@ -140,6 +141,19 @@ def require_tags(
             ),
         )
     return [tags_by_id[tag_id] for tag_id in tag_ids]
+
+
+def require_contact(
+    db_session: Session, contact_id: UUID | None, field_name: str
+) -> None:
+    if contact_id is not None and get_contact_by_id(contact_id, db_session) is None:
+        raise ToolCallException(
+            message=f"Contact not found for {field_name}: {contact_id}",
+            llm_facing_message=(
+                f"'{field_name}' {contact_id} is not an existing contact. Find the "
+                "contact with crm_search first. Nothing was saved."
+            ),
+        )
 
 
 def resolve_owner_ids(db_session: Session, value: Any, field_name: str) -> list[UUID]:

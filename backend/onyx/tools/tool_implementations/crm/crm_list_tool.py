@@ -67,7 +67,7 @@ FILTERS_BY_ENTITY_TYPE: dict[str, tuple[str, ...]] = {
         *TIMESTAMP_FILTERS,
     ),
     "organization": ("tag_ids", *TIMESTAMP_FILTERS),
-    "interaction": ("contact_id", "organization_id", "interaction_type"),
+    "interaction": ("contact_id", "organization_id", "principal", "interaction_type"),
     "tag": (),
 }
 CRM_LIST_ENTITY_TYPES = set(FILTERS_BY_ENTITY_TYPE)
@@ -167,9 +167,11 @@ class CrmListTool(Tool[None]):
                         "principal": {
                             "type": "string",
                             "description": (
-                                "Staffers of this official: contacts whose "
-                                "principal matches (case-insensitive, exact "
-                                "spelling). With no match, the result lists "
+                                "One official's office, matched on the principal "
+                                "(case-insensitive, exact spelling). Contacts: "
+                                "the official's staffers. Interactions: with any "
+                                "of those staffers or with the official's linked "
+                                "contact. With no results, the result lists "
                                 "similar existing spellings. "
                                 f"{_applies_to('principal')}"
                             ),
@@ -371,6 +373,36 @@ class CrmListTool(Tool[None]):
     def _optional_uuid(self, args: dict[str, Any], field: str) -> UUID | None:
         return parse_uuid(args[field], field) if field in args else None
 
+    def _parse_principal(self, args: dict[str, Any]) -> str | None:
+        principal = args.get("principal")
+        if principal is None:
+            return None
+        if not isinstance(principal, str) or not principal.strip():
+            raise ToolCallException(
+                message=f"Invalid principal in {self.name}: {principal!r}",
+                llm_facing_message="'principal' must be a non-empty string.",
+            )
+        return principal.strip()
+
+    def _add_principal_hint(
+        self, db_session: Session, payload: dict[str, Any], principal: str | None
+    ) -> None:
+        """With no results for a principal, list other spellings that may be
+        the same official."""
+        if principal is None or payload["total_items"] > 0:
+            return
+        similar = find_similar_principals(db_session, principal)
+        if not similar:
+            return
+        payload["similar_principals"] = [
+            {"name": row.name, "contact_count": row.contact_count} for row in similar
+        ]
+        payload["note"] = (
+            "Nothing matches this exact principal spelling. If one of "
+            "similar_principals is the same official, list again with that "
+            "spelling."
+        )
+
     def _page(
         self,
         entity_type: str,
@@ -410,16 +442,7 @@ class CrmListTool(Tool[None]):
                 )
             category = category_raw.strip()
 
-        principal_raw = args.get("principal")
-        principal: str | None = None
-        if principal_raw is not None:
-            if not isinstance(principal_raw, str) or not principal_raw.strip():
-                raise ToolCallException(
-                    message=f"Invalid principal in {self.name}: {principal_raw!r}",
-                    llm_facing_message="'principal' must be a non-empty string.",
-                )
-            principal = principal_raw.strip()
-
+        principal = self._parse_principal(args)
         contacts, total = list_contacts(
             db_session=db_session,
             page_num=page_num,
@@ -439,18 +462,7 @@ class CrmListTool(Tool[None]):
             total,
             serialize_contacts(db_session, contacts),
         )
-        if principal is not None and total == 0:
-            similar = find_similar_principals(db_session, principal)
-            if similar:
-                payload["similar_principals"] = [
-                    {"name": row.name, "contact_count": row.contact_count}
-                    for row in similar
-                ]
-                payload["note"] = (
-                    "No contact has this exact principal. If one of "
-                    "similar_principals is the same official, list again with "
-                    "that spelling."
-                )
+        self._add_principal_hint(db_session, payload, principal)
         return payload
 
     def _list_organizations(
@@ -492,21 +504,25 @@ class CrmListTool(Tool[None]):
             if "interaction_type" in args
             else None
         )
+        principal = self._parse_principal(args)
         interactions, total = list_interactions(
             db_session=db_session,
             page_num=page_num,
             page_size=page_size,
             contact_id=self._optional_uuid(args, "contact_id"),
             organization_id=self._optional_uuid(args, "organization_id"),
+            principal=principal,
             interaction_type=interaction_type,
         )
-        return self._page(
+        payload = self._page(
             "interaction",
             page_num,
             page_size,
             total,
             serialize_interactions(db_session, interactions),
         )
+        self._add_principal_hint(db_session, payload, principal)
+        return payload
 
     def _list_tags(
         self,

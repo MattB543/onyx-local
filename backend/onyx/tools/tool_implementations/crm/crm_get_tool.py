@@ -42,7 +42,7 @@ from onyx.tools.tool_implementations.crm.validation import (
 CRM_GET_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 # Related records each entity type can expand (latest 10 of each).
 INCLUDES_BY_ENTITY_TYPE: dict[str, tuple[str, ...]] = {
-    "contact": ("organization", "interactions"),
+    "contact": ("organization", "interactions", "staff"),
     "organization": ("contacts", "interactions"),
     "interaction": (),
     "tag": (),
@@ -125,8 +125,10 @@ class CrmGetTool(Tool[None]):
                             },
                             "description": (
                                 "Contact: 'organization', 'interactions' (including "
-                                "ones it attended). Organization: 'contacts', "
-                                "'interactions' (linked to the org itself)."
+                                "ones it attended), 'staff' (contacts whose "
+                                "principal_contact_id is this contact). "
+                                "Organization: 'contacts', 'interactions' (linked "
+                                "to the org itself)."
                             ),
                         },
                     },
@@ -244,6 +246,18 @@ class CrmGetTool(Tool[None]):
             result["recent_interactions"] = self._recent_interactions(
                 db_session, contact_id=contact.id
             )
+
+        if "staff" in includes:
+            staff, total = list_contacts(
+                db_session=db_session,
+                page_num=0,
+                page_size=RELATED_PAGE_SIZE,
+                principal_contact_id=contact.id,
+            )
+            result["staff"] = {
+                "total": total,
+                "items": serialize_contacts(db_session, staff),
+            }
 
         return result
 

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
+    contact_full_name,
     find_similar_principals,
     get_contact_names,
     get_contact_owner_ids,
@@ -87,10 +88,13 @@ def crm_tool_response(
 
 
 def add_similar_principals(
-    db_session: Session, payload: dict[str, Any], principal: Any
+    db_session: Session, payload: dict[str, Any], contact: CrmContact, principal: Any
 ) -> None:
-    """Flag other spellings of the principal that was just written, so the
-    model can switch to the one other contacts already use."""
+    """Flag other spellings of the principal text that was just written, so the
+    model can switch to the one other contacts already use. A linked principal
+    is already canonical, so it gets no flag."""
+    if contact.principal_contact_id is not None:
+        return
     if not isinstance(principal, str) or not principal.strip():
         return
     similar = find_similar_principals(db_session, principal)
@@ -216,12 +220,6 @@ def parse_stage_maybe(
     )
 
 
-def contact_full_name(contact: CrmContact) -> str:
-    first_name = (contact.first_name or "").strip()
-    last_name = (contact.last_name or "").strip()
-    return " ".join([part for part in [first_name, last_name] if part]).strip()
-
-
 @dataclass
 class CrmNames:
     """Display names for the users, contacts and organizations that one tool
@@ -316,6 +314,9 @@ def serialize_contact(
         "party_affiliation": contact.party_affiliation,
         "us_state": contact.us_state,
         "principal": contact.principal,
+        "principal_contact_id": (
+            str(contact.principal_contact_id) if contact.principal_contact_id else None
+        ),
         "notes": contact.notes,
         "linkedin_url": contact.linkedin_url,
         "location": contact.location,

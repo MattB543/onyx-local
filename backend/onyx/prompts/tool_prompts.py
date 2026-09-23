@@ -97,7 +97,10 @@ always pick the specific policy-maker variant.
 Social Democrat), **us_state** (2-letter state abbreviation, for US House/Senate members and state-level policy \
 makers), and **principal** (for staffers, the name of the Senator/Representative or other official they work for). \
 Reuse the exact principal spelling other contacts already use for the same official; `crm_create` and `crm_update` \
-return `similar_principals` when a spelling differs. To find an official's staffers, use `crm_list` with the \
+return `similar_principals` when a spelling differs. When the official has their own contact record, also set \
+`principal_contact_id` to that contact's UUID: this links the staffer, and the principal text then follows the \
+official's name. To find an official's staffers, use `crm_list` with the `principal` filter, or `crm_get` on the \
+official with include `staff`. For the history with an office, use `crm_list` with entity_type "interaction" and the \
 `principal` filter.
 - **Organizations** represent companies or entities. Multiple contacts can belong to one organization.
 - **Interactions** are logged events (calls, meetings, emails, notes, events) linked to a contact and/or organization. \

@@ -35,6 +35,7 @@ import ContactAvatar from "@/views/crm/components/ContactAvatar";
 import ContactRoleLine from "@/views/crm/components/ContactRoleLine";
 import CreateContactModal from "@/views/crm/components/CreateContactModal";
 import ImportCsvModal from "@/views/crm/components/ImportCsvModal";
+import OfficeActivitySummary from "@/views/crm/components/OfficeActivitySummary";
 import { formatRelativeDate } from "@/views/crm/components/crmDateUtils";
 import StatusBadge from "@/views/crm/components/StatusBadge";
 import CrmDateRangeFilter, {
@@ -68,6 +69,8 @@ const PAGE_SIZE = 25;
 export default function CrmContactsPage() {
   const searchParams = useSearchParams();
   const organizationIdFilter = searchParams.get("organization_id") ?? undefined;
+  const principalContactIdFilter =
+    searchParams.get("principal_contact_id") ?? undefined;
   const { user, isAdmin } = useUser();
   const { crmSettings } = useCrmSettings();
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
@@ -185,6 +188,7 @@ export default function CrmContactsPage() {
       category: categoryFilter === "all" ? undefined : categoryFilter,
       organizationId: organizationIdFilter ?? orgFilterId,
       principal: principalFilter,
+      principalContactId: principalContactIdFilter,
       ownerIds: ownerFilterId ? [ownerFilterId] : undefined,
       tagIds: tagFilterIds.length ? tagFilterIds : undefined,
       createdAfter: dateParams.created_after,
@@ -211,6 +215,7 @@ export default function CrmContactsPage() {
       Boolean(orgFilterId) ||
       Boolean(organizationIdFilter) ||
       Boolean(principalFilter) ||
+      Boolean(principalContactIdFilter) ||
       tagFilterIds.length > 0 ||
       Boolean(dateRange.from) ||
       Boolean(dateRange.to),
@@ -222,6 +227,7 @@ export default function CrmContactsPage() {
       orgFilterId,
       organizationIdFilter,
       principalFilter,
+      principalContactIdFilter,
       tagFilterIds,
       dateRange,
     ]
@@ -320,11 +326,13 @@ export default function CrmContactsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          {organizationIdFilter && (
+          {(organizationIdFilter || principalContactIdFilter) && (
             <Card variant="secondary">
               <div className="flex items-center justify-between gap-2">
                 <Text as="p" secondaryBody text03 className="text-sm">
-                  Showing contacts linked to the selected organization.
+                  {principalContactIdFilter
+                    ? "Showing the staff linked to the selected official."
+                    : "Showing contacts linked to the selected organization."}
                 </Text>
                 <Button
                   variant="action"
@@ -402,6 +410,10 @@ export default function CrmContactsPage() {
               isError={false}
             />
           </div>
+
+          {principalFilter && (
+            <OfficeActivitySummary principal={principalFilter} />
+          )}
 
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
             <div className="w-full md:w-[180px]">

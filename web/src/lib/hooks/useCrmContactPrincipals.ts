@@ -9,10 +9,11 @@ import {
 } from "@/app/app/crm/crmService";
 import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
 
-export function useCrmContactPrincipals() {
+/** Distinct contact principals; with organizationId, only that org's contacts. */
+export function useCrmContactPrincipals(organizationId?: string) {
   const { data, error, isLoading } = useSWR<CrmPrincipalSummary[]>(
-    ["crm-contact-principals"],
-    () => listCrmContactPrincipals(),
+    ["crm-contact-principals", organizationId ?? ""],
+    () => listCrmContactPrincipals(organizationId),
     { revalidateOnFocus: false }
   );
 
