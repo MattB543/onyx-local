@@ -1,9 +1,15 @@
 import React from "react";
-import { Form, Formik } from "formik";
+import { Form, Formik, type FormikProps } from "formik";
 import "@testing-library/jest-dom";
 import userEvent from "@testing-library/user-event";
 
-import { cleanup, render, screen, waitFor } from "@tests/setup/test-utils";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+} from "@tests/setup/test-utils";
 import CrmCategoryField from "@/views/crm/components/CrmCategoryField";
 
 // jsdom has no scrollIntoView; the dropdown calls it for the highlighted row.
@@ -17,8 +23,10 @@ const OPTIONS = ["Policy Maker", "Journalist", "Academic"].map((category) => ({
 
 function renderField(initialCategory = "") {
   const onSubmit = jest.fn();
+  const formik = React.createRef<FormikProps<{ category: string }>>();
   render(
     <Formik
+      innerRef={formik}
       initialValues={{ category: initialCategory }}
       onSubmit={(values) => onSubmit(values.category)}
     >
@@ -40,6 +48,7 @@ function renderField(initialCategory = "") {
     input: screen.getByPlaceholderText("Category"),
     committed: () => screen.getByTestId("committed").textContent,
     onSubmit,
+    formik,
   };
 }
 
@@ -146,6 +155,38 @@ describe("CrmCategoryField", () => {
     await user.click(screen.getByRole("option", { name: "Journalist" }));
 
     expect(committed()).toBe("");
+  });
+
+  test("an external value change discards a pending draft", async () => {
+    const { user, input, committed, formik } = renderField();
+
+    await user.click(input);
+    await user.type(input, "Draft");
+    // e.g. the contact refetches while the field still has focus.
+    await act(async () => {
+      await formik.current?.setFieldValue("category", "Custom External");
+    });
+    await user.tab();
+
+    expect(committed()).toBe("Custom External");
+    // The select remounts to resync its text, so query the input afresh.
+    expect(screen.getByPlaceholderText("Category")).toHaveValue(
+      "Custom External"
+    );
+  });
+
+  test("a form reset discards a pending draft", async () => {
+    const { user, input, committed, formik } = renderField("Academic");
+
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, "Draft");
+    await act(async () => {
+      formik.current?.resetForm({ values: { category: "Journalist" } });
+    });
+    await user.tab();
+
+    expect(committed()).toBe("Journalist");
   });
 
   test("Escape discards the draft", async () => {

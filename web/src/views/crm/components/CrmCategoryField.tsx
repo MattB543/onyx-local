@@ -1,7 +1,7 @@
 "use client";
 
-import { useField } from "formik";
-import { useRef } from "react";
+import { useField, useFormikContext } from "formik";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 
 import { InputSingleSelect, type SelectOption } from "@opal/components";
@@ -22,7 +22,10 @@ import { InputSingleSelect, type SelectOption } from "@opal/components";
  *   differs from the committed value, so typed free text is never lost and
  *   clearing the text clears the category;
  * - Escape and the chevron revert the visible text to the committed value,
- *   so they discard the draft too.
+ *   so they discard the draft too;
+ * - an external change (form re-initialization, programmatic setValue)
+ *   discards a pending draft and resyncs the visible text, so a stale draft
+ *   can never overwrite a newer value on the next blur.
  *
  * Kept outside the upstream files so upstream syncs don't conflict.
  */
@@ -38,12 +41,37 @@ export default function CrmCategoryField({
   placeholder,
 }: CrmCategoryFieldProps) {
   const [field, meta, helpers] = useField<string>(name);
+  const { initialValues } = useFormikContext();
   const committed = field.value ?? "";
   // Text typed since the last commit; null while nothing is pending.
   const draftRef = useRef<string | null>(null);
+  // The value this field itself last wrote, so its own commits are not
+  // mistaken for external changes.
+  const ownCommitRef = useRef<string | null>(null);
+  // Bumped to remount the select, which resets its visible text.
+  const [resyncKey, setResyncKey] = useState(0);
+
+  const seenRef = useRef({ committed, initialValues });
+  useEffect(() => {
+    const seen = seenRef.current;
+    if (seen.committed === committed && seen.initialValues === initialValues) {
+      return;
+    }
+    const ownCommit =
+      seen.initialValues === initialValues &&
+      ownCommitRef.current !== null &&
+      ownCommitRef.current === committed;
+    seenRef.current = { committed, initialValues };
+    ownCommitRef.current = null;
+    if (!ownCommit && draftRef.current !== null) {
+      draftRef.current = null;
+      setResyncKey((key) => key + 1);
+    }
+  }, [committed, initialValues]);
 
   const commit = (next: string) => {
     draftRef.current = null;
+    ownCommitRef.current = next;
     helpers.setTouched(true, false);
     helpers.setValue(next);
   };
@@ -100,6 +128,7 @@ export default function CrmCategoryField({
       }}
     >
       <InputSingleSelect
+        key={resyncKey}
         name={name}
         mode="open"
         options={options}
