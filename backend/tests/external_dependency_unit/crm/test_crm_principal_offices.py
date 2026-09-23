@@ -148,14 +148,13 @@ def test_link_sets_text_and_rename_updates_linked_staff(
 
     update_contact(db_session, contact=official, patches={"last_name": "Lee"})
 
-    rows = {
-        contact_id: principal
-        for contact_id, principal in db_session.execute(
+    rows = dict(
+        db_session.execute(
             select(CrmContact.id, CrmContact.principal).where(
                 CrmContact.id.in_([created.id, patched.id, unlinked.id])
             )
-        )
-    }
+        ).tuples()
+    )
     assert rows == {
         created.id: "Sara Lee",
         patched.id: "Sara Lee",

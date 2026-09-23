@@ -1923,7 +1923,7 @@ def get_organization_names(
             CrmOrganization.id.in_(organization_ids)
         )
     )
-    return {organization_id: name for organization_id, name in rows}
+    return dict(rows.tuples())
 
 
 def get_existing_user_ids(user_ids: list[UUID], db_session: Session) -> set[UUID]:
