@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from typing import Any
 from uuid import UUID
 
@@ -10,11 +9,11 @@ from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
 from onyx.db.crm import (
-    add_interaction_attendees,
     create_interaction,
     get_contact_by_id,
     get_interaction_attendees,
     get_organization_by_id,
+    replace_interaction_attendees,
 )
 from onyx.db.enums import CrmAttendeeRole, CrmInteractionType
 from onyx.server.query_and_chat.placement import Placement
@@ -35,19 +34,48 @@ from onyx.tools.tool_implementations.crm.models import (
     parse_uuid_maybe,
     serialize_interaction,
 )
+from onyx.tools.tool_implementations.crm.validation import (
+    crm_write_errors,
+    reject_unknown_keys,
+)
 
 ATTENDEES_NOT_PROVIDED = object()
+# 'type' and 'primary_contact_id' are accepted aliases, not in the schema.
+LOG_INTERACTION_FIELDS = (
+    "title",
+    "interaction_type",
+    "type",
+    "summary",
+    "occurred_at",
+    "contact_id",
+    "primary_contact_id",
+    "organization_id",
+    "attendees",
+)
+
+
+def _unresolved_attendee_warning(item: dict[str, Any]) -> str:
+    candidates = ", ".join(
+        f"{candidate['label']} ({candidate['entity_type']} {candidate['id']})"
+        for candidate in item.get("candidates", [])
+    )
+    warning = (
+        f"Attendee {json.dumps(item['input'], default=str)} was not added "
+        f"({item['reason']})."
+    )
+    if candidates:
+        warning += f" Candidates: {candidates}."
+    return warning
 
 
 class CrmLogInteractionTool(Tool[None]):
     NAME = "crm_log_interaction"
     DISPLAY_NAME = "CRM Log Interaction"
     DESCRIPTION = (
-        "Log a call, meeting, email, note, or event in the CRM. Link it to a contact_id and/or "
-        "organization_id for context. Include attendees by email or name — the system will try to "
-        "match them to existing contacts and team members and report what matched. Always include "
-        "a summary capturing key discussion points and action items. Set occurred_at if the "
-        "interaction happened in the past."
+        "Log a call, meeting, email, note, or event. Link contact_id and/or "
+        "organization_id. Give attendees by email or name; the result reports matches "
+        "and warns about any it couldn't resolve. Summarize key points and action "
+        "items; set occurred_at for past events."
     )
 
     def __init__(
@@ -117,18 +145,12 @@ class CrmLogInteractionTool(Tool[None]):
                             "type": "string",
                             "description": "UUID of the organization this interaction relates to.",
                         },
-                        "primary_contact_id": {
-                            "type": "string",
-                            "description": "UUID of the primary contact if different from contact_id. Auto-added as attendee.",
-                        },
                         "attendees": {
                             "type": "array",
                             "description": (
-                                "People who attended. Each item can provide an email or name "
-                                "for automatic resolution to an existing contact or team member. "
-                                "The system will report what matched and at what confidence level. "
-                                "If omitted, defaults to the invoking user plus primary contact; "
-                                "pass [] for explicitly no attendees."
+                                "People who attended, matched to existing contacts or "
+                                "teammates. Omit to use the current user plus contact_id; "
+                                "[] means no attendees."
                             ),
                             "items": {
                                 "type": "object",
@@ -174,6 +196,9 @@ class CrmLogInteractionTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        reject_unknown_keys(
+            llm_kwargs, LOG_INTERACTION_FIELDS, "crm_log_interaction arguments"
+        )
         title = llm_kwargs.get("title")
         if not isinstance(title, str) or not title.strip():
             raise ToolCallException(
@@ -195,11 +220,20 @@ class CrmLogInteractionTool(Tool[None]):
 
         occurred_at = parse_datetime_maybe(llm_kwargs.get("occurred_at"), "occurred_at")
         contact_id = parse_uuid_maybe(llm_kwargs.get("contact_id"), "contact_id")
-        organization_id = parse_uuid_maybe(
-            llm_kwargs.get("organization_id"), "organization_id"
-        )
         primary_contact_id = parse_uuid_maybe(
             llm_kwargs.get("primary_contact_id"), "primary_contact_id"
+        )
+        if contact_id and primary_contact_id and contact_id != primary_contact_id:
+            raise ToolCallException(
+                message=f"Conflicting contact_id and primary_contact_id in {self.name}",
+                llm_facing_message=(
+                    "'contact_id' and 'primary_contact_id' name different contacts. "
+                    "Send only 'contact_id'."
+                ),
+            )
+        contact_id = contact_id or primary_contact_id
+        organization_id = parse_uuid_maybe(
+            llm_kwargs.get("organization_id"), "organization_id"
         )
         actor_user_id = parse_uuid_maybe(self._user_id, "user_id")
 
@@ -215,7 +249,7 @@ class CrmLogInteractionTool(Tool[None]):
                 llm_facing_message="'attendees' must be an array.",
             )
 
-        with self._session_factory() as db_session:
+        with self._session_factory() as db_session, crm_write_errors("log"):
             if contact_id and get_contact_by_id(contact_id, db_session) is None:
                 raise ToolCallException(
                     message=f"Contact not found: {contact_id}",
@@ -229,57 +263,29 @@ class CrmLogInteractionTool(Tool[None]):
                     message=f"Organization not found: {organization_id}",
                     llm_facing_message="Could not find the provided organization_id.",
                 )
-            if (
-                primary_contact_id
-                and get_contact_by_id(primary_contact_id, db_session) is None
-            ):
-                raise ToolCallException(
-                    message=f"Primary contact not found: {primary_contact_id}",
-                    llm_facing_message="Could not find the provided primary_contact_id.",
-                )
 
-            resolved_attendees, needs_confirmation, resolution_details = (
+            resolved_attendees, unresolved_attendees, resolution_details = (
                 resolve_attendees(
                     db_session=db_session,
                     attendees_to_resolve=attendees_to_resolve,
                 )
             )
-
-            deduped_attendees: dict[
-                tuple[UUID | None, UUID | None], CrmAttendeeRole
-            ] = {}
-            for attendee in resolved_attendees:
-                key = (attendee["user_id"], attendee["contact_id"])
-                existing_role = deduped_attendees.get(key)
-                next_role = attendee["role"]
-                if existing_role is None:
-                    deduped_attendees[key] = next_role
-                elif (
-                    existing_role != CrmAttendeeRole.ORGANIZER
-                    and next_role == CrmAttendeeRole.ORGANIZER
-                ):
-                    deduped_attendees[key] = next_role
-
+            attendee_tuples: list[tuple[UUID | None, UUID | None, CrmAttendeeRole]] = [
+                (attendee["user_id"], attendee["contact_id"], attendee["role"])
+                for attendee in resolved_attendees
+            ]
             # Default attendees only when 'attendees' is omitted entirely.
             # Explicit [] or null means "no attendees".
-            effective_primary_contact_id = primary_contact_id or contact_id
             if attendees_were_omitted:
                 if actor_user_id is not None:
-                    deduped_attendees[(actor_user_id, None)] = CrmAttendeeRole.ORGANIZER
+                    attendee_tuples.append(
+                        (actor_user_id, None, CrmAttendeeRole.ORGANIZER)
+                    )
+                if contact_id is not None:
+                    attendee_tuples.append((None, contact_id, CrmAttendeeRole.ATTENDEE))
 
-                if contact_id is None:
-                    contact_id = effective_primary_contact_id
-
-                if effective_primary_contact_id is not None:
-                    key = (None, effective_primary_contact_id)
-                    if key not in deduped_attendees:
-                        deduped_attendees[key] = CrmAttendeeRole.ATTENDEE
-
-            # Proceed with creating the interaction even when some attendees
-            # could not be resolved. Unresolved attendees are reported in the
-            # response as a warning so the caller can decide whether to follow
-            # up separately and update the interaction with additional attendees.
-
+            # Unresolved attendees do not block the interaction; they are
+            # reported as warnings so the caller can follow up with crm_update.
             interaction = create_interaction(
                 db_session=db_session,
                 contact_id=contact_id,
@@ -289,38 +295,31 @@ class CrmLogInteractionTool(Tool[None]):
                 title=title,
                 summary=summary,
                 occurred_at=occurred_at,
+                commit=False,
             )
+            replace_interaction_attendees(
+                db_session=db_session,
+                interaction_id=interaction.id,
+                attendees=attendee_tuples,
+                commit=False,
+            )
+            # Commit expires loaded rows, so the serializer re-reads updated_at
+            # as the triggers left it.
+            db_session.commit()
 
-            user_ids_by_role: dict[CrmAttendeeRole, list[UUID]] = defaultdict(list)
-            contact_ids_by_role: dict[CrmAttendeeRole, list[UUID]] = defaultdict(list)
-            for (
-                attendee_user_id,
-                attendee_contact_id,
-            ), role in deduped_attendees.items():
-                if attendee_user_id is not None:
-                    user_ids_by_role[role].append(attendee_user_id)
-                if attendee_contact_id is not None:
-                    contact_ids_by_role[role].append(attendee_contact_id)
-
-            all_roles = set(user_ids_by_role.keys()) | set(contact_ids_by_role.keys())
-            for role in all_roles:
-                add_interaction_attendees(
-                    db_session=db_session,
-                    interaction_id=interaction.id,
-                    user_ids=user_ids_by_role.get(role),
-                    contact_ids=contact_ids_by_role.get(role),
-                    role=role,
-                )
-
-            attendees = get_interaction_attendees(interaction.id, db_session)
             payload: dict[str, Any] = {
                 "status": "created",
-                "interaction": serialize_interaction(interaction, attendees=attendees),
+                "interaction": serialize_interaction(
+                    interaction,
+                    attendees=get_interaction_attendees(interaction.id, db_session),
+                ),
             }
             if resolution_details:
                 payload["attendee_resolution"] = resolution_details
-            if needs_confirmation:
-                payload["unresolved_attendees"] = needs_confirmation
+            if unresolved_attendees:
+                payload["warnings"] = [
+                    _unresolved_attendee_warning(item) for item in unresolved_attendees
+                ]
 
         compact_payload = compact_tool_payload_for_model(payload)
         self.emitter.emit(

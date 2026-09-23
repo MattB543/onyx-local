@@ -119,7 +119,7 @@ when it can be inferred. For US congressional contacts capture `us_state` and `p
 
 ### Common Workflows
 
-**After a meeting:** Search for the contact and org → create if they don't exist → log the interaction with a summary and attendees → apply relevant tags.
+**After a meeting:** Search for the contact and org → create if they don't exist → log the interaction with a summary and attendees → apply relevant tags (`crm_update` with `add_tag_ids`).
 
 **Prepping for a meeting:** Use `crm_get` to pull the contact and org details, then use `crm_list` to find recent interactions and understand the relationship history.
 

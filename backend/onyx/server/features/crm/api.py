@@ -932,6 +932,8 @@ def post_interaction(
             role=role,
         )
 
+    # Attendee triggers moved updated_at after create_interaction's refresh.
+    db_session.refresh(interaction)
     return _serialize_interaction(interaction, db_session)
 
 

@@ -5,11 +5,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, or_, select, text
+from sqlalchemy import case, func, or_, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import delete
+from sqlalchemy.sql import delete, expression
 
+from onyx.configs.constants import (
+    ANONYMOUS_USER_EMAIL,
+    DANSWER_API_KEY_DUMMY_EMAIL_DOMAIN,
+    NO_AUTH_PLACEHOLDER_USER_EMAIL,
+)
 from onyx.db.enums import (
+    AccountType,
     CrmAttendeeRole,
     CrmContactSource,
     CrmInteractionType,
@@ -132,13 +139,9 @@ def _normalize_us_state(value: str | None) -> str | None:
     return normalized
 
 
-def _require_at_least_one_name(
-    first_name: str | None, last_name: str | None
-) -> None:
+def _require_at_least_one_name(first_name: str | None, last_name: str | None) -> None:
     if _strip_or_none(first_name) is None and _strip_or_none(last_name) is None:
-        raise ValueError(
-            "A contact requires at least a first name or a last name."
-        )
+        raise ValueError("A contact requires at least a first name or a last name.")
 
 
 def _normalize_stage_options(values: list[str]) -> list[str]:
@@ -496,6 +499,7 @@ def create_contact(
     party_affiliation: str | None = None,
     us_state: str | None = None,
     principal: str | None = None,
+    profile_picture_file_id: str | None = None,
     commit: bool = True,
 ) -> tuple[CrmContact, bool]:
     normalized_first_name = _strip_or_none(first_name)
@@ -527,6 +531,7 @@ def create_contact(
         notes=_normalize_text(notes),
         linkedin_url=_strip_or_none(linkedin_url),
         location=_strip_or_none(location),
+        profile_picture_file_id=profile_picture_file_id,
         created_by=created_by,
     )
     db_session.add(contact)
@@ -1086,43 +1091,55 @@ def replace_interaction_attendees(
     interaction_id: UUID,
     attendees: list[tuple[UUID | None, UUID | None, CrmAttendeeRole]],
     commit: bool = True,
-) -> list[CrmInteractionAttendee]:
-    """Replace ALL attendees of an interaction with the given tuples.
+) -> bool:
+    """Make the interaction's attendees exactly the given (user_id, contact_id,
+    role) tuples. An empty list clears all attendees.
 
-    Each tuple is (user_id, contact_id, role). Deletes existing attendee rows
-    then inserts the provided set (deduped by (user_id, contact_id), preferring
-    ORGANIZER role on conflict). An empty list clears all attendees.
+    Duplicate (user_id, contact_id) pairs collapse, preferring ORGANIZER. Only
+    rows that differ are written, so an unchanged set fires no updated_at
+    triggers. Returns True if any attendee row changed.
     """
-    db_session.execute(
-        delete(CrmInteractionAttendee).where(
-            CrmInteractionAttendee.interaction_id == interaction_id
-        )
-    )
-
-    deduped: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
+    desired: dict[tuple[UUID | None, UUID | None], CrmAttendeeRole] = {}
     for user_id, contact_id, role in attendees:
         key = (user_id, contact_id)
-        existing = deduped.get(key)
-        if existing is None or (
-            existing != CrmAttendeeRole.ORGANIZER and role == CrmAttendeeRole.ORGANIZER
+        existing_role = desired.get(key)
+        if existing_role is None or (
+            existing_role != CrmAttendeeRole.ORGANIZER
+            and role == CrmAttendeeRole.ORGANIZER
         ):
-            deduped[key] = role
+            desired[key] = role
 
-    for (user_id, contact_id), role in deduped.items():
-        db_session.add(
-            CrmInteractionAttendee(
-                interaction_id=interaction_id,
-                user_id=user_id,
-                contact_id=contact_id,
-                role=role,
+    current = {
+        (attendee.user_id, attendee.contact_id): attendee
+        for attendee in get_interaction_attendees(interaction_id, db_session)
+    }
+
+    changed = False
+    for key, attendee in current.items():
+        if key not in desired:
+            db_session.delete(attendee)
+            changed = True
+    for (user_id, contact_id), role in desired.items():
+        attendee = current.get((user_id, contact_id))
+        if attendee is None:
+            db_session.add(
+                CrmInteractionAttendee(
+                    interaction_id=interaction_id,
+                    user_id=user_id,
+                    contact_id=contact_id,
+                    role=role,
+                )
             )
-        )
+            changed = True
+        elif attendee.role != role:
+            attendee.role = role
+            changed = True
 
-    db_session.flush()
-    if commit:
-        db_session.commit()
-
-    return get_interaction_attendees(interaction_id, db_session)
+    if changed:
+        db_session.flush()
+        if commit:
+            db_session.commit()
+    return changed
 
 
 def delete_interaction(
@@ -1306,27 +1323,32 @@ def get_organization_tags(organization_id: UUID, db_session: Session) -> list[Cr
     )
 
 
+def get_tags_by_ids(tag_ids: list[UUID], db_session: Session) -> dict[UUID, CrmTag]:
+    if not tag_ids:
+        return {}
+    return {
+        tag.id: tag
+        for tag in db_session.scalars(select(CrmTag).where(CrmTag.id.in_(tag_ids)))
+    }
+
+
 def add_tag_to_contact(
     db_session: Session,
     *,
     contact_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    existing = db_session.scalar(
-        select(CrmContact__Tag).where(
-            and_(
-                CrmContact__Tag.contact_id == contact_id,
-                CrmContact__Tag.tag_id == tag_id,
-            )
-        )
-    )
-    if existing:
-        return
-
-    db_session.add(CrmContact__Tag(contact_id=contact_id, tag_id=tag_id))
+) -> bool:
+    """Returns False if the contact already had the tag."""
+    inserted = db_session.execute(
+        pg_insert(CrmContact__Tag)
+        .values(contact_id=contact_id, tag_id=tag_id)
+        .on_conflict_do_nothing()
+        .returning(CrmContact__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return inserted is not None
 
 
 def remove_tag_from_contact(
@@ -1335,13 +1357,19 @@ def remove_tag_from_contact(
     contact_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    db_session.query(CrmContact__Tag).filter(
-        CrmContact__Tag.contact_id == contact_id,
-        CrmContact__Tag.tag_id == tag_id,
-    ).delete()
+) -> bool:
+    """Returns False if the contact did not have the tag."""
+    removed = db_session.execute(
+        delete(CrmContact__Tag)
+        .where(
+            CrmContact__Tag.contact_id == contact_id,
+            CrmContact__Tag.tag_id == tag_id,
+        )
+        .returning(CrmContact__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return removed is not None
 
 
 def add_tag_to_organization(
@@ -1350,21 +1378,17 @@ def add_tag_to_organization(
     organization_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    existing = db_session.scalar(
-        select(CrmOrganization__Tag).where(
-            and_(
-                CrmOrganization__Tag.organization_id == organization_id,
-                CrmOrganization__Tag.tag_id == tag_id,
-            )
-        )
-    )
-    if existing:
-        return
-
-    db_session.add(CrmOrganization__Tag(organization_id=organization_id, tag_id=tag_id))
+) -> bool:
+    """Returns False if the organization already had the tag."""
+    inserted = db_session.execute(
+        pg_insert(CrmOrganization__Tag)
+        .values(organization_id=organization_id, tag_id=tag_id)
+        .on_conflict_do_nothing()
+        .returning(CrmOrganization__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return inserted is not None
 
 
 def remove_tag_from_organization(
@@ -1373,13 +1397,19 @@ def remove_tag_from_organization(
     organization_id: UUID,
     tag_id: UUID,
     commit: bool = True,
-) -> None:
-    db_session.query(CrmOrganization__Tag).filter(
-        CrmOrganization__Tag.organization_id == organization_id,
-        CrmOrganization__Tag.tag_id == tag_id,
-    ).delete()
+) -> bool:
+    """Returns False if the organization did not have the tag."""
+    removed = db_session.execute(
+        delete(CrmOrganization__Tag)
+        .where(
+            CrmOrganization__Tag.organization_id == organization_id,
+            CrmOrganization__Tag.tag_id == tag_id,
+        )
+        .returning(CrmOrganization__Tag.tag_id)
+    ).first()
     if commit:
         db_session.commit()
+    return removed is not None
 
 
 def search_crm_entities(
@@ -1589,6 +1619,39 @@ def find_users_for_attendee_resolution(
             .limit(max_results)
         ).unique()
     )
+
+
+def get_existing_user_ids(user_ids: list[UUID], db_session: Session) -> set[UUID]:
+    if not user_ids:
+        return set()
+    id_col = User.__table__.c.id
+    return set(db_session.scalars(select(id_col).where(id_col.in_(user_ids))))
+
+
+def find_assignable_users_by_email(
+    emails: list[str], db_session: Session
+) -> dict[str, list[User]]:
+    """Exact, case-insensitive email match over the users the CRM owner picker
+    shows (no bots, API-key users, external or system users). Keys are
+    lower-cased emails; more than one user per key means the match is ambiguous.
+    """
+    lowered = {email.strip().lower() for email in emails if email.strip()}
+    if not lowered:
+        return {}
+    email_col = User.__table__.c.email
+    users = db_session.scalars(
+        select(User).where(
+            func.lower(email_col).in_(lowered),
+            expression.not_(email_col.endswith(DANSWER_API_KEY_DUMMY_EMAIL_DOMAIN)),
+            email_col != ANONYMOUS_USER_EMAIL,
+            email_col != NO_AUTH_PLACEHOLDER_USER_EMAIL,
+            User.account_type.not_in([AccountType.BOT, AccountType.EXT_PERM_USER]),
+        )
+    ).unique()
+    matches: dict[str, list[User]] = {}
+    for user in users:
+        matches.setdefault(user.email.lower(), []).append(user)
+    return matches
 
 
 def export_all_organizations(db_session: Session) -> list[dict]:

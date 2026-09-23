@@ -99,6 +99,10 @@ class CrmRecords:
         self._created.append((type(record), record.id))
         return record
 
+    def track(self, model: type, record_id: UUID | str) -> None:
+        """Delete a row created outside this helper (e.g. by a tool) on cleanup."""
+        self._created.append((model, UUID(str(record_id))))
+
     def org(self, **fields: Any) -> CrmOrganization:
         fields.setdefault("name", self._name("CRM Test Org"))
         return self._commit(CrmOrganization(**fields))
