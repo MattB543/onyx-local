@@ -7,7 +7,7 @@ import {
   CrmPrincipalSummary,
   listCrmContactPrincipals,
 } from "@/app/app/crm/crmService";
-import type { ComboBoxOption } from "@/refresh-components/inputs/InputComboBox";
+import type { SelectOption } from "@opal/components";
 
 /** Distinct contact principals; with organizationId, only that org's contacts. */
 export function useCrmContactPrincipals(organizationId?: string) {
@@ -17,7 +17,7 @@ export function useCrmContactPrincipals(organizationId?: string) {
     { revalidateOnFocus: false }
   );
 
-  const principalOptions = useMemo<ComboBoxOption[]>(
+  const principalOptions = useMemo<SelectOption[]>(
     () =>
       (data ?? []).map((p) => ({
         value: p.name,

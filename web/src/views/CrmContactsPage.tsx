@@ -100,9 +100,6 @@ export default function CrmContactsPage() {
   const [principalFilter, setPrincipalFilter] = useState<string | undefined>(
     () => searchParams.get("principal") || undefined
   );
-  const [principalFilterText, setPrincipalFilterText] = useState(
-    () => searchParams.get("principal") ?? ""
-  );
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<CrmDateRangeValue>({
     field: "created",
@@ -242,7 +239,6 @@ export default function CrmContactsPage() {
       setOrgFilterId(undefined);
     }
     setPrincipalFilter(undefined);
-    setPrincipalFilterText("");
     setTagFilterIds([]);
     setDateRange({ field: "created", from: null, to: null });
     setSortValue(DEFAULT_CRM_SORT_VALUE);
@@ -376,29 +372,25 @@ export default function CrmContactsPage() {
               disabled={!!organizationIdFilter}
             />
 
-            <InputComboBox
-              value={principalFilterText}
+            <InputSingleSelect
+              value={principalFilter ?? ""}
               onChange={(e) => {
-                setPrincipalFilterText(e.target.value);
-                if (!e.target.value) {
+                // Emptying the text clears the filter; re-picking the
+                // selected principal also toggles it off ("").
+                if (!e.target.value && principalFilter) {
                   setPrincipalFilter(undefined);
                   setPageNum(0);
                 }
               }}
               onValueChange={(value) => {
-                setPrincipalFilter(value);
-                setPrincipalFilterText(value);
-                setPageNum(0);
-              }}
-              onClear={() => {
-                setPrincipalFilter(undefined);
-                setPrincipalFilterText("");
+                setPrincipalFilter(value || undefined);
                 setPageNum(0);
               }}
               options={principalOptions}
               placeholder="Filter by principal"
-              strict
               searchIcon
+              // A ?principal= value can precede the option list (or match
+              // no current contact); keep it without a closed-set error.
               isError={false}
             />
           </div>

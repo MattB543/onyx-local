@@ -467,7 +467,7 @@ export default function CrmContactDetailPage({
                               buildContactPatchBody(values, [
                                 ...hiddenOwnerIds,
                                 ...unresolvableOwnerIds,
-                              ]),
+                              ])
                             );
                           } catch {
                             setStatus("Failed to save contact.");

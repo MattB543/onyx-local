@@ -14,9 +14,13 @@ import { SettingsLayouts } from "@opal/layouts";
 import { useCrmContactPrincipals } from "@/lib/hooks/useCrmContactPrincipals";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
 import { useUser } from "@/providers/UserProvider";
-import { Button, EmptyMessageCard, Popover } from "@opal/components";
+import {
+  Button,
+  EmptyMessageCard,
+  InputSingleSelect,
+  Popover,
+} from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import InputComboBox from "@/refresh-components/inputs/InputComboBox";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -57,9 +61,6 @@ export default function CrmInteractionsPage() {
   // Seeded from ?principal= so office views can link here.
   const [principalFilter, setPrincipalFilter] = useState<string | undefined>(
     () => searchParams.get("principal") || undefined
-  );
-  const [principalFilterText, setPrincipalFilterText] = useState(
-    () => searchParams.get("principal") ?? ""
   );
   const [pageNum, setPageNum] = useState(0);
   const [morePopoverOpen, setMorePopoverOpen] = useState(false);
@@ -177,29 +178,25 @@ export default function CrmInteractionsPage() {
 
         <SettingsLayouts.Body>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
-            <InputComboBox
-              value={principalFilterText}
+            <InputSingleSelect
+              value={principalFilter ?? ""}
               onChange={(e) => {
-                setPrincipalFilterText(e.target.value);
-                if (!e.target.value) {
+                // Emptying the text clears the filter; re-picking the
+                // selected principal also toggles it off ("").
+                if (!e.target.value && principalFilter) {
                   setPrincipalFilter(undefined);
                   setPageNum(0);
                 }
               }}
               onValueChange={(value) => {
-                setPrincipalFilter(value);
-                setPrincipalFilterText(value);
-                setPageNum(0);
-              }}
-              onClear={() => {
-                setPrincipalFilter(undefined);
-                setPrincipalFilterText("");
+                setPrincipalFilter(value || undefined);
                 setPageNum(0);
               }}
               options={principalOptions}
               placeholder="Filter by principal"
-              strict
               searchIcon
+              // A ?principal= value can precede the option list (or match
+              // no current contact); keep it without a closed-set error.
               isError={false}
             />
 
