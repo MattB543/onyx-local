@@ -19,6 +19,8 @@ it.each([
     match_highlights: [],
     metadata: {},
     updated_at: null,
+    // Fork: OnyxDocument.image is required (web search result images).
+    image: null,
     is_internet: true,
     link,
   });
@@ -35,6 +37,8 @@ it.each([
     match_highlights: [],
     metadata: {},
     updated_at: null,
+    // Fork: OnyxDocument.image is required (web search result images).
+    image: null,
     is_internet: true,
     link: "https://example.com/doc",
   });
