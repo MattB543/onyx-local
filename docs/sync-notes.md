@@ -689,3 +689,114 @@ Inherited (pre-date this sync at e1c7a8d161) — NOT fixed, follow-up candidates
   List/Get replay sends the full stored response while live emits
   `compact_tool_payload_for_model` (display-only difference after reload);
   packetUtils/packetProcessor tests + `__tests__/testHelpers.ts` lack List/Get cases.
+
+# Sync Notes — 2026-09-23 upstream sync (215 commits behind at start)
+
+Merge-base `94271d7e11` → `upstream/main` tip `5094e0f37f`. Backup branch
+`pre-sync-backup-2026-09-23` (622a5eb889). Probe from start: N25=4, N50=7, N55=7,
+N60=13, N65=21, N75=24, N100=28, N148=34, N215=43. ~70% of conflicted files are
+b4a033ab62-only (cosmetic → take theirs). #14849 (search receipts, #149) is reverted by
+#178 — don't end a batch between them (llm_loop.py/process_message.py conflict only there).
+Per-batch verification is fork suites + ruff + tsc + alembic heads; the full unit suite
+(~22 min on Windows) runs once at the end.
+
+## Batch 1 — cb3aef2e0e (2026-09-23, 55 commits, 215→160 behind)
+
+- Conflicts: 7 (as probed). Blends: `prompt_utils.py` (import block only; upstream's
+  interface-language section #14564 alongside fork timezone/CRM_GUIDANCE),
+  `multi_llm.py` (upstream #14603 reasoning-none learning nested inside the fork's
+  `_run_attempts(max_tokens_arg)`; needed `nonlocal reasoning_effort`),
+  `pyproject.toml` (keep ours + upstream bumps/PIE), `uv.lock` (theirs + fork 2 lines;
+  `uv lock --check --offline` OK), `InputComboBoxField.tsx` (upstream @opal import + fork
+  onBlur/id/isError). Take theirs: `ModifyCredential.tsx`. Accepted delete:
+  `refresh-components/Calendar.tsx`.
+- Out-of-marker fixes: (1) ruff PIE794 exposed a real latent bug — the fork's trailing
+  `ChatMessage.__table_args__` silently REPLACED upstream's (`ix_chat_message_chat_session_id`
+  missing from metadata since the 2026-07 sync); merged into one declaration (9524f74291,
+  no DB change). (2) upstream retired refresh inputs (#14616/#14617/#14618) and IconButton
+  (#14625): 10 fork files migrated to Opal (CRM pages, CrmDateRangeFilter → Opal
+  InputDatePicker + `useLocale()` for `getFormattedDateRangeString`, gcalendar
+  Credential.tsx, fork InputMultiSelect; 10c6a765fe). (3) alembic merge `3f146f01df77`
+  (ad99acb9be41 + fork b3e1f7a2c9d4). (4) +3 degrade-retry tests in test_multi_llm.py.
+- Deviations from playbook defaults: none. InputComboBox recurring row moved: component
+  now at `web/lib/opal/src/components/inputs/input-combo-box/` (git carried the fork
+  `onClear`/`showAddPrefix`/isOpen-skip deltas across the move).
+- New upstream patterns: ruff PIE enabled; `ods type-coverage` pre-commit gate
+  (`web/.type-coverage-baseline.yaml`, can't run locally — avoid `any` in fork code);
+  Opal `InputMultiSelect` + Formik field exists (#14641) — fork `InputMultiSelect` is a
+  migration candidate; `getFormattedDateRangeString` needs a locale; main needs
+  `bun install` + `web/lib/shared` rebuild (`bun run build`) after merges touching them
+  or tsc reports false TextColor errors.
+- Verification: ruff clean; tsc 0 (on main after bun install + lib/shared rebuild);
+  oxlint 0 i18n (4 known jsx-a11y); jest 81/81; fork suites 706/707 (1 = litellm LIVE
+  price list dropped claude-3-haiku-20240307 → pass with `LITELLM_LOCAL_MODEL_COST_MAP=True`);
+  full unit suite in worktree 9655 pass / 73 fail — all environmental: 46 known Windows,
+  21 new Zoom connector tests (`OSError [Errno 22]` in
+  `cross_connector_utils/miscellaneous_utils.py:63`, Windows), 6 live-price-list.
+  alembic single head `3f146f01df77`.
+- DEPLOY FLAGS: migration `ad99acb9be41` alters `user_usage` (actor_kind default 'USER',
+  system_attribution, check constraint, recreates `uq_user_usage_dims`) — bounded, no
+  backfill; markitdown 0.1.2→0.1.7 (runtime) + croniter 6.2.4 ⇒ venv rebuild;
+  code-interpreter 0.4.7; new optional env `ZOOM_TRANSCRIPT_LAG_BUFFER_HOURS`.
+- Follow-ups noted: `cryptography==46.0.5` fork pin is dead (uv override
+  `>=42,<50` resolves 48.0.1 — already true before this sync); fork test
+  `test_legacy_model_clamps_to_registry_limit` depends on litellm's live price list.
+- Codex sanity check (astra medium): PASS. Verified reasoning-none learning via both
+  invoke/stream, caller-set max_tokens preserved, exactly one generation span incl.
+  stream backoff → token degrade (5 in-memory probes); Opal migration keeps callback
+  contracts/controlled values/clear behavior (`Date | null`); both ChatMessage indexes
+  match migrations and an AST scan found no other duplicate class attrs in models.py;
+  CRM/Calendar tools survive disabled-tool filtering; custom-jobs registration intact;
+  271 targeted tests + tsc pass. One PRE-EXISTING NIT: `_run_attempts(None)` restarts the
+  option ladder, so a Claude call that learned reasoning must be dropped resends it once
+  (one avoidable request, no lost result) — follow-up, not fixed.
+
+## Batch 2 — fa84cc91b1 (2026-09-23, 60 commits, 160→100 behind)
+
+- Conflicts: 22 (as probed). 11 cosmetic take-theirs (b4a033ab62/9947837f9f-only),
+  4 accepted deletes (#14717: `timing.ts`, `useKeyPress.ts`, `browserUtilities.tsx`,
+  `contains.ts` — no importers), `NRFPage.tsx` take theirs (upstream #14700 = same
+  `noPaste` fix as fork 622a5eb889), blends: `AppPage.tsx` (upstream paste fix + full
+  chat-fork feature), `position/hooks.ts` (recurring CRM), `providers.tsx` (keep
+  `mergeUploadedFile` → attachment_source/index_for_later), `imap/connector.py`,
+  `multi_llm.py`, and `lib/connectors/credentials.ts`.
+- Deviations from playbook defaults:
+  - `credentials.ts` looked cosmetic in the `--no-merges` log but carries fork Google
+    Calendar types/template (arrived via merge commits) → blended into upstream's new
+    `CredentialTemplateMap` + `satisfies`. RULE: always also check
+    `git diff <merge-base> main -- <file>`, not just `--no-merges` history.
+  - IMAP: upstream #14670 TLS verification (`ssl.create_default_context()`) combined with
+    the fork's socket timeout inside the fork retry wrapper; cert-verification failures
+    now fail fast instead of being retried 5× (`_ImapCertificateError`), +3 tests.
+  - `multi_llm.py` vs upstream #14605: chat now passes its own context-aware output
+    allowance (`chat/token_budget.py`, registry max output clamped to remaining context),
+    so the fork's `_default_claude_max_tokens` only applies when callers pass None
+    (custom jobs / email→CRM, title gen, other non-chat calls — still needed to avoid the
+    4096 default). NEW: caller-set Claude `max_tokens` is capped with
+    `min(..., ANTHROPIC_MAX_OUTPUT_TOKENS)` so the operator knob still governs chat
+    (otherwise chat sends 128K for Opus/Sonnet 5 vs the fork's 100K default). Upstream now
+    shrinks thinking budget to fit in max_tokens; one upstream test assertion adjusted for
+    the fork's None→64000 default. Degrade retry still only applies to the fork's auto value.
+- Out-of-marker fixes: tsc — Opal `Checkbox`→`InputCheckbox` (#14681) in fork FileCard
+  "Index for later"; `DocumentsSidebar` needs fork-required `OnyxDocument.image: null` once
+  upstream dropped an `as any`. oxlint — `.oxlintrc.json` fork override repointed to
+  `inputs/selections/input-combo-box/`; upstream #14720 made `no-unknown-parameters` an
+  error → 3 fork fixes (`crmService.postJson` named `CrmRequestBody` union, SWR matcher
+  inference, CRM/Calendar packet payloads typed `JsonObject` + `isJsonObject` guards).
+- New upstream patterns: `@/lib/json` `JsonValue`/`JsonObject` readers (#14648); lint
+  errors `no-unknown-parameters`, `no-conditional-empty-object-spread`; `as any` removal
+  exposes fork-required fields; Opal inputs now under `inputs/{booleans,chrono,selections}/`.
+  InputComboBox recurring row → `web/lib/opal/src/components/inputs/selections/input-combo-box/`.
+- Verification: ruff clean; tsc 0; oxlint 4 known a11y; jest 316/316 (15 suites); fork
+  suites 721/721; llm + token_budget + llm_loop 706/706; IMAP + chat-file serving 57/57;
+  alembic single head `3f146f01df77` (no migrations in range). A broad directory sweep was
+  killed at ~63% (≈30 unnamed failures in the craft-sandbox range — expected Windows set;
+  settled by the end-of-sync full run).
+- DEPLOY FLAGS: IMAP now VERIFIES TLS certs (self-signed IMAP servers fail immediately;
+  WorkMail's public cert is fine); new optional env `REDIS_SOCKET_CONNECT_TIMEOUT` (10),
+  `REDIS_SOCKET_TIMEOUT` (30, also caps BLPOP), `OUTLOOK_CONNECTOR_ATTACHMENT_SIZE_THRESHOLD`;
+  chat files outside the inline MIME allowlist now served as attachments; 10 web deps
+  removed (bun install); no migrations.
+- Worktree gotcha: the Agent tool's worktree was created at origin/main (622a5eb889), not
+  local main, in BOTH batches — step 0 (`merge-base --is-ancestor main HEAD` → reset) caught it.
+- Codex sanity check: PENDING
