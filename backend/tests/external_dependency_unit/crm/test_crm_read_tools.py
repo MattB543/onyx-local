@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from queue import Queue
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.orm import Session
@@ -41,6 +41,11 @@ def tools(db_session: Session) -> ReadTools:
 
 def call(tool: Any, **kwargs: Any) -> dict[str, Any]:
     return json.loads(tool.run(placement=PLACEMENT, **kwargs).rich_response)
+
+
+def call_model_view(tool: Any, **kwargs: Any) -> dict[str, Any]:
+    """The compacted response the model actually sees."""
+    return json.loads(tool.run(placement=PLACEMENT, **kwargs).llm_facing_response)
 
 
 def call_error(tool: Any, **kwargs: Any) -> str:
@@ -85,9 +90,12 @@ def test_organization_timeline_includes_member_attendee_interactions(
 ) -> None:
     org = crm.org()
     member = crm.contact(organization_id=org.id)
+    other_member = crm.contact(organization_id=org.id)
     linked = crm.interaction(organization_id=org.id, attendee_contact_ids=[member.id])
-    member_primary = crm.interaction(contact_id=member.id)
-    member_attendee = crm.interaction(attendee_contact_ids=[member.id])
+    member_primary = crm.interaction(
+        contact_id=member.id, attendee_contact_ids=[other_member.id]
+    )
+    member_attendee = crm.interaction(attendee_contact_ids=[member.id, other_member.id])
     crm.interaction()  # unrelated
 
     items, total = list_interactions(
@@ -112,7 +120,7 @@ def test_pagination_returns_every_interaction_once_despite_timestamp_ties(
     crm: CrmRecords, tools: ReadTools
 ) -> None:
     contact = crm.contact()
-    expected: set[str] = set()
+    created: list[UUID] = []
     for i in range(30):
         # Alternate primary contact and attendee-only; all share one time.
         interaction = (
@@ -122,23 +130,46 @@ def test_pagination_returns_every_interaction_once_despite_timestamp_ties(
                 occurred_at=SAME_TIME, attendee_contact_ids=[contact.id]
             )
         )
-        expected.add(str(interaction.id))
+        created.append(interaction.id)
 
-    seen: list[str] = []
-    for page_num in range(3):
-        page = call(
+    pages = [
+        call_model_view(
             tools.list,
             entity_type="interaction",
             contact_id=str(contact.id),
             page_num=page_num,
             page_size=50,
         )
-        assert page["page_size"] == 25
-        assert page["total_items"] == 30
-        seen.extend(item["id"] for item in page["results"])
+        for page_num in range(3)
+    ]
 
-    assert len(seen) == 30
-    assert set(seen) == expected
+    assert [page["page_size"] for page in pages] == [25, 25, 25]
+    assert [page["total_items"] for page in pages] == [30, 30, 30]
+    assert [len(page["results"]) for page in pages] == [25, 5, 0]
+    # Equal times fall back to id order (descending), so paging is stable.
+    seen = [item["id"] for page in pages for item in page["results"]]
+    assert seen == [str(i) for i in sorted(created, reverse=True)]
+
+
+def test_list_filters_interactions_by_contact_and_type(
+    crm: CrmRecords, tools: ReadTools
+) -> None:
+    contact = crm.contact()
+    crm.interaction(contact_id=contact.id, type=CrmInteractionType.NOTE)
+    call_attended = crm.interaction(
+        attendee_contact_ids=[contact.id], type=CrmInteractionType.CALL
+    )
+    crm.interaction(type=CrmInteractionType.CALL)  # other contact
+
+    result = call(
+        tools.list,
+        entity_type="interaction",
+        contact_id=str(contact.id),
+        interaction_type="call",
+    )
+
+    assert result["total_items"] == 1
+    assert [item["id"] for item in result["results"]] == [str(call_attended.id)]
 
 
 def test_list_rejects_inapplicable_and_malformed_filters(
@@ -259,10 +290,34 @@ def test_get_rejects_invalid_or_inapplicable_includes(
 def test_search_rejects_invalid_entity_types_and_caps_page_size(
     tools: ReadTools,
 ) -> None:
-    message = call_error(
-        tools.search, query="anything", entity_types=["contact", "people"]
-    )
-    assert "people" in message
+    for entity_types in (["contact", "people"], ["contact", {}], [["contact"]]):
+        message = call_error(tools.search, query="anything", entity_types=entity_types)
+        assert "Invalid 'entity_types'" in message
 
     result = call(tools.search, query="anything", page_size=50)
     assert result["page_size"] == 25
+
+
+def test_search_pagination_returns_every_tied_result_once(
+    crm: CrmRecords, tools: ReadTools
+) -> None:
+    token = f"tiebreak{uuid4().hex[:10]}"
+    created = {
+        str(crm.interaction(title=f"Sync {token}", occurred_at=SAME_TIME).id)
+        for _ in range(30)
+    }
+
+    seen: list[str] = []
+    for page_num in range(2):
+        page = call_model_view(
+            tools.search,
+            query=token,
+            entity_types=["interaction"],
+            page_num=page_num,
+            page_size=25,
+        )
+        assert page["total_items"] == 30
+        seen.extend(result["entity_id"] for result in page["results"])
+
+    assert len(seen) == 30
+    assert set(seen) == created

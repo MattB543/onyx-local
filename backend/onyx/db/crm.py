@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, or_, select, text
+from sqlalchemy import case, func, or_, select, text, union
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import delete, expression
@@ -937,15 +937,15 @@ def delete_organization(
         db_session.flush()
 
 
-def _has_contact_attendee(contact_condition: Any) -> Any:
-    return (
-        select(CrmInteractionAttendee.id)
-        .where(
-            CrmInteractionAttendee.interaction_id == CrmInteraction.id,
-            contact_condition,
-        )
-        .exists()
-    )
+def _interaction_ids_for_contacts(contact_condition: Any) -> list[Any]:
+    """Interactions whose primary contact or a contact attendee matches the
+    condition on a contact id column. Each branch has its own index."""
+    return [
+        select(CrmInteraction.id).where(contact_condition(CrmInteraction.contact_id)),
+        select(CrmInteractionAttendee.interaction_id).where(
+            contact_condition(CrmInteractionAttendee.contact_id)
+        ),
+    ]
 
 
 def list_interactions(
@@ -965,11 +965,11 @@ def list_interactions(
     page_num, page_size = _normalize_page(page_num, page_size)
 
     stmt = select(CrmInteraction)
+    # IN over a UNION of indexed lookups; an OR here scans every interaction.
     if contact_id:
         stmt = stmt.where(
-            or_(
-                CrmInteraction.contact_id == contact_id,
-                _has_contact_attendee(CrmInteractionAttendee.contact_id == contact_id),
+            CrmInteraction.id.in_(
+                union(*_interaction_ids_for_contacts(lambda col: col == contact_id))
             )
         )
     if organization_id:
@@ -978,12 +978,13 @@ def list_interactions(
                 CrmContact.organization_id == organization_id
             )
             stmt = stmt.where(
-                or_(
-                    CrmInteraction.organization_id == organization_id,
-                    CrmInteraction.contact_id.in_(member_ids),
-                    _has_contact_attendee(
-                        CrmInteractionAttendee.contact_id.in_(member_ids)
-                    ),
+                CrmInteraction.id.in_(
+                    union(
+                        select(CrmInteraction.id).where(
+                            CrmInteraction.organization_id == organization_id
+                        ),
+                        *_interaction_ids_for_contacts(lambda col: col.in_(member_ids)),
+                    )
                 )
             )
         else:
@@ -1538,7 +1539,8 @@ def search_crm_entities(
             f"""
             SELECT entity_type, entity_id, primary_text, secondary_text, sort_at, rank
             FROM ({union_sql}) AS crm_search
-            ORDER BY rank DESC, sort_at DESC NULLS LAST, primary_text ASC
+            ORDER BY rank DESC, sort_at DESC NULLS LAST, primary_text ASC,
+                entity_type ASC, entity_id ASC
             OFFSET :offset
             LIMIT :limit
             """  # noqa: S608 -- union_sql built from static fragments; values are bound params

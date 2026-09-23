@@ -133,9 +133,9 @@ class CrmSearchTool(Tool[None]):
                 for value in entity_types_raw
             ]
             invalid = [
-                json.dumps(value)
+                json.dumps(value, default=str)
                 for value in normalized
-                if value not in CRM_SEARCH_ENTITY_TYPES
+                if not isinstance(value, str) or value not in CRM_SEARCH_ENTITY_TYPES
             ]
             if invalid:
                 raise ToolCallException(

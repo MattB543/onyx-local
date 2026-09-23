@@ -173,6 +173,7 @@ class CrmListTool(Tool[None]):
                         "tag_ids": {
                             "type": "array",
                             "items": {"type": "string"},
+                            "minItems": 1,
                             "description": (
                                 "Records that have ALL of these tag UUIDs. "
                                 f"{_applies_to('tag_ids')}"
@@ -186,7 +187,9 @@ class CrmListTool(Tool[None]):
                         "sort_dir": {
                             "type": "string",
                             "enum": ["asc", "desc"],
-                            "description": "Default 'desc' (newest first).",
+                            "description": (
+                                f"Default 'desc' (newest first). {timestamp_note}"
+                            ),
                         },
                         "created_after": {
                             "type": "string",
@@ -199,18 +202,20 @@ class CrmListTool(Tool[None]):
                             "type": "string",
                             "description": (
                                 "ISO date or datetime, inclusive; a bare date "
-                                "includes the whole day."
+                                f"includes the whole day. {timestamp_note}"
                             ),
                         },
                         "updated_after": {
                             "type": "string",
-                            "description": "ISO date or datetime, inclusive.",
+                            "description": (
+                                f"ISO date or datetime, inclusive. {timestamp_note}"
+                            ),
                         },
                         "updated_before": {
                             "type": "string",
                             "description": (
                                 "ISO date or datetime, inclusive; a bare date "
-                                "includes the whole day."
+                                f"includes the whole day. {timestamp_note}"
                             ),
                         },
                         "page_num": {
