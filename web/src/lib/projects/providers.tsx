@@ -812,7 +812,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
         setCurrentProjectDetails((prev) => {
           if (!prev || !prev.files || prev.files.length === 0) return prev;
           let changed = false;
-          const nextFiles = prev.files.map((f) => {
+          const nextFiles = prev.files.map((f): ProjectFile => {
             const latest = statusById.get(f.id);
             if (latest) {
               if (
@@ -827,7 +827,7 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
             return f;
           });
           return changed
-            ? ({ ...prev, files: nextFiles } as ProjectDetails)
+            ? ({ ...prev, files: nextFiles } satisfies ProjectDetails)
             : prev;
         });
 

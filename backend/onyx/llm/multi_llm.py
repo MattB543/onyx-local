@@ -22,6 +22,7 @@ from onyx.configs.chat_configs import (
 )
 from onyx.configs.model_configs import (
     ANTHROPIC_MAX_OUTPUT_TOKENS,
+    GEN_AI_NUM_RESERVED_OUTPUT_TOKENS,
     GEN_AI_TEMPERATURE,
     LITELLM_EXTRA_BODY,
 )
@@ -104,6 +105,7 @@ _VERTEX_ANTHROPIC_MODELS_REJECTING_STREAM_OPTIONS = (
     "claude-opus-4-7",
     "claude-opus-4-8",
 )
+_ANTHROPIC_MIN_THINKING_BUDGET_TOKENS = 1024
 
 # Best-effort tuning kwargs, never worth failing a chat over. _completion
 # retries provider rejections without them (reasoning keys first, then all),
@@ -815,14 +817,23 @@ class LitellmLLM(LLM):
 
         # See _default_claude_max_tokens: replaces the provider-side 4096-token
         # default that truncated answers and emptied hard-thinking responses.
-        # auto_max_tokens marks the value as ours (not caller-set) so a
-        # context-overflow 400 can degrade back to the provider default below.
+        # The chat loop passes its own context-aware allowance (min of the
+        # model's output limit and the room left in the context window, see
+        # chat/token_budget.py), so the default only fills in for callers that
+        # pass none. auto_max_tokens marks the value as ours (not caller-set)
+        # so a context-overflow 400 can degrade back to the provider default.
         auto_max_tokens = False
-        if max_tokens is None and is_claude_model:
-            max_tokens = _default_claude_max_tokens(
-                model_identity_names, self.config.model_provider
-            )
-            auto_max_tokens = max_tokens is not None
+        if is_claude_model:
+            if max_tokens is None:
+                max_tokens = _default_claude_max_tokens(
+                    model_identity_names, self.config.model_provider
+                )
+                auto_max_tokens = max_tokens is not None
+            else:
+                # The operator ceiling (cost, Bedrock admission quotas) bounds
+                # caller-set values too. min() only lowers, so a smaller
+                # context-aware allowance from the caller always wins.
+                max_tokens = min(max_tokens, ANTHROPIC_MAX_OUTPUT_TOKENS)
 
         if stream and not is_vertex_model_rejecting_stream_options:
             optional_kwargs["stream_options"] = {"include_usage": True}
@@ -930,16 +941,21 @@ class LitellmLLM(LLM):
                         and not isinstance(tool_choice, NamedToolChoice)
                     ):
                         if max_tokens is not None:
-                            # Anthropic has a weird rule where max token has to be at least as much as budget tokens if set
-                            # and the minimum budget tokens is 1024
-                            # Will note that overwriting a developer set max tokens is not ideal but is the best we can do for now
-                            # It is better to allow the LLM to output more reasoning tokens even if it results in a fairly small tool
-                            # call as compared to reducing the budget for reasoning.
-                            max_tokens = max(budget_tokens + 1, max_tokens)
-                        optional_kwargs["thinking"] = {
-                            "type": "enabled",
-                            "budget_tokens": budget_tokens,
-                        }
+                            response_reserve = max(1, GEN_AI_NUM_RESERVED_OUTPUT_TOKENS)
+                            budget_tokens = min(
+                                budget_tokens, max_tokens - response_reserve
+                            )
+                        if budget_tokens >= _ANTHROPIC_MIN_THINKING_BUDGET_TOKENS:
+                            optional_kwargs["thinking"] = {
+                                "type": "enabled",
+                                "budget_tokens": budget_tokens,
+                            }
+                        else:
+                            logger.warning(
+                                "Skipping Anthropic thinking: max_tokens=%s cannot "
+                                "fit the minimum thinking budget and answer reserve",
+                                max_tokens,
+                            )
 
             else:
                 # Hope for the best from LiteLLM

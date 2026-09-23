@@ -3,7 +3,6 @@
 import { PageSelector } from "@/components/PageSelector";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import type { Route } from "next";
 import { useEffect, useState } from "react";
 import {
   Table,
@@ -24,7 +23,7 @@ function ClickableTableRow({
   children,
   ...props
 }: {
-  url: string;
+  url: `/admin/bots/${number}`;
   children: React.ReactNode;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
@@ -32,11 +31,11 @@ function ClickableTableRow({
   const router = useRouter();
 
   useEffect(() => {
-    router.prefetch(url as Route);
+    router.prefetch(url);
   }, [router, url]);
 
   const navigate = () => {
-    router.push(url as Route);
+    router.push(url);
   };
 
   return (

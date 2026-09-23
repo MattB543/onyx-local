@@ -616,6 +616,9 @@ class HierarchyNodeType(str, PyEnum):
     # Slack
     CHANNEL = "channel"
 
+    # Outlook
+    MAILBOX = "mailbox"
+
 
 class CrmContactSource(str, PyEnum):
     MANUAL = "manual"

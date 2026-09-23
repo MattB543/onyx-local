@@ -528,6 +528,22 @@ class TestClaudeDefaultMaxTokens:
     def test_explicit_caller_value_is_preserved(self) -> None:
         assert self._sent_max_tokens(self._llm("claude-opus-5"), 1234) == 1234
 
+    def test_chat_loop_allowance_is_capped_by_operator_ceiling(self) -> None:
+        # The chat loop passes the model's full output limit (128K for Opus 5)
+        # when the context has room; ANTHROPIC_MAX_OUTPUT_TOKENS still bounds
+        # what reaches the provider.
+        assert self._sent_max_tokens(self._llm("claude-opus-5"), 128_000) == 100_000
+
+    def test_operator_ceiling_is_configurable_for_caller_values(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("onyx.llm.multi_llm.ANTHROPIC_MAX_OUTPUT_TOKENS", 32_000)
+        assert self._sent_max_tokens(self._llm("claude-opus-5"), 64_000) == 32_000
+        assert self._sent_max_tokens(self._llm("claude-opus-5")) == 32_000
+
+    def test_operator_ceiling_leaves_non_claude_caller_values_alone(self) -> None:
+        assert self._sent_max_tokens(self._llm("gpt-4o"), 128_000) == 128_000
+
     def test_claude_identity_in_deployment_name_resolves_limits(self) -> None:
         # Foundry-style: opaque model_name, canonical id in deployment alias.
         llm = self._llm("foundry-deploy-1", deployment_name="claude-opus-5")
@@ -547,15 +563,19 @@ class TestClaudeDefaultMaxTokens:
         assert self._sent_max_tokens(self._llm("gpt-4o")) is None
 
     def test_older_thinking_budget_does_not_shrink_default(self) -> None:
-        # Non-adaptive Claude (< 4.7): thinking budget path runs
-        # max(budget_tokens + 1, max_tokens) — must keep the large default.
+        # Non-adaptive Claude (< 4.7): the thinking budget is fitted inside
+        # max_tokens (minus the answer reserve) — the large default must
+        # survive, and a default that large must leave the budget intact.
         llm = self._llm("claude-sonnet-4-5")
         with patch("litellm.completion") as mock_completion:
             mock_completion.return_value = []
             messages: LanguageModelInput = [UserMessage(content="Hi")]
             list(llm.stream(messages, reasoning_effort=ReasoningEffort.MEDIUM))
-            sent = mock_completion.call_args.kwargs["max_tokens"]
+            kwargs = mock_completion.call_args.kwargs
+            sent = kwargs["max_tokens"]
             assert sent is not None and sent >= 8192
+            assert kwargs["thinking"]["type"] == "enabled"
+            assert kwargs["thinking"]["budget_tokens"] < sent
 
     def _complete_with_max_tokens_rejection(
         self, llm: LitellmLLM, max_tokens: int | None = None
@@ -941,6 +961,58 @@ def test_aliased_claude_model_still_reasons() -> None:
 
         kwargs = mock_completion.call_args.kwargs
         assert kwargs["thinking"] == {"type": "enabled", "budget_tokens": 4096}
+
+
+@pytest.mark.parametrize(
+    "max_tokens, expected_thinking",
+    [
+        (None, {"type": "enabled", "budget_tokens": 4096}),
+        (8000, {"type": "enabled", "budget_tokens": 4096}),
+        (5000, {"type": "enabled", "budget_tokens": 3976}),
+        (2048, {"type": "enabled", "budget_tokens": 1024}),
+        (2000, None),
+    ],
+)
+def test_legacy_claude_thinking_budget_fits_inside_max_tokens(
+    max_tokens: int | None,
+    expected_thinking: dict[str, int | str] | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("onyx.llm.multi_llm.GEN_AI_NUM_RESERVED_OUTPUT_TOKENS", 1024)
+    llm = LitellmLLM(
+        api_key="test_key",
+        timeout=30,
+        model_provider=LlmProviderNames.VERTEX_AI,
+        model_name="claude-sonnet-4-5",
+        max_input_tokens=100000,
+    )
+
+    with (
+        patch("litellm.completion") as mock_completion,
+        patch("onyx.llm.multi_llm.model_is_reasoning_model", return_value=False),
+        patch("onyx.llm.multi_llm.logger.warning") as warning,
+    ):
+        mock_completion.return_value = []
+
+        messages: LanguageModelInput = [UserMessage(content="Hi")]
+        list(
+            llm.stream(
+                messages, reasoning_effort=ReasoningEffort.HIGH, max_tokens=max_tokens
+            )
+        )
+
+        kwargs = mock_completion.call_args.kwargs
+        # Fork: an omitted max_tokens resolves to the Claude default (the
+        # registry output limit, 64K for Sonnet 4.5) instead of staying None.
+        assert kwargs["max_tokens"] == (64_000 if max_tokens is None else max_tokens)
+        if expected_thinking is None:
+            assert "thinking" not in kwargs
+            warning.assert_called_once()
+            assert "Skipping Anthropic thinking" in warning.call_args.args[0]
+            assert warning.call_args.args[1] == max_tokens
+        else:
+            assert kwargs["thinking"] == expected_thinking
+            warning.assert_not_called()
 
 
 def test_openai_chat_omits_reasoning_params() -> None:

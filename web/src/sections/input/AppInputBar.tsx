@@ -970,7 +970,7 @@ const AppInputBar = React.memo(
                           event.key === "Enter" &&
                           !showPrompts &&
                           !event.shiftKey &&
-                          !(event.nativeEvent as any).isComposing
+                          !event.nativeEvent.isComposing
                         ) {
                           event.preventDefault();
                           const canSubmitNormally = chatState === "input";

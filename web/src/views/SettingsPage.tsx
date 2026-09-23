@@ -28,10 +28,10 @@ import {
   Card,
   InputTextArea,
   InputTypeIn,
-  PasswordInputTypeIn,
+  InputPasswordTypeIn,
 } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
-import { Switch } from "@opal/components";
+import { InputSwitch } from "@opal/components";
 import { useUser } from "@/providers/UserProvider";
 import { useTheme } from "next-themes";
 import { MemoryItem, Permission, ThemePreference } from "@/lib/types";
@@ -56,7 +56,7 @@ import {
   AttachmentItemButton,
   Button,
   Divider,
-  Checkbox,
+  InputCheckbox,
   Text,
 } from "@opal/components";
 import useFederatedOAuthStatus from "@/hooks/useFederatedOAuthStatus";
@@ -98,6 +98,7 @@ import { findModelConfigId } from "@/lib/languageModels/options";
 import { useLLMProviders } from "@/lib/languageModels/hooks";
 import { DOCS_BASE_URL } from "@/lib/constants";
 import SimpleCollapsible from "@/refresh-components/SimpleCollapsible";
+import type { ErrorResponseBody } from "@/lib/fetcher";
 
 interface PAT {
   id: number;
@@ -107,6 +108,11 @@ interface PAT {
   expires_at: string | null;
   last_used_at: string | null;
   scopes: string[] | null;
+}
+
+// Mirrors backend `CreatedTokenResponse`.
+interface CreatedPAT extends PAT {
+  token: string;
 }
 
 interface PatScopeOption {
@@ -198,7 +204,7 @@ function ScopeSelector({
             const locked = lockReason !== undefined;
             return (
               <div key={option.scope} className="flex items-start gap-2 ps-2">
-                <Checkbox
+                <InputCheckbox
                   checked={selectedScopes.includes(option.scope) || locked}
                   disabled={disabled || locked}
                   onCheckedChange={() => toggleScope(option.scope)}
@@ -481,7 +487,7 @@ function usePATCreation({
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: CreatedPAT = await response.json();
         setNewlyCreatedToken({
           id: data.id,
           token: data.token,
@@ -490,7 +496,7 @@ function usePATCreation({
         toast.success(t("apiKeys.toasts.created"));
         await onCreateSuccess?.();
       } else {
-        const errorData = await response.json();
+        const errorData: ErrorResponseBody = await response.json();
         toast.error(errorData.detail || t("apiKeys.toasts.createFailed"));
       }
     } catch (error) {
@@ -1441,7 +1447,7 @@ function ChatPreferencesSettings() {
               description={t("chats.autoScroll.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={user?.preferences.auto_scroll}
                 onCheckedChange={(checked) => {
                   updateUserAutoScroll(checked);
@@ -1454,7 +1460,7 @@ function ChatPreferencesSettings() {
               description={t("chats.smoothStreaming.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={smoothStreamingEnabled}
                 onCheckedChange={setSmoothStreamingEnabled}
               />
@@ -1465,7 +1471,7 @@ function ChatPreferencesSettings() {
               description={t("chats.collapseLargePastes.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={user?.preferences?.paste_as_tile ?? false}
                 onCheckedChange={(checked) => {
                   updateUserPasteAsTile(checked);
@@ -1547,7 +1553,7 @@ function ChatPreferencesSettings() {
               description={t("memory.referenceStoredMemories.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={personalizationValues.use_memories}
                 onCheckedChange={(checked) => {
                   toggleUseMemories(checked);
@@ -1560,7 +1566,7 @@ function ChatPreferencesSettings() {
               description={t("memory.updateMemories.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={personalizationValues.enable_memory_tool}
                 onCheckedChange={(checked) => {
                   toggleEnableMemoryTool(checked);
@@ -1597,7 +1603,7 @@ function ChatPreferencesSettings() {
               description={t("promptShortcuts.toggle.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={user?.preferences?.shortcut_enabled}
                 onCheckedChange={(checked) => {
                   updateUserShortcuts(checked);
@@ -1624,7 +1630,7 @@ function ChatPreferencesSettings() {
               description={t("voice.autoSend.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={user?.preferences.voice_auto_send ?? false}
                 onCheckedChange={(checked) => {
                   void saveVoiceSettings({ auto_send: checked });
@@ -1637,7 +1643,7 @@ function ChatPreferencesSettings() {
               description={t("voice.autoPlayback.description")}
               withLabel
             >
-              <Switch
+              <InputSwitch
                 checked={user?.preferences.voice_auto_playback ?? false}
                 onCheckedChange={(checked) => {
                   void saveVoiceSettings({ auto_playback: checked });
@@ -2090,7 +2096,7 @@ function AccountsAccessSettings() {
           toast.success(t("accounts.passwordModal.toasts.updated"));
           setShowPasswordModal(false);
         } else {
-          const errorData = await response.json();
+          const errorData: ErrorResponseBody = await response.json();
           toast.error(
             errorData.detail || t("accounts.passwordModal.toasts.updateFailed")
           );
@@ -2203,7 +2209,7 @@ function AccountsAccessSettings() {
                       withLabel="currentPassword"
                       title={t("accounts.passwordModal.currentPassword.title")}
                     >
-                      <PasswordInputTypeIn
+                      <InputPasswordTypeIn
                         name="currentPassword"
                         value={values.currentPassword}
                         onChange={handleChange}
@@ -2219,7 +2225,7 @@ function AccountsAccessSettings() {
                       withLabel="newPassword"
                       title={t("accounts.passwordModal.newPassword.title")}
                     >
-                      <PasswordInputTypeIn
+                      <InputPasswordTypeIn
                         name="newPassword"
                         value={values.newPassword}
                         onChange={handleChange}
@@ -2233,7 +2239,7 @@ function AccountsAccessSettings() {
                       withLabel="confirmPassword"
                       title={t("accounts.passwordModal.confirmPassword.title")}
                     >
-                      <PasswordInputTypeIn
+                      <InputPasswordTypeIn
                         name="confirmPassword"
                         value={values.confirmPassword}
                         onChange={handleChange}
@@ -2605,27 +2611,20 @@ function ConnectorsSettings() {
   ];
 
   // Group indexed connectors by source
-  const groupedConnectors = ccPairs.reduce(
-    (acc, ccPair) => {
-      if (!acc[ccPair.source]) {
-        acc[ccPair.source] = {
-          source: ccPair.source,
-          hasActiveConnector: false,
-        };
-      }
-      if (ACTIVE_STATUSES.includes(ccPair.status)) {
-        acc[ccPair.source]!.hasActiveConnector = true;
-      }
-      return acc;
-    },
-    {} as Record<
-      string,
-      {
-        source: ValidSources;
-        hasActiveConnector: boolean;
-      }
-    >
-  );
+  const groupedConnectors = ccPairs.reduce<
+    Record<string, { source: ValidSources; hasActiveConnector: boolean }>
+  >((acc, ccPair) => {
+    if (!acc[ccPair.source]) {
+      acc[ccPair.source] = {
+        source: ccPair.source,
+        hasActiveConnector: false,
+      };
+    }
+    if (ACTIVE_STATUSES.includes(ccPair.status)) {
+      acc[ccPair.source]!.hasActiveConnector = true;
+    }
+    return acc;
+  }, {});
 
   const hasConnectors =
     Object.keys(groupedConnectors).length > 0 || federatedConnectors.length > 0;

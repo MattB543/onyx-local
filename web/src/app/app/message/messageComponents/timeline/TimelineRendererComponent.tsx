@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, memo, useCallback, useMemo, useState } from "react";
+import React, { useState, useCallback, JSX } from "react";
 import { Packet, StopReason } from "@/app/app/services/streamingModels";
 import {
   FullChatState,
@@ -71,7 +71,7 @@ function arePropsEqual(
   );
 }
 
-export const TimelineRendererComponent = memo(
+export const TimelineRendererComponent = React.memo(
   function TimelineRendererComponent({
     packets,
     chatState,
@@ -86,8 +86,7 @@ export const TimelineRendererComponent = memo(
   }: TimelineRendererComponentProps) {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
     const handleToggle = useCallback(() => setIsExpanded((prev) => !prev), []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- packets identity changes every render; renderer is derived from packet type
-    const RendererFn = useMemo(() => findRenderer({ packets }), [packets.length]);
+    const RendererFn = findRenderer({ packets });
     const renderType =
       renderTypeOverride ?? (isExpanded ? RenderType.FULL : RenderType.COMPACT);
 
@@ -121,8 +120,7 @@ export const TimelineRendererComponent = memo(
 
     return (
       <RendererFn
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        packets={packets as any}
+        packets={packets}
         state={chatState}
         onComplete={() => {}}
         animate={animate}

@@ -25,7 +25,6 @@ const buildOnyxDocumentFromFile = (
     document_id,
     semantic_identifier: name || id,
     link: "",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     source_type: "file" as any,
     blurb: "",
     boost: 0,
@@ -36,8 +35,7 @@ const buildOnyxDocumentFromFile = (
     metadata: {},
     updated_at: null,
     is_internet: false,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
+  };
 };
 
 interface HeaderProps {
@@ -106,7 +104,6 @@ const DocumentsSidebar = memo(
       : null;
 
     // Get citations in order and build a set of cited document IDs
-    /* eslint-disable react-hooks/preserve-manual-memoization -- compiler infers different deps */
     const { citedDocumentIds, citationOrder } = useMemo(() => {
       if (!selectedMessage) {
         return {
@@ -127,7 +124,6 @@ const DocumentsSidebar = memo(
       });
       return { citedDocumentIds, citationOrder };
     }, [idOfMessageToDisplay, selectedMessage?.packets.length]);
-    /* eslint-enable react-hooks/preserve-manual-memoization */
 
     // if these are missing for some reason, then nothing we can do. Just
     // don't render.

@@ -3,6 +3,7 @@ import email
 import imaplib
 import os
 import re
+import ssl
 from datetime import datetime, timedelta, timezone
 from email.message import Message
 from email.utils import getaddresses
@@ -63,6 +64,19 @@ _PAGE_SIZE = 100
 _MAX_EMAIL_BODY_CHARS = 500_000
 _USERNAME_KEY = "imap_username"
 _PASSWORD_KEY = "imap_password"
+
+
+class _ImapCertificateError(Exception):
+    """Carries a TLS certificate failure out of the connect retry loop.
+
+    ssl.SSLCertVerificationError is an OSError, which _add_imap_retries
+    retries; a bad certificate or hostname is permanent, so it is wrapped
+    inside the loop and the original error re-raised once outside it.
+    """
+
+    def __init__(self, error: ssl.SSLCertVerificationError) -> None:
+        super().__init__(str(error))
+        self.error = error
 
 
 class CurrentMailbox(BaseModel):
@@ -154,15 +168,27 @@ class ImapConnector(
 
         @_add_imap_retries
         def _connect_and_login() -> imaplib.IMAP4_SSL:
-            client = imaplib.IMAP4_SSL(
-                host=self._host, port=self._port, timeout=_IMAP_SOCKET_TIMEOUT_SECONDS
-            )
+            try:
+                # imaplib defaults to an unverified context; pass an explicit one
+                # so the certificate and hostname are checked before credentials
+                # are sent.
+                client = imaplib.IMAP4_SSL(
+                    host=self._host,
+                    port=self._port,
+                    ssl_context=ssl.create_default_context(),
+                    timeout=_IMAP_SOCKET_TIMEOUT_SECONDS,
+                )
+            except ssl.SSLCertVerificationError as e:
+                raise _ImapCertificateError(e) from e
             status, _data = client.login(user=username, password=password)
             if status != _IMAP_OKAY_STATUS:
                 raise RuntimeError(f"Failed to log into imap server; {status=}")
             return client
 
-        return _connect_and_login()
+        try:
+            return _connect_and_login()
+        except _ImapCertificateError as e:
+            raise e.error from None
 
     def _load_from_checkpoint(
         self,

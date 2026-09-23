@@ -1,16 +1,27 @@
+/** JSON body of a backend error response. `OnyxError` and the request
+ * validation handler both send `error_code` and a string `detail`; the
+ * validation and `ValueError` handlers also send `message`. */
+export interface ErrorResponseBody {
+  detail?: string;
+  error_code?: string;
+  message?: string;
+}
+
 export class FetchError extends Error {
   status: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  info: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(message: string, status: number, info: any) {
+  info: ErrorResponseBody | null;
+  constructor(message: string, status: number, info: ErrorResponseBody | null) {
     super(message);
     this.status = status;
     this.info = info;
   }
 }
 
-export class RedirectError extends FetchError {}
+export class RedirectError extends FetchError {
+  constructor(message: string, status: number, info: ErrorResponseBody | null) {
+    super(message, status, info);
+  }
+}
 
 /** Extract the backend error `detail` from a failed Response, falling back
  * to `fallback` when the body isn't JSON or carries no detail. */

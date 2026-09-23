@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import email
+import ssl
 from datetime import datetime, timezone
 from email.message import Message
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from onyx.configs.constants import DocumentSource
+from onyx.connectors.credentials_provider import OnyxStaticCredentialsProvider
 from onyx.connectors.imap.connector import (
+    _IMAP_OKAY_STATUS,
+    _IMAP_SOCKET_TIMEOUT_SECONDS,
     _convert_email_headers_and_body_into_document,
     _fetch_email_ids_in_mailbox,
     _parse_addrs,
     _parse_email_body,
+    ImapConnector,
 )
 from onyx.connectors.imap.models import EmailHeaders
 
@@ -467,3 +475,66 @@ def test_email_html_to_text_percent_encoded_mailto_is_decoded() -> None:
     body = _parse_email_body(email_msg=_mime_message(raw), email_headers=_HEADERS)
 
     assert "Frank <frank@example.com>" in body
+
+
+def _connector_with_credentials() -> ImapConnector:
+    connector = ImapConnector(host="imap.example.com")
+    connector.set_credentials_provider(
+        OnyxStaticCredentialsProvider(
+            tenant_id=None,
+            connector_name=DocumentSource.IMAP,
+            credential_json={
+                "imap_username": "admin@example.com",
+                "imap_password": "hunter2",
+            },
+        )
+    )
+    return connector
+
+
+@patch("onyx.connectors.imap.connector.imaplib.IMAP4_SSL")
+def test_mail_client_keeps_socket_timeout_alongside_verified_tls(
+    mock_imap4_ssl: MagicMock,
+) -> None:
+    # Fork: the socket timeout (hang fix) must ride the same connection that
+    # upstream's verified TLS context protects.
+    mock_imap4_ssl.return_value.login.return_value = (_IMAP_OKAY_STATUS, [b""])
+
+    _connector_with_credentials()._get_mail_client()
+
+    kwargs = mock_imap4_ssl.call_args.kwargs
+    assert kwargs["timeout"] == _IMAP_SOCKET_TIMEOUT_SECONDS
+    assert kwargs["ssl_context"].verify_mode is ssl.CERT_REQUIRED
+    assert kwargs["ssl_context"].check_hostname is True
+
+
+@patch(
+    "onyx.connectors.imap.connector.imaplib.IMAP4_SSL",
+    side_effect=ssl.SSLCertVerificationError("certificate verify failed"),
+)
+def test_mail_client_does_not_retry_certificate_failures(
+    mock_imap4_ssl: MagicMock,
+) -> None:
+    # SSLCertVerificationError is an OSError, which the connect retry loop
+    # retries; a bad certificate is permanent, so it must fail on the first try.
+    with patch("tenacity.nap.time.sleep") as mock_sleep:
+        with pytest.raises(ssl.SSLCertVerificationError):
+            _connector_with_credentials()._get_mail_client()
+
+    assert mock_imap4_ssl.call_count == 1
+    mock_sleep.assert_not_called()
+
+
+@patch("onyx.connectors.imap.connector.imaplib.IMAP4_SSL")
+def test_mail_client_retries_transient_connect_errors(
+    mock_imap4_ssl: MagicMock,
+) -> None:
+    client = MagicMock()
+    client.login.return_value = (_IMAP_OKAY_STATUS, [b""])
+    mock_imap4_ssl.side_effect = [TimeoutError("timed out"), client]
+
+    with patch("tenacity.nap.time.sleep"):
+        result = _connector_with_credentials()._get_mail_client()
+
+    assert result is client
+    assert mock_imap4_ssl.call_count == 2
