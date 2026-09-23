@@ -153,7 +153,9 @@ def test_link_sets_text_and_rename_updates_linked_staff(
             select(CrmContact.id, CrmContact.principal).where(
                 CrmContact.id.in_([created.id, patched.id, unlinked.id])
             )
-        ).tuples()
+        )
+        .tuples()
+        .all()
     )
     assert rows == {
         created.id: "Sara Lee",
