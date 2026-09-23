@@ -136,11 +136,20 @@ check_next_build() {
 
 # "$PYTHON" -m pytest backend/tests/unit/ → all pass
 check_unit_tests() {
+  if [ "${SYNC_VERIFY_SKIP_UNIT:-0}" = "1" ]; then
+    echo "SYNC_VERIFY_SKIP_UNIT=1 (full suite already run separately)"; return 77
+  fi
   if ! have_python; then echo "python not available"; return 77; fi
   cd "$BACKEND_DIR" || return 1
   # os.geteuid does not exist on Windows; upstream test_log_collection.py calls it
   # at collection time and aborts the whole run — exclude it here (runs in CI).
-  "$PYTHON" -m pytest tests/unit/ -q --ignore=tests/unit/ee/onyx/server/log_export/test_log_collection.py
+  # faulthandler_timeout dumps stacks of a test stuck >5 min (Windows socket
+  # waits look like hangs); the local cost map keeps litellm's live price list
+  # from flipping model-limit tests. ~26 min on Windows; ~67 environmental
+  # failures expected (see playbook "Known baseline").
+  LITELLM_LOCAL_MODEL_COST_MAP=True "$PYTHON" -m pytest tests/unit/ -q -rf \
+    -o faulthandler_timeout=300 \
+    --ignore=tests/unit/ee/onyx/server/log_export/test_log_collection.py
 }
 
 # python -m ruff check backend/ → clean
@@ -228,7 +237,7 @@ run_feature_pytest() {
     return 77
   fi
 
-  "$PYTHON" -m pytest "${existing[@]}" -q
+  LITELLM_LOCAL_MODEL_COST_MAP=True "$PYTHON" -m pytest "${existing[@]}" -q
 }
 
 check_pytest_crm() {
@@ -263,6 +272,15 @@ check_pytest_email_triggers() {
     tests/unit/onyx/indexing/test_email_trigger_emission.py
 }
 
+check_pytest_llm_chat_fork_imap() {
+  run_feature_pytest \
+    tests/unit/onyx/llm/test_multi_llm.py \
+    tests/unit/onyx/llm/test_multi_llm_stream_retry.py \
+    tests/unit/onyx/llm/test_token_limit_lookups.py \
+    tests/unit/onyx/db/test_chat_fork_files.py \
+    tests/unit/onyx/connectors/imap/test_imap_connector.py
+}
+
 # --------------------------------------------------------------------------
 # Run
 # --------------------------------------------------------------------------
@@ -279,6 +297,7 @@ if [ "$MODE" = "batch" ]; then
   run_check "pytest: custom jobs"         check_pytest_custom_jobs
   run_check "pytest: Google Calendar"     check_pytest_calendar
   run_check "pytest: email triggers"      check_pytest_email_triggers
+  run_check "pytest: LLM/chat fork/IMAP" check_pytest_llm_chat_fork_imap
 else
   run_check "conflict markers"            check_conflict_markers
   run_check "commits behind upstream"     check_commits_behind
@@ -290,6 +309,7 @@ else
   run_check "pytest: custom jobs"         check_pytest_custom_jobs
   run_check "pytest: Google Calendar"     check_pytest_calendar
   run_check "pytest: email triggers"      check_pytest_email_triggers
+  run_check "pytest: LLM/chat fork/IMAP" check_pytest_llm_chat_fork_imap
   run_check "ruff check"                  check_ruff
   run_check "oxfmt --check src (web fmt)"  check_prettier
   run_check "alembic single head"         check_alembic_single_head

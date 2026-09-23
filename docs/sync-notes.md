@@ -860,7 +860,9 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
      public+listed does NOT restore private-document search. Suggested: run as a configured
      service user (separate attribution, explicit grants) or the persona owner (less config,
      attributes CRM changes to that person). No other fork background caller runs as
-     anonymous or passes removed params. → DECISION FOR MATT.
+     anonymous or passes removed params. → DECISION (Matt, 2026-09-23): no code change —
+     make the CRM persona public + listed on each deployment (it needs no document search).
+     DEPLOY CHECKLIST ITEM for FLI/FLF/Wrenly.
   2. (sync-introduced) branching loses parent search filters/tool states — a restricted
      parent can yield an UNRESTRICTED branch search. Fix: `handOffTo(newSessionId)` before
      navigation, read through a ref at click time (callback identity must stay stable).
@@ -928,3 +930,62 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
   Verified OK: 259 backend + 60 web targeted tests (catalog key parity), org clearing,
   remote org search selection + id mapping, non-streaming Claude invoke retries exactly
   once (100000 → None, stream=False, request metadata correct), Calendar routing.
+
+## Post-sync (2026-09-23) — main at 0 behind upstream (b62b665e5a)
+
+- Fixes on main after batch 4:
+  - 42f18acdf3 — branched chats inherit the parent's per-chat search filters + tool
+    states (`toolConfigurationRef.current.handOffTo(newSessionId)`; Codex b3 #2).
+  - 539aa59e69 — fork `CrmCategoryField` wrapper for both CRM category fields: keystrokes
+    stay in a local draft; commit on select/create or on blur/leave (trimmed,
+    case-insensitive snap to an option's spelling); Escape/chevron discard the draft;
+    option clicks can't commit-then-toggle. Upstream `InputComboBoxField` and `lib/opal/`
+    untouched (Codex b4 #1). 10 Formik-level tests (5 fail against upstream's field).
+  - 371e75b358 — `crmEditPayloads.ts`: emptied optional text fields send `null` so edits
+    can clear them (contact: email, phone, title, location, linkedin_url, category,
+    party_affiliation, us_state, principal, notes; org: website, sector, location, size,
+    notes). Left: contact `source` / org `type` (no empty choice), org `name` (required).
+  - Codex review (astra medium) of 539aa59e69 + 371e75b358: payload fix PASS (every nulled
+    field clears through API + DB); category wrapper SHOULD-FIX — a pending draft survived
+    external value changes / form reinit and could overwrite them on blur → fixed in the
+    follow-up commit (draft dropped + select remounted on any non-self change; +2 tests).
+    Not fixed (upstream Opal): IME Enter commits an unfinished composition in
+    `selects/shared.ts` keyboard handling.
+- `scripts/sync-verify.sh`: `SYNC_VERIFY_SKIP_UNIT=1`, `-o faulthandler_timeout=300` +
+  `LITELLM_LOCAL_MODEL_COST_MAP=True` on pytest, new LLM/chat-fork/IMAP fork suite.
+- Full backend unit suite on main (before the CRM UI fixes, which are frontend-only):
+  10954 pass / 67 fail / 33 skip in 25:45, no hangs. All 67 environmental: craft sandbox /
+  session / nextjs_dev (39), zoom (18, Windows Errno 22), simple_job_terminate (3),
+  process_isolation (2), connector_download_limits (2, POSIX 0o600), sandbox_proxy (2),
+  pptx, gitbook, save_chat csv.
+- `sync-verify.sh --full` (SYNC_VERIFY_SKIP_UNIT=1) on main: 12 PASS (conflict markers,
+  0 behind, tsc, next build, 6 fork pytest groups, ruff, alembic single head
+  `3f146f01df77`), oxfmt SKIP (CRLF), secrets FAIL = benign: 0 hits in the 20 fork-authored
+  commits; all hits are upstream test fixtures (PGPASSWORD=s3cret, hashed_password="unused",
+  minioadmin) and the sync notes' mention of `AKIAIOSFODNN7EXAMPLE`.
+- DECISIONS: email→CRM keeps running as the anonymous user — make the CRM persona public +
+  listed on each deployment (no document search needed). Batch-2 caller-set Claude
+  max_tokens cap reverted (63ec2361f2).
+- DEPLOY CHECKLIST (FLI / FLF / Wrenly):
+  1. CRM persona used by the email→CRM job: public + listed.
+  2. Rebuild images/venv (markitdown 0.1.7, croniter 6.2.4, anyio 4.14.2); web `bun install`
+     (TS 7 nightly, tsdown, removed deps).
+  3. Migration `ad99acb9be41` (`user_usage` actor_kind/system_attribution, constraint +
+     index recreate — bounded, no backfill); merge revision `3f146f01df77` is the head.
+  4. IMAP now verifies TLS certs (WorkMail fine; self-signed servers fail fast).
+  5. Image captioning no longer falls back to any vision model — set a default vision
+     model in Index Settings if prod relied on it.
+  6. New optional env (all defaulted): `ZOOM_TRANSCRIPT_LAG_BUFFER_HOURS`,
+     `REDIS_SOCKET_CONNECT_TIMEOUT`, `REDIS_SOCKET_TIMEOUT`,
+     `OUTLOOK_CONNECTOR_ATTACHMENT_SIZE_THRESHOLD`, `AIRTABLE_ATTACHMENT_SIZE_THRESHOLD`,
+     `DROPBOX_CONNECTOR_SIZE_THRESHOLD`, `PORT_SWAP_VERIFY_DOCS_PER_UNIT`,
+     `PORT_SWAP_VERIFY_RETRY_DELAY_S`.
+  7. `/admin/indexing/status` → `/admin/indexing-status` (redirect in place).
+- FOLLOW-UPS (not done): Claude degrade-retry doesn't recover on context overflow
+  (Codex b2 #2, pre-existing); `_run_attempts(None)` restarts the option ladder (Codex b1
+  NIT); CRM/Calendar tool sessionmaker keeps a Connection bind (multi-tenant only, Codex b3
+  #3); unknown Ollama names probe `/api/show` during admin provider serialization (Codex b4
+  #2, upstream code); fork `cryptography==46.0.5` pin is dead (uv override → 48.0.1);
+  `test_legacy_model_clamps_to_registry_limit` depends on the live litellm price list; fork
+  `InputMultiSelect` → upstream Opal `InputMultiSelect`; revert b4a033ab62 cosmetics
+  (~70% of this sync's conflicts).
