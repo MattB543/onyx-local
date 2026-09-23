@@ -981,6 +981,11 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
      `DROPBOX_CONNECTOR_SIZE_THRESHOLD`, `PORT_SWAP_VERIFY_DOCS_PER_UNIT`,
      `PORT_SWAP_VERIFY_RETRY_DELAY_S`.
   7. `/admin/indexing/status` → `/admin/indexing-status` (redirect in place).
+  8. MinIO image in `docker-compose.prod-tunnel.yml` moved to digest-pinned
+     `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1` (Docker Hub withdrew
+     minio/minio → 401). `onyx.service` only pre-pulls app images, so `up -d` pulls MinIO
+     on first start after deploy — the host needs quay.io egress; MinIO minor release bump,
+     data volume unchanged.
 - FOLLOW-UPS (not done): Claude degrade-retry doesn't recover on context overflow
   (Codex b2 #2, pre-existing); `_run_attempts(None)` restarts the option ladder (Codex b1
   NIT); CRM/Calendar tool sessionmaker keeps a Connection bind (multi-tenant only, Codex b3
@@ -989,3 +994,28 @@ Per-batch verification is fork suites + ruff + tsc + alembic heads; the full uni
   `test_legacy_model_clamps_to_registry_limit` depends on the live litellm price list; fork
   `InputMultiSelect` → upstream Opal `InputMultiSelect`; revert b4a033ab62 cosmetics
   (~70% of this sync's conflicts).
+
+### Whole-sync Codex review (gpt-6-astra, HIGH) — 3 SHOULD-FIX + 1 NIT, no blockers
+
+Ran read-only on main at 1473437536 over `pre-sync-backup-2026-09-23..main`. Verified OK: 701
+targeted backend + 259 web tests; all 113 fork Python modules import; ruff; `check_router_auth`
+on 566 routes; CRM category commits + optional-field clearing; all CRM packet dispatch sites
+and the 7 CRM/Calendar replay paths; Calendar registration/credentials/scopes/callback/catalog;
+9 fork i18n keys in all 9 catalogs; custom jobs, email triggers, IMAP TLS/timeout/parsing/
+retention, encryption, web-search images; file-reference hardening; empty-answer fallback
+(fresh session); Claude non-streaming fallback + backoff→token-fallback probes; explicit
+token allowances preserved; alembic single head, all 34 fork migrations connected; navigation
+headers, OAuth owner checks, whitelabel, full_name, timezone, hashless Dockerfile installs,
+Windows scripts; oxlint fork globs match existing files.
+1. (PRE-EXISTING, deploy) tunnel compose still used Docker Hub `minio/minio` (401; upstream
+   #14689 fixed only upstream's compose files) → FIXED e0cf61ba9f; deploy checklist item 8.
+2. (SYNC-INTRODUCED by 42f18acdf3) branch hand-off read the config/project refs AFTER awaiting
+   the fork request → navigating mid-request gave the branch another chat's filters
+   (reproduced) → FIXED e0cf61ba9f (snapshot before the first await).
+3. (PRE-EXISTING, also upstream) stream retry tuple has LiteLLM `Timeout` but `_completion()`
+   converts it to `LLMTimeoutError`, so connection-setup timeouts never retry (reproduced:
+   1 provider call, 2 configured retries). NOT fixed: enabling it would triple wall-clock on
+   a genuinely hung provider (timeout × 3); decide deliberately. Follow-up.
+4. (NIT, PRE-EXISTING) CRM models omit 6 migration-created indexes (lower(name)/lower(email),
+   attendee interaction_id, 3 `search_tsv` GIN) — metadata-created DBs differ; migrated DBs
+   fine. Follow-up.
