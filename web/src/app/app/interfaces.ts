@@ -177,6 +177,9 @@ export interface Message {
   // Multi-model answer generation
   preferredResponseId?: number | null;
   modelDisplayName?: string | null;
+  // Server time the message was created. Replies of one multi-model turn
+  // share it. Unset on messages created live in this browser.
+  timeSent?: string;
 
   // new gen
   packets: Packet[];

@@ -711,13 +711,18 @@ export function ProjectsProvider({ children }: ProjectsProviderProps) {
     }
   }, [recentFilesData]);
 
+  // Merge fetched fields into known files and prepend files not seen yet
+  // (e.g. an "Index for later" upload promoted by a chat send).
   useEffect(() => {
-    setAllRecentFiles((prev) =>
-      prev.map((f) => {
+    setAllRecentFiles((prev) => {
+      const knownIds = new Set(prev.map((f) => f.id));
+      const unseen = recentFiles.filter((f) => !knownIds.has(f.id));
+      const merged = prev.map((f) => {
         const newFile = recentFiles.find((f2) => f2.id === f.id);
         return newFile ? { ...f, ...newFile } : f;
-      })
-    );
+      });
+      return unseen.length > 0 ? [...unseen, ...merged] : merged;
+    });
   }, [recentFiles]);
 
   // Clear project details when switching projects to show skeleton

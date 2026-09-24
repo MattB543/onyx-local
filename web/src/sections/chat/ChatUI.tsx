@@ -11,6 +11,7 @@ import AgentMessage from "@/app/app/message/messageComponents/AgentMessage";
 import MultiModelResponseView from "@/app/app/message/MultiModelResponseView";
 import { MultiModelResponse } from "@/app/app/message/interfaces";
 import { getMultiModelResponses } from "@/app/app/message/multiModel";
+import { getChainEndError } from "@/sections/chat/chainEndError";
 import { SelectedModel } from "@/sections/model-selector/MultiModelSelector";
 import { buildModelProviderLookup } from "@/lib/languageModels/options";
 import DynamicBottomSpacer from "@/components/chat/DynamicBottomSpacer";
@@ -187,6 +188,10 @@ const ChatUI = React.memo(
       [messageTree, modelProviderLookup]
     );
 
+    const lastMessage = messages[messages.length - 1];
+    // After a reload the error text is on the message, not in the store.
+    const chainEndError = getChainEndError(messages, messageTree);
+
     return (
       <>
         {/* No max-width on container — individual messages control their own width.
@@ -356,23 +361,16 @@ const ChatUI = React.memo(
               Skip for multi-model per-panel errors — those are shown in
               their own panel, not as a global banner. */}
           {(((error !== null || loadError !== null) &&
-            messages[messages.length - 1]?.type === "user") ||
-            (messages[messages.length - 1]?.type === "error" &&
-              !messages[messages.length - 1]?.modelDisplayName)) && (
+            lastMessage?.type === "user") ||
+            chainEndError) && (
             <div className={cn("p-4 w-full self-center", msgWidth)}>
               <ErrorBanner
                 resubmit={onResubmit}
-                error={error || loadError || ""}
-                errorCode={
-                  messages[messages.length - 1]?.errorCode || undefined
-                }
-                isRetryable={messages[messages.length - 1]?.isRetryable ?? true}
-                details={
-                  messages[messages.length - 1]?.errorDetails || undefined
-                }
-                stackTrace={
-                  messages[messages.length - 1]?.stackTrace || undefined
-                }
+                error={chainEndError?.message || error || loadError || ""}
+                errorCode={lastMessage?.errorCode || undefined}
+                isRetryable={lastMessage?.isRetryable ?? true}
+                details={lastMessage?.errorDetails || undefined}
+                stackTrace={lastMessage?.stackTrace || undefined}
               />
             </div>
           )}

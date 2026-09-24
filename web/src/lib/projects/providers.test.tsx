@@ -1,13 +1,21 @@
 import React, { PropsWithChildren } from "react";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { SWRConfig } from "swr";
 import englishMessages from "@/i18n/messages/en.json";
+import { ChatFileType } from "@/app/app/interfaces";
 import { ProjectsProvider, useProjectsContext } from "@/lib/projects/providers";
-import type { ProjectFile } from "@/lib/projects/types";
+import { UserFileStatus, type ProjectFile } from "@/lib/projects/types";
 
 const mockUploadFiles = jest.fn();
 const mockGetRecentFiles = jest.fn();
 const mockToastWarning = jest.fn();
+const mockRecentFilesFetcher = jest.fn();
+
+jest.mock("@/lib/fetcher", () => ({
+  ...jest.requireActual("@/lib/fetcher"),
+  errorHandlingFetcher: (...args: unknown[]) => mockRecentFilesFetcher(...args),
+}));
 
 jest.mock("next/navigation", () => ({
   useSearchParams: () => ({
@@ -195,5 +203,65 @@ describe("ProjectsContext beginUpload size precheck", () => {
     // to strip the file from user_file_ids; otherwise the submit button stays
     // disabled forever waiting on a phantom "uploading" file.
     expect(onFailure).toHaveBeenCalledWith([tempId]);
+  });
+});
+
+function makeRecentFile(id: string, name: string): ProjectFile {
+  return {
+    id,
+    name,
+    project_id: null,
+    user_id: "user-1",
+    file_id: `file-${id}`,
+    created_at: "2026-09-23T00:00:00Z",
+    status: UserFileStatus.COMPLETED,
+    file_type: "application/pdf",
+    last_accessed_at: "2026-09-23T00:00:00Z",
+    chat_file_type: ChatFileType.DOCUMENT,
+    token_count: null,
+    chunk_count: null,
+  };
+}
+
+describe("ProjectsContext recent files sync", () => {
+  // A fresh SWR cache per test, so no fetch result leaks between tests.
+  const isolatedWrapper = ({ children }: PropsWithChildren) => (
+    <SWRConfig value={{ provider: () => new Map() }}>
+      {wrapper({ children })}
+    </SWRConfig>
+  );
+
+  beforeEach(() => {
+    mockRecentFilesFetcher.mockReset();
+  });
+
+  it("prepends files that a refresh returns for the first time", async () => {
+    const known = makeRecentFile("known", "Known.pdf");
+    const promoted = makeRecentFile("promoted", "Promoted.pdf");
+    mockRecentFilesFetcher.mockResolvedValueOnce([known]);
+
+    const { result } = renderHook(() => useProjectsContext(), {
+      wrapper: isolatedWrapper,
+    });
+    await waitFor(() =>
+      expect(result.current.allRecentFiles.map((f) => f.id)).toEqual(["known"])
+    );
+
+    // A chat send promoted an "Index for later" upload; the known file was
+    // also renamed on the server.
+    mockRecentFilesFetcher.mockResolvedValueOnce([
+      promoted,
+      { ...known, name: "Renamed.pdf" },
+    ]);
+    await act(async () => {
+      await result.current.refreshRecentFiles();
+    });
+
+    await waitFor(() =>
+      expect(result.current.allRecentFiles.map((f) => [f.id, f.name])).toEqual([
+        ["promoted", "Promoted.pdf"],
+        ["known", "Renamed.pdf"],
+      ])
+    );
   });
 });

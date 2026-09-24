@@ -525,6 +525,7 @@ export function processRawChatHistory(
       // Multi-model answer generation
       preferredResponseId: messageInfo.preferred_response_id ?? null,
       modelDisplayName: messageInfo.model_display_name ?? null,
+      timeSent: messageInfo.time_sent,
     };
 
     // Only agent messages carry these fields, so that a reloaded message is

@@ -10186,6 +10186,11 @@
           "text": "回复出现错误。"
         }
       },
+      "streamError": {
+        "endedUnexpectedly": {
+          "text": "回复意外中断。请重试。"
+        }
+      },
       "text": {
         "thinkingPlaceholder": {
           "text": "思考中"

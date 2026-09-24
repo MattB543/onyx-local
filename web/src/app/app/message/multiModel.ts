@@ -8,25 +8,89 @@ export function messageModelName(msg: Message): string | null {
   return msg.overridden_model || msg.modelDisplayName || null;
 }
 
-// Model-tagged children (2+) of a multi-model turn, in layout order. The
-// model metadata distinguishes a real multi-model turn from a plain
-// regeneration. Null when the message isn't a multi-model turn.
+function isModelTagged(msg: Message): boolean {
+  return (
+    (msg.type === "assistant" || msg.type === "error") &&
+    Boolean(msg.modelDisplayName || msg.overridden_model)
+  );
+}
+
+// The child the chain walk continues through: the latest child, else the
+// newest child.
+function getActiveChild(
+  userMessage: Message,
+  messageTree: Map<number, Message>
+): Message | undefined {
+  const childIds = userMessage.childrenNodeIds ?? [];
+  const latestId = userMessage.latestChildNodeId;
+  const activeId =
+    latestId != null && childIds.includes(latestId)
+      ? latestId
+      : childIds.at(-1);
+  return activeId == null ? undefined : messageTree.get(activeId);
+}
+
+// The model-tagged children grouped by time_sent, oldest group first, each in
+// child order. Every reply carries its model, so the tag alone can't tell a
+// multi-model turn from a retry. The backend reserves one turn's replies in
+// one transaction, so they share a time_sent, and each retry gets its own.
+// Live replies have no time_sent yet and group together; a live retry has no
+// model tag.
+function getModelGroups(
+  userMessage: Message,
+  messageTree: Map<number, Message>
+): Message[][] {
+  const groups = new Map<string | undefined, Message[]>();
+  for (const id of userMessage.childrenNodeIds ?? []) {
+    const msg = messageTree.get(id);
+    if (!msg || !isModelTagged(msg)) continue;
+    groups.set(msg.timeSent, [...(groups.get(msg.timeSent) ?? []), msg]);
+  }
+  return Array.from(groups.values());
+}
+
+function isUsableResponse(msg: Message): boolean {
+  return msg.type === "assistant" && msg.messageId != null;
+}
+
+// Model-tagged children (2+) of a multi-model turn, in layout order: the
+// active child's group. Null when the active child is not in a group of 2+.
 export function getMultiModelChildren(
   userMessage: Message,
   messageTree: Map<number, Message>
 ): Message[] | null {
-  const childIds = userMessage.childrenNodeIds ?? [];
-  if (childIds.length < 2) return null;
+  if ((userMessage.childrenNodeIds ?? []).length < 2) return null;
 
-  const multiModelChildren = childIds
-    .map((id) => messageTree.get(id))
-    .filter(
-      (msg): msg is Message =>
-        msg !== undefined &&
-        (msg.type === "assistant" || msg.type === "error") &&
-        Boolean(msg.modelDisplayName || msg.overridden_model)
-    );
-  return multiModelChildren.length >= 2 ? multiModelChildren : null;
+  const active = getActiveChild(userMessage, messageTree);
+  if (!active || !isModelTagged(active)) return null;
+
+  const group = getModelGroups(userMessage, messageTree).find((g) =>
+    g.includes(active)
+  );
+  return group && group.length >= 2 ? group : null;
+}
+
+// The multi-model group a send continues from when the chain ends in an
+// error. That is the active group (a panel errored). A failed retry is in no
+// group of 2+, so then it is the group with the preferred response, else the
+// newest group of 2+ with a usable response.
+export function getErrorTipMultiModelGroup(
+  userMessage: Message,
+  messageTree: Map<number, Message>
+): Message[] | null {
+  const active = getMultiModelChildren(userMessage, messageTree);
+  if (active) return active;
+  const groups = getModelGroups(userMessage, messageTree).filter(
+    (g) => g.length >= 2 && g.some(isUsableResponse)
+  );
+  const preferredId = userMessage.preferredResponseId;
+  return (
+    groups.find(
+      (g) => preferredId != null && g.some((m) => m.messageId === preferredId)
+    ) ??
+    groups.at(-1) ??
+    null
+  );
 }
 
 // Group a user message's sibling responses into multi-model panels.
@@ -72,14 +136,20 @@ export interface UnresolvedMultiModelTurn {
 }
 
 // The multi-model turn a new message would continue from, when the user
-// never picked a preferred response. `chain` is the tree's latest chain.
+// never picked a preferred response or the chain ends in an error.
+// `chain` is the tree's latest chain.
 export function getUnresolvedMultiModelTurn(
   chain: Message[],
   messageTree: Map<number, Message>
 ): UnresolvedMultiModelTurn | null {
   const lastUserMsg = [...chain].reverse().find((m) => m.type === "user");
-  if (!lastUserMsg || lastUserMsg.preferredResponseId != null) return null;
-  const responses = getMultiModelChildren(lastUserMsg, messageTree);
+  if (!lastUserMsg) return null;
+  const responses =
+    chain.at(-1)?.type === "error"
+      ? getErrorTipMultiModelGroup(lastUserMsg, messageTree)
+      : lastUserMsg.preferredResponseId == null
+        ? getMultiModelChildren(lastUserMsg, messageTree)
+        : null;
   return responses ? { userMessage: lastUserMsg, responses } : null;
 }
 
@@ -128,20 +198,19 @@ export function getMostVisibleResponseId(userNodeId: number): number | null {
 }
 
 // The response a send assumes as preferred: the response in view on narrow
-// screens, else the prior turn's preferred model when it answered this turn
-// too, else the first model (right-most, last child). Errors never assumed.
+// screens, else the turn's own earlier pick (kept after a failed retry), else
+// the prior turn's preferred model when it answered this turn too, else the
+// first model (right-most, last child). Errors never assumed.
 export function chooseImplicitPreferred(
   chain: Message[],
   messageTree: Map<number, Message>,
   turn: UnresolvedMultiModelTurn,
   visibleResponseId: number | null = null
 ): Message | null {
-  const candidates = turn.responses.filter(
-    (r) => r.type === "assistant" && r.messageId != null
-  );
-  if (visibleResponseId != null) {
-    const visible = candidates.find((r) => r.messageId === visibleResponseId);
-    if (visible) return visible;
+  const candidates = turn.responses.filter(isUsableResponse);
+  for (const id of [visibleResponseId, turn.userMessage.preferredResponseId]) {
+    const picked = id != null && candidates.find((r) => r.messageId === id);
+    if (picked) return picked;
   }
   const priorModel = findPriorPreferredModel(
     chain,

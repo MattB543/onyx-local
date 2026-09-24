@@ -10186,6 +10186,11 @@
           "text": "Bei der Antwort ist ein Fehler aufgetreten."
         }
       },
+      "streamError": {
+        "endedUnexpectedly": {
+          "text": "Die Antwort wurde unerwartet beendet. Bitte versuche es erneut."
+        }
+      },
       "text": {
         "thinkingPlaceholder": {
           "text": "Denkt nach"

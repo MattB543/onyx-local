@@ -11,8 +11,8 @@ import {
 import {
   applyPreferredResponse,
   chooseImplicitPreferred,
+  getErrorTipMultiModelGroup,
   getMostVisibleResponseId,
-  getMultiModelChildren,
   getUnresolvedMultiModelTurn,
 } from "@/app/app/message/multiModel";
 import {
@@ -64,6 +64,12 @@ import {
   CurrentMessageFIFO,
   updateCurrentMessageFIFO,
 } from "@/app/app/services/currentMessageFIFO";
+import {
+  buildUserStopPacket,
+  getUnfinishedModelIndices,
+  resolveStreamEnd,
+  shouldKeepConsuming,
+} from "@/app/app/services/streamEnd";
 import {
   agentDeclaresOwnSources,
   buildFilters,
@@ -214,6 +220,7 @@ export default function useChatController({
   const { pinnedAgents, togglePinnedAgent } = usePinnedAgents();
   const {
     fetchProjects,
+    refreshRecentFiles,
     beginChatUpload,
     beginUpload,
     setCurrentMessageFiles,
@@ -273,6 +280,9 @@ export default function useChatController({
   const currentChatState = useCurrentChatState();
 
   const navigatingAway = useRef(false);
+  // Sends the user stopped, keyed by their abort controller. A stopped send
+  // is never marked as ended unexpectedly, even if its STOP packet is lost.
+  const stopRequestedSends = useRef(new WeakSet<AbortController>());
 
   // Sync store state changes
   useEffect(() => {
@@ -413,6 +423,13 @@ export default function useChatController({
     const currentSession = getCurrentSessionId();
     const lastMessage = currentMessageHistory[currentMessageHistory.length - 1];
 
+    const sendController = useChatSessionStore
+      .getState()
+      .sessions.get(currentSession)?.abortController;
+    if (sendController) {
+      stopRequestedSends.current.add(sendController);
+    }
+
     // Call the backend stop endpoint to set the Redis fence
     // This signals the backend to stop processing as soon as possible
     // The backend will emit a STOP packet when it detects the fence
@@ -490,15 +507,15 @@ export default function useChatController({
       let currentHistory = getLatestMessageChain(currentMessageTreeLocal);
       let lastMessage = currentHistory[currentHistory.length - 1];
 
-      // A multi-model turn whose chain-tip panel errored can still have usable
-      // siblings. Keep the turn so the implicit-preferred pick below can
-      // continue the chain through a successful sibling.
+      // A multi-model turn whose chain-tip panel or later retry errored can
+      // still have usable siblings. Keep the turn so the implicit-preferred
+      // pick below can continue the chain through a successful sibling.
       const errorTurnUserMsg =
         lastMessage?.type === "error" && lastMessage.parentNodeId != null
           ? currentMessageTreeLocal.get(lastMessage.parentNodeId)
           : undefined;
       const errorTurnHasUsableSibling = errorTurnUserMsg
-        ? (getMultiModelChildren(
+        ? (getErrorTipMultiModelGroup(
             errorTurnUserMsg,
             currentMessageTreeLocal
           )?.some((m) => m.type === "assistant" && m.messageId != null) ??
@@ -731,7 +748,9 @@ export default function useChatController({
 
       // Sending into an unresolved multi-model turn must not block: assume a
       // preference, persist it, and continue the chain from it. An explicit
-      // pick already set preferredResponseId, making this a no-op.
+      // pick already set preferredResponseId, making this a no-op, unless the
+      // chain ends in an error: then the pick is persisted again to move the
+      // chain back from the error.
       let implicitPreference: {
         message: Message;
         persist: Promise<Response | null>;
@@ -971,6 +990,38 @@ export default function useChatController({
         return nodes;
       }
 
+      /** Replace one multi-model panel with an error node. The other
+       *  panels keep streaming. */
+      function markModelErrored(idx: number, streamingError: StreamingError) {
+        const errorNode = initialAssistantNodes[idx]!;
+        erroredModelIndices.add(idx);
+        dirtyModelIndices.delete(idx);
+        currentMessageTreeLocal = upsertToCompleteMessageTree({
+          messages: [
+            {
+              ...errorNode,
+              messageId: assistantMessageIds[idx] ?? undefined,
+              message: streamingError.error,
+              type: "error",
+              stackTrace: streamingError.stack_trace || null,
+              errorCode: streamingError.error_code || null,
+              isRetryable: streamingError.is_retryable ?? true,
+              errorDetails: streamingError.details || null,
+              overridden_model: selectedModels?.[idx]?.modelName,
+              modelDisplayName:
+                modelDisplayNames[idx] ||
+                selectedModels?.[idx]?.displayName ||
+                null,
+              packets: [],
+              packetCount: 0,
+              is_generating: false,
+            },
+          ],
+          completeMessageTreeOverride: currentMessageTreeLocal,
+          chatSessionId: frozenSessionId,
+        });
+      }
+
       /** Flush accumulated packet state into the tree as one Zustand
        *  update. No-op when nothing is pending. */
       function flushPendingUpdates() {
@@ -1203,7 +1254,7 @@ export default function useChatController({
         };
 
         await delay(50);
-        while (!stack.isComplete || !stack.isEmpty()) {
+        while (shouldKeepConsuming(stack, controller.signal)) {
           if (stack.isEmpty()) {
             // Flush the burst on the next paint, or idle briefly.
             if (pendingFlush) {
@@ -1317,43 +1368,17 @@ export default function useChatController({
                   errorModelIndex >= 0 &&
                   errorModelIndex < initialAssistantNodes.length
                 ) {
-                  const errorNode = initialAssistantNodes[errorModelIndex]!;
-                  erroredModelIndices.add(errorModelIndex);
-                  dirtyModelIndices.delete(errorModelIndex);
-                  currentMessageTreeLocal = upsertToCompleteMessageTree({
-                    messages: [
-                      {
-                        ...errorNode,
-                        messageId:
-                          assistantMessageIds[errorModelIndex] ?? undefined,
-                        message: streamingError.error,
-                        type: "error",
-                        stackTrace: streamingError.stack_trace || null,
-                        errorCode: streamingError.error_code || null,
-                        isRetryable: streamingError.is_retryable ?? true,
-                        errorDetails: streamingError.details || null,
-                        overridden_model:
-                          selectedModels?.[errorModelIndex]?.modelName,
-                        modelDisplayName:
-                          modelDisplayNames[errorModelIndex] ||
-                          selectedModels?.[errorModelIndex]?.displayName ||
-                          null,
-                        packets: [],
-                        packetCount: 0,
-                        is_generating: false,
-                      },
-                    ],
-                    completeMessageTreeOverride: currentMessageTreeLocal,
-                    chatSessionId: frozenSessionId!,
-                  });
+                  markModelErrored(errorModelIndex, streamingError);
                 } else {
-                  // Error without model_index in multi-model — can't route
-                  // to a specific panel. Log and continue; the stream loop
-                  // stays alive for other models.
-                  console.warn(
-                    "Multi-model error without model_index:",
-                    streamingError.error
-                  );
+                  // An error without model_index (setup failure, 429,
+                  // writer crash) ends every panel that is still
+                  // streaming. Finished panels keep their answers.
+                  for (const idx of getUnfinishedModelIndices(
+                    packetsPerModel,
+                    erroredModelIndices
+                  )) {
+                    markModelErrored(idx, streamingError);
+                  }
                 }
                 continue;
               } else {
@@ -1477,25 +1502,79 @@ export default function useChatController({
         // could get stranded in local state.
         flushPendingUpdates();
 
-        // Surface FIFO errors (e.g. 429 before any packets arrive) so the
-        // catch block replaces the thinking placeholder with an error message.
+        // Each model must end with a STOP or an error of its own. A stream
+        // that closes early, or whose transport fails (e.g. an HTTP error
+        // before any packets, a dropped connection), would otherwise leave
+        // its panel on "Thinking…". Models that already finished keep their
+        // answers. An abort (navigation away) ends the stream on purpose:
+        // the backend run goes on and the next load of the chat resumes it.
         if (stack.error) {
-          throw new Error(stack.error);
+          console.warn("Chat stream transport failed:", stack.error);
+        }
+        const streamEnd = resolveStreamEnd({
+          aborted: controller.signal.aborted,
+          stopRequested: stopRequestedSends.current.has(controller),
+          packetsPerModel: isMultiModel ? packetsPerModel : [packets],
+          erroredModelIndices,
+          transportError: stack.error,
+          endedUnexpectedlyError: t("streamError.endedUnexpectedly.text"),
+        });
+        if (streamEnd.stopped.length > 0) {
+          // The user stopped this send but its STOP was lost: close the
+          // panels as stopped, not as errors.
+          for (const idx of streamEnd.stopped) {
+            if (isMultiModel) {
+              packetsPerModel[idx]?.push(buildUserStopPacket());
+              dirtyModelIndices.add(idx);
+            } else {
+              packets.push(buildUserStopPacket());
+              singleModelDirty = true;
+            }
+          }
+          pendingFlush = true;
+          flushPendingUpdates();
+        }
+        if (streamEnd.errored.length > 0) {
+          if (!isMultiModel) {
+            // The catch below turns the only panel into an error.
+            setUncaughtError(frozenSessionId, streamEnd.errorMessage);
+            throw new Error(streamEnd.errorMessage);
+          }
+          // Not the shared catch: it would also overwrite finished panels.
+          for (const idx of streamEnd.errored) {
+            markModelErrored(idx, {
+              error: streamEnd.errorMessage,
+              stack_trace: "",
+              is_retryable: true,
+            });
+          }
         }
         streamSucceeded = true;
       } catch (e: any) {
         console.log("Error:", e);
         const errorMsg = e.message;
-        const userErrorNode: Message = {
-          nodeId: initialUserNode.nodeId,
-          message: currMessage,
-          type: "user",
-          files: effectiveFileDescriptors,
-          toolCall: null,
-          parentNodeId: parentMessage?.nodeId || SYSTEM_NODE_ID,
-          packets: [],
-          packetCount: 0,
-        };
+        // Keep the user node as the tree has it. A rebuild would drop its
+        // saved id (Resubmit needs it to find the message and its files),
+        // its files and its other replies. The id may still be unflushed.
+        const existingUserNode = currentMessageTreeLocal.get(
+          initialUserNode.nodeId
+        );
+        const userErrorNode: Message = existingUserNode
+          ? {
+              ...existingUserNode,
+              messageId: newUserMessageId ?? existingUserNode.messageId,
+            }
+          : {
+              nodeId: initialUserNode.nodeId,
+              messageId: newUserMessageId ?? undefined,
+              message: currMessage,
+              type: "user",
+              files: effectiveFileDescriptors,
+              toolCall: null,
+              parentNodeId: parentMessage?.nodeId || SYSTEM_NODE_ID,
+              packets: [],
+              packetCount: 0,
+            };
 
         // In multi-model mode, mark non-errored assistant nodes as errors.
         // Skip models that already have their own per-model error state.
@@ -1553,9 +1632,20 @@ export default function useChatController({
       // Error paths replace the streaming node with an empty-packets error
       // node, so MessageTextRenderer never fires streamFullyDisplayed and
       // never flips the queue gate back to true. Reset it here so queued
-      // follow-ups aren't silently dropped after a stream failure.
-      if (!streamSucceeded) {
+      // follow-ups aren't silently dropped after a stream failure. The same
+      // applies when every multi-model panel ended as an error.
+      const allPanelsErrored =
+        isMultiModel &&
+        initialAssistantNodes.length > 0 &&
+        erroredModelIndices.size >= initialAssistantNodes.length;
+      if (!streamSucceeded || allPanelsErrored) {
         setLatestMessageRenderComplete(frozenSessionId, true);
+      }
+
+      // "Index for later" files are promoted before generation starts, so
+      // Recent Files must show them whether the send succeeded or not.
+      if (indexForLaterFileIds.length > 0) {
+        void refreshRecentFiles();
       }
 
       // Name the chat now that we have the first AI response (navigation already happened before streaming)
@@ -1584,9 +1674,11 @@ export default function useChatController({
       toolConfiguration,
       // Keep tool preference-derived values fresh
       fetchProjects,
+      refreshRecentFiles,
       // For auto-pinning agents
       pinnedAgents,
       togglePinnedAgent,
+      t,
     ]
   );
 
@@ -1810,8 +1902,7 @@ export default function useChatController({
       // Snapshot the source chat's configuration and project before the first
       // await: navigating to another chat while the fork request is in flight
       // would otherwise hand the branch that other chat's filters.
-      const handOffSourceConfiguration =
-        toolConfigurationRef.current.handOffTo;
+      const handOffSourceConfiguration = toolConfigurationRef.current.handOffTo;
       const sourceProjectId = activeProjectIdRef.current;
 
       branchInFlight.current = true;

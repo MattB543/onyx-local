@@ -10186,6 +10186,11 @@
           "text": "응답에 오류가 발생했습니다."
         }
       },
+      "streamError": {
+        "endedUnexpectedly": {
+          "text": "응답이 예기치 않게 종료되었습니다. 다시 시도해 주세요."
+        }
+      },
       "text": {
         "thinkingPlaceholder": {
           "text": "생각 중"
