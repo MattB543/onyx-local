@@ -20,7 +20,9 @@ import {
   Popover,
 } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
+import InputMultiSelect, {
+  MultiSelectChips,
+} from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -60,7 +62,7 @@ export default function CrmOrganizationsPage() {
   const { data: usersData } = useShareableUsers({ includeApiKeys: false });
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState<CrmOrganizationType | "all">(
-    "all",
+    "all"
   );
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([]);
@@ -70,7 +72,7 @@ export default function CrmOrganizationsPage() {
     to: null,
   });
   const [sortValue, setSortValue] = useState<CrmSortValue>(
-    DEFAULT_CRM_SORT_VALUE,
+    DEFAULT_CRM_SORT_VALUE
   );
   const [allTags, setAllTags] = useState<CrmTag[]>([]);
   const [pageNum, setPageNum] = useState(0);
@@ -98,7 +100,7 @@ export default function CrmOrganizationsPage() {
 
   const tagOptions = useMemo(
     () => allTags.map((t) => ({ value: t.id, label: t.name })),
-    [allTags],
+    [allTags]
   );
 
   const ownerOptions = useMemo(
@@ -109,7 +111,7 @@ export default function CrmOrganizationsPage() {
           value: candidate.id,
           label: candidate.email,
         })),
-    [usersData, user?.id],
+    [usersData, user?.id]
   );
   const ownerFilterId =
     ownerFilter === "all"
@@ -139,7 +141,7 @@ export default function CrmOrganizationsPage() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalItems / PAGE_SIZE)),
-    [totalItems],
+    [totalItems]
   );
 
   const hasActiveFilters = useMemo(
@@ -150,7 +152,7 @@ export default function CrmOrganizationsPage() {
       tagFilterIds.length > 0 ||
       Boolean(dateRange.from) ||
       Boolean(dateRange.to),
-    [searchText, typeFilter, ownerFilter, tagFilterIds, dateRange],
+    [searchText, typeFilter, ownerFilter, tagFilterIds, dateRange]
   );
 
   const handleClearFilters = useCallback(() => {
@@ -250,101 +252,120 @@ export default function CrmOrganizationsPage() {
             />
           </div>
 
-          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={typeFilter}
-                onValueChange={(value) => {
-                  setTypeFilter(value as CrmOrganizationType | "all");
-                  setPageNum(0);
-                }}
-              >
-                <InputSelect.Trigger placeholder="Filter by type" />
-                <InputSelect.Content>
-                  <InputSelect.Item value="all">All types</InputSelect.Item>
-                  {ORGANIZATION_TYPE_OPTIONS.map((type) => (
-                    <InputSelect.Item key={type} value={type}>
-                      {formatCrmLabel(type)}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={typeFilter}
+                  onValueChange={(value) => {
+                    setTypeFilter(value as CrmOrganizationType | "all");
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Filter by type" />
+                  <InputSelect.Content>
+                    <InputSelect.Item value="all">All types</InputSelect.Item>
+                    {ORGANIZATION_TYPE_OPTIONS.map((type) => (
+                      <InputSelect.Item key={type} value={type}>
+                        {formatCrmLabel(type)}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
+
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={ownerFilter}
+                  onValueChange={(value) => {
+                    setOwnerFilter(value);
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Filter by owner" />
+                  <InputSelect.Content>
+                    <InputSelect.Item value="all">All owners</InputSelect.Item>
+                    <InputSelect.Item value="me">Me</InputSelect.Item>
+                    {ownerOptions.map((owner) => (
+                      <InputSelect.Item key={owner.value} value={owner.value}>
+                        {owner.label}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
+
+              <div className="w-full md:w-[200px]">
+                <InputMultiSelect
+                  value={tagFilterIds}
+                  onChange={(ids) => {
+                    setTagFilterIds(ids);
+                    setPageNum(0);
+                  }}
+                  options={tagOptions}
+                  placeholder="Filter by tags"
+                  showChips={false}
+                />
+              </div>
             </div>
 
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={ownerFilter}
-                onValueChange={(value) => {
-                  setOwnerFilter(value);
+            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+              <CrmDateRangeFilter
+                value={dateRange}
+                onChange={(v) => {
+                  setDateRange(v);
                   setPageNum(0);
                 }}
-              >
-                <InputSelect.Trigger placeholder="Filter by owner" />
-                <InputSelect.Content>
-                  <InputSelect.Item value="all">All owners</InputSelect.Item>
-                  <InputSelect.Item value="me">Me</InputSelect.Item>
-                  {ownerOptions.map((owner) => (
-                    <InputSelect.Item key={owner.value} value={owner.value}>
-                      {owner.label}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
-            </div>
-
-            <div className="w-full md:w-[200px]">
-              <InputMultiSelect
-                value={tagFilterIds}
-                onChange={(ids) => {
-                  setTagFilterIds(ids);
-                  setPageNum(0);
-                }}
-                options={tagOptions}
-                placeholder="Filter by tags"
               />
-            </div>
 
-            <CrmDateRangeFilter
-              value={dateRange}
-              onChange={(v) => {
-                setDateRange(v);
-                setPageNum(0);
-              }}
-            />
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={sortValue}
+                  onValueChange={(value) => {
+                    setSortValue(value as CrmSortValue);
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Sort" />
+                  <InputSelect.Content>
+                    {CRM_SORT_OPTIONS.map((option) => (
+                      <InputSelect.Item key={option.value} value={option.value}>
+                        {option.label}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
 
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={sortValue}
-                onValueChange={(value) => {
-                  setSortValue(value as CrmSortValue);
-                  setPageNum(0);
-                }}
-              >
-                <InputSelect.Trigger placeholder="Sort" />
-                <InputSelect.Content>
-                  {CRM_SORT_OPTIONS.map((option) => (
-                    <InputSelect.Item key={option.value} value={option.value}>
-                      {option.label}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
-            </div>
-
-            {hasActiveFilters && (
+              {/* Always rendered so the row does not shift when filters change. */}
               <Button
                 variant="action"
                 prominence="tertiary"
                 size="md"
                 onClick={handleClearFilters}
+                disabled={!hasActiveFilters}
               >
                 Clear filters
               </Button>
-            )}
 
-            <Text as="p" secondaryAction text03 className="text-sm md:ml-auto">
-              {totalItems} total
-            </Text>
+              <Text
+                as="p"
+                secondaryAction
+                text03
+                className="text-sm md:ms-auto"
+              >
+                {totalItems} total
+              </Text>
+            </div>
+
+            <MultiSelectChips
+              values={tagFilterIds}
+              options={tagOptions}
+              onRemove={(id) => {
+                setTagFilterIds((ids) => ids.filter((tagId) => tagId !== id));
+                setPageNum(0);
+              }}
+            />
           </div>
 
           {error && (
@@ -398,14 +419,14 @@ export default function CrmOrganizationsPage() {
                                 event.preventDefault();
                                 event.stopPropagation();
                                 const href = organization.website!.startsWith(
-                                  "http",
+                                  "http"
                                 )
                                   ? organization.website!
                                   : `https://${organization.website!}`;
                                 window.open(
                                   href,
                                   "_blank",
-                                  "noopener,noreferrer",
+                                  "noopener,noreferrer"
                                 );
                               }}
                               className="w-fit max-w-full truncate text-left text-sm text-text-04 hover:underline"

@@ -7,14 +7,11 @@ import { cn } from "@opal/utils";
 import LineItem, { LineItemProps } from "@/refresh-components/buttons/LineItem";
 import Text from "@/refresh-components/texts/Text";
 import type { IconProps } from "@opal/types";
-import {
-  iconClasses,
-  textClasses,
-  Variants,
-  wrapperClasses,
-} from "@/refresh-components/inputs/styles";
-import Truncated from "@/refresh-components/texts/Truncated";
-import { SvgChevronDownSmall } from "@opal/icons";
+import { Variants } from "@/refresh-components/inputs/styles";
+import InputTriggerChrome, {
+  inputTriggerClasses,
+  InputTriggerValue,
+} from "@/refresh-components/inputs/InputTriggerChrome";
 import { Divider, type DividerSpacing } from "@opal/components";
 import type { WithoutStyles } from "@opal/types";
 
@@ -221,44 +218,22 @@ function InputSelectTrigger({
       </Text>
     );
   } else {
-    const Icon = selectedItemDisplay.icon;
     displayContent = (
-      <div className="flex flex-row items-center gap-2 flex-1 w-full">
-        {Icon && <Icon className={cn("h-4 w-4", iconClasses[variant])} />}
-        <Truncated className={cn(textClasses[variant])}>
-          {selectedItemDisplay.children}
-        </Truncated>
-      </div>
+      <InputTriggerValue variant={variant} icon={selectedItemDisplay.icon}>
+        {selectedItemDisplay.children}
+      </InputTriggerValue>
     );
   }
 
   return (
     <SelectPrimitive.Trigger
       ref={ref}
-      className={cn(
-        "group/InputSelect flex w-full items-center justify-between p-1.5 rounded-08 focus:outline-hidden",
-        wrapperClasses[variant],
-        variant === "primary" && "data-[state=open]:border-border-05"
-      )}
+      className={inputTriggerClasses(variant)}
       {...props}
     >
-      <div className="flex flex-row items-center justify-between w-full p-0.5 gap-1">
+      <InputTriggerChrome variant={variant} rightSection={rightSection}>
         {children ?? displayContent}
-
-        <div className="flex flex-row items-center gap-1">
-          {rightSection}
-
-          <SelectPrimitive.Icon asChild>
-            <SvgChevronDownSmall
-              className={cn(
-                "h-4 w-4 transition-transform",
-                iconClasses[variant],
-                "group-data-[state=open]/InputSelect:-rotate-180"
-              )}
-            />
-          </SelectPrimitive.Icon>
-        </div>
-      </div>
+      </InputTriggerChrome>
     </SelectPrimitive.Trigger>
   );
 }

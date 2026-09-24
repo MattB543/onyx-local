@@ -27,7 +27,9 @@ import {
   type SelectOption,
 } from "@opal/components";
 import Card from "@/refresh-components/cards/Card";
-import InputMultiSelect from "@/refresh-components/inputs/InputMultiSelect";
+import InputMultiSelect, {
+  MultiSelectChips,
+} from "@/refresh-components/inputs/InputMultiSelect";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
 import { PageSelector } from "@/components/PageSelector";
 import Text from "@/refresh-components/texts/Text";
@@ -202,16 +204,16 @@ export default function CrmContactsPage() {
     [totalItems]
   );
 
-  const hasActiveFilters = useMemo(
+  // The filters that "Clear filters" resets. The URL-driven filters have
+  // their own banner link, so they do not enable the button.
+  const hasClearableFilters = useMemo(
     () =>
       Boolean(searchText) ||
       statusFilter !== "all" ||
       categoryFilter !== "all" ||
       ownerFilter !== "all" ||
-      Boolean(orgFilterId) ||
-      Boolean(organizationIdFilter) ||
+      (Boolean(orgFilterId) && !organizationIdFilter) ||
       Boolean(principalFilter) ||
-      Boolean(principalContactIdFilter) ||
       tagFilterIds.length > 0 ||
       Boolean(dateRange.from) ||
       Boolean(dateRange.to),
@@ -223,11 +225,16 @@ export default function CrmContactsPage() {
       orgFilterId,
       organizationIdFilter,
       principalFilter,
-      principalContactIdFilter,
       tagFilterIds,
       dateRange,
     ]
   );
+
+  const hasActiveFilters =
+    hasClearableFilters ||
+    Boolean(orgFilterId) ||
+    Boolean(organizationIdFilter) ||
+    Boolean(principalContactIdFilter);
 
   const handleClearFilters = useCallback(() => {
     setSearchText("");
@@ -399,123 +406,144 @@ export default function CrmContactsPage() {
             <OfficeActivitySummary principal={principalFilter} />
           )}
 
-          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value as CrmContactStage | "all");
-                  setPageNum(0);
-                }}
-              >
-                <InputSelect.Trigger placeholder="Filter by status" />
-                <InputSelect.Content>
-                  <InputSelect.Item value="all">All statuses</InputSelect.Item>
-                  {stageOptions.map((status) => (
-                    <InputSelect.Item key={status} value={status}>
-                      {formatCrmLabel(status)}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={statusFilter}
+                  onValueChange={(value) => {
+                    setStatusFilter(value as CrmContactStage | "all");
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Filter by status" />
+                  <InputSelect.Content>
+                    <InputSelect.Item value="all">
+                      All statuses
                     </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
+                    {stageOptions.map((status) => (
+                      <InputSelect.Item key={status} value={status}>
+                        {formatCrmLabel(status)}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
+
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={categoryFilter}
+                  onValueChange={(value) => {
+                    setCategoryFilter(value);
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Filter by category" />
+                  <InputSelect.Content>
+                    <InputSelect.Item value="all">
+                      All categories
+                    </InputSelect.Item>
+                    {categoryOptions.map((category) => (
+                      <InputSelect.Item key={category} value={category}>
+                        {formatCrmLabel(category)}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
+
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={ownerFilter}
+                  onValueChange={(value) => {
+                    setOwnerFilter(value);
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Filter by owner" />
+                  <InputSelect.Content>
+                    <InputSelect.Item value="all">All owners</InputSelect.Item>
+                    <InputSelect.Item value="me">Me</InputSelect.Item>
+                    {ownerOptions.map((owner) => (
+                      <InputSelect.Item key={owner.value} value={owner.value}>
+                        {owner.label}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
+
+              <div className="w-full md:w-[200px]">
+                <InputMultiSelect
+                  value={tagFilterIds}
+                  onChange={(ids) => {
+                    setTagFilterIds(ids);
+                    setPageNum(0);
+                  }}
+                  options={tagOptions}
+                  placeholder="Filter by tags"
+                  showChips={false}
+                />
+              </div>
             </div>
 
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={categoryFilter}
-                onValueChange={(value) => {
-                  setCategoryFilter(value);
+            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+              <CrmDateRangeFilter
+                value={dateRange}
+                onChange={(v) => {
+                  setDateRange(v);
                   setPageNum(0);
                 }}
-              >
-                <InputSelect.Trigger placeholder="Filter by category" />
-                <InputSelect.Content>
-                  <InputSelect.Item value="all">
-                    All categories
-                  </InputSelect.Item>
-                  {categoryOptions.map((category) => (
-                    <InputSelect.Item key={category} value={category}>
-                      {formatCrmLabel(category)}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
-            </div>
-
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={ownerFilter}
-                onValueChange={(value) => {
-                  setOwnerFilter(value);
-                  setPageNum(0);
-                }}
-              >
-                <InputSelect.Trigger placeholder="Filter by owner" />
-                <InputSelect.Content>
-                  <InputSelect.Item value="all">All owners</InputSelect.Item>
-                  <InputSelect.Item value="me">Me</InputSelect.Item>
-                  {ownerOptions.map((owner) => (
-                    <InputSelect.Item key={owner.value} value={owner.value}>
-                      {owner.label}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
-            </div>
-
-            <div className="w-full md:w-[200px]">
-              <InputMultiSelect
-                value={tagFilterIds}
-                onChange={(ids) => {
-                  setTagFilterIds(ids);
-                  setPageNum(0);
-                }}
-                options={tagOptions}
-                placeholder="Filter by tags"
               />
-            </div>
 
-            <CrmDateRangeFilter
-              value={dateRange}
-              onChange={(v) => {
-                setDateRange(v);
-                setPageNum(0);
-              }}
-            />
+              <div className="w-full md:w-[180px]">
+                <InputSelect
+                  value={sortValue}
+                  onValueChange={(value) => {
+                    setSortValue(value as CrmSortValue);
+                    setPageNum(0);
+                  }}
+                >
+                  <InputSelect.Trigger placeholder="Sort" />
+                  <InputSelect.Content>
+                    {CRM_SORT_OPTIONS.map((option) => (
+                      <InputSelect.Item key={option.value} value={option.value}>
+                        {option.label}
+                      </InputSelect.Item>
+                    ))}
+                  </InputSelect.Content>
+                </InputSelect>
+              </div>
 
-            <div className="w-full md:w-[180px]">
-              <InputSelect
-                value={sortValue}
-                onValueChange={(value) => {
-                  setSortValue(value as CrmSortValue);
-                  setPageNum(0);
-                }}
-              >
-                <InputSelect.Trigger placeholder="Sort" />
-                <InputSelect.Content>
-                  {CRM_SORT_OPTIONS.map((option) => (
-                    <InputSelect.Item key={option.value} value={option.value}>
-                      {option.label}
-                    </InputSelect.Item>
-                  ))}
-                </InputSelect.Content>
-              </InputSelect>
-            </div>
-
-            {hasActiveFilters && (
+              {/* Always rendered so the row does not shift when filters change. */}
               <Button
                 variant="action"
                 prominence="tertiary"
                 size="md"
                 onClick={handleClearFilters}
+                disabled={!hasClearableFilters}
               >
                 Clear filters
               </Button>
-            )}
 
-            <Text as="p" secondaryAction text03 className="text-sm md:ml-auto">
-              {totalItems} total
-            </Text>
+              <Text
+                as="p"
+                secondaryAction
+                text03
+                className="text-sm md:ms-auto"
+              >
+                {totalItems} total
+              </Text>
+            </div>
+
+            <MultiSelectChips
+              values={tagFilterIds}
+              options={tagOptions}
+              onRemove={(id) => {
+                setTagFilterIds((ids) => ids.filter((tagId) => tagId !== id));
+                setPageNum(0);
+              }}
+            />
           </div>
 
           {error && (

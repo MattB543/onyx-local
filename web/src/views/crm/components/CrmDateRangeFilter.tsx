@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { useLocale } from "next-intl";
 
-import {
-  getFormattedDateRangeString,
-  isAfterDate,
-  normalizeDate,
-} from "@/lib/dateUtils";
+import { isAfterDate, normalizeDate } from "@/lib/dateUtils";
 import { Button, InputDatePicker, Popover } from "@opal/components";
 import InputSelect from "@/refresh-components/inputs/InputSelect";
+import InputTriggerChrome, {
+  inputTriggerClasses,
+  InputTriggerValue,
+} from "@/refresh-components/inputs/InputTriggerChrome";
 import Text from "@/refresh-components/texts/Text";
 import { SvgCalendar } from "@opal/icons";
+import { cn } from "@opal/utils";
 
 export type CrmDateField = "created" | "updated";
 
@@ -63,17 +64,33 @@ export function dateRangeToParams(v: CrmDateRangeValue): {
   return { updated_after: fromIso, updated_before: toIso };
 }
 
-function buildTriggerLabel(value: CrmDateRangeValue, locale: string): string {
+/**
+ * Short trigger label, for example "Created: Sep 1 – Sep 23". The dates show
+ * the year only when one of them is not in the year of `now`.
+ */
+export function formatDateRangeLabel(
+  value: CrmDateRangeValue,
+  locale: string,
+  now: Date = new Date()
+): string {
   const prefix = value.field === "created" ? "Created" : "Updated";
-  const range = getFormattedDateRangeString(value.from, value.to, locale);
-  if (range) {
-    return `${prefix}: ${range}`;
+  const { from, to } = value;
+  const showYear = [from, to].some(
+    (date) => date !== null && date.getFullYear() !== now.getFullYear()
+  );
+  const formatter = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: showYear ? "numeric" : undefined,
+  });
+  if (from && to) {
+    return `${prefix}: ${formatter.format(from)} – ${formatter.format(to)}`;
   }
-  if (value.from) {
-    return `${prefix}: from ${value.from.toLocaleDateString(locale)}`;
+  if (from) {
+    return `${prefix}: from ${formatter.format(from)}`;
   }
-  if (value.to) {
-    return `${prefix}: until ${value.to.toLocaleDateString(locale)}`;
+  if (to) {
+    return `${prefix}: until ${formatter.format(to)}`;
   }
   return `${prefix}: any date`;
 }
@@ -110,12 +127,28 @@ export default function CrmDateRangeFilter({
     onChange({ ...value, from: null, to: null });
   }
 
+  const label = formatDateRangeLabel(value, locale);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <Button variant="action" prominence="secondary" icon={SvgCalendar}>
-          {buildTriggerLabel(value, locale)}
-        </Button>
+        {/* raw-ok: an input-style trigger that matches InputSelect; Opal Button has no input look */}
+        <button
+          type="button"
+          title={label}
+          className={cn(inputTriggerClasses("primary"), "md:w-[240px]")}
+        >
+          <InputTriggerChrome variant="primary">
+            {/* The title attribute already shows the full label. */}
+            <InputTriggerValue
+              variant="primary"
+              icon={SvgCalendar}
+              disableTooltip
+            >
+              {label}
+            </InputTriggerValue>
+          </InputTriggerChrome>
+        </button>
       </Popover.Trigger>
       <Popover.Content align="start">
         <div className="flex flex-col gap-3 p-1">
