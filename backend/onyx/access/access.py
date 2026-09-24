@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from onyx.access.models import DocumentAccess
 from onyx.access.utils import prefix_user_email
+from onyx.chat.chat_file_utils import CHAT_UPLOAD_OWNER_ID_METADATA_KEY
 from onyx.configs.constants import PUBLIC_DOC_PAT, DocumentSource, FileOrigin
 from onyx.db.document import get_access_info_for_document, get_access_info_for_documents
 from onyx.db.models import (
@@ -227,6 +228,7 @@ def user_can_access_chat_file(file_id: str, user: User, db_session: Session) -> 
     JSONB scan in `_documents_from_file_connector_config`):
 
     - `UserFile` owned by the user.
+    - `FileRecord` with origin `CHAT_UPLOAD` that the user uploaded.
     - `UserFile` attached to a `Persona` the user can read (public, owned,
       or directly shared via `Persona.users`).
     - `ChatMessage.files` of a session the user owns or that is shared as
@@ -246,6 +248,9 @@ def user_can_access_chat_file(file_id: str, user: User, db_session: Session) -> 
         .exists()
     ).scalar()
     if owns_user_file:
+        return True
+
+    if _user_owns_chat_upload(file_id, user, db_session):
         return True
 
     if _user_can_access_persona_attached_file(file_id, user, db_session):
@@ -325,6 +330,32 @@ def _user_can_access_persona_attached_file(
                 Persona.user_id == user.id,
                 Persona__User.user_id.is_not(None),
             ),
+        )
+        .limit(1)
+    )
+    return db_session.execute(stmt).first() is not None
+
+
+def _user_owns_chat_upload(file_id: str, user: User, db_session: Session) -> bool:
+    """Grant access if `file_id` is a `CHAT_UPLOAD` file that `user` uploaded
+    through `POST /chat/files/upload`.
+
+    The composer shows previews before the chat message that references the
+    file is committed, so the `ChatMessage.files` check cannot grant access
+    yet. The owner id must be equal to the user id. Rows without an owner id
+    do not pass. The anonymous user does not pass, because all anonymous
+    visitors share its id.
+    """
+    if user.is_anonymous:
+        return False
+
+    stmt = (
+        select(FileRecord.file_id)
+        .where(
+            FileRecord.file_id == file_id,
+            FileRecord.file_origin == FileOrigin.CHAT_UPLOAD,
+            FileRecord.file_metadata[CHAT_UPLOAD_OWNER_ID_METADATA_KEY].astext
+            == str(user.id),
         )
         .limit(1)
     )
