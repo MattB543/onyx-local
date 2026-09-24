@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { errorHandlingFetcher } from "@/lib/fetcher";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -48,26 +47,23 @@ export function IncognitoProvider({ children }: IncognitoProviderProps) {
   const [incognitoEnabled, setIncognitoEnabled] = useState(false);
   const [incognitoLocked, setIncognitoLocked] = useState(false);
 
-  const { data: availability, mutate: revalidateAvailability } =
-    useSWR<IncognitoAvailabilityResponse>(
-      SWR_KEYS.incognitoAvailability,
-      errorHandlingFetcher,
-      {
-        // Hiding the toggle is the safe fallback, but a persistent failure
-        // otherwise looks identical to the admin turning incognito off.
-        onError: (error) =>
-          console.error("Failed to load incognito availability:", error),
-      }
-    );
-  const incognitoAvailable = availability?.available ?? false;
-
   // The provider mounts once for the whole app, so route changes never
-  // remount the hook. Revalidating per navigation picks up admin changes to
-  // the availability setting or group flags without a hard refresh.
-  const pathname = usePathname();
-  useEffect(() => {
-    void revalidateAvailability();
-  }, [pathname, revalidateAvailability]);
+  // remount the hook. Focus and reconnect revalidation picks up another
+  // admin's change to the setting or group flags, at most once a minute.
+  // Admin pages in this browser mutate the key directly.
+  const { data: availability } = useSWR<IncognitoAvailabilityResponse>(
+    SWR_KEYS.incognitoAvailability,
+    errorHandlingFetcher,
+    {
+      dedupingInterval: 60_000,
+      focusThrottleInterval: 60_000,
+      // Hiding the toggle is the safe fallback, but a persistent failure
+      // otherwise looks identical to the admin turning incognito off.
+      onError: (error) =>
+        console.error("Failed to load incognito availability:", error),
+    }
+  );
+  const incognitoAvailable = availability?.available ?? false;
 
   const [incognitoSessionId, setIncognitoSessionId] = useState<string | null>(
     null
