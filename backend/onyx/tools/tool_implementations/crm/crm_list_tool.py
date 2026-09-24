@@ -47,6 +47,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     parse_uuid_list,
     reject_unknown_keys,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 
 PAGING_FIELDS = ("entity_type", "page_num", "page_size")
 TIMESTAMP_FILTERS = (
@@ -288,6 +289,10 @@ class CrmListTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(self.emitter, placement, CrmListToolDelta):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         entity_type, args = self._validate_args(llm_kwargs)
         page_num, page_size = parse_page(args, self.name)
 

@@ -63,6 +63,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     require_tags,
     resolve_owner_ids,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -749,6 +750,10 @@ class CrmUpdateTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(self.emitter, placement, CrmUpdateToolDelta):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         reject_unknown_keys(llm_kwargs, TOP_LEVEL_FIELDS, "crm_update arguments")
 
         entity_type = parse_entity_type(

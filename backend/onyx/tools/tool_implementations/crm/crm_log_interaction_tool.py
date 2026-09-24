@@ -36,6 +36,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     crm_write_errors,
     reject_unknown_keys,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 
 ATTENDEES_NOT_PROVIDED = object()
 # 'type' and 'primary_contact_id' are accepted aliases, not in the schema.
@@ -194,6 +195,12 @@ class CrmLogInteractionTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(
+            self.emitter, placement, CrmLogInteractionToolDelta
+        ):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         reject_unknown_keys(
             llm_kwargs, LOG_INTERACTION_FIELDS, "crm_log_interaction arguments"
         )

@@ -64,6 +64,16 @@ class CrmPrincipalCount:
     contact_count: int
 
 
+@dataclass(frozen=True)
+class CrmContactAffiliation:
+    """Who a contact works for: their title, organization and principal."""
+
+    title: str | None
+    organization_name: str | None
+    principal: str | None
+    principal_contact_id: UUID | None
+
+
 def _normalize_page(page_num: int, page_size: int) -> tuple[int, int]:
     return max(0, page_num), min(max(1, page_size), MAX_PAGE_SIZE)
 
@@ -1924,6 +1934,40 @@ def get_organization_names(
         )
     )
     return dict(rows.tuples().all())
+
+
+def get_contact_affiliations(
+    contact_ids: set[UUID], db_session: Session
+) -> dict[UUID, CrmContactAffiliation]:
+    """Title, organization name and principal for each contact: one contact
+    query and one organization-name query."""
+    if not contact_ids:
+        return {}
+    rows = db_session.execute(
+        select(
+            CrmContact.id,
+            CrmContact.title,
+            CrmContact.organization_id,
+            CrmContact.principal,
+            CrmContact.principal_contact_id,
+        ).where(CrmContact.id.in_(contact_ids))
+    ).all()
+    organization_names = get_organization_names(
+        {row.organization_id for row in rows if row.organization_id}, db_session
+    )
+    return {
+        row.id: CrmContactAffiliation(
+            title=row.title,
+            organization_name=(
+                organization_names.get(row.organization_id)
+                if row.organization_id
+                else None
+            ),
+            principal=row.principal,
+            principal_contact_id=row.principal_contact_id,
+        )
+        for row in rows
+    }
 
 
 def get_existing_user_ids(user_ids: list[UUID], db_session: Session) -> set[UUID]:

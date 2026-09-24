@@ -38,6 +38,7 @@ from onyx.tools.tool_implementations.crm.validation import (
     parse_uuid,
     reject_unknown_keys,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 
 CRM_GET_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
 # Related records each entity type can expand (latest 10 of each).
@@ -175,6 +176,10 @@ class CrmGetTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(self.emitter, placement, CrmGetToolDelta):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         reject_unknown_keys(
             llm_kwargs, ("entity_type", "entity_id", "include"), "crm_get arguments"
         )

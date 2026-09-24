@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 from typing_extensions import override
 
 from onyx.chat.emitter import Emitter
-from onyx.db.crm import search_crm_entities
+from onyx.db.crm import (
+    CrmContactAffiliation,
+    CrmSearchResult,
+    get_contact_affiliations,
+    search_crm_entities,
+)
 from onyx.server.query_and_chat.placement import Placement
 from onyx.server.query_and_chat.streaming_models import (
     CrmSearchToolDelta,
@@ -25,8 +31,41 @@ from onyx.tools.tool_implementations.crm.validation import (
     parse_page,
     reject_unknown_keys,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 
 CRM_SEARCH_ENTITY_TYPES = {"contact", "organization", "interaction", "tag"}
+
+
+def _affiliation_fields(affiliation: CrmContactAffiliation | None) -> dict[str, str]:
+    """The affiliation fields that have a value."""
+    if affiliation is None:
+        return {}
+    fields = {
+        "title": affiliation.title,
+        "organization_name": affiliation.organization_name,
+        "principal": affiliation.principal,
+        "principal_contact_id": (
+            str(affiliation.principal_contact_id)
+            if affiliation.principal_contact_id
+            else None
+        ),
+    }
+    return {key: value for key, value in fields.items() if value and value.strip()}
+
+
+def _serialize_result(
+    result: CrmSearchResult, affiliations: dict[UUID, CrmContactAffiliation]
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "entity_type": result.entity_type,
+        "entity_id": result.entity_id,
+        "primary_text": result.primary_text,
+        "secondary_text": result.secondary_text,
+        "sort_at": result.sort_at.isoformat() if result.sort_at else None,
+    }
+    if result.entity_type == "contact":
+        item.update(_affiliation_fields(affiliations.get(UUID(result.entity_id))))
+    return item
 
 
 class CrmSearchTool(Tool[None]):
@@ -35,7 +74,11 @@ class CrmSearchTool(Tool[None]):
     DESCRIPTION = (
         "Keyword search across CRM contacts, organizations, interactions, and tags. "
         "Search before creating to avoid duplicates. To filter by status, tag, org, "
-        "or date, use crm_list."
+        "or date, use crm_list. Contacts include title, organization and principal "
+        "(the official a staffer works for; principal_contact_id is the official's "
+        "contact ID when linked). To list an official's staff, use crm_list "
+        "entity_type='contact' principal=<name>, or crm_get on the official's "
+        "contact with include=['staff']."
     )
 
     def __init__(
@@ -116,6 +159,10 @@ class CrmSearchTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(self.emitter, placement, CrmSearchToolDelta):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         reject_unknown_keys(
             llm_kwargs,
             ("query", "entity_types", "page_num", "page_size"),
@@ -166,6 +213,14 @@ class CrmSearchTool(Tool[None]):
                 page_num=page_num,
                 page_size=page_size,
             )
+            affiliations = get_contact_affiliations(
+                {
+                    UUID(result.entity_id)
+                    for result in search_results
+                    if result.entity_type == "contact"
+                },
+                db_session,
+            )
 
         payload = {
             "status": "ok",
@@ -175,15 +230,7 @@ class CrmSearchTool(Tool[None]):
             "page_size": page_size,
             "total_items": total_items,
             "results": [
-                {
-                    "entity_type": result.entity_type,
-                    "entity_id": result.entity_id,
-                    "primary_text": result.primary_text,
-                    "secondary_text": result.secondary_text,
-                    "rank": result.rank,
-                    "sort_at": result.sort_at.isoformat() if result.sort_at else None,
-                }
-                for result in search_results
+                _serialize_result(result, affiliations) for result in search_results
             ],
         }
 

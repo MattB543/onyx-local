@@ -14,11 +14,13 @@ import {
 import {
   isJsonArray,
   isJsonObject,
+  readString,
   type JsonObject,
   type JsonValue,
 } from "@/lib/json";
 import Text from "@/refresh-components/texts/Text";
 
+import { Text as OpalText } from "@opal/components";
 import { SvgUser } from "@opal/icons";
 
 function BlinkingDot() {
@@ -125,7 +127,33 @@ function summarizePayloadValue(value: JsonValue): string {
   return objectLabel(value) ?? `${Object.keys(value).length} fields`;
 }
 
+/** A failed call: the backend streams `{"error": ...}` live and on replay. */
+function renderError(message: string): JSX.Element {
+  return (
+    <div className="flex items-start gap-4 rounded-08 border border-status-error-02 bg-status-error-01 px-2 py-1">
+      <div className="shrink-0">
+        <OpalText as="p" font="secondary-action" color="status-error-05">
+          Error
+        </OpalText>
+      </div>
+      <OpalText
+        as="p"
+        font="secondary-body"
+        color="status-error-05"
+        wordWrap="wrap-break-word"
+      >
+        {message}
+      </OpalText>
+    </div>
+  );
+}
+
 function renderPayload(payload: JsonObject): JSX.Element {
+  const error = readString(payload, "error");
+  if (error !== null) {
+    return renderError(error);
+  }
+
   const entries = Object.entries(payload);
 
   if (entries.length === 0) {

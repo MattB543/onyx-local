@@ -84,6 +84,7 @@ from onyx.tools.tool_implementations.crm.crm_log_interaction_tool import (
 )
 from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from onyx.tools.tool_implementations.crm.crm_update_tool import CrmUpdateTool
+from onyx.tools.tool_implementations.error_delta import ERROR_PAYLOAD_KEY
 from onyx.tools.tool_implementations.file_reader.file_reader_tool import FileReaderTool
 from onyx.tools.tool_implementations.images.image_generation_tool import (
     ImageGenerationTool,
@@ -93,9 +94,13 @@ from onyx.tools.tool_implementations.open_url.open_url_tool import OpenURLTool
 from onyx.tools.tool_implementations.python.python_tool import PythonTool
 from onyx.tools.tool_implementations.search.search_tool import SearchTool
 from onyx.tools.tool_implementations.web_search.web_search_tool import WebSearchTool
+from onyx.tools.tool_runner import GENERIC_TOOL_ERROR_MESSAGE
 from onyx.utils.logger import setup_logger
 
 logger = setup_logger()
+
+# The runner stores a failed call's response as this prefix plus the error.
+_TOOL_ERROR_PREFIX = GENERIC_TOOL_ERROR_MESSAGE.partition("{error}")[0]
 
 
 def create_message_packets(
@@ -262,8 +267,12 @@ def create_custom_tool_packets(
 
 
 def _parse_crm_tool_payload(tool_call_response: str | None) -> dict:
+    """The stored response as the payload the live delta carried. A failed
+    call becomes {"error": ...}, the same payload that streams live."""
     if not tool_call_response:
         return {}
+    if tool_call_response.startswith(_TOOL_ERROR_PREFIX):
+        return {ERROR_PAYLOAD_KEY: tool_call_response.removeprefix(_TOOL_ERROR_PREFIX)}
     try:
         payload = json.loads(tool_call_response)
         if isinstance(payload, dict):

@@ -31,6 +31,7 @@ from onyx.tools.tool_implementations.calendar.models import (
     parse_string_list_maybe,
     serialize_calendar_event,
 )
+from onyx.tools.tool_implementations.error_delta import stream_tool_call_error
 from onyx.utils.datetime_utils import parse_iso_datetime_in_tz
 from onyx.utils.logger import setup_logger
 
@@ -277,6 +278,10 @@ class SearchCalendarTool(Tool[None]):
         override_kwargs: None = None,  # noqa: ARG002
         **llm_kwargs: Any,
     ) -> ToolResponse:
+        with stream_tool_call_error(self.emitter, placement, CalendarSearchToolDelta):
+            return self._run(placement, llm_kwargs)
+
+    def _run(self, placement: Placement, llm_kwargs: dict[str, Any]) -> ToolResponse:
         self._raise_if_invalid_user_context()
 
         query = self._parse_optional_string(llm_kwargs.get("query"), "query")
@@ -308,9 +313,7 @@ class SearchCalendarTool(Tool[None]):
             start_time = parse_datetime_maybe(
                 llm_kwargs.get("start_time"), "start_time"
             )
-            end_time = parse_datetime_maybe(
-                llm_kwargs.get("end_time"), "end_time"
-            )
+            end_time = parse_datetime_maybe(llm_kwargs.get("end_time"), "end_time")
         if start_time and end_time and end_time < start_time:
             raise ToolCallException(
                 message="Invalid time window for search_calendar",
