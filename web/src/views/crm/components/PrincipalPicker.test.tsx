@@ -17,6 +17,12 @@ jest.mock("@/lib/hooks/useCrmContactPrincipals", () => ({
         label: "Sen. Jane Smith",
         description: "3 contacts",
       },
+      // Other contacts name the edited contact as their principal.
+      {
+        value: "Self Person",
+        label: "Self Person",
+        description: "2 contacts",
+      },
     ],
     isLoading: false,
     error: undefined,
@@ -45,12 +51,14 @@ jest.mock("@/lib/hooks/useCrmContacts", () => ({
 interface HarnessProps {
   initialPrincipal?: string;
   initialContactId?: string | null;
+  excludeName?: string;
   onChangeSpy: jest.Mock;
 }
 
 function Harness({
   initialPrincipal = "",
   initialContactId = null,
+  excludeName = "Self Person",
   onChangeSpy,
 }: HarnessProps) {
   const [state, setState] = useState({
@@ -67,6 +75,7 @@ function Harness({
           setState({ principal, contactId });
         }}
         excludeContactId="c-self"
+        excludeName={excludeName}
         placeholder="Principal"
       />
       <output data-testid="principal">{state.principal}</output>
@@ -134,6 +143,40 @@ describe("PrincipalPicker", () => {
     expect(
       screen.queryByRole("option", { name: /Self Person/ })
     ).not.toBeInTheDocument();
+  });
+
+  test("hides only the contact's own name from principal suggestions", async () => {
+    const { user, input } = renderPicker({ excludeName: "  self PERSON " });
+
+    await user.click(input);
+
+    expect(
+      await screen.findByRole("option", { name: /Sen\. Jane Smith/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Self Person/ })
+    ).not.toBeInTheDocument();
+  });
+
+  test("offers every principal name when no name is excluded", async () => {
+    const { user, input } = renderPicker({ excludeName: "" });
+
+    await user.click(input);
+
+    expect(
+      await screen.findByRole("option", { name: /Self Person/ })
+    ).toBeInTheDocument();
+  });
+
+  test("still accepts the excluded name when typed by hand", async () => {
+    const { user, input, principal, link } = renderPicker();
+
+    await user.click(input);
+    await user.type(input, "Self Person");
+    await user.click(screen.getByRole("button", { name: "Elsewhere" }));
+
+    expect(principal()).toBe("Self Person");
+    expect(link()).toBe("");
   });
 
   test("Escape discards the draft", async () => {

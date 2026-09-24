@@ -7,6 +7,50 @@ import { SvgEdit, SvgTrash } from "@opal/icons";
 import { formatDateTime } from "./crmDateUtils";
 import InteractionTypeIcon from "./InteractionTypeIcon";
 
+/** Names for the card's people line: the primary contact, then the attendees.
+ * The primary contact is often also an attendee row (the log modal preselects
+ * it), so that row is skipped and repeated names are shown once. */
+export function getInteractionPeople(
+  interaction: CrmInteraction,
+  attendeeUserNameById?: Map<string, string>,
+  attendeeContactNameById?: Map<string, string>
+): string[] {
+  const primaryName = interaction.contact_name?.trim();
+  const attendeeNames = interaction.attendees
+    .filter(
+      (attendee) =>
+        !primaryName ||
+        !interaction.contact_id ||
+        attendee.contact_id !== interaction.contact_id
+    )
+    .map((attendee) => {
+      const providedName = attendee.display_name?.trim();
+      if (providedName) {
+        return providedName;
+      }
+
+      if (attendee.user_id) {
+        return attendeeUserNameById?.get(attendee.user_id)?.trim() || null;
+      }
+
+      if (attendee.contact_id) {
+        return (
+          attendeeContactNameById?.get(attendee.contact_id)?.trim() || null
+        );
+      }
+
+      return null;
+    });
+
+  return Array.from(
+    new Set(
+      [primaryName, ...attendeeNames].filter((name): name is string =>
+        Boolean(name)
+      )
+    )
+  );
+}
+
 interface TimelineInteractionCardProps {
   interaction: CrmInteraction;
   attendeeUserNameById?: Map<string, string>;
@@ -31,35 +75,11 @@ export default function TimelineInteractionCard({
   );
   const typeLabel =
     interaction.type.charAt(0).toUpperCase() + interaction.type.slice(1);
-  const attendeeNames = Array.from(
-    new Set(
-      interaction.attendees
-        .map((attendee) => {
-          const providedName = attendee.display_name?.trim();
-          if (providedName) {
-            return providedName;
-          }
-
-          if (attendee.user_id) {
-            return attendeeUserNameById?.get(attendee.user_id)?.trim() || null;
-          }
-
-          if (attendee.contact_id) {
-            return (
-              attendeeContactNameById?.get(attendee.contact_id)?.trim() || null
-            );
-          }
-
-          return null;
-        })
-        .filter((name): name is string => Boolean(name))
-    )
+  const people = getInteractionPeople(
+    interaction,
+    attendeeUserNameById,
+    attendeeContactNameById
   );
-
-  const people = [
-    interaction.contact_name,
-    ...attendeeNames,
-  ].filter(Boolean);
 
   return (
     <div>

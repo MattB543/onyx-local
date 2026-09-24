@@ -9,6 +9,7 @@ import {
 } from "@/app/app/crm/crmService";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { Button, Modal } from "@opal/components";
+import { FormikInputError } from "@opal/layouts/inputs/components";
 import InputSelectField from "@/refresh-components/form/InputSelectField";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
@@ -101,14 +102,20 @@ export default function CreateOrganizationModal({
               <Modal.Body>
                 <div className="flex w-full flex-col gap-3">
                   <div className="grid gap-3 md:grid-cols-2">
-                    <InputTypeInField
-                      name="name"
-                      placeholder="Organization name *"
-                    />
-                    <InputTypeInField
-                      name="website"
-                      placeholder="Website URL"
-                    />
+                    <div className="flex flex-col gap-1">
+                      <InputTypeInField
+                        name="name"
+                        placeholder="Organization name *"
+                      />
+                      <FormikInputError name="name" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <InputTypeInField
+                        name="website"
+                        placeholder="Website URL"
+                      />
+                      <FormikInputError name="website" />
+                    </div>
                     <InputSelectField name="type">
                       <InputSelect.Trigger placeholder="Type" />
                       <InputSelect.Content>

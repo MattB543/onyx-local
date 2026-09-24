@@ -15,6 +15,7 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { ConfirmationModalLayout, SettingsLayouts, toast } from "@opal/layouts";
+import { FormikInputError } from "@opal/layouts/inputs/components";
 import { useCrmContact } from "@/lib/hooks/useCrmContact";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -503,7 +504,13 @@ export default function CrmContactDetailPage({
                           }
                         }}
                       >
-                        {({ isSubmitting, status, values, setFieldValue }) => (
+                        {({
+                          isSubmitting,
+                          status,
+                          values,
+                          touched,
+                          setFieldValue,
+                        }) => (
                           <Form className="flex h-full flex-col gap-3">
                             <div className="flex flex-col items-center gap-2">
                               <InputImage
@@ -565,6 +572,14 @@ export default function CrmContactDetailPage({
                                     placeholder="Last name"
                                   />
                                 </div>
+                                {/* Both name fields share one rule: show it once. */}
+                                <FormikInputError
+                                  name={
+                                    touched.first_name
+                                      ? "first_name"
+                                      : "last_name"
+                                  }
+                                />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Text
@@ -579,6 +594,7 @@ export default function CrmContactDetailPage({
                                   name="email"
                                   placeholder="Email"
                                 />
+                                <FormikInputError name="email" />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Text
@@ -743,6 +759,7 @@ export default function CrmContactDetailPage({
                                     );
                                   }}
                                   excludeContactId={contact.id}
+                                  excludeName={contact.full_name}
                                   placeholder="e.g. Sen. Jane Smith"
                                 />
                               </div>
@@ -759,6 +776,7 @@ export default function CrmContactDetailPage({
                                   name="linkedin_url"
                                   placeholder="LinkedIn URL"
                                 />
+                                <FormikInputError name="linkedin_url" />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Text

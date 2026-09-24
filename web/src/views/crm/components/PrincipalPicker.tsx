@@ -19,6 +19,9 @@ interface PrincipalPickerProps {
   onChange: (principal: string, principalContactId: string | null) => void;
   /** The contact being edited; a contact cannot be its own principal. */
   excludeContactId?: string;
+  /** The contact's own name: hidden from the principal-name suggestions only,
+   * so it can still be typed by hand (names are not unique). */
+  excludeName?: string;
   placeholder: string;
 }
 
@@ -39,6 +42,7 @@ export default function PrincipalPicker({
   principalContactId,
   onChange,
   excludeContactId,
+  excludeName,
   placeholder,
 }: PrincipalPickerProps) {
   const { principalOptions } = useCrmContactPrincipals();
@@ -86,10 +90,15 @@ export default function PrincipalPicker({
     return options;
   }, [contacts, query, excludeContactId, principalContactId, principal]);
 
-  const options = useMemo(
-    () => [...contactOptions, ...principalOptions],
-    [contactOptions, principalOptions]
-  );
+  const options = useMemo(() => {
+    const excluded = excludeName?.trim().toLowerCase();
+    const principalSuggestions = excluded
+      ? principalOptions.filter(
+          (option) => option.value.trim().toLowerCase() !== excluded
+        )
+      : principalOptions;
+    return [...contactOptions, ...principalSuggestions];
+  }, [contactOptions, principalOptions, excludeName]);
 
   const value = principalContactId
     ? `${CONTACT_OPTION_PREFIX}${principalContactId}`

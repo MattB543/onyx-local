@@ -11,6 +11,7 @@ import {
 } from "@/app/app/crm/crmService";
 import useShareableUsers from "@/hooks/useShareableUsers";
 import { toast } from "@opal/layouts";
+import { FormikInputError } from "@opal/layouts/inputs/components";
 import { useCrmSettings } from "@/lib/hooks/useCrmSettings";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useUser } from "@/providers/UserProvider";
@@ -213,7 +214,7 @@ export default function CreateContactModal({
             }
           }}
         >
-          {({ isSubmitting, status, values, setFieldValue }) => (
+          {({ isSubmitting, status, values, touched, setFieldValue }) => (
             <Form>
               <Modal.Body>
                 <div className="flex w-full flex-col gap-3">
@@ -241,15 +242,26 @@ export default function CreateContactModal({
                     </Text>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <InputTypeInField
-                      name="first_name"
-                      placeholder="First name"
-                    />
-                    <InputTypeInField
-                      name="last_name"
-                      placeholder="Last name"
-                    />
-                    <InputTypeInField name="email" placeholder="Email" />
+                    <div className="flex flex-col gap-1 md:col-span-2">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <InputTypeInField
+                          name="first_name"
+                          placeholder="First name"
+                        />
+                        <InputTypeInField
+                          name="last_name"
+                          placeholder="Last name"
+                        />
+                      </div>
+                      {/* Both name fields share one rule: show it once. */}
+                      <FormikInputError
+                        name={touched.first_name ? "first_name" : "last_name"}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <InputTypeInField name="email" placeholder="Email" />
+                      <FormikInputError name="email" />
+                    </div>
                     <InputTypeInField name="phone" placeholder="Phone" />
                     <InputTypeInField
                       name="title"
@@ -274,10 +286,13 @@ export default function CreateContactModal({
                       }}
                       placeholder="Organization"
                     />
-                    <InputTypeInField
-                      name="linkedin_url"
-                      placeholder="LinkedIn URL"
-                    />
+                    <div className="flex flex-col gap-1">
+                      <InputTypeInField
+                        name="linkedin_url"
+                        placeholder="LinkedIn URL"
+                      />
+                      <FormikInputError name="linkedin_url" />
+                    </div>
                     <InputSelectField name="status">
                       <InputSelect.Trigger placeholder="Status" />
                       <InputSelect.Content>
@@ -321,6 +336,10 @@ export default function CreateContactModal({
                           nextPrincipalContactId ?? ""
                         );
                       }}
+                      excludeName={[values.first_name, values.last_name]
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                        .join(" ")}
                       placeholder="Principal (e.g. Sen. Jane Smith)"
                     />
                   </div>

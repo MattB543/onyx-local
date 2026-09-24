@@ -20,6 +20,7 @@ import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/providers/UserProvider";
 import { Button, Modal } from "@opal/components";
+import { FormikInputError } from "@opal/layouts/inputs/components";
 import InputTextAreaField from "@/refresh-components/form/InputTextAreaField";
 import InputTypeInField from "@/refresh-components/form/InputTypeInField";
 import InputMultiSelect, {
@@ -313,10 +314,13 @@ export default function LogInteractionModal({
                     </div>
                   </div>
 
-                  <InputTypeInField
-                    name="title"
-                    placeholder="Title (e.g. 'Call about renewal')"
-                  />
+                  <div className="flex w-full flex-col gap-1">
+                    <InputTypeInField
+                      name="title"
+                      placeholder="Title (e.g. 'Call about renewal')"
+                    />
+                    <FormikInputError name="title" />
+                  </div>
                   <InputTextAreaField
                     name="summary"
                     placeholder="Summary / notes"

@@ -14,6 +14,7 @@ import {
   patchCrmOrganization,
 } from "@/app/app/crm/crmService";
 import { ConfirmationModalLayout, SettingsLayouts, toast } from "@opal/layouts";
+import { FormikInputError } from "@opal/layouts/inputs/components";
 import { useCrmContacts } from "@/lib/hooks/useCrmContacts";
 import { useInvalidateCrmCache } from "@/lib/hooks/useInvalidateCrmCache";
 import { useCrmInteractions } from "@/lib/hooks/useCrmInteractions";
@@ -293,7 +294,7 @@ export default function CrmOrganizationDetailPage({
                           try {
                             await patchCrmOrganization(
                               organization.id,
-                              buildOrganizationPatchBody(values),
+                              buildOrganizationPatchBody(values)
                             );
                             await invalidateCrmCache();
                             await refreshOrganization();
@@ -319,6 +320,7 @@ export default function CrmOrganizationDetailPage({
                                   name="name"
                                   placeholder="Organization name *"
                                 />
+                                <FormikInputError name="name" />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Text
@@ -333,6 +335,7 @@ export default function CrmOrganizationDetailPage({
                                   name="website"
                                   placeholder="Website URL"
                                 />
+                                <FormikInputError name="website" />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <Text
