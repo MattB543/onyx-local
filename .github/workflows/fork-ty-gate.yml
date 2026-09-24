@@ -1,0 +1,72 @@
+# Fork-only (MattB543/onyx-local). Upstream has no such file, so syncs never
+# conflict on it.
+#
+# Upstream's pr-python-checks.yml runs ty only on pull requests and merge
+# queues. This fork pushes straight to main, so a type error reached
+# production unchecked (FLF QA 2026-09-23, P0-3). This job runs the same
+# baseline gate as the pre-push hook (scripts/git-hooks/pre-push). It fails on
+# any ty diagnostic that is not in scripts/ty_baseline/.
+#
+# The baseline comes from the Windows dev venv (with --python-platform linux).
+# If this job reports new diagnostics that do not occur locally, the CI
+# environment differs (package versions, or packages installed on one side
+# only). The log prints them in baseline format, and the
+# ty-current-diagnostics artifact holds the complete current baseline files.
+name: Fork ty Baseline Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "scripts/ty_baseline_gate.py"
+      - "scripts/ty_baseline/**"
+      - ".github/workflows/fork-ty-gate.yml"
+      - ".github/actions/setup-python-and-install-dependencies/**"
+  workflow_dispatch:
+
+concurrency:
+  group: fork-ty-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ty-baseline-gate:
+    # Upstream runs ty on a RunsOn arm64 runner. This is the GitHub-hosted
+    # equivalent (public repos only). arm64 also skips the x86_64-only CUDA
+    # wheels in model_server.txt.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Same environment as upstream's ty job, so ty resolves imports the same
+      # way. dev.txt installs the pinned ty.
+      - name: Setup Python and Install Dependencies
+        uses: ./.github/actions/setup-python-and-install-dependencies
+        with:
+          requirements: |
+            backend/requirements/default.txt
+            backend/requirements/dev.txt
+            backend/requirements/model_server.txt
+            backend/requirements/ee.txt
+
+      - name: Run ty baseline gate
+        run: python scripts/ty_baseline_gate.py --write-current "$RUNNER_TEMP/ty-current"
+
+      - name: Upload current diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ty-current-diagnostics
+          path: ${{ runner.temp }}/ty-current/
+          retention-days: 14
+          if-no-files-found: ignore

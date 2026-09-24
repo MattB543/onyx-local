@@ -1,0 +1,122 @@
+# ty 0.0.63 --python-platform linux, tests diagnostics (path<TAB>description). Regenerate with: python scripts/ty_baseline_gate.py --update
+backend/tests/unit/onyx/configs/test_secret_encryption_config.py	invalid-return-type: Return type does not match returned value: expected `None`, found `types.GeneratorType`
+backend/tests/unit/onyx/connectors/imap/test_imap_connector.py	invalid-argument-type: Argument to function `sorted` is incorrect: Argument type `str | None` does not satisfy upper bound `SupportsDunderLT[Any] | SupportsDunderGT[Any]` of type variable `SupportsRichComparisonT`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_crm_queries.py	unresolved-attribute: Object of type `object` has no attribute `params`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `_mock_scalar_all` is incorrect: Expected `list[object]`, found `list[SimpleNamespace]`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `create_manual_run_if_allowed` is incorrect: Expected `CustomJob`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `create_manual_run_if_allowed` is incorrect: Expected `CustomJob`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `create_manual_run_if_allowed` is incorrect: Expected `CustomJob`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `create_manual_run_if_allowed` is incorrect: Expected `CustomJob`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `mark_run_terminal` is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `mark_run_terminal` is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `mark_run_terminal` is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/db/test_custom_jobs.py	invalid-argument-type: Argument to function `mark_run_terminal` is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to bound method `CrmContactSnapshot.from_model` is incorrect: Expected `CrmContact`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to bound method `CrmContactSnapshot.from_model` is incorrect: Expected `CrmContact`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to bound method `CrmContactSnapshot.from_model` is incorrect: Expected `CrmContact`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to bound method `CrmContactSnapshot.from_model` is incorrect: Expected `CrmContact`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_contact` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_contact` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_contact` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_organization` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `delete_crm_organization` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_contacts` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_organizations` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_organizations` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `get_organizations` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `import_contacts_csv` is incorrect: Expected `User | None`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `patch_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `post_contact` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `post_contact` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `post_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `post_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `post_interaction` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `UploadFile`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	invalid-argument-type: Argument to function `upload_contact_profile_picture` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `created`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `created`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `errors`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `errors`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `errors`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `errors`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `updated`
+backend/tests/unit/onyx/server/features/test_crm_api.py	unresolved-attribute: Object of type `object` has no attribute `updated`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument is incorrect: Expected `CustomJobRun`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `create_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `create_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `delete_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `delete_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `delete_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `dry_run_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `get_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `get_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `get_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `get_custom_job_step_catalog` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_run_steps_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_run_steps_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_runs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_runs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_runs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_job_runs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_jobs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_jobs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_jobs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `list_custom_jobs_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `manual_trigger_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `update_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `update_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/onyx/server/manage/test_custom_jobs_api.py	invalid-argument-type: Argument to function `update_custom_job_endpoint` is incorrect: Expected `User`, found `SimpleNamespace`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`
+backend/tests/unit/tools/test_crm_tool_packets.py	unresolved-attribute: Object of type `Emitter` has no attribute `bus`

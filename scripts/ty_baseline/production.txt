@@ -1,0 +1,70 @@
+# ty 0.0.63 --python-platform linux, production diagnostics (path<TAB>description). Regenerate with: python scripts/ty_baseline_gate.py --update
+backend/onyx/background/celery/apps/app_base.py	invalid-argument-type: Argument to function `cleanup_legacy_kv_store_redis_cache` is incorrect: Expected `Redis | None`, found `TenantRedisClient`
+backend/onyx/background/celery/tasks/custom_jobs/tasks.py	invalid-argument-type: Argument is incorrect: Expected `(Task[((...)) | ((*, run_id: str, tenant_id: str)), None], /, *args: ((...)) | ((*, run_id: str, tenant_id: str)), **kwargs: ((...)) | ((*, run_id: str, tenant_id: str))) -> None`, found `def run_custom_job(self: Task[(...), Unknown], *, run_id: str, tenant_id: str) -> None`
+backend/onyx/background/celery/tasks/custom_jobs/tasks.py	invalid-argument-type: Argument is incorrect: Expected `(Task[((...)) | ((*, tenant_id: str)), int | None], /, *args: ((...)) | ((*, tenant_id: str)), **kwargs: ((...)) | ((*, tenant_id: str))) -> int | None`, found `def check_for_custom_job_trigger_events(self: Task[(...), Unknown], *, tenant_id: str) -> int | None`
+backend/onyx/background/celery/tasks/custom_jobs/tasks.py	invalid-argument-type: Argument is incorrect: Expected `(Task[((...)) | ((*, tenant_id: str)), int | None], /, *args: ((...)) | ((*, tenant_id: str)), **kwargs: ((...)) | ((*, tenant_id: str))) -> int | None`, found `def check_for_custom_jobs(self: Task[(...), Unknown], *, tenant_id: str) -> int | None`
+backend/onyx/background/celery/tasks/custom_jobs/tasks.py	invalid-argument-type: Argument is incorrect: Expected `(Task[((...)) | ((*, tenant_id: str)), int | None], /, *args: ((...)) | ((*, tenant_id: str)), **kwargs: ((...)) | ((*, tenant_id: str))) -> int | None`, found `def cleanup_custom_job_history_task(self: Task[(...), Unknown], *, tenant_id: str) -> int | None`
+backend/onyx/background/celery/tasks/custom_jobs/tasks.py	invalid-argument-type: Argument is incorrect: Expected `(Task[((...)) | ((*, tenant_id: str)), int | None], /, *args: ((...)) | ((*, tenant_id: str)), **kwargs: ((...)) | ((*, tenant_id: str))) -> int | None`, found `def poll_custom_job_triggers(self: Task[(...), Unknown], *, tenant_id: str) -> int | None`
+backend/onyx/connectors/google_calendar/connector.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `calendarList`
+backend/onyx/connectors/google_calendar/connector.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `calendarList`
+backend/onyx/connectors/google_calendar/connector.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `calendarList`
+backend/onyx/connectors/google_calendar/connector.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `events`
+backend/onyx/connectors/google_calendar/connector.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `events`
+backend/onyx/connectors/google_calendar/connector.py	unused-type-ignore-comment: Unused blanket `type: ignore` directive
+backend/onyx/connectors/google_utils/google_kv.py	unresolved-attribute: Object of type `GoogleCalendarService` has no attribute `calendarList`
+backend/onyx/connectors/imap/connector.py	redundant-cast: Value is already of type `ImapCheckpoint`
+backend/onyx/custom_jobs/runner.py	invalid-argument-type: Argument is incorrect: Expected `dict[str, Any]`, found `(CustomJobConfig & ~AlwaysFalsy) | dict[str, Any]`
+backend/onyx/custom_jobs/runner.py	invalid-argument-type: Argument to function `build_workflow_definition` is incorrect: Expected `dict[str, Any]`, found `(CustomJobConfig & ~AlwaysFalsy) | dict[str, Any]`
+backend/onyx/custom_jobs/runner.py	possibly-unresolved-reference: Name `attempt_start_monotonic` used when possibly not defined
+backend/onyx/custom_jobs/steps/google_doc_output.py	unresolved-attribute: Object of type `GoogleDocsService` has no attribute `documents`
+backend/onyx/custom_jobs/steps/google_doc_output.py	unresolved-attribute: Object of type `GoogleDocsService` has no attribute `documents`
+backend/onyx/custom_jobs/steps/google_doc_output.py	unresolved-attribute: Object of type `GoogleDriveService` has no attribute `files`
+backend/onyx/custom_jobs/steps/google_doc_output.py	unresolved-attribute: Object of type `GoogleDriveService` has no attribute `files`
+backend/onyx/custom_jobs/steps/google_doc_output.py	unresolved-attribute: Object of type `GoogleDriveService` has no attribute `permissions`
+backend/onyx/db/calendar.py	invalid-argument-type: Argument to bound method `SQLCoreOperations.in_` is incorrect: Expected `Iterable[Any] | InElementRole`, found `ColumnElement[Unknown]`
+backend/onyx/db/calendar.py	invalid-return-type: Return type does not match returned value: expected `ColumnElement[Unknown]`, found `Select[tuple[str]]`
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	no-matching-overload: No overload of function `select` matches arguments
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `UUID` has no attribute `in_`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `UUID` has no attribute `in_`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `UUID` has no attribute `in_`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `UUID` has no attribute `in_`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `str` has no attribute `asc`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `str` has no attribute `asc`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `str` has no attribute `ilike`
+backend/onyx/db/crm.py	unresolved-attribute: Object of type `str` has no attribute `ilike`
+backend/onyx/db/custom_jobs.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/custom_jobs.py	no-matching-overload: No overload of `dict.__init__` matches arguments
+backend/onyx/db/custom_jobs.py	unresolved-attribute: Object of type `Result[Any]` has no attribute `rowcount`
+backend/onyx/db/custom_jobs.py	unresolved-attribute: Object of type `Result[Any]` has no attribute `rowcount`
+backend/onyx/db/models.py	deprecated: The function `utcnow` is deprecated: Use timezone-aware objects to represent datetimes in UTC; e.g. by calling .now(datetime.timezone.utc)
+backend/onyx/db/models.py	invalid-argument-type: Argument to function `encrypt_string_to_bytes` is incorrect: Expected `str`, found `str | SensitiveValue[str] | None`
+backend/onyx/db/models.py	invalid-assignment: Object of type `object` is not assignable to `dict[str, Any] | SensitiveValue[dict[str, Any]] | None`
+backend/onyx/db/models.py	invalid-assignment: Object of type `object` is not assignable to `str | SensitiveValue[str] | None`
+backend/onyx/db/models.py	unused-type-ignore-comment: Unused blanket `type: ignore` directive
+backend/onyx/db/models.py	unused-type-ignore-comment: Unused blanket `type: ignore` directive
+backend/onyx/db/reencrypt_secret_values.py	unresolved-attribute: Object of type `Result[Any]` has no attribute `rowcount`
+backend/onyx/key_value_store/store.py	invalid-assignment: Object of type `TenantRedisClient` is not assignable to `Redis | None`
+backend/onyx/key_value_store/store.py	unresolved-attribute: Attribute `delete` is not defined on `None` in union `Redis | None`
+backend/onyx/key_value_store/store.py	unresolved-attribute: Attribute `delete` is not defined on `None` in union `Redis | None`
+backend/onyx/key_value_store/store.py	unresolved-attribute: Attribute `get` is not defined on `None` in union `Redis | None`
+backend/onyx/key_value_store/store.py	unresolved-attribute: Attribute `scan_iter` is not defined on `None` in union `Redis | None`
+backend/onyx/key_value_store/store.py	unresolved-attribute: Attribute `set` is not defined on `None` in union `Redis | None`
+backend/onyx/key_value_store/store.py	unsupported-operator: Operator `+=` is not supported between objects of type `Literal[0]` and `Awaitable[Any] | Any`
+backend/onyx/key_value_store/store.py	unsupported-operator: Operator `+=` is not supported between objects of type `Literal[0]` and `Awaitable[Any] | Any`
+backend/onyx/server/features/crm/api.py	invalid-argument-type: Argument to function `create_contact` is incorrect: Expected `str`, found `str | None`
+backend/onyx/server/features/crm/csv_utils.py	not-iterable: Object of type `type` is not iterable
+backend/onyx/server/features/crm/csv_utils.py	not-iterable: Object of type `type` is not iterable
+backend/onyx/server/manage/custom_jobs/api.py	invalid-argument-type: Argument to function `_validate_trigger_source_config` is incorrect: Expected `dict[str, Any] | None`, found `CustomJobTriggerSourceConfig | None`
+backend/onyx/server/manage/custom_jobs/api.py	invalid-argument-type: Argument to function `_validate_workflow_and_step_configs` is incorrect: Expected `dict[str, Any]`, found `(CustomJobConfig & ~AlwaysFalsy) | dict[str, Any]`

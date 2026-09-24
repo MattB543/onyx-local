@@ -144,8 +144,9 @@ Only needed when conflicts require complex blending (e.g., structural refactors,
 4. Handles modify/delete conflicts: `git rm <file>` for accepted deletions
 5. Stages everything: `git add -A`
 6. Verifies no conflict markers: `grep -r "<<<<<<< " --include="*.py" --include="*.ts" --include="*.tsx" .`
-7. Commits: `git commit --no-edit`
-8. Ends its report with a **Learnings** section: new conflict files not in the recurring table, resolutions that deviated from the playbook defaults, upstream patterns worth knowing. The orchestrating session appends this to the sync notes (see below) — the agent must NOT write the notes file itself from the worktree.
+7. Runs the ty gate with main's venv (the worktree has none): `<main-checkout>/.venv/Scripts/python.exe scripts/ty_baseline_gate.py`. It must pass (see "Type-check Gate (ty)").
+8. Commits: `git commit --no-edit`
+9. Ends its report with a **Learnings** section: new conflict files not in the recurring table, resolutions that deviated from the playbook defaults, upstream patterns worth knowing. The orchestrating session appends this to the sync notes (see below) — the agent must NOT write the notes file itself from the worktree.
 
 ### Merging Worktree Back to Main
 
@@ -292,6 +293,16 @@ Upstream may change method signatures (e.g., adding `.unique()` to query results
 
 Run prettier on modified custom files, ruff on modified Python files. These are cosmetic but should be clean before pushing.
 
+## Type-check Gate (ty)
+
+Upstream runs `ty` only on pull requests and merge queues. The fork pushes straight to `main`, so `scripts/ty_baseline_gate.py` fails on any **new** ty diagnostic in `backend/`. The known diagnostics are in two committed baselines, `scripts/ty_baseline/production.txt` and `scripts/ty_baseline/tests.txt`. Each line is `path<TAB>description`, with no line numbers, so edits do not churn the baseline.
+
+- **Run it after every batch** and before pushing: `.venv/Scripts/python.exe scripts/ty_baseline_gate.py` (Linux: `.venv/bin/python`). It takes about 30 s. Exit 0 = pass, 1 = new diagnostics (listed with `file:line`), 2 = tool failure (for example, ty is not the version that `pyproject.toml` pins).
+- **New diagnostic:** fix the code, or add `# ty: ignore[<rule>]` for a false positive. Upstream code is ty-clean in upstream CI, so after a sync a new diagnostic usually comes from a fork blend or from fork code that uses a changed upstream API.
+- **Update the baselines only on purpose:** run `python scripts/ty_baseline_gate.py --update`, review `git diff scripts/ty_baseline/`, and commit the baseline with the change. Also run `--update` when the gate reports that baseline diagnostics are gone, and in the same commit as a ty version bump.
+- **Pre-push hook:** install it once per clone with `sh scripts/install-git-hooks.sh`. It runs the gate only when the push changes `backend/`, `pyproject.toml`, `uv.lock`, or the gate files. It exports each pushed commit with `git archive` to a temporary directory and checks it there with that commit's own gate and baselines, so uncommitted edits do not affect the result (about 3 s of export plus the ty run per pushed branch). `TY_GATE_PYTHON` overrides the interpreter.
+- **CI:** `.github/workflows/fork-ty-gate.yml` (fork-only) runs the same gate on each push to `main`, with upstream's ty environment on a GitHub-hosted arm64 runner. If CI reports diagnostics that the local run does not, the CI packages differ from the local venv. The log prints the lines in baseline format, and the `ty-current-diagnostics` artifact holds the full current files.
+
 ## Verification Checklist (before pushing)
 
 Keep this as a runnable script (`scripts/sync-verify.sh`) so agents and the Codex checker can execute it mechanically — per batch for the cheap checks (tsc, custom-feature pytest), and in full before pushing.
@@ -322,6 +333,7 @@ Known baseline (as of 2026-07-29, ruff-clean tree):
 [ ] npx next build                            → compiles (Windows NTFS colon issue is OS-level, not code)
 [ ] python -m pytest backend/tests/unit/ -v   → all pass
 [ ] python -m ruff check backend/             → clean (or only pre-existing upstream issues)
+[ ] python scripts/ty_baseline_gate.py        → PASS (no new ty diagnostics)
 [ ] npx prettier --check "src/**"             → clean on custom files
 [ ] python -m alembic heads                   → single head
 [ ] git diff origin/main..HEAD | grep -iE "AKIA|aws_secret|password=" → no real secrets
@@ -386,6 +398,7 @@ Refresh this table before each sync (Pre-work step 4) — diff `upstream/main..H
 | CRM frontend unit tests | `web/src/lib/crmService.test.ts`, `web/src/components/ContactAvatar.test.tsx`, `web/src/views/crm/crmOptions.test.ts`, `web/src/views/crm/components/crmDateUtils.test.ts`, `web/src/views/crm/components/CrmDateRangeFilter.test.ts` | `cd web && npx jest src/lib/crmService.test.ts src/components/ContactAvatar.test.tsx src/views/crm` |
 | Cloudflare Tunnel  | `deployment/docker_compose/docker-compose.prod-tunnel.yml`, `deployment/docker_compose/env.ec2.cloudflare.template`, `deployment/data/nginx/app.conf.template.tunnel`, `deployment/docker_compose/onyx.service.tunnel`, `deployment/docker_compose/bootstrap-env.sh` | Files exist and are unmodified                                                                                                                                    |
 | Image publishing + prod deploy | `.github/workflows/build-images.yml`, `deployment/docker_compose/docker-compose.prod.yml`, `deployment/docker_compose/env.prod.template`, `backend/Dockerfile` (no `--require-hashes`), `backend/Dockerfile.model_server` | Files exist; Dockerfile keeps hashless pip install (commit 03d16f7794) |
+| ty baseline gate | `scripts/ty_baseline_gate.py`, `scripts/ty_baseline/`, `scripts/git-hooks/pre-push`, `scripts/install-git-hooks.sh`, `.github/workflows/fork-ty-gate.yml` | `python scripts/ty_baseline_gate.py` passes; see "Type-check Gate (ty)" |
 | Windows dev scripts | `scripts/run_api_server.ps1`, `run_bg_jobs.ps1`, `run_frontend.ps1`, `run_infra.ps1`, `run_model_server.ps1`, `stop_all.ps1`, `tail_logs.ps1`, `start_dev.ps1`, `start_bg_jobs.ps1`, `scripts/sync-verify.sh` | Files exist and are unmodified |
 | CRM sidebar nav    | `web/src/sections/sidebar/AppSidebar.tsx`                                                                                               | CRM button present with SvgOrganization icon                                                                                                                      |
 | Timezone in chat   | `web/src/app/app/services/lib.tsx` (payload field), `backend/onyx/chat/llm_loop.py` (`timezone` kwarg on `run_llm_loop`), `backend/onyx/utils/datetime_utils.py`, `backend/onyx/prompts/prompt_utils.py`, `backend/onyx/chat/prompt_utils.py` (calendar-tool timezone guidance) | `timezone` field in chat payload, `timezone` kwarg in `run_llm_loop`                                                                                              |

@@ -1,0 +1,127 @@
+#!/bin/sh
+#
+# pre-push — fork-only hook that runs the ty baseline gate
+# (scripts/ty_baseline_gate.py) on each pushed commit whose changes can change
+# ty's result. Each pushed tip is exported with `git archive` into a temporary
+# directory and checked there with that commit's own gate and baselines, so
+# uncommitted edits and the checked-out branch do not affect the result.
+# CI runs the same gate on every push to main (.github/workflows/fork-ty-gate.yml),
+# so `git push --no-verify` only moves a failure to CI.
+#
+# Install once per clone: sh scripts/install-git-hooks.sh
+# Set TY_GATE_PYTHON to use an interpreter other than the repo venv's.
+
+gate_paths='^(backend/|scripts/ty_baseline|pyproject\.toml$|uv\.lock$)'
+# What the gate reads from a pushed commit.
+export_paths='backend pyproject.toml scripts/ty_baseline_gate.py scripts/ty_baseline'
+
+root=$(git rev-parse --show-toplevel) || exit 1
+
+# "sha:ref" tokens (a ref name cannot contain ":"), one per distinct tip.
+tips=
+while read -r local_ref local_sha _ remote_sha; do
+  # An all-zero SHA means "no commit". Local all-zero: branch deletion.
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+
+  case "$remote_sha" in
+    *[!0]*)
+      if git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        changed=$(git diff --name-only "$remote_sha" "$local_sha")
+      else
+        # Remote tip is not known locally: check to be safe.
+        changed=backend/
+      fi
+      ;;
+    *)
+      # New remote branch: files in commits that no remote-tracking ref has.
+      changed=$(git log --format= --name-only "$local_sha" --not --remotes)
+      ;;
+  esac
+  if printf '%s\n' "$changed" | grep -Eq "$gate_paths"; then
+    case " $tips " in
+      *" $local_sha:"*) ;;
+      *) tips="$tips $local_sha:$local_ref" ;;
+    esac
+  fi
+done
+
+if [ -z "$tips" ]; then
+  echo "pre-push: no backend/ or ty-gate changes in this push; ty gate skipped."
+  exit 0
+fi
+
+# Prefer TY_GATE_PYTHON, then the venv of this checkout, then the main
+# checkout's venv (linked worktrees usually have none). Bare `python` may be a
+# broken pyenv shim.
+PYTHON=${TY_GATE_PYTHON:-}
+if [ -z "$PYTHON" ]; then
+  common_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+  main_root=$(dirname "$common_dir")
+  for venv in "$root/.venv" "$main_root/.venv"; do
+    for candidate in "$venv/Scripts/python.exe" "$venv/bin/python"; do
+      if [ -x "$candidate" ]; then
+        PYTHON=$candidate
+        break 2
+      fi
+    done
+  done
+fi
+if [ -z "$PYTHON" ]; then
+  PYTHON=$(command -v python3 || command -v python)
+fi
+if [ -z "$PYTHON" ]; then
+  echo "pre-push: no Python found (TY_GATE_PYTHON, .venv or PATH); cannot run the ty gate." >&2
+  exit 1
+fi
+
+tmp_base=$(mktemp -d 2>/dev/null) || tmp_base="${TMPDIR:-/tmp}/ty-gate.$$"
+mkdir -p "$tmp_base" || exit 1
+trap 'rm -rf "$tmp_base"' EXIT
+trap 'exit 130' INT TERM
+
+failed=
+for tip in $tips; do
+  sha=${tip%%:*}
+  ref=${tip#*:}
+  short=$(git rev-parse --short "$sha")
+
+  if ! git cat-file -e "$sha:scripts/ty_baseline_gate.py" 2>/dev/null; then
+    echo "pre-push: $ref ($short) has no scripts/ty_baseline_gate.py; ty gate skipped for it."
+    continue
+  fi
+
+  paths=
+  for path in $export_paths; do
+    if git cat-file -e "$sha:$path" 2>/dev/null; then
+      paths="$paths $path"
+    fi
+  done
+
+  dir="$tmp_base/$short"
+  mkdir -p "$dir"
+  # shellcheck disable=SC2086 # $paths is a word list of repo paths
+  if ! git archive --format=tar "$sha" -- $paths | tar -xf - -C "$dir"; then
+    echo "pre-push: could not export $ref ($short) for the ty gate." >&2
+    failed="$failed $ref($short)"
+    continue
+  fi
+
+  echo "pre-push: running ty baseline gate on $ref ($short), about 30s..."
+  "$PYTHON" "$dir/scripts/ty_baseline_gate.py"
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    failed="$failed $ref($short)"
+  fi
+  rm -rf "$dir"
+done
+
+if [ -n "$failed" ]; then
+  echo "pre-push: ty baseline gate failed for:$failed. Push aborted." >&2
+  echo "pre-push: the gate checks the pushed commits, not the working tree. Commit the fix, then push again." >&2
+  if [ -n "$(git -C "$root" status --porcelain -- backend pyproject.toml)" ]; then
+    echo "pre-push: note: uncommitted changes under backend/ are not part of this push." >&2
+  fi
+  echo "pre-push: to push anyway: git push --no-verify (CI runs the same gate on main)." >&2
+  exit 1
+fi
+exit 0
