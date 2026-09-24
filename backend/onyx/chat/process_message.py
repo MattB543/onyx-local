@@ -726,7 +726,7 @@ def build_chat_turn(
         model_display_names.append(_build_model_display_name(override, llm))
     token_counter = get_llm_token_counter(llms[0])
 
-    promoted_user_file_ids: list[int] = []
+    promoted_user_file_ids: list[UUID] = []
     if new_msg_req.index_for_later_file_ids and not record_mode_persists_content(
         chat_session.incognito_record_mode
     ):
@@ -1186,6 +1186,7 @@ class _PersistContext(Enum):
     STOP_BUTTON = "stop-button"
     NORMAL = "normal"
     POST_STEPS = "post-steps"
+    NO_OUTCOME = "no-outcome"
 
 
 # How often the drain loop polls for user-initiated cancellation (stop button).
@@ -1196,7 +1197,7 @@ _FENCE_REFRESH_INTERVAL_S: Final[float] = 60.0
 
 
 def _model_error_details(
-    error: Exception,
+    error: Exception | None,
     llm: LLM,
     model_index: int,
 ) -> dict[str, str | int | None]:
@@ -1210,6 +1211,15 @@ def _model_error_details(
         details["finish_reason"] = error.finish_reason
 
     return details
+
+
+def _unclassified_model_error() -> LLMErrorInfo:
+    """Error info to stream and save when classifying the real exception fails."""
+    return LLMErrorInfo(
+        message="The model stopped unexpectedly.",
+        error_code="MODEL_ERROR",
+        is_retryable=True,
+    )
 
 
 def _run_models(
@@ -1315,6 +1325,8 @@ def _run_models(
             errored = model_errored[model_idx]
             if not succeeded and not errored and not stop_button:
                 return
+            # Claimed before the save runs, so a failed save is not retried by
+            # a later exit path. Known gap, kept for now.
             persisted[model_idx] = True
 
         if errored:
@@ -1385,17 +1397,23 @@ def _run_models(
             logger.exception("post-steps processing status reset failed")
 
     def _run_model(model_idx: int) -> None:
-        """Run one LLM loop inside a worker thread, writing packets to ``merged_queue``."""
+        """Run one LLM loop inside a worker thread, writing packets to ``merged_queue``.
 
-        model_emitter = Emitter(
-            model_idx=model_idx,
-            merged_queue=merged_queue,
-            drain_done=drain_done,
-        )
-        sc = state_containers[model_idx]
-        model_llm = setup.llms[model_idx]
-
+        The whole body is one boundary: an ``Exception`` always queues an error
+        item, and every exit queues ``_MODEL_DONE``. Without the error item,
+        the stream ends with no error and no stop packet. Without
+        ``_MODEL_DONE``, the writer waits for this model forever. Other
+        BaseExceptions are not caught here; the writer's
+        ``_fail_model_without_outcome`` handles them when DONE arrives."""
         try:
+            model_emitter = Emitter(
+                model_idx=model_idx,
+                merged_queue=merged_queue,
+                drain_done=drain_done,
+            )
+            sc = state_containers[model_idx]
+            model_llm = setup.llms[model_idx]
+
             # Each function opens short-lived DB sessions on demand.
             # Do NOT pass a long-lived session here — it would hold a
             # connection for the entire LLM loop (minutes), and cloud
@@ -1484,22 +1502,46 @@ def _run_models(
             model_succeeded[model_idx] = True
 
         except Exception as e:
+            model_errored[model_idx] = True
+            # Generic until classified, so a classifier failure still streams
+            # and saves an error for this model.
+            error_info = _unclassified_model_error()
+            try:
+                error_info = litellm_exception_to_safe_error(
+                    e, setup.llms[model_idx], fallback_to_error_msg=True
+                )
+            except Exception:
+                try:
+                    logger.exception(
+                        "error classification failed for model %d", model_idx
+                    )
+                except Exception:
+                    pass
+            model_error_info[model_idx] = error_info
             # Log server-side too — otherwise the traceback only reaches the
             # browser via StreamingError and never appears in container logs.
-            logger.exception(
-                "LLM loop failed for model %s (chat_session_id=%s)",
-                setup.model_display_names[model_idx],
-                setup.chat_session.id,
-            )
-            model_errored[model_idx] = True
-            model_error_info[model_idx] = litellm_exception_to_safe_error(
-                e, model_llm, fallback_to_error_msg=True
-            )
+            try:
+                logger.exception(
+                    "LLM loop failed for model %s (chat_session_id=%s)",
+                    setup.model_display_names[model_idx],
+                    setup.chat_session_id,
+                )
+            except Exception:
+                pass
             merged_queue.put((model_idx, e))
 
         finally:
-            _persist_model_outcome(model_idx, _PersistContext.WORKER)
-            merged_queue.put((model_idx, _MODEL_DONE))
+            try:
+                _persist_model_outcome(model_idx, _PersistContext.WORKER)
+            except Exception:
+                logger.exception(
+                    "%s persist failed for model %d",
+                    _PersistContext.WORKER.value,
+                    model_idx,
+                )
+            finally:
+                # The writer's only completion signal for this model.
+                merged_queue.put((model_idx, _MODEL_DONE))
 
     def _save_errored_message(model_idx: int, context: _PersistContext) -> None:
         """Save an error message to a reserved ChatMessage that failed during execution."""
@@ -1556,6 +1598,46 @@ def _run_models(
         if not reader_gone.is_set():
             tee.put(item)
 
+    def _fail_model_without_outcome(model_idx: int) -> None:
+        """Writer-side: turn a finished worker with no outcome into a model error.
+
+        A BaseException (e.g. ``CancelledError``) skips the worker's
+        ``except Exception``, so the worker sets no flag, its persist is a
+        no-op, and it queues no error item. Without this, the model ends with
+        no error and no stop, and its reserved row keeps the placeholder."""
+        with persist_lock:
+            # A claimed row (e.g. by the stop button) keeps its outcome.
+            if (
+                persisted[model_idx]
+                or model_succeeded[model_idx]
+                or model_errored[model_idx]
+            ):
+                return
+            model_errored[model_idx] = True
+            info = _unclassified_model_error()
+            model_error_info[model_idx] = info
+
+        logger.error(
+            "worker for model %d ended with no outcome; streaming a generic error",
+            model_idx,
+        )
+        _publish(
+            StreamingError(
+                error=info.message,
+                error_code=info.error_code,
+                is_retryable=info.is_retryable,
+                details=_model_error_details(None, setup.llms[model_idx], model_idx),
+            )
+        )
+        try:
+            _persist_model_outcome(model_idx, _PersistContext.NO_OUTCOME)
+        except Exception:
+            logger.exception(
+                "%s persist failed for model %d",
+                _PersistContext.NO_OUTCOME.value,
+                model_idx,
+            )
+
     def _drain_to_completion() -> None:
         """Writer: consume worker output to the very end regardless of client state."""
         models_remaining = n_models
@@ -1606,6 +1688,7 @@ def _run_models(
                     continue
                 if item is _MODEL_DONE:
                     models_remaining -= 1
+                    _fail_model_without_outcome(model_idx)
                 elif isinstance(item, Exception):
                     # Publish a tagged error for this model but keep the other
                     # models running. Do NOT decrement models_remaining —
@@ -1657,13 +1740,22 @@ def _run_models(
                 )
             )
         finally:
-            # Mark done before _run_post_steps clears the fence so resume
-            # readers never see a fence-less, not-done buffer and drop the tail.
-            if stream_buffer is not None:
-                stream_buffer.mark_done()
-            _run_post_steps()
-            tee.put(_STREAM_DONE)
-            executor.shutdown(wait=False)
+            # No cleanup failure may skip _STREAM_DONE: without it the reader
+            # sends heartbeats forever and the client never sees the end.
+            try:
+                # Mark done before _run_post_steps clears the fence so resume
+                # readers never see a fence-less, not-done buffer and drop the tail.
+                if stream_buffer is not None:
+                    try:
+                        stream_buffer.mark_done()
+                    except Exception:
+                        logger.exception("stream buffer mark_done failed")
+                _run_post_steps()
+            except Exception:
+                logger.exception("chat stream post-steps failed")
+            finally:
+                tee.put(_STREAM_DONE)
+                executor.shutdown(wait=False)
 
     # Each worker thread needs its own Context copy — a single Context object
     # cannot be entered concurrently by multiple threads (RuntimeError).
@@ -1912,7 +2004,11 @@ def _stream_chat_turn(
 
         llm = setup.llms[0] if setup else None
         if llm:
-            error_info = litellm_exception_to_safe_error(e, llm)
+            try:
+                error_info = litellm_exception_to_safe_error(e, llm)
+            except Exception:
+                logger.exception("chat error classification failed")
+                error_info = _unclassified_model_error()
             stack_trace = scrub_sensitive_values(
                 stack_trace,
                 collect_credential_values(llm.config.api_key, llm.config.custom_config),

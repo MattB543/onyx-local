@@ -5,9 +5,13 @@ The validation logic in handle_multi_model_stream fires before any external
 calls, so we can trigger it with lightweight mocks.
 """
 
+import asyncio
+import dataclasses
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Iterator
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -15,6 +19,7 @@ from uuid import uuid4
 import pytest
 from litellm.exceptions import ContextWindowExceededError
 
+from onyx.chat.chat_state import ChatTurnSetup
 from onyx.chat.llm_loop import EmptyLLMResponseError
 from onyx.chat.models import StreamingError
 from onyx.configs.constants import MessageType
@@ -252,8 +257,11 @@ class TestLLMOverrideDisplayName:
 
 
 def _make_setup(n_models: int = 1) -> MagicMock:
-    """Minimal ChatTurnSetup mock whose fields pass Pydantic validation in _run_model."""
-    setup = MagicMock()
+    """Minimal ChatTurnSetup mock whose fields pass Pydantic validation in _run_model.
+
+    Specced to the dataclass fields, so reading an attribute ChatTurnSetup
+    doesn't have fails here instead of only in production."""
+    setup = MagicMock(spec=[field.name for field in dataclasses.fields(ChatTurnSetup)])
     setup.llms = [MagicMock() for _ in range(n_models)]
     # Real int so the min() over model windows in _persist_model_outcome works.
     for mock_llm in setup.llms:
@@ -1028,6 +1036,257 @@ class TestRunModels:
         assert call_kwargs["state_container"] is external
 
 
+# ---------------------------------------------------------------------------
+# _run_models — the stream always ends, even when error handling fails
+# ---------------------------------------------------------------------------
+
+# A regression here is a stream that never ends, so fail on a timeout
+# instead of hanging the test run.
+_STREAM_END_TIMEOUT_S = 10.0
+
+
+def _collect_until_stream_end(setup: MagicMock, **kwargs: Any) -> list[Any]:
+    """Drain _run_models on a daemon thread. Fail, not hang, if it never ends."""
+    from onyx.chat.process_message import _run_models
+
+    items: list[Any] = []
+    failures: list[BaseException] = []
+    ended = threading.Event()
+
+    def _consume() -> None:
+        try:
+            items.extend(_run_models(setup, MagicMock(), **kwargs))
+        except BaseException as exc:
+            failures.append(exc)
+        finally:
+            ended.set()
+
+    threading.Thread(target=_consume, daemon=True).start()
+    if not ended.wait(timeout=_STREAM_END_TIMEOUT_S):
+        # Release a stuck writer through the stop-button path.
+        setup.check_is_connected = MagicMock(return_value=False)
+        pytest.fail("chat stream never ended")
+    if failures:
+        raise failures[0]
+    return items
+
+
+def _raise_on_log(prefix: str, raised: threading.Event) -> Callable[..., None]:
+    """Stand-in for logger.exception that raises for one message format."""
+
+    def _exception(msg: str, *_args: Any, **_kwargs: Any) -> None:
+        if msg.startswith(prefix):
+            raised.set()
+            raise RuntimeError("logging failed")
+
+    return _exception
+
+
+@contextmanager
+def _patched_worker_deps(
+    run_llm_loop_side_effect: Any = None,
+) -> Iterator[MagicMock]:
+    """Patch the worker's external calls. Yields the DB session factory mock."""
+    with (
+        patch(
+            "onyx.chat.process_message.run_llm_loop",
+            side_effect=run_llm_loop_side_effect,
+        ),
+        patch("onyx.chat.process_message.run_deep_research_llm_loop"),
+        patch("onyx.chat.process_message.construct_tools", return_value={}),
+        patch("onyx.chat.process_message.llm_loop_completion_handle"),
+        patch(
+            "onyx.chat.process_message.get_llm_token_counter",
+            return_value=lambda _: 0,
+        ),
+        patch("onyx.chat.process_message.load_settings"),
+        patch(
+            "onyx.chat.process_message.get_session_with_current_tenant"
+        ) as mock_get_session,
+    ):
+        yield mock_get_session
+
+
+class TestRunModelsStreamAlwaysEnds:
+    """A failure inside error handling or cleanup must still end the stream
+    with an error or a stop, so the client never waits forever."""
+
+    def test_classification_failure_still_streams_error(self) -> None:
+        setup = _make_setup()
+        setup.incognito_record_mode = None
+
+        with (
+            _patched_worker_deps(RuntimeError("provider down")) as mock_get_session,
+            patch(
+                "onyx.chat.process_message.litellm_exception_to_safe_error",
+                side_effect=RuntimeError("classifier failed"),
+            ),
+        ):
+            packets = _collect_until_stream_end(setup)
+
+        errors = [p for p in packets if isinstance(p, StreamingError)]
+        assert len(errors) == 1
+        assert errors[0].error == "The model stopped unexpectedly."
+        assert errors[0].error_code == "MODEL_ERROR"
+        assert errors[0].is_retryable is True
+        # The saved row gets the same generic error.
+        saved = mock_get_session.return_value.__enter__.return_value.get.return_value
+        assert saved.error == "Error from model-0: The model stopped unexpectedly."
+
+    def test_log_failure_still_streams_error(self) -> None:
+        """The worker's own error log raises (the shape of the P0-1 bug)."""
+        setup = _make_setup()
+        log_raised = threading.Event()
+
+        with (
+            _patched_worker_deps(RuntimeError("provider down")),
+            patch(
+                "onyx.chat.process_message.logger.exception",
+                side_effect=_raise_on_log("LLM loop failed", log_raised),
+            ),
+        ):
+            packets = _collect_until_stream_end(setup)
+
+        assert log_raised.is_set()
+        errors = [p for p in packets if isinstance(p, StreamingError)]
+        assert len(errors) == 1
+        assert errors[0].error_code == "UNKNOWN_ERROR"
+        assert "provider down" in errors[0].error
+
+    def test_worker_persist_failure_still_ends_stream(self) -> None:
+        """Persistence raising in the worker's finally must not lose
+        _MODEL_DONE, or the writer waits for the model forever."""
+        setup = _make_setup()
+        log_raised = threading.Event()
+
+        with (
+            _patched_worker_deps(RuntimeError("provider down")) as mock_get_session,
+            patch(
+                "onyx.chat.process_message.logger.exception",
+                side_effect=_raise_on_log("%s error save failed", log_raised),
+            ),
+        ):
+            mock_get_session.side_effect = RuntimeError("db down")
+            packets = _collect_until_stream_end(setup)
+
+        assert log_raised.is_set()
+        errors = [p for p in packets if isinstance(p, StreamingError)]
+        assert len(errors) == 1
+        assert "provider down" in errors[0].error
+
+    def test_mark_done_failure_still_ends_stream(self) -> None:
+        setup = _make_setup()
+        stream_buffer = MagicMock()
+        stream_buffer.mark_done.side_effect = RuntimeError("cache down")
+
+        with (
+            _patched_worker_deps(),
+            patch("onyx.chat.process_message.set_processing_status") as mock_status,
+        ):
+            _collect_until_stream_end(setup, stream_buffer=stream_buffer)
+
+        stream_buffer.mark_done.assert_called_once()
+        # Post-steps still ran and cleared the processing fence.
+        mock_status.assert_called_with(
+            chat_session_id=setup.chat_session_id, cache=setup.cache, value=False
+        )
+
+    def test_post_steps_failure_still_ends_stream(self) -> None:
+        setup = _make_setup()
+        log_raised = threading.Event()
+
+        with (
+            _patched_worker_deps(),
+            patch(
+                "onyx.chat.process_message.set_processing_status",
+                side_effect=RuntimeError("cache down"),
+            ),
+            patch(
+                "onyx.chat.process_message.logger.exception",
+                side_effect=_raise_on_log(
+                    "post-steps processing status reset failed", log_raised
+                ),
+            ),
+        ):
+            _collect_until_stream_end(setup)
+
+        assert log_raised.is_set()
+
+    def test_worker_base_exception_streams_and_saves_error(self) -> None:
+        """A BaseException skips the worker's ``except Exception``. The writer
+        must still stream and save an error, for that model only."""
+        setup = _make_setup(n_models=2)
+        setup.incognito_record_mode = None
+
+        def cancel_model_0(**kwargs: Any) -> None:
+            if kwargs["llm"] is setup.llms[0]:
+                raise asyncio.CancelledError()
+            kwargs["emitter"].emit(
+                Packet(placement=Placement(turn_index=0), obj=ReasoningStart())
+            )
+
+        with _patched_worker_deps(cancel_model_0) as mock_get_session:
+            packets = _collect_until_stream_end(setup)
+
+        errors = [p for p in packets if isinstance(p, StreamingError)]
+        assert len(errors) == 1
+        assert errors[0].error == "The model stopped unexpectedly."
+        assert errors[0].error_code == "MODEL_ERROR"
+        assert errors[0].details is not None
+        assert errors[0].details["model_index"] == 0
+        reasoning = [
+            p
+            for p in packets
+            if isinstance(p, Packet) and isinstance(p.obj, ReasoningStart)
+        ]
+        assert [p.placement.model_index for p in reasoning] == [1]
+        db_session = mock_get_session.return_value.__enter__.return_value
+        db_session.get.assert_called_once_with(
+            ChatMessage, setup.reserved_messages[0].id
+        )
+        assert (
+            db_session.get.return_value.error
+            == "Error from model-0: The model stopped unexpectedly."
+        )
+
+    def test_user_stopped_model_is_not_turned_into_error(self) -> None:
+        """A model the stop button already saved keeps its stopped outcome,
+        even when its worker then ends with a BaseException."""
+        setup = _make_setup()
+        setup.check_is_connected = MagicMock(return_value=False)
+        executors: list[ThreadPoolExecutor] = []
+
+        def tracking_executor(*args: Any, **kwargs: Any) -> ThreadPoolExecutor:
+            executor = ThreadPoolExecutor(*args, **kwargs)
+            executors.append(executor)
+            return executor
+
+        def slow_then_cancelled(**_kwargs: Any) -> None:
+            time.sleep(0.2)  # Outlasts the 50 ms stop poll
+            raise asyncio.CancelledError()
+
+        with (
+            _patched_worker_deps(slow_then_cancelled) as mock_get_session,
+            patch(
+                "onyx.chat.process_message.ThreadPoolExecutor",
+                side_effect=tracking_executor,
+            ),
+        ):
+            packets = _collect_until_stream_end(setup)
+            # Join the worker so its exit path has fully run.
+            executors[0].shutdown(wait=True)
+
+        assert not [p for p in packets if isinstance(p, StreamingError)]
+        assert any(
+            isinstance(p, Packet)
+            and isinstance(p.obj, OverallStop)
+            and p.obj.stop_reason == "user_cancelled"
+            for p in packets
+        )
+        # No error save: the stopped snapshot stays the row's outcome.
+        mock_get_session.assert_not_called()
+
+
 def test_worker_traceback_only_reaches_development_clients() -> None:
     for dev_mode in (False, True):
         setup = _make_setup()
@@ -1060,3 +1319,44 @@ def test_worker_traceback_only_reaches_development_clients() -> None:
             assert error.stack_trace and "worker-frame" in error.stack_trace
         else:
             assert error.stack_trace is None
+
+
+def test_turn_level_classification_failure_still_streams_error() -> None:
+    """_stream_chat_turn's catch-all must yield an error even when
+    classifying the exception fails."""
+    from onyx.chat.process_message import _stream_chat_turn
+
+    setup = _make_setup()
+    setup.incognito_record_mode = None
+    setup.llms[0].config.api_key = None
+    setup.llms[0].config.custom_config = None
+
+    def fake_build_chat_turn(**_kwargs: Any) -> Generator[Packet, None, MagicMock]:
+        yield from ()
+        return setup
+
+    user = MagicMock()
+    user.is_anonymous = False
+
+    with (
+        patch("onyx.chat.process_message.get_session_with_current_tenant"),
+        patch(
+            "onyx.chat.process_message.build_chat_turn",
+            side_effect=fake_build_chat_turn,
+        ),
+        patch(
+            "onyx.chat.process_message.StreamBufferWriter",
+            side_effect=RuntimeError("cache down"),
+        ),
+        patch(
+            "onyx.chat.process_message.litellm_exception_to_safe_error",
+            side_effect=RuntimeError("classifier failed"),
+        ),
+        patch("onyx.chat.process_message.set_processing_status"),
+    ):
+        packets = list(_stream_chat_turn(_make_request(), user))
+
+    errors = [p for p in packets if isinstance(p, StreamingError)]
+    assert len(errors) == 1
+    assert errors[0].error == "The model stopped unexpectedly."
+    assert errors[0].error_code == "MODEL_ERROR"
