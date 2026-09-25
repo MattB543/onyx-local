@@ -241,6 +241,39 @@ def test_list_and_get_include_names(
     assert fetched["contact"]["owners"][0]["name"] == "Olive Owner"
 
 
+def test_get_contact_names_its_principal_and_creator(
+    db_session: Session, crm: CrmRecords, tools: ReadTools
+) -> None:
+    """X4: the model echoed principal_contact_id to the user. Each id the model
+    sees on a contact now has the name next to it."""
+    creator = crm.user()
+    creator.personal_name = "Casey Creator"
+    db_session.commit()
+    official = crm.contact(first_name="Jane", last_name="Official")
+    staffer = crm.contact(
+        principal="Jane Official",
+        principal_contact_id=official.id,
+        created_by=creator.id,
+    )
+
+    contact = call_model_view(
+        tools.get, entity_type="contact", entity_id=str(staffer.id)
+    )["contact"]
+    assert contact["principal_contact_id"] == str(official.id)
+    assert contact["principal_contact_name"] == "Jane Official"
+    assert contact["created_by"] == str(creator.id)
+    assert contact["created_by_name"] == "Casey Creator"
+
+    staff = call_model_view(
+        tools.get,
+        entity_type="contact",
+        entity_id=str(official.id),
+        include=["staff"],
+    )["staff"]["items"]
+    assert [row["principal_contact_name"] for row in staff] == ["Jane Official"]
+    assert "UUIDs are for tool calls only" in tools.get.description
+
+
 def test_get_contact_interactions_include_attendee_only(
     crm: CrmRecords, tools: ReadTools
 ) -> None:

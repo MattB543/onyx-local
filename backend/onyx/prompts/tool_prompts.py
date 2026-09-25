@@ -116,6 +116,7 @@ already exist. Duplicates waste everyone's time.
 ask which one they mean.
 - **Be specific in confirmations.** After creating or updating, confirm what was done with key details \
 (e.g. "Created contact Sarah Chen (sarah@acme.com) at Acme Corp, tagged as 'enterprise-lead'.").
+- **Refer to records by name, never by ID.** CRM results include UUIDs (`id` and `*_id` fields) so you can pass them to other CRM tools. Never show a UUID to the user; use the name given next to it (e.g. `organization_name`, `principal_contact_name`, `contact_name`, owner and attendee names).
 - **Link things together.** When logging an interaction, always try to associate it with both a contact AND their organization.
 - **Use natural status flows.** New people start as "lead". Move to "active" once there's a real relationship. \
 "Inactive" for gone cold. "Archived" for no longer relevant.

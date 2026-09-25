@@ -61,6 +61,14 @@ REQUIRED_CRM_TABLES = {
 }
 
 
+# Tool results carry UUIDs for follow-up calls; the model echoed them to
+# users. Every UUID field has a name field next to it.
+REFER_BY_NAME_NOTE = (
+    "In replies, refer to records by name; UUIDs are for tool calls only, "
+    "never show them to the user."
+)
+
+
 CrmToolDelta = (
     CrmCreateToolDelta
     | CrmGetToolDelta
@@ -239,8 +247,16 @@ class CrmNames:
         interactions: Iterable[CrmInteraction] = (),
         attendees: Iterable[CrmInteractionAttendee] = (),
     ) -> CrmNames:
+        contacts = list(contacts)
         user_ids = set(owner_ids)
-        contact_ids: set[UUID] = set()
+        user_ids.update(
+            contact.created_by for contact in contacts if contact.created_by
+        )
+        contact_ids = {
+            contact.principal_contact_id
+            for contact in contacts
+            if contact.principal_contact_id
+        }
         organization_ids = {
             contact.organization_id for contact in contacts if contact.organization_id
         }
@@ -317,6 +333,11 @@ def serialize_contact(
         "principal_contact_id": (
             str(contact.principal_contact_id) if contact.principal_contact_id else None
         ),
+        "principal_contact_name": (
+            names.contacts.get(contact.principal_contact_id)
+            if contact.principal_contact_id
+            else None
+        ),
         "notes": contact.notes,
         "linkedin_url": contact.linkedin_url,
         "location": contact.location,
@@ -327,6 +348,7 @@ def serialize_contact(
             else None
         ),
         "created_by": str(contact.created_by) if contact.created_by else None,
+        "created_by_name": names.user_name(contact.created_by),
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
         "updated_at": contact.updated_at.isoformat() if contact.updated_at else None,
         "tags": [serialize_tag(tag) for tag in (tags or [])],

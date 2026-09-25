@@ -29,6 +29,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
+    REFER_BY_NAME_NOTE,
     crm_tool_response,
     is_crm_schema_available,
     parse_datetime_maybe,
@@ -95,7 +96,7 @@ class CrmListTool(Tool[None]):
         "contacts with a tag, an org's interactions, or contacts/orgs updated this "
         "week. A contact's or org's updated_at changes when the record or its "
         "directly related data (tags, owners, interactions) changes. Filters that "
-        "don't apply to the chosen entity_type are rejected."
+        "don't apply to the chosen entity_type are rejected. " + REFER_BY_NAME_NOTE
     )
 
     def __init__(

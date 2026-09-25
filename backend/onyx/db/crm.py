@@ -72,6 +72,8 @@ class CrmContactAffiliation:
     organization_name: str | None
     principal: str | None
     principal_contact_id: UUID | None
+    # The linked official's current name, so the id never needs showing.
+    principal_contact_name: str | None
 
 
 def _normalize_page(page_num: int, page_size: int) -> tuple[int, int]:
@@ -1940,7 +1942,7 @@ def get_contact_affiliations(
     contact_ids: set[UUID], db_session: Session
 ) -> dict[UUID, CrmContactAffiliation]:
     """Title, organization name and principal for each contact: one contact
-    query and one organization-name query."""
+    query, then one name query each for organizations and linked officials."""
     if not contact_ids:
         return {}
     rows = db_session.execute(
@@ -1955,6 +1957,10 @@ def get_contact_affiliations(
     organization_names = get_organization_names(
         {row.organization_id for row in rows if row.organization_id}, db_session
     )
+    principal_names = get_contact_names(
+        {row.principal_contact_id for row in rows if row.principal_contact_id},
+        db_session,
+    )
     return {
         row.id: CrmContactAffiliation(
             title=row.title,
@@ -1965,6 +1971,11 @@ def get_contact_affiliations(
             ),
             principal=row.principal,
             principal_contact_id=row.principal_contact_id,
+            principal_contact_name=(
+                principal_names.get(row.principal_contact_id)
+                if row.principal_contact_id
+                else None
+            ),
         )
         for row in rows
     }

@@ -26,6 +26,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
+    REFER_BY_NAME_NOTE,
     crm_tool_response,
     is_crm_schema_available,
     serialize_contacts,
@@ -67,7 +68,9 @@ class CrmGetTool(Tool[None]):
     DESCRIPTION = (
         "Get a CRM record by UUID. Contacts include tags and owners; organizations "
         "include tags; interactions include attendees and their linked contact/org. "
-        "Use include for related records (latest 10); use crm_list to see more."
+        "Use include for related records (latest 10), e.g. include=['staff'] on an "
+        "official's contact for their staffers; use crm_list to see more. "
+        + REFER_BY_NAME_NOTE
     )
 
     def __init__(

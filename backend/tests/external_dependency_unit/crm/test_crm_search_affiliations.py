@@ -1,5 +1,6 @@
 """crm_search tells the model who a contact works for: title, organization and
-principal, loaded in one batch, with empty values and the rank left out."""
+principal (with the linked official's name), loaded in one batch, with empty
+values and the rank left out."""
 
 import json
 from queue import Queue
@@ -15,7 +16,13 @@ from onyx.tools.tool_implementations.crm.crm_search_tool import CrmSearchTool
 from tests.external_dependency_unit.crm.conftest import CrmRecords
 
 PLACEMENT = Placement(turn_index=0, tab_index=0)
-AFFILIATION_KEYS = {"title", "organization_name", "principal", "principal_contact_id"}
+AFFILIATION_KEYS = {
+    "title",
+    "organization_name",
+    "principal",
+    "principal_contact_id",
+    "principal_contact_name",
+}
 
 
 def test_get_contact_affiliations_loads_each_contact(
@@ -42,18 +49,21 @@ def test_get_contact_affiliations_loads_each_contact(
             organization_name=org.name,
             principal="Sara Official",
             principal_contact_id=official.id,
+            principal_contact_name="Sara Official",
         ),
         unlinked.id: CrmContactAffiliation(
             title=None,
             organization_name=None,
             principal="Rep. Someone Else",
             principal_contact_id=None,
+            principal_contact_name=None,
         ),
         bare.id: CrmContactAffiliation(
             title=None,
             organization_name=None,
             principal=None,
             principal_contact_id=None,
+            principal_contact_name=None,
         ),
     }
     assert get_contact_affiliations(set(), db_session) == {}
@@ -93,6 +103,7 @@ def test_search_contacts_include_affiliation_without_rank(
         "organization_name": org.name,
         "principal": "Sara Official",
         "principal_contact_id": str(official.id),
+        "principal_contact_name": "Sara Official",
     }
     assert not AFFILIATION_KEYS & by_id[str(bare.id)].keys()
     assert not AFFILIATION_KEYS & by_id[str(interaction.id)].keys()

@@ -23,6 +23,7 @@ from onyx.server.query_and_chat.streaming_models import (
 from onyx.tools.interface import Tool
 from onyx.tools.models import ToolCallException, ToolResponse
 from onyx.tools.tool_implementations.crm.models import (
+    REFER_BY_NAME_NOTE,
     crm_tool_response,
     is_crm_schema_available,
 )
@@ -49,6 +50,7 @@ def _affiliation_fields(affiliation: CrmContactAffiliation | None) -> dict[str, 
             if affiliation.principal_contact_id
             else None
         ),
+        "principal_contact_name": affiliation.principal_contact_name,
     }
     return {key: value for key, value in fields.items() if value and value.strip()}
 
@@ -75,10 +77,11 @@ class CrmSearchTool(Tool[None]):
         "Keyword search across CRM contacts, organizations, interactions, and tags. "
         "Search before creating to avoid duplicates. To filter by status, tag, org, "
         "or date, use crm_list. Contacts include title, organization and principal "
-        "(the official a staffer works for; principal_contact_id is the official's "
-        "contact ID when linked). To list an official's staff, use crm_list "
-        "entity_type='contact' principal=<name>, or crm_get on the official's "
-        "contact with include=['staff']."
+        "(the official a staffer works for; principal_contact_id and "
+        "principal_contact_name identify the official's contact when linked). To "
+        "list an official's staff, use crm_list entity_type='contact' "
+        "principal=<name>, or crm_get on the official's contact with "
+        "include=['staff']. " + REFER_BY_NAME_NOTE
     )
 
     def __init__(
