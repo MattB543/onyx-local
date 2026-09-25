@@ -1,0 +1,7 @@
+/* The CRM tab pages scroll inside SettingsLayouts.Root. Reserve the
+   scrollbar's space there, so the centered page does not move sideways when
+   a short list (or a shorter tab) removes the scrollbar. Scoped to the pages
+   that render CrmNav, which carries the data-crm-nav marker. */
+#page-wrapper-scroll-container:has([data-crm-nav]) {
+  scrollbar-gutter: stable;
+}

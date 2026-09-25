@@ -347,68 +347,69 @@ export default function CrmContactsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_240px_240px]">
-            <InputTypeIn
-              value={searchText}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                setSearchText(event.target.value);
-                setPageNum(0);
-              }}
-              placeholder="Search contacts"
-              searchIcon
-            />
-
-            <InputSingleSelect
-              value={orgFilterId ?? ""}
-              onChange={(e) => {
-                // Emptying the text clears the filter; re-picking the
-                // selected org in the dropdown also toggles it off ("").
-                if (!e.target.value && orgFilterId) {
-                  setOrgFilterId(undefined);
+          {/* One container for every filter row, so the rows share one gap
+              (the Body's gap-8 is for page sections). The container's width,
+              not the viewport's, picks the layout because the docked sidebar
+              narrows the page: stacked below @xl (a phone), rows from @xl,
+              fixed column widths from @3xl. */}
+          <div className="@container/crmfilters flex flex-col gap-2">
+            <div className="grid grid-cols-1 gap-2 @xl/crmfilters:grid-cols-3 @3xl/crmfilters:grid-cols-[minmax(0,1fr)_240px_240px]">
+              <InputTypeIn
+                value={searchText}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setSearchText(event.target.value);
                   setPageNum(0);
-                }
-              }}
-              onValueChange={(value) => {
-                setOrgFilterId(value || undefined);
-                setPageNum(0);
-              }}
-              options={orgOptions}
-              placeholder="Filter by org"
-              searchIcon
-              isError={false}
-              disabled={!!organizationIdFilter}
-            />
+                }}
+                placeholder="Search contacts"
+                searchIcon
+              />
 
-            <InputSingleSelect
-              value={principalFilter ?? ""}
-              onChange={(e) => {
-                // Emptying the text clears the filter; re-picking the
-                // selected principal also toggles it off ("").
-                if (!e.target.value && principalFilter) {
-                  setPrincipalFilter(undefined);
+              <InputSingleSelect
+                value={orgFilterId ?? ""}
+                onChange={(e) => {
+                  // Emptying the text clears the filter; re-picking the
+                  // selected org in the dropdown also toggles it off ("").
+                  if (!e.target.value && orgFilterId) {
+                    setOrgFilterId(undefined);
+                    setPageNum(0);
+                  }
+                }}
+                onValueChange={(value) => {
+                  setOrgFilterId(value || undefined);
                   setPageNum(0);
-                }
-              }}
-              onValueChange={(value) => {
-                setPrincipalFilter(value || undefined);
-                setPageNum(0);
-              }}
-              options={principalOptions}
-              placeholder="Filter by principal"
-              searchIcon
-              // A ?principal= value can precede the option list (or match
-              // no current contact); keep it without a closed-set error.
-              isError={false}
-            />
-          </div>
+                }}
+                options={orgOptions}
+                placeholder="Filter by org"
+                searchIcon
+                isError={false}
+                disabled={!!organizationIdFilter}
+              />
 
-          {principalFilter && (
-            <OfficeActivitySummary principal={principalFilter} />
-          )}
+              <InputSingleSelect
+                value={principalFilter ?? ""}
+                onChange={(e) => {
+                  // Emptying the text clears the filter; re-picking the
+                  // selected principal also toggles it off ("").
+                  if (!e.target.value && principalFilter) {
+                    setPrincipalFilter(undefined);
+                    setPageNum(0);
+                  }
+                }}
+                onValueChange={(value) => {
+                  setPrincipalFilter(value || undefined);
+                  setPageNum(0);
+                }}
+                options={principalOptions}
+                placeholder="Filter by principal"
+                searchIcon
+                // A ?principal= value can precede the option list (or match
+                // no current contact); keep it without a closed-set error.
+                isError={false}
+              />
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-              <div className="w-full md:w-[180px]">
+            <div className="grid grid-cols-1 gap-2 @xl/crmfilters:grid-cols-2 @3xl/crmfilters:grid-cols-[180px_180px_180px_200px]">
+              <div>
                 <InputSelect
                   value={statusFilter}
                   onValueChange={(value) => {
@@ -430,7 +431,7 @@ export default function CrmContactsPage() {
                 </InputSelect>
               </div>
 
-              <div className="w-full md:w-[180px]">
+              <div>
                 <InputSelect
                   value={categoryFilter}
                   onValueChange={(value) => {
@@ -452,7 +453,7 @@ export default function CrmContactsPage() {
                 </InputSelect>
               </div>
 
-              <div className="w-full md:w-[180px]">
+              <div>
                 <InputSelect
                   value={ownerFilter}
                   onValueChange={(value) => {
@@ -473,7 +474,7 @@ export default function CrmContactsPage() {
                 </InputSelect>
               </div>
 
-              <div className="w-full md:w-[200px]">
+              <div>
                 <InputMultiSelect
                   value={tagFilterIds}
                   onChange={(ids) => {
@@ -487,16 +488,18 @@ export default function CrmContactsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-              <CrmDateRangeFilter
-                value={dateRange}
-                onChange={(v) => {
-                  setDateRange(v);
-                  setPageNum(0);
-                }}
-              />
+            <div className="flex flex-col gap-2 @xl/crmfilters:flex-row @xl/crmfilters:flex-wrap @xl/crmfilters:items-center">
+              <div className="w-full @xl/crmfilters:w-[240px]">
+                <CrmDateRangeFilter
+                  value={dateRange}
+                  onChange={(v) => {
+                    setDateRange(v);
+                    setPageNum(0);
+                  }}
+                />
+              </div>
 
-              <div className="w-full md:w-[180px]">
+              <div className="w-full @xl/crmfilters:w-[180px]">
                 <InputSelect
                   value={sortValue}
                   onValueChange={(value) => {
@@ -530,7 +533,7 @@ export default function CrmContactsPage() {
                 as="p"
                 secondaryAction
                 text03
-                className="text-sm md:ms-auto"
+                className="text-sm @xl/crmfilters:ms-auto"
               >
                 {totalItems} total
               </Text>
@@ -544,6 +547,12 @@ export default function CrmContactsPage() {
                 setPageNum(0);
               }}
             />
+
+            {/* Under the filters, not between the rows, so it does not
+                split the filter bar. */}
+            {principalFilter && (
+              <OfficeActivitySummary principal={principalFilter} />
+            )}
           </div>
 
           {error && (

@@ -240,7 +240,12 @@ export default function CrmOrganizationsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          <div className="grid grid-cols-1 gap-2">
+          {/* One container for every filter row, so the rows share one gap
+              (the Body's gap-8 is for page sections). The container's width,
+              not the viewport's, picks the layout because the docked sidebar
+              narrows the page: stacked below @xl (a phone), rows from @xl,
+              fixed column widths from @3xl. */}
+          <div className="@container/crmfilters flex flex-col gap-2">
             <InputTypeIn
               value={searchText}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -250,11 +255,9 @@ export default function CrmOrganizationsPage() {
               placeholder="Search organizations"
               searchIcon
             />
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-              <div className="w-full md:w-[180px]">
+            <div className="grid grid-cols-1 gap-2 @xl/crmfilters:grid-cols-3 @3xl/crmfilters:grid-cols-[180px_180px_200px]">
+              <div>
                 <InputSelect
                   value={typeFilter}
                   onValueChange={(value) => {
@@ -274,7 +277,7 @@ export default function CrmOrganizationsPage() {
                 </InputSelect>
               </div>
 
-              <div className="w-full md:w-[180px]">
+              <div>
                 <InputSelect
                   value={ownerFilter}
                   onValueChange={(value) => {
@@ -295,7 +298,7 @@ export default function CrmOrganizationsPage() {
                 </InputSelect>
               </div>
 
-              <div className="w-full md:w-[200px]">
+              <div>
                 <InputMultiSelect
                   value={tagFilterIds}
                   onChange={(ids) => {
@@ -309,16 +312,18 @@ export default function CrmOrganizationsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-              <CrmDateRangeFilter
-                value={dateRange}
-                onChange={(v) => {
-                  setDateRange(v);
-                  setPageNum(0);
-                }}
-              />
+            <div className="flex flex-col gap-2 @xl/crmfilters:flex-row @xl/crmfilters:flex-wrap @xl/crmfilters:items-center">
+              <div className="w-full @xl/crmfilters:w-[240px]">
+                <CrmDateRangeFilter
+                  value={dateRange}
+                  onChange={(v) => {
+                    setDateRange(v);
+                    setPageNum(0);
+                  }}
+                />
+              </div>
 
-              <div className="w-full md:w-[180px]">
+              <div className="w-full @xl/crmfilters:w-[180px]">
                 <InputSelect
                   value={sortValue}
                   onValueChange={(value) => {
@@ -352,7 +357,7 @@ export default function CrmOrganizationsPage() {
                 as="p"
                 secondaryAction
                 text03
-                className="text-sm md:ms-auto"
+                className="text-sm @xl/crmfilters:ms-auto"
               >
                 {totalItems} total
               </Text>

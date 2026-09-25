@@ -177,74 +177,79 @@ export default function CrmInteractionsPage() {
         </SettingsLayouts.Header>
 
         <SettingsLayouts.Body>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_220px_auto] md:items-center">
-            <InputSingleSelect
-              value={principalFilter ?? ""}
-              onChange={(e) => {
-                // Emptying the text clears the filter; re-picking the
-                // selected principal also toggles it off ("").
-                if (!e.target.value && principalFilter) {
-                  setPrincipalFilter(undefined);
+          {/* The filter bar's own width picks the layout, as on Contacts:
+              the docked sidebar narrows the page, so the viewport is the
+              wrong gauge. */}
+          <div className="@container/crmfilters">
+            <div className="grid grid-cols-1 gap-2 @xl/crmfilters:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] @xl/crmfilters:items-center @3xl/crmfilters:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
+              <InputSingleSelect
+                value={principalFilter ?? ""}
+                onChange={(e) => {
+                  // Emptying the text clears the filter; re-picking the
+                  // selected principal also toggles it off ("").
+                  if (!e.target.value && principalFilter) {
+                    setPrincipalFilter(undefined);
+                    setPageNum(0);
+                  }
+                }}
+                onValueChange={(value) => {
+                  setPrincipalFilter(value || undefined);
                   setPageNum(0);
-                }
-              }}
-              onValueChange={(value) => {
-                setPrincipalFilter(value || undefined);
-                setPageNum(0);
-              }}
-              options={principalOptions}
-              placeholder="Filter by principal"
-              searchIcon
-              // A ?principal= value can precede the option list (or match
-              // no current contact); keep it without a closed-set error.
-              isError={false}
-            />
+                }}
+                options={principalOptions}
+                placeholder="Filter by principal"
+                searchIcon
+                // A ?principal= value can precede the option list (or match
+                // no current contact); keep it without a closed-set error.
+                isError={false}
+              />
 
-            <InputSelect
-              value={typeFilter}
-              onValueChange={(value) => {
-                setTypeFilter(value as CrmInteractionType | "all");
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by type" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All types</InputSelect.Item>
-                {INTERACTION_TYPE_OPTIONS.map((type) => (
-                  <InputSelect.Item key={type} value={type}>
-                    {formatCrmLabel(type)}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+              <InputSelect
+                value={typeFilter}
+                onValueChange={(value) => {
+                  setTypeFilter(value as CrmInteractionType | "all");
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by type" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All types</InputSelect.Item>
+                  {INTERACTION_TYPE_OPTIONS.map((type) => (
+                    <InputSelect.Item key={type} value={type}>
+                      {formatCrmLabel(type)}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
 
-            <InputSelect
-              value={ownerFilter}
-              onValueChange={(value) => {
-                setOwnerFilter(value);
-                setPageNum(0);
-              }}
-            >
-              <InputSelect.Trigger placeholder="Filter by owner" />
-              <InputSelect.Content>
-                <InputSelect.Item value="all">All owners</InputSelect.Item>
-                <InputSelect.Item value="me">Me</InputSelect.Item>
-                {ownerOptions.map((owner) => (
-                  <InputSelect.Item key={owner.value} value={owner.value}>
-                    {owner.label}
-                  </InputSelect.Item>
-                ))}
-              </InputSelect.Content>
-            </InputSelect>
+              <InputSelect
+                value={ownerFilter}
+                onValueChange={(value) => {
+                  setOwnerFilter(value);
+                  setPageNum(0);
+                }}
+              >
+                <InputSelect.Trigger placeholder="Filter by owner" />
+                <InputSelect.Content>
+                  <InputSelect.Item value="all">All owners</InputSelect.Item>
+                  <InputSelect.Item value="me">Me</InputSelect.Item>
+                  {ownerOptions.map((owner) => (
+                    <InputSelect.Item key={owner.value} value={owner.value}>
+                      {owner.label}
+                    </InputSelect.Item>
+                  ))}
+                </InputSelect.Content>
+              </InputSelect>
 
-            <Text
-              as="p"
-              secondaryAction
-              text03
-              className="text-sm md:justify-self-end"
-            >
-              {totalItems} total
-            </Text>
+              <Text
+                as="p"
+                secondaryAction
+                text03
+                className="text-sm @xl/crmfilters:justify-self-end"
+              >
+                {totalItems} total
+              </Text>
+            </div>
           </div>
 
           {error && (

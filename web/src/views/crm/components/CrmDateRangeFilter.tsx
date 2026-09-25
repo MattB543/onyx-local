@@ -12,7 +12,6 @@ import InputTriggerChrome, {
 } from "@/refresh-components/inputs/InputTriggerChrome";
 import Text from "@/refresh-components/texts/Text";
 import { SvgCalendar } from "@opal/icons";
-import { cn } from "@opal/utils";
 
 export type CrmDateField = "created" | "updated";
 
@@ -136,7 +135,8 @@ export default function CrmDateRangeFilter({
         <button
           type="button"
           title={label}
-          className={cn(inputTriggerClasses("primary"), "md:w-[240px]")}
+          // Full width; the filter bar sizes it.
+          className={inputTriggerClasses("primary")}
         >
           <InputTriggerChrome variant="primary">
             {/* The title attribute already shows the full label. */}

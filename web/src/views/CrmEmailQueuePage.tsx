@@ -208,37 +208,47 @@ export default function CrmEmailQueuePage() {
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
-                <div />
+              {/* The filter bar's own width picks the layout, as on
+                  Contacts: the docked sidebar narrows the page, so the
+                  viewport is the wrong gauge. */}
+              <div className="@container/crmfilters">
+                <div className="grid grid-cols-1 gap-2 @xl/crmfilters:grid-cols-[minmax(0,1fr)_220px_auto] @xl/crmfilters:items-center">
+                  <div />
 
-                <InputSelect
-                  value={statusFilter}
-                  onValueChange={(value) => {
-                    setStatusFilter(value as CrmEmailQueueStatusFilter | "all");
-                    setPageNum(0);
-                  }}
-                >
-                  <InputSelect.Trigger placeholder="Filter by status" />
-                  <InputSelect.Content>
-                    <InputSelect.Item value="all">
-                      All statuses
-                    </InputSelect.Item>
-                    {STATUS_FILTER_OPTIONS.map((option) => (
-                      <InputSelect.Item key={option.value} value={option.value}>
-                        {option.label}
+                  <InputSelect
+                    value={statusFilter}
+                    onValueChange={(value) => {
+                      setStatusFilter(
+                        value as CrmEmailQueueStatusFilter | "all"
+                      );
+                      setPageNum(0);
+                    }}
+                  >
+                    <InputSelect.Trigger placeholder="Filter by status" />
+                    <InputSelect.Content>
+                      <InputSelect.Item value="all">
+                        All statuses
                       </InputSelect.Item>
-                    ))}
-                  </InputSelect.Content>
-                </InputSelect>
+                      {STATUS_FILTER_OPTIONS.map((option) => (
+                        <InputSelect.Item
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </InputSelect.Item>
+                      ))}
+                    </InputSelect.Content>
+                  </InputSelect>
 
-                <Text
-                  as="p"
-                  secondaryAction
-                  text03
-                  className="text-sm md:justify-self-end"
-                >
-                  {totalItems} total
-                </Text>
+                  <Text
+                    as="p"
+                    secondaryAction
+                    text03
+                    className="text-sm @xl/crmfilters:justify-self-end"
+                  >
+                    {totalItems} total
+                  </Text>
+                </div>
               </div>
 
               {error && (
