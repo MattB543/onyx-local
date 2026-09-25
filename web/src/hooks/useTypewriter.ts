@@ -25,11 +25,16 @@ export interface UseTypewriterResult {
  * `streamFinished` lets the loop drain any remaining backlog faster
  * once the backend is done, so callers gating on "FE fully displayed"
  * don't sit on a long tail when packets arrived in a burst.
+ *
+ * `flush` snaps to the full `target` at once and keeps it there, e.g.
+ * after the user stops the run: the screen should show everything that
+ * was received (and saved), not keep typing out the backlog.
  */
 export function useTypewriter(
   target: string,
   enabled: boolean,
-  streamFinished: boolean = false
+  streamFinished: boolean = false,
+  flush: boolean = false
 ): UseTypewriterResult {
   // Ref so the rAF loop reads latest length without restarting.
   const targetRef = useRef(target);
@@ -42,12 +47,14 @@ export function useTypewriter(
 
   // Read inside the rAF loop without restarting it.
   const streamFinishedRef = useRef(streamFinished);
+  const flushRef = useRef(flush);
 
   useEffect(() => {
     targetRef.current = target;
     enabledRef.current = enabled;
     streamFinishedRef.current = streamFinished;
-  }, [target, enabled, streamFinished]);
+    flushRef.current = flush;
+  }, [target, enabled, streamFinished, flush]);
 
   // Captured once when post-finish drain begins, so the per-frame step
   // size stays constant instead of decaying with the shrinking backlog.
@@ -134,7 +141,7 @@ export function useTypewriter(
       // voice-mode path where content is driven by audio position, and
       // any "gap" (e.g. user stops audio early) must jump instantly
       // instead of animating a 1500-char typewriter burst.
-      if (!enabledRef.current) {
+      if (!enabledRef.current || flushRef.current) {
         const targetLen = targetRef.current.length;
         if (displayedLengthRef.current !== targetLen) {
           displayedLengthRef.current = targetLen;
@@ -161,6 +168,25 @@ export function useTypewriter(
       startLoopRef.current = null;
     };
   }, []);
+
+  // Flush: stop a running loop and snap to everything received. Runs as an
+  // effect, not in the rAF loop, so it also lands in a background tab.
+  useEffect(() => {
+    if (!flush) return;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    runningRef.current = false;
+    if (isDrainingRef.current) {
+      isDrainingRef.current = false;
+      setIsDraining(false);
+    }
+    if (displayedLengthRef.current !== target.length) {
+      displayedLengthRef.current = target.length;
+      setDisplayedLength(target.length);
+    }
+  }, [flush, target.length]);
 
   // Restart the loop when target grows past what's currently displayed.
   useEffect(() => {

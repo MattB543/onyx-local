@@ -267,10 +267,14 @@ export const MessageTextRenderer: MessageRenderer<
 
   const isStreamFinished = isFinalAnswerComplete(packets);
 
+  // A user stop shows everything received at once, so the screen matches
+  // the saved partial answer. Any other end (e.g. an error before the
+  // answer's SECTION_END) drains the backlog fast instead of typing it out.
   const { displayed: displayedContent, isDraining } = useTypewriter(
     content,
     isStreamingAnimationEnabled,
-    isStreamFinished
+    isStreamFinished || stopPacketSeen,
+    stopReason === StopReason.USER_CANCELLED
   );
 
   // One-way signal: stream done AND typewriter caught up. Do NOT derive

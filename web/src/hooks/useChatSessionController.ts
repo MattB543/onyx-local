@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { ReadonlyURLSearchParams } from "next/navigation";
 import {
   nameChatSession,
@@ -9,6 +9,7 @@ import {
   resumeStream,
 } from "@/app/app/services/lib";
 import { Packet } from "@/app/app/services/streamingModels";
+import { enqueueBranchSelection } from "@/app/app/services/branchSelection";
 import {
   getLatestMessageChain,
   setMessageAsLatest,
@@ -40,6 +41,19 @@ import type { ErrorResponseBody } from "@/lib/fetcher";
 // Runs currently being re-attached; module-level so effect re-runs (incl.
 // strict mode) can't start a second tail for the same run.
 const resumingRuns = new Set<number>();
+
+// A local send owns the session's tree while in one of these states; a load
+// or a resumed tail must not write over it.
+function isLocallyStreaming(sessionId: string): boolean {
+  const chatState = useChatSessionStore
+    .getState()
+    .sessions.get(sessionId)?.chatState;
+  return (
+    chatState === "toolBuilding" ||
+    chatState === "streaming" ||
+    chatState === "loading"
+  );
+}
 
 interface UseChatSessionControllerProps {
   existingChatSessionId: string | null;
@@ -93,6 +107,10 @@ export default function useChatSessionController({
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
   const [sessionFetchError, setSessionFetchError] =
     useState<SessionFetchError>(null);
+  // Bumped on every run of the load effect. Only the newest load may write
+  // shared state: in A → B → A, the first load of A must not overwrite the
+  // second one or show its old error.
+  const loadGenerationRef = useRef(0);
   // Store actions
   const updateSessionAndMessageTree = useChatSessionStore(
     (state) => state.updateSessionAndMessageTree
@@ -115,16 +133,14 @@ export default function useChatSessionController({
   const updateCurrentSelectedNodeForDocDisplay = useChatSessionStore(
     (state) => state.updateCurrentSelectedNodeForDocDisplay
   );
-  const currentChatState = useChatSessionStore(
-    (state) =>
-      state.sessions.get(state.currentSessionId || "")?.chatState || "input"
-  );
   const currentChatHistory = useCurrentMessageHistory();
   const chatSessions = useChatSessionStore((state) => state.sessions);
   const { setIncognitoEnabled, setIncognitoSessionId } = useIncognito();
 
   // Fetch chat messages for the chat session
   useEffect(() => {
+    const generation = ++loadGenerationRef.current;
+    const isActive = () => loadGenerationRef.current === generation;
     const priorChatSessionId = chatSessionIdRef.current;
     const loadedSessionId = loadedIdSessionRef.current;
     chatSessionIdRef.current = existingChatSessionId;
@@ -188,86 +204,105 @@ export default function useChatSessionController({
       setCurrentSession(existingChatSessionId);
       setIsFetchingChatMessages(existingChatSessionId, true);
 
-      let response: Response;
+      // Every await below re-checks isActive(): once the user opens another
+      // chat (or this one again), this load must not touch shared state.
+      let chatSession: BackendChatSession;
+      let newMessageMap: Map<number, Message>;
+      let newMessageHistory: Message[];
+      let ownedByLocalSend: boolean;
       try {
-        response = await fetch(
+        const response = await fetch(
           `/api/chat/get-chat-session/${existingChatSessionId}`
         );
+
+        if (!response.ok) {
+          let detail = "An unexpected error occurred.";
+          try {
+            const errorBody: ErrorResponseBody = await response.json();
+            detail = errorBody.detail || detail;
+          } catch {
+            // ignore parse errors
+          }
+          const type =
+            response.status === 404
+              ? "not_found"
+              : response.status === 403
+                ? "access_denied"
+                : "unknown";
+          if (isActive()) {
+            setSessionFetchError({ type, detail });
+          }
+          return;
+        }
+
+        chatSession = await response.json();
+        if (!isActive()) {
+          return;
+        }
+
+        // Restore the incognito UI state on reload of a live incognito session.
+        // The id must come back too, or a later upload would be sent with none
+        // and land as an ordinary indexed file.
+        const isIncognito = chatSession.incognito ?? false;
+        setIncognitoEnabled(isIncognito);
+        setIncognitoSessionId(isIncognito ? chatSession.chat_session_id : null);
+
+        // Ensure the current session is set to the actual session ID from the response
+        setCurrentSession(chatSession.chat_session_id);
+
+        // Initialize session data including personaId
+        initializeSession(chatSession.chat_session_id, chatSession);
+
+        newMessageMap = processRawChatHistory(
+          chatSession.messages,
+          chatSession.packets
+        );
+        newMessageHistory = getLatestMessageChain(newMessageMap);
+
+        // Read from the store now, not at render time: the render-time state
+        // belongs to the session that was current when the effect ran, e.g.
+        // the chat the user just left mid-stream, and would skip this load.
+        ownedByLocalSend = isLocallyStreaming(chatSession.chat_session_id);
+
+        // Update message history except for edge where where
+        // last message is an error and we're on a new chat.
+        // This corresponds to a "renaming" of chat, which occurs after first message
+        // stream
+        if (
+          (newMessageHistory[newMessageHistory.length - 1]?.type !== "error" ||
+            loadedSessionId != null) &&
+          !ownedByLocalSend
+        ) {
+          updateCurrentSelectedNodeForDocDisplay(
+            newMessageHistory[newMessageHistory.length - 1]?.nodeId ?? null
+          );
+
+          updateSessionAndMessageTree(
+            chatSession.chat_session_id,
+            newMessageMap
+          );
+          chatSessionIdRef.current = chatSession.chat_session_id;
+        }
       } catch (error) {
-        setIsFetchingChatMessages(existingChatSessionId, false);
         console.error("Failed to fetch chat session", {
           chatSessionId: existingChatSessionId,
           error,
         });
-        setSessionFetchError({
-          type: "unknown",
-          detail: "Failed to load chat session. Please check your connection.",
-        });
-        return;
-      }
-
-      if (!response.ok) {
-        setIsFetchingChatMessages(existingChatSessionId, false);
-        let detail = "An unexpected error occurred.";
-        try {
-          const errorBody: ErrorResponseBody = await response.json();
-          detail = errorBody.detail || detail;
-        } catch {
-          // ignore parse errors
+        if (isActive()) {
+          setSessionFetchError({
+            type: "unknown",
+            detail:
+              "Failed to load chat session. Please check your connection.",
+          });
         }
-        const type =
-          response.status === 404
-            ? "not_found"
-            : response.status === 403
-              ? "access_denied"
-              : "unknown";
-        setSessionFetchError({ type, detail });
         return;
+      } finally {
+        // Only the active load settles the flag: a superseded load of the
+        // same chat would clear it under the newer one.
+        if (isActive()) {
+          setIsFetchingChatMessages(existingChatSessionId, false);
+        }
       }
-
-      const session: BackendChatSession = await response.json();
-      const chatSession = session;
-      // Restore the incognito UI state on reload of a live incognito session.
-      // The id must come back too, or a later upload would be sent with none
-      // and land as an ordinary indexed file.
-      const isIncognito = chatSession.incognito ?? false;
-      setIncognitoEnabled(isIncognito);
-      setIncognitoSessionId(isIncognito ? chatSession.chat_session_id : null);
-
-      // Ensure the current session is set to the actual session ID from the response
-      setCurrentSession(chatSession.chat_session_id);
-
-      // Initialize session data including personaId
-      initializeSession(chatSession.chat_session_id, chatSession);
-
-      const newMessageMap = processRawChatHistory(
-        chatSession.messages,
-        chatSession.packets
-      );
-      const newMessageHistory = getLatestMessageChain(newMessageMap);
-
-      // Update message history except for edge where where
-      // last message is an error and we're on a new chat.
-      // This corresponds to a "renaming" of chat, which occurs after first message
-      // stream
-      if (
-        (newMessageHistory[newMessageHistory.length - 1]?.type !== "error" ||
-          loadedSessionId != null) &&
-        !(
-          currentChatState == "toolBuilding" ||
-          currentChatState == "streaming" ||
-          currentChatState == "loading"
-        )
-      ) {
-        updateCurrentSelectedNodeForDocDisplay(
-          newMessageHistory[newMessageHistory.length - 1]?.nodeId ?? null
-        );
-
-        updateSessionAndMessageTree(chatSession.chat_session_id, newMessageMap);
-        chatSessionIdRef.current = chatSession.chat_session_id;
-      }
-
-      setIsFetchingChatMessages(chatSession.chat_session_id, false);
 
       // Re-attach to an in-flight run: replay its buffered stream and tail it
       // live instead of leaving a stale placeholder. Single-model only — a
@@ -297,8 +332,13 @@ export default function useChatSessionController({
         // from this tail would hijack their new session's sends.
         const stillCurrent = () =>
           useChatSessionStore.getState().currentSessionId === sessionId;
+        // A send started in this chat since the load owns its tree, so the
+        // tail and its settle refresh must not write over it. Not tied to
+        // the load generation: after A → B → A this tail is still the only
+        // one (resumingRuns makes the newer load skip its own).
+        const canWrite = () => stillCurrent() && !isLocallyStreaming(sessionId);
         const flush = () => {
-          if (!stillCurrent()) {
+          if (!canWrite()) {
             return;
           }
           node.packets = [...accumulated];
@@ -350,7 +390,7 @@ export default function useChatSessionController({
             clearTimeout(trailingFlush);
           }
           resumingRuns.delete(runId);
-          if (stillCurrent()) {
+          if (canWrite()) {
             flush();
             // Settle final state (message text, citations, documents) from
             // the persisted session.
@@ -358,13 +398,15 @@ export default function useChatSessionController({
               const settledResponse = await fetch(
                 `/api/chat/get-chat-session/${sessionId}`
               );
-              if (settledResponse.ok && stillCurrent()) {
+              if (settledResponse.ok && canWrite()) {
                 const settled: BackendChatSession =
                   await settledResponse.json();
-                updateSessionAndMessageTree(
-                  sessionId,
-                  processRawChatHistory(settled.messages, settled.packets)
-                );
+                if (canWrite()) {
+                  updateSessionAndMessageTree(
+                    sessionId,
+                    processRawChatHistory(settled.messages, settled.packets)
+                  );
+                }
               }
             } catch (error) {
               console.error("Post-resume session refresh failed", { error });
@@ -373,8 +415,11 @@ export default function useChatSessionController({
         }
       }
 
+      // A local send already streams this run into the tree; a second
+      // consumer would write the same session.
       const currentRun = chatSession.current_run;
       if (
+        !ownedByLocalSend &&
         currentRun &&
         newMessageMap.get(currentRun.run_id)?.type === "assistant"
       ) {
@@ -386,32 +431,36 @@ export default function useChatSessionController({
       }
 
       // Fetch token count for this chat session's project (if any)
+      let tokenCount = 0;
       try {
         if (chatSession.chat_session_id) {
-          const total = await getSessionProjectTokenCount(
-            chatSession.chat_session_id
-          );
-          setCurrentSessionFileTokenCount(total || 0);
-        } else {
-          setCurrentSessionFileTokenCount(0);
+          tokenCount =
+            (await getSessionProjectTokenCount(chatSession.chat_session_id)) ||
+            0;
         }
       } catch (e) {
-        setCurrentSessionFileTokenCount(0);
+        tokenCount = 0;
       }
+      if (!isActive()) {
+        return;
+      }
+      setCurrentSessionFileTokenCount(tokenCount);
 
       // Fetch project files for this chat session (if any)
+      let files: ProjectFile[] = [];
       try {
         if (chatSession.chat_session_id) {
-          const files = await getProjectFilesForSession(
-            chatSession.chat_session_id
-          );
-          setProjectFiles(files || []);
-        } else {
-          setProjectFiles([]);
+          files =
+            (await getProjectFilesForSession(chatSession.chat_session_id)) ||
+            [];
         }
       } catch (e) {
-        setProjectFiles([]);
+        files = [];
       }
+      if (!isActive()) {
+        return;
+      }
+      setProjectFiles(files);
 
       // If this is a seeded chat, then kick off the AI message generation
       if (
@@ -504,11 +553,15 @@ export default function useChatSessionController({
         }
 
         const message = currentMessageTree.get(nodeId);
+        const messageId = message?.messageId;
 
-        if (message?.messageId) {
+        if (messageId) {
           // Makes actual API call to set message as latest in the DB so we can
-          // edit this message and so it sticks around on page reload
-          patchMessageToBeLatest(message.messageId);
+          // edit this message and so it sticks around on page reload. Queued
+          // so later switches land after it and a send waits for it.
+          void enqueueBranchSelection(currentSessionId ?? "", () =>
+            patchMessageToBeLatest(messageId)
+          );
         } else {
           console.error("Message has no messageId", nodeId);
         }

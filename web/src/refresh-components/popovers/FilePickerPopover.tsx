@@ -10,7 +10,6 @@ import {
   useCreateModal,
 } from "@opal/components";
 import { noProp } from "@/lib/utils";
-import { cn } from "@opal/utils";
 import UserFilesModal from "@/sections/modals/UserFilesModal";
 import { ProjectFile, UserFileStatus } from "@/lib/projects/types";
 import { Hoverable } from "@opal/core";
@@ -23,8 +22,8 @@ import {
   SvgExternalLink,
   SvgFileText,
   SvgImage,
-  SvgLoader,
   SvgMoreHorizontal,
+  SvgSimpleLoader,
   SvgUploadSquare,
 } from "@opal/icons";
 const getFileExtension = (fileName: string): string => {
@@ -70,10 +69,10 @@ function FileLineItem({
         key={projectFile.id}
         onClick={noProp(() => onPickRecent(projectFile))}
         icon={
+          // The row sizes its icon through props, so the loader must pass
+          // them on; a wrapper that kept only className left it unsized.
           showLoader
-            ? ({ className }) => (
-                <SvgLoader className={cn(className, "animate-spin")} />
-              )
+            ? SvgSimpleLoader
             : isImageFile(projectFile.name)
               ? SvgImage
               : SvgFileText
