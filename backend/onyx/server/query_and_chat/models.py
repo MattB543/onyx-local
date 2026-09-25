@@ -140,6 +140,11 @@ class SendMessageRequest(BaseModel):
     # If the message of parent_message_id is a user message, the message will be ignored and it will use the
     # original user message for regeneration.
     parent_message_id: int | None = AUTO_PLACE_AFTER_LATEST_MESSAGE
+    # Whether the request is a regeneration, i.e. parent_message_id names a
+    # user message. None (legacy clients) infers it from the parent's type.
+    # When set, a parent of the other kind is rejected: a new message sent
+    # against a user message would otherwise silently regenerate its reply.
+    regenerate: bool | None = None
     chat_session_id: UUID | None = None
     chat_session_info: ChatSessionCreationRequest | None = None
 

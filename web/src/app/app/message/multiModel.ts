@@ -93,6 +93,24 @@ export function getErrorTipMultiModelGroup(
   );
 }
 
+// The reply a send continues from when the chain ends in an error reply of
+// `userMessage`: the preferred response, else the newest usable reply. A
+// failed retry leaves the replies before it. Null when there are none, as
+// after a failed send.
+export function getErrorTurnFallbackReply(
+  userMessage: Message,
+  messageTree: Map<number, Message>
+): Message | null {
+  const replies = (userMessage.childrenNodeIds ?? [])
+    .map((id) => messageTree.get(id))
+    .filter((m): m is Message => m !== undefined && isUsableResponse(m));
+  return (
+    replies.find((m) => m.messageId === userMessage.preferredResponseId) ??
+    replies.at(-1) ??
+    null
+  );
+}
+
 // Group a user message's sibling responses into multi-model panels.
 // `modelProviderLookup` maps model → provider slug for icons and may be
 // empty (e.g. the shared view). `getModelIcon` then falls back to the name.

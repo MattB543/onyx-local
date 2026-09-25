@@ -15,6 +15,7 @@ import { RegenerationFactory } from "@/app/app/message/messageComponents/AgentMe
 import MultiModelPanel from "@/app/app/message/MultiModelPanel";
 import { MultiModelResponse } from "@/app/app/message/interfaces";
 import { setPreferredResponse } from "@/app/app/services/lib";
+import { enqueueBranchSelection } from "@/app/app/services/branchSelection";
 import {
   applyPreferredResponse,
   setMostVisibleResponseId,
@@ -345,8 +346,11 @@ export default function MultiModelResponseView({
       if (!response) return;
 
       if (parentMessage?.messageId && response.messageId && currentSessionId) {
-        setPreferredResponse(parentMessage.messageId, response.messageId).catch(
-          (err) => console.error("Failed to persist preferred response:", err)
+        const userMessageId = parentMessage.messageId;
+        const responseMessageId = response.messageId;
+        // Queued with the chat's other branch switches; a send waits for it.
+        void enqueueBranchSelection(currentSessionId, () =>
+          setPreferredResponse(userMessageId, responseMessageId)
         );
 
         const tree = useChatSessionStore

@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from itertools import pairwise
 from typing import Tuple
 from uuid import UUID, uuid4
 
@@ -853,6 +854,60 @@ def set_preferred_response(
     user_msg.preferred_response_id = preferred_assistant_message_id
     user_msg.latest_child_message_id = preferred_assistant_message_id
     db_session.commit()
+
+
+def adopt_branch_of_message(
+    chat_session_id: UUID,
+    message_id: int,
+    db_session: Session,
+) -> bool:
+    """Put ``message_id`` on the session's mainline, the chain that follows
+    each message's ``latest_child_message_id``.
+
+    A client names a new message's parent from the branch it shows, and its
+    branch switches (the message pager) may not have reached the server yet.
+    Each ancestor's latest child is pointed down the path to the message. A
+    user message's preferred response moves with its latest child, as in
+    ``set_preferred_response``.
+
+    Only flushes. The caller's next commit persists the switch: in a send,
+    creating the user message (or reserving the reply of a regeneration),
+    after which a later failure keeps it. A send rejected before that point
+    rolls it back with its session.
+
+    Returns False, changing nothing, unless the message and every ancestor up
+    to the root exist in the session, without a cycle.
+    """
+    # The path from the message up to the root, validated before any change.
+    path: list[ChatMessage] = []
+    visited: set[int] = set()
+    message_id_on_path: int | None = message_id
+    while message_id_on_path is not None:
+        node = db_session.get(ChatMessage, message_id_on_path)
+        if (
+            node is None
+            or node.chat_session_id != chat_session_id
+            or node.id in visited
+        ):
+            return False
+        path.append(node)
+        visited.add(node.id)
+        message_id_on_path = node.parent_message_id
+
+    repointed: list[ChatMessage] = []
+    for child, parent in pairwise(path):
+        if parent.latest_child_message_id != child.id:
+            parent.latest_child_message_id = child.id
+            if parent.preferred_response_id is not None:
+                parent.preferred_response_id = child.id
+            repointed.append(parent)
+
+    db_session.flush()
+    # A loaded relationship does not follow its foreign key, and the mainline
+    # walk reads the relationship.
+    for parent in repointed:
+        db_session.expire(parent, ["latest_child_message", "preferred_response"])
+    return True
 
 
 def create_new_chat_message(

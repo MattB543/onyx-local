@@ -5,13 +5,14 @@ import {
   forkChatSession,
   getAvailableContextTokens,
   nameChatSession,
+  patchMessageToBeLatest,
   setPreferredResponse,
   updateLlmOverrideForChatSession,
 } from "@/app/app/services/lib";
 import {
   applyPreferredResponse,
   chooseImplicitPreferred,
-  getErrorTipMultiModelGroup,
+  getErrorTurnFallbackReply,
   getMostVisibleResponseId,
   getUnresolvedMultiModelTurn,
 } from "@/app/app/message/multiModel";
@@ -28,6 +29,7 @@ import {
   getLastSuccessfulMessageId,
   getLatestMessageChain,
   MessageTreeState,
+  setMessageAsLatest,
   upsertMessages,
   SYSTEM_NODE_ID,
   buildImmediateMessages,
@@ -38,6 +40,7 @@ import { SEARCH_PARAM_NAMES } from "@/app/app/services/searchParams";
 import { SEARCH_TOOL_ID } from "@/lib/tools/constants";
 import { OnyxDocument } from "@/lib/search/types";
 import { LlmDescriptor, LlmManager } from "@/lib/hooks";
+import type { LLMProviderDescriptor } from "@/lib/languageModels/types";
 import {
   BackendMessage,
   ChatFileType,
@@ -64,6 +67,10 @@ import {
   CurrentMessageFIFO,
   updateCurrentMessageFIFO,
 } from "@/app/app/services/currentMessageFIFO";
+import {
+  branchSelectionsSettled,
+  enqueueBranchSelection,
+} from "@/app/app/services/branchSelection";
 import {
   buildUserStopPacket,
   getUnfinishedModelIndices,
@@ -182,6 +189,26 @@ async function resolvePrefillFiles(
     .map((id) => byId.get(id))
     .filter((f): f is ProjectFile => f !== undefined);
   return { files, unresolvedCount: descriptors.length - files.length };
+}
+
+// The chosen model's display name, saved on its reply the way multi-model
+// sends save theirs. Matched by configuration id when known: provider and
+// model names can repeat. Undefined when the model is not listed.
+function findModelDisplayName(
+  llmProviders: LLMProviderDescriptor[] | undefined,
+  llm: LlmDescriptor
+): string | undefined {
+  const configs = (llmProviders ?? []).flatMap((provider) =>
+    provider.model_configurations.map((mc) => ({ provider, mc }))
+  );
+  const match =
+    llm.modelConfigurationId != null
+      ? configs.find(({ mc }) => mc.id === llm.modelConfigurationId)
+      : configs.find(
+          ({ provider, mc }) =>
+            provider.name === llm.name && mc.name === llm.modelName
+        );
+  return match?.mc.effectiveDisplayName || undefined;
 }
 
 export default function useChatController({
@@ -507,27 +534,23 @@ export default function useChatController({
       let currentHistory = getLatestMessageChain(currentMessageTreeLocal);
       let lastMessage = currentHistory[currentHistory.length - 1];
 
-      // A multi-model turn whose chain-tip panel or later retry errored can
-      // still have usable siblings. Keep the turn so the implicit-preferred
-      // pick below can continue the chain through a successful sibling.
+      // A chain-tip error from a failed panel or a failed retry leaves the
+      // turn's earlier usable replies. Keep the turn (the user message is
+      // saved and owns them) so the send below continues through one.
       const errorTurnUserMsg =
         lastMessage?.type === "error" && lastMessage.parentNodeId != null
           ? currentMessageTreeLocal.get(lastMessage.parentNodeId)
           : undefined;
-      const errorTurnHasUsableSibling = errorTurnUserMsg
-        ? (getErrorTipMultiModelGroup(
-            errorTurnUserMsg,
-            currentMessageTreeLocal
-          )?.some((m) => m.type === "assistant" && m.messageId != null) ??
-          false)
-        : false;
+      const errorTurnFallback = errorTurnUserMsg
+        ? getErrorTurnFallbackReply(errorTurnUserMsg, currentMessageTreeLocal)
+        : null;
 
       if (
         lastMessage &&
         lastMessage.type === "error" &&
         !messageIdToResend &&
         !regenerationRequest &&
-        !errorTurnHasUsableSibling
+        !errorTurnFallback
       ) {
         const newMessageTree = new Map(currentMessageTreeLocal);
         const parentNodeId = lastMessage.parentNodeId;
@@ -684,9 +707,15 @@ export default function useChatController({
       const controller = new AbortController();
       setAbortController(currChatSessionId, controller);
 
-      const messageToResend = currentHistory.find(
-        (message) => message.messageId === messageIdToResend
-      );
+      // No id means nothing to resend. Matching on it would pick any id-less
+      // node, e.g. a failed retry's error, and turn a new message into a
+      // resend of it.
+      const messageToResend =
+        messageIdToResend == null
+          ? undefined
+          : currentHistory.find(
+              (message) => message.messageId === messageIdToResend
+            );
       if (messageIdToResend && regenerationRequest) {
         updateRegenerationState(
           { regenerating: true, finalMessageIndex: messageIdToResend + 1 },
@@ -780,12 +809,13 @@ export default function useChatController({
           // locally, retries skip the PUT, and the send's parent stays off
           // the backend mainline until a reload.
           const originalUserMessage = unresolvedTurn.userMessage;
+          const userMessageId = unresolvedTurn.userMessage.messageId;
+          const chosenMessageId = chosen.messageId;
           implicitPreference = {
             message: chosen,
-            persist: setPreferredResponse(
-              unresolvedTurn.userMessage.messageId,
-              chosen.messageId
-            ).catch(() => null),
+            persist: enqueueBranchSelection(frozenSessionId, () =>
+              setPreferredResponse(userMessageId, chosenMessageId)
+            ),
             revert: () => {
               // A newer explicit pick may have replaced the assumption while
               // the PUT was in flight. Never clobber it with this snapshot.
@@ -821,15 +851,54 @@ export default function useChatController({
         }
       }
 
+      // Any other chain-tip error with a usable sibling is a failed retry of
+      // a single-model turn. Continue from the earlier answer, as above for a
+      // multi-model turn. The error stays one pager step away.
+      // The send below waits for the switch.
+      let errorTurnSwitch: Message | null = null;
+      if (
+        !implicitPreference &&
+        !regenerationRequest &&
+        !messageToResend &&
+        lastMessage?.type === "error" &&
+        errorTurnFallback?.messageId != null
+      ) {
+        const fallbackMessageId = errorTurnFallback.messageId;
+        currentMessageTreeLocal = setMessageAsLatest(
+          currentMessageTreeLocal,
+          errorTurnFallback.nodeId
+        );
+        void enqueueBranchSelection(frozenSessionId, () =>
+          patchMessageToBeLatest(fallbackMessageId)
+        );
+        errorTurnSwitch = errorTurnFallback;
+      }
+
       let parentMessage =
         messageToResendParent ||
         implicitPreference?.message ||
+        errorTurnSwitch ||
         (currMessageHistory.length > 0
           ? currMessageHistory[currMessageHistory.length - 1]
           : null) ||
         (currentMessageTreeLocal.size === 1
           ? Array.from(currentMessageTreeLocal.values())[0]
           : null);
+      // A saved user message with no reply (its send failed before one was
+      // reserved) can end a reloaded chain. A new message replaces it as a
+      // sibling: sent after a user message, it would regenerate that one.
+      // A seeded chat's lone user message is meant to get its reply that way.
+      if (
+        !regenerationRequest &&
+        !messageToResend &&
+        !isSeededChat &&
+        parentMessage?.type === "user" &&
+        parentMessage.parentNodeId != null
+      ) {
+        parentMessage =
+          currentMessageTreeLocal.get(parentMessage.parentNodeId) ??
+          parentMessage;
+      }
 
       // Add user message immediately to the message tree so that the chat
       // immediately reflects the user message
@@ -1062,11 +1131,17 @@ export default function useChatController({
           if (!singleModelDirty) return;
           singleModelDirty = false;
 
+          // The tree's copy, not the snapshot taken at submit: a regeneration
+          // must keep the user node's replies, id and attachments. Its files
+          // are not the composer's.
+          const liveUserNode =
+            currentMessageTreeLocal.get(initialUserNode.nodeId) ??
+            initialUserNode;
           messagesToUpsert = [
             {
-              ...initialUserNode,
-              messageId: newUserMessageId ?? undefined,
-              files: files,
+              ...liveUserNode,
+              messageId: newUserMessageId ?? liveUserNode.messageId,
+              files: regenerationRequest ? liveUserNode.files : files,
             },
             {
               ...initialAgentNode,
@@ -1146,6 +1221,9 @@ export default function useChatController({
             );
           }
         }
+        // Every branch switch sent so far (pager clicks, the picks above)
+        // lands before the send, so none can move the mainline off it.
+        await branchSelectionsSettled(currChatSessionId);
 
         const lastSuccessfulMessageId = getLastSuccessfulMessageId(
           currentMessageTreeLocal
@@ -1185,9 +1263,14 @@ export default function useChatController({
           fileDescriptors: effectiveFileDescriptors,
           indexForLaterFileIds,
           parentMessageId: (() => {
+            // The parent the tree above placed the new message under. A
+            // regeneration names its user message instead.
             const parentId =
               regenerationRequest?.parentMessage.messageId ||
               messageToResendParent?.messageId ||
+              (parentMessage?.type !== "error"
+                ? parentMessage?.messageId
+                : undefined) ||
               lastSuccessfulMessageId;
             // Don't send SYSTEM_MESSAGE_ID (-3) as parent, use null instead
             // The backend expects null for "the first message in the chat"
@@ -1216,6 +1299,12 @@ export default function useChatController({
             : modelOverride
               ? (modelOverride.modelConfigurationId ?? undefined)
               : (llmManager.currentLlm.modelConfigurationId ?? undefined),
+          modelDisplayName: isMultiModel
+            ? undefined
+            : findModelDisplayName(
+                llmManager.llmProviders,
+                modelOverride ?? llmManager.currentLlm
+              ),
           // Only a chosen temperature is sent, zero included. Without one the
           // backend resolves the admin default, then GEN_AI_TEMPERATURE.
           temperature: llmManager.hasTemperatureOverride
@@ -1239,6 +1328,13 @@ export default function useChatController({
           forcedToolId: effectiveForcedToolId,
           origin: messageOrigin,
           additionalContext,
+          // A seeded chat regenerates its user message's reply the legacy
+          // way, so it leaves the kind to the parent it names.
+          regenerate: regenerationRequest
+            ? true
+            : isSeededChat
+              ? undefined
+              : false,
           llmOverrides: isMultiModel
             ? selectedModels!.map((m) => ({
                 model_provider: m.name,
@@ -1391,7 +1487,7 @@ export default function useChatController({
 
                 setUncaughtError(frozenSessionId, streamingError.error);
                 updateChatStateAction(frozenSessionId, "input");
-                updateSubmittedMessage(getCurrentSessionId(), "");
+                updateSubmittedMessage(frozenSessionId, "");
 
                 throw new Error(streamingError.error);
               }
@@ -1594,6 +1690,9 @@ export default function useChatController({
           : [
               {
                 nodeId: initialAgentNode.nodeId,
+                // The saved error row: the pager can select it, and no
+                // resend lookup mistakes an id-less node for its target.
+                messageId: newAgentMessageId ?? undefined,
                 message: errorMsg,
                 type: "error" as const,
                 files: aiMessageImages || [],

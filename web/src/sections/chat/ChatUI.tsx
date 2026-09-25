@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Message } from "@/app/app/interfaces";
 import { OnyxDocument, MinimalOnyxDocument } from "@/lib/search/types";
 import HumanMessage from "@/app/app/message/HumanMessage";
+import MessageSwitcher from "@/app/app/message/MessageSwitcher";
 import { ErrorBanner } from "@/app/app/message/Resubmit";
 import { MinimalAgent } from "@/lib/agents/types";
 import { LlmDescriptor, LlmManager } from "@/lib/hooks";
@@ -21,6 +22,7 @@ import {
   useCurrentMessageTree,
   useCurrentSessionForkedFrom,
   useCurrentSessionIncognito,
+  useChatSessionStore,
   useLoadingError,
   useUncaughtError,
 } from "@/app/app/stores/useChatSessionStore";
@@ -191,6 +193,25 @@ const ChatUI = React.memo(
     const lastMessage = messages[messages.length - 1];
     // After a reload the error text is on the message, not in the store.
     const chainEndError = getChainEndError(messages, messageTree);
+    // A failed retry's error pages to the turn's earlier replies.
+    const errorSiblings =
+      (chainEndError?.parentNodeId != null
+        ? messageTree?.get(chainEndError.parentNodeId)?.childrenNodeIds
+        : undefined) ?? emptyChildrenIds;
+
+    // The last send's error belongs to the branch it ended. Switching
+    // branches clears it, or the chosen reply would render as that error.
+    const setUncaughtError = useChatSessionStore(
+      (state) => state.setUncaughtError
+    );
+    const selectMessage = useCallback(
+      (nodeId: number) => {
+        const sessionId = useChatSessionStore.getState().currentSessionId;
+        if (sessionId) setUncaughtError(sessionId, null);
+        onMessageSelection(nodeId);
+      },
+      [onMessageSelection, setUncaughtError]
+    );
 
     return (
       <>
@@ -259,7 +280,7 @@ const ChatUI = React.memo(
                       otherMessagesCanSwitchTo={
                         parentMessage?.childrenNodeIds ?? emptyChildrenIds
                       }
-                      onMessageSelection={onMessageSelection}
+                      onMessageSelection={selectMessage}
                     />
                   </div>
 
@@ -281,7 +302,7 @@ const ChatUI = React.memo(
                       otherMessagesCanSwitchTo={
                         parentMessage?.childrenNodeIds ?? emptyChildrenIds
                       }
-                      onMessageSelection={onMessageSelection}
+                      onMessageSelection={selectMessage}
                       selectionDisabled={chatState !== "input"}
                     />
                   )}
@@ -343,7 +364,7 @@ const ChatUI = React.memo(
                     otherMessagesCanSwitchTo={
                       parentMessage?.childrenNodeIds ?? emptyChildrenIds
                     }
-                    onMessageSelection={onMessageSelection}
+                    onMessageSelection={selectMessage}
                     onRegenerate={createRegenerator}
                     onBranch={branchHandler}
                     parentMessage={previousMessage}
@@ -372,6 +393,27 @@ const ChatUI = React.memo(
                 details={lastMessage?.errorDetails || undefined}
                 stackTrace={lastMessage?.stackTrace || undefined}
               />
+              {chainEndError && errorSiblings.length > 1 && (
+                <div className="flex pt-1" data-testid="ChatUI/error-switcher">
+                  <MessageSwitcher
+                    disableForStreaming={chatState !== "input"}
+                    currentPage={
+                      errorSiblings.indexOf(chainEndError.nodeId) + 1
+                    }
+                    totalPages={errorSiblings.length}
+                    handlePrevious={() => {
+                      const i = errorSiblings.indexOf(chainEndError.nodeId);
+                      const prev = errorSiblings[i - 1];
+                      if (prev !== undefined) selectMessage(prev);
+                    }}
+                    handleNext={() => {
+                      const i = errorSiblings.indexOf(chainEndError.nodeId);
+                      const next = errorSiblings[i + 1];
+                      if (next !== undefined) selectMessage(next);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

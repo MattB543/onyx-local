@@ -177,6 +177,8 @@ export interface SendMessageParams {
   modelProvider?: string;
   modelVersion?: string;
   modelConfigurationId?: number | null;
+  // Saved on the reply as its model name, as multi-model sends do.
+  modelDisplayName?: string;
   temperature?: number;
   // Multi-model: send multiple LLM overrides for parallel generation
   llmOverrides?: LLMOverride[];
@@ -185,6 +187,10 @@ export interface SendMessageParams {
   // Additional context injected into the LLM call but not stored/shown in chat.
   // Used e.g. by Chrome extension "Read this tab" feature.
   additionalContext?: string;
+  // True regenerates the reply to the user message `parentMessageId` names.
+  // False makes the backend reject a user-message parent instead of
+  // silently regenerating it and dropping the new text.
+  regenerate?: boolean;
 }
 
 export async function* sendMessage({
@@ -201,10 +207,12 @@ export async function* sendMessage({
   modelProvider,
   modelVersion,
   modelConfigurationId,
+  modelDisplayName,
   temperature,
   llmOverrides,
   origin,
   additionalContext,
+  regenerate,
 }: SendMessageParams): AsyncGenerator<PacketType, void, unknown> {
   // Build payload for new send-chat-message API
   const payload = {
@@ -224,6 +232,7 @@ export async function* sendMessage({
             model_provider: modelProvider,
             model_version: modelVersion,
             model_configuration_id: modelConfigurationId ?? null,
+            display_name: modelDisplayName,
           }
         : null,
     // Multi-model: list of LLM overrides for parallel generation
@@ -232,6 +241,7 @@ export async function* sendMessage({
     origin: origin ?? "unknown",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     additional_context: additionalContext ?? null,
+    regenerate: regenerate ?? null,
   };
 
   const body = JSON.stringify(payload);

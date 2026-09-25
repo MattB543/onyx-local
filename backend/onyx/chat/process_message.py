@@ -84,6 +84,7 @@ from onyx.configs.constants import (
 )
 from onyx.context.search.models import BaseFilters, SearchDoc
 from onyx.db.chat import (
+    adopt_branch_of_message,
     create_new_chat_message,
     get_chat_session_by_id,
     get_or_create_root_message,
@@ -602,6 +603,82 @@ def _resolve_query_processing_hook_result(
     return hook_result.query.strip()
 
 
+def _history_through_parent(
+    chat_history: list[ChatMessage], parent_message_id: int
+) -> tuple[ChatMessage | None, list[ChatMessage]]:
+    """The parent in the mainline and the history up to and including it, or
+    None and the untouched history when the parent is not in the mainline."""
+    for i in range(len(chat_history) - 1, -1, -1):
+        if chat_history[i].id == parent_message_id:
+            return chat_history[i], chat_history[: i + 1]
+    return None, chat_history
+
+
+def _resolve_parent_message(
+    new_msg_req: SendMessageRequest,
+    chat_session_id: UUID,
+    chat_history: list[ChatMessage],
+    db_session: Session,
+) -> tuple[ChatMessage, list[ChatMessage]]:
+    """The new message's parent and the mainline history up to and including
+    it. A user-message parent means a regeneration of its reply.
+
+    Raises ValueError when the parent is not in the session, or its kind
+    contradicts the request's ``regenerate`` flag (None infers it)."""
+    # Determine the parent message based on the request:
+    # - AUTO_PLACE_AFTER_LATEST_MESSAGE (-1): auto-place after latest message in chain
+    # - None or root ID: regeneration from root (first message)
+    # - positive int: place after that specific parent message
+    root_message = get_or_create_root_message(
+        chat_session_id=chat_session_id, db_session=db_session
+    )
+
+    parent_message: ChatMessage | None
+    parent_message_id = new_msg_req.parent_message_id
+    if parent_message_id == AUTO_PLACE_AFTER_LATEST_MESSAGE:
+        parent_message = chat_history[-1] if chat_history else root_message
+    elif parent_message_id is None or parent_message_id == root_message.id:
+        # Regeneration from root — clear history so we start fresh
+        parent_message = root_message
+        chat_history = []
+    else:
+        parent_message, chat_history = _history_through_parent(
+            chat_history, parent_message_id
+        )
+        # The client sends from the branch it shows. A branch switch that
+        # has not reached the server (e.g. a pager click still in flight)
+        # leaves that branch off the mainline, so adopt it.
+        if parent_message is None and adopt_branch_of_message(
+            chat_session_id=chat_session_id,
+            message_id=parent_message_id,
+            db_session=db_session,
+        ):
+            parent_message, chat_history = _history_through_parent(
+                create_chat_history_chain(
+                    chat_session_id=chat_session_id, db_session=db_session
+                ),
+                parent_message_id,
+            )
+
+    if parent_message is None:
+        raise ValueError(
+            "The new message sent is not on the latest mainline of messages"
+        )
+
+    is_regeneration = parent_message.message_type == MessageType.USER
+    if new_msg_req.regenerate is False and is_regeneration:
+        raise ValueError(
+            "The new message's parent is a user message. Sending it would "
+            "regenerate that message's reply and drop the new text."
+        )
+    if new_msg_req.regenerate is True and not is_regeneration:
+        raise ValueError(
+            "A regeneration's parent must be the user message whose reply "
+            "it regenerates."
+        )
+    return parent_message, chat_history
+
+
 def build_chat_turn(
     new_msg_req: SendMessageRequest,
     user: User,
@@ -780,36 +857,12 @@ def build_chat_turn(
         chat_session_id=chat_session.id, db_session=db_session
     )
 
-    # Determine the parent message based on the request:
-    # - AUTO_PLACE_AFTER_LATEST_MESSAGE (-1): auto-place after latest message in chain
-    # - None or root ID: regeneration from root (first message)
-    # - positive int: place after that specific parent message
-    root_message = get_or_create_root_message(
-        chat_session_id=chat_session.id, db_session=db_session
+    parent_message, chat_history = _resolve_parent_message(
+        new_msg_req=new_msg_req,
+        chat_session_id=chat_session.id,
+        chat_history=chat_history,
+        db_session=db_session,
     )
-
-    if new_msg_req.parent_message_id == AUTO_PLACE_AFTER_LATEST_MESSAGE:
-        parent_message = chat_history[-1] if chat_history else root_message
-    elif (
-        new_msg_req.parent_message_id is None
-        or new_msg_req.parent_message_id == root_message.id
-    ):
-        # Regeneration from root — clear history so we start fresh
-        parent_message = root_message
-        chat_history = []
-    else:
-        parent_message = None
-        for i in range(len(chat_history) - 1, -1, -1):
-            if chat_history[i].id == new_msg_req.parent_message_id:
-                parent_message = chat_history[i]
-                # Truncate to only messages up to and including the parent
-                chat_history = chat_history[: i + 1]
-                break
-
-    if parent_message is None:
-        raise ValueError(
-            "The new message sent is not on the latest mainline of messages"
-        )
 
     # ── Query Processing hook + user message ─────────────────────────────────
     # Skipped on regeneration (parent is USER type): message already exists/was accepted.

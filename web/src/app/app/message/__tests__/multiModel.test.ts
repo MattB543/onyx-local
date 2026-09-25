@@ -3,6 +3,7 @@ import {
   applyPreferredResponse,
   chooseImplicitPreferred,
   getErrorTipMultiModelGroup,
+  getErrorTurnFallbackReply,
   getMultiModelChildren,
   getUnresolvedMultiModelTurn,
 } from "@/app/app/message/multiModel";
@@ -427,5 +428,59 @@ describe("sending after a failed retry of a multi-model turn", () => {
     });
     expect(getErrorTipMultiModelGroup(userMessage, tree)).toBeNull();
     expect(getUnresolvedMultiModelTurn(chainOf(tree), tree)).toBeNull();
+  });
+});
+
+describe("getErrorTurnFallbackReply", () => {
+  const T1 = "2026-09-24T14:56:00.000000+00:00";
+  const T2 = "2026-09-24T14:56:40.000000+00:00";
+
+  it("returns the answer before a failed retry of a single-model turn", () => {
+    const tree = new Map<number, Message>();
+    const { userMessage, responses } = buildTurn(tree, ["opus-4-6"], {
+      timeSent: T1,
+    });
+    addRetry(tree, userMessage, {
+      type: "error",
+      modelDisplayName: "opus-5-5",
+      timeSent: T2,
+    });
+    expect(getErrorTurnFallbackReply(userMessage, tree)).toBe(responses[0]);
+  });
+
+  it("returns the newest usable reply after several retries", () => {
+    const tree = new Map<number, Message>();
+    const { userMessage } = buildTurn(tree, ["opus-4-6"], { timeSent: T1 });
+    const goodRetry = addRetry(tree, userMessage, {
+      modelDisplayName: "sonnet-4-6",
+    });
+    addRetry(tree, userMessage, { type: "error" });
+    expect(getErrorTurnFallbackReply(userMessage, tree)).toBe(goodRetry);
+  });
+
+  it("returns the preferred response when one is set", () => {
+    const tree = new Map<number, Message>();
+    const { userMessage, responses } = buildTurn(tree, ["gpt-5", "gemini-3"], {
+      timeSent: T1,
+      preferredModel: "gpt-5",
+    });
+    addRetry(tree, userMessage, { type: "error" });
+    expect(getErrorTurnFallbackReply(userMessage, tree)).toBe(responses[0]);
+  });
+
+  it("returns null after a failed send", () => {
+    const tree = new Map<number, Message>();
+    const { userMessage } = buildTurn(tree, [
+      { model: "opus-5-5", type: "error" },
+    ]);
+    expect(getErrorTurnFallbackReply(userMessage, tree)).toBeNull();
+  });
+
+  it("never returns a reply without a saved id", () => {
+    const tree = new Map<number, Message>();
+    const { userMessage } = buildTurn(tree, []);
+    addRetry(tree, userMessage, { messageId: undefined });
+    addRetry(tree, userMessage, { type: "error" });
+    expect(getErrorTurnFallbackReply(userMessage, tree)).toBeNull();
   });
 });
