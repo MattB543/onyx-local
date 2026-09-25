@@ -10179,6 +10179,9 @@
         }
       },
       "resubmit": {
+        "pickAnotherModel": {
+          "text": "別のモデルを選んでから、もう一度お試しください。"
+        },
         "regenerateButton": {
           "label": "再生成"
         },

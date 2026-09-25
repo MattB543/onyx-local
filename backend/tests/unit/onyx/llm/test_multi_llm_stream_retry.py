@@ -2,9 +2,11 @@ from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from litellm.exceptions import APIConnectionError as LiteLLMAPIConnectionError
 from litellm.exceptions import RateLimitError as LiteLLMRateLimitError
 from litellm.exceptions import ServiceUnavailableError as LiteLLMServiceUnavailableError
 from litellm.exceptions import Timeout as LiteLLMTimeout
+from litellm.llms.bedrock.common_utils import BedrockError
 
 from onyx.llm.interfaces import LanguageModelInput
 from onyx.llm.model_response import Delta, ModelResponseStream, StreamingChoice
@@ -250,3 +252,71 @@ def test_stream_does_not_retry_quota_exhaustion() -> None:
 
     assert fake_llm._completion.call_count == 1
     mock_sleep.assert_not_called()
+
+
+def _bedrock_403_as_connection_error(as_cause: bool) -> LiteLLMAPIConnectionError:
+    """litellm raises its catch-all APIConnectionError while handling the
+    provider's 403, which stays on it as __context__ (or __cause__, when
+    raised `from` it)."""
+    body = str(b'{"message":"Model access is denied due to IAM user ..."}')
+    try:
+        try:
+            raise BedrockError(status_code=403, message=body)
+        except BedrockError as provider_error:
+            error = LiteLLMAPIConnectionError(
+                message=f"BedrockException - {body}",
+                llm_provider="bedrock",
+                model="us.anthropic.claude-opus-5-5",
+            )
+            if as_cause:
+                raise error from provider_error
+            raise error
+    except LiteLLMAPIConnectionError as e:
+        return e
+
+
+def _stream_raising(error: Exception) -> Iterator[object]:
+    raise error
+    yield  # makes this a generator, like litellm's stream wrapper
+
+
+@pytest.mark.parametrize("as_cause", [False, True])
+def test_stream_does_not_retry_access_denied_connection_error(as_cause: bool) -> None:
+    fake_llm = _make_fake_llm()
+    fake_llm._completion = MagicMock(
+        side_effect=lambda **_kwargs: _stream_raising(
+            _bedrock_403_as_connection_error(as_cause)
+        )
+    )
+
+    with (
+        patch("onyx.llm.multi_llm.LLM_FIRST_CHUNK_MAX_RETRIES", 2),
+        patch("onyx.llm.multi_llm.is_true_openai_model", return_value=False),
+        patch("onyx.llm.multi_llm.logger") as mock_logger,
+    ):
+        with pytest.raises(LiteLLMAPIConnectionError):
+            list(LitellmLLM.stream(fake_llm, prompt=_make_prompt()))
+
+    assert fake_llm._completion.call_count == 1
+    mock_logger.warning.assert_not_called()
+
+
+def test_stream_still_retries_plain_connection_error() -> None:
+    fake_llm = _make_fake_llm()
+    fake_llm._completion = MagicMock(
+        side_effect=lambda **_kwargs: _stream_raising(
+            LiteLLMAPIConnectionError(
+                message="Connection refused", llm_provider="bedrock", model="m"
+            )
+        )
+    )
+
+    with (
+        patch("onyx.llm.multi_llm.LLM_FIRST_CHUNK_MAX_RETRIES", 2),
+        patch("onyx.llm.multi_llm.is_true_openai_model", return_value=False),
+        patch("onyx.llm.multi_llm.logger"),
+    ):
+        with pytest.raises(LiteLLMAPIConnectionError):
+            list(LitellmLLM.stream(fake_llm, prompt=_make_prompt()))
+
+    assert fake_llm._completion.call_count == 3

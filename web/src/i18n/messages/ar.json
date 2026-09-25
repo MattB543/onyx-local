@@ -10179,6 +10179,9 @@
         }
       },
       "resubmit": {
+        "pickAnotherModel": {
+          "text": "اختر نموذجًا آخر، ثم حاول مرة أخرى."
+        },
         "regenerateButton": {
           "label": "إعادة التوليد"
         },

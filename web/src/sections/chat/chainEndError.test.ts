@@ -1,5 +1,8 @@
 import { Message } from "@/app/app/interfaces";
-import { getChainEndError } from "@/sections/chat/chainEndError";
+import {
+  getChainEndError,
+  inferSavedErrorCode,
+} from "@/sections/chat/chainEndError";
 
 let nextNodeId = 1;
 
@@ -92,5 +95,45 @@ describe("getChainEndError", () => {
     const { tree, chain } = buildTurn([{ messageId: 2, message: "Hi" }]);
     expect(getChainEndError(chain, tree)).toBeNull();
     expect(getChainEndError([], tree)).toBeNull();
+  });
+});
+
+describe("inferSavedErrorCode", () => {
+  it.each([
+    [
+      "Error from us.anthropic.claude-opus-5-5: API connection error: Failed to connect to the API.",
+      "CONNECTION_ERROR",
+    ],
+    [
+      "Error from Opus 5.5: Permission denied: Model access is denied due to IAM user ...",
+      "PERMISSION_DENIED",
+    ],
+    [
+      "Error from gpt-oss:120b: Request timed out: the provider did not respond.",
+      "CONNECTION_ERROR",
+    ],
+    ["Error from GPT: openai rate limit: slow down", "RATE_LIMIT"],
+    ["Error from GPT: openai quota exceeded: check billing", "BUDGET_EXCEEDED"],
+    [
+      "Error from Opus: bedrock service error (HTTP 503): busy",
+      "SERVICE_UNAVAILABLE",
+    ],
+    [
+      "Error from Bedrock: Claude: Permission denied: Model access is denied",
+      "PERMISSION_DENIED",
+    ],
+    ["Error from GPT: Bad request: Permission denied: nested", "BAD_REQUEST"],
+  ])("reads the category of %s", (text, code) => {
+    expect(inferSavedErrorCode(text)).toBe(code);
+  });
+
+  it("gives no code to unknown or unsaved text", () => {
+    expect(
+      inferSavedErrorCode("Error from GPT: The model stopped unexpectedly.")
+    ).toBeUndefined();
+    expect(
+      inferSavedErrorCode("API connection error: Failed to connect to the API.")
+    ).toBeUndefined();
+    expect(inferSavedErrorCode("")).toBeUndefined();
   });
 });

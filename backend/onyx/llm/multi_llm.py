@@ -76,7 +76,7 @@ from onyx.llm.models import (
     resolve_reasoning_effort,
 )
 from onyx.llm.request_context import get_llm_mock_response, set_llm_request_params
-from onyx.llm.utils import build_litellm_passthrough_kwargs
+from onyx.llm.utils import build_litellm_passthrough_kwargs, find_access_denial
 from onyx.llm.well_known_providers.constants import VERTEX_LOCATION_KWARG
 from onyx.tracing.llm_utils import record_llm_request_params
 from onyx.utils.encryption import mask_env_value_for_logging, mask_string
@@ -1544,6 +1544,11 @@ class LitellmLLM(LLM):
                 return
             except retryable_exceptions as e:
                 if yielded_any:
+                    raise
+                # litellm reports some 401/403s (e.g. a Bedrock model with no
+                # AWS Marketplace access) as connection errors; a retry fails
+                # the same way.
+                if find_access_denial(e) is not None:
                     raise
                 # 503s and throttling are transient provider-side capacity
                 # congestion; wait them out with backoff instead of burning

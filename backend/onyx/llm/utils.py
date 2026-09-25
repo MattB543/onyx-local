@@ -1,8 +1,11 @@
+import ast
 import copy
+import json
 import re
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from sqlalchemy import select
 
 from onyx.configs.app_configs import (
@@ -91,10 +94,12 @@ def build_litellm_passthrough_kwargs(
     return passthrough_kwargs
 
 
-def _unwrap_nested_exception(error: Exception) -> Exception:
+def _unwrap_path(error: Exception) -> list[Exception]:
     """
-    Traverse common exception wrappers to surface the underlying LiteLLM error.
+    The error, then each common exception wrapper step down to the underlying
+    LiteLLM error (the last item).
     """
+    path = [error]
     visited: set[int] = set()
     current = error
     for _ in range(100):
@@ -111,8 +116,159 @@ def _unwrap_nested_exception(error: Exception) -> Exception:
             candidate = current.args[0]
         if candidate is None or id(candidate) in visited:
             break
+        path.append(candidate)
         current = candidate
-    return current
+    return path
+
+
+def _unwrap_nested_exception(error: Exception) -> Exception:
+    """
+    Traverse common exception wrappers to surface the underlying LiteLLM error.
+    """
+    return _unwrap_path(error)[-1]
+
+
+# 401 means bad credentials, 403 means the credentials lack access. Neither is
+# a network fault, and a retry fails the same way.
+_ACCESS_DENIED_STATUS_CODES = frozenset({401, 403})
+# Lowercase phrases of provider access denials that carry no status code.
+_ACCESS_DENIED_MARKERS = (
+    "accessdenied",
+    "access denied",
+    "access is denied",
+    "aws-marketplace:",
+    "not authorized to perform",
+)
+_LITELLM_PREFIX_RE = re.compile(r"^(?:litellm\.\w+:\s*)+")
+# e.g. "BedrockException - " or "BedrockException PermissionDeniedError - "
+_PROVIDER_PREFIX_RE = re.compile(r"^\w+Exception(?:\s+\w+Error)?\s*-\s*")
+_BYTES_REPR_RE = re.compile(r"^b(['\"]).*\1$", re.DOTALL)
+_MAX_PROVIDER_DETAIL_SOURCE_CHARS = 20_000
+_MAX_PROVIDER_DETAIL_CHARS = 600
+
+
+def _exception_chain(error: BaseException) -> list[BaseException]:
+    """The error, then what it was raised from or while handling. litellm
+    raises its mapped error while handling the provider's, so the provider
+    error (with the real status code) is usually the ``__context__``."""
+    chain: list[BaseException] = []
+    current: BaseException | None = error
+    while current is not None and len(chain) < 20:
+        if any(current is seen for seen in chain):
+            break
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+def _http_status_code(error: BaseException) -> int | None:
+    # Provider and litellm error types vary; not all carry a status code.
+    status = getattr(error, "status_code", None)  # ods: ignore[getattr]
+    if status is None and isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+    if isinstance(status, int):
+        return status
+    if isinstance(status, str) and status.isdigit():
+        return int(status)
+    return None
+
+
+def _error_text(error: BaseException) -> str:
+    """The error's message without litellm's ``litellm.<Type>:`` prefixes."""
+    # Only some error types carry .message.
+    message = getattr(error, "message", None)  # ods: ignore[getattr]
+    text = message if isinstance(message, str) and message.strip() else str(error)
+    text = text.strip()[:_MAX_PROVIDER_DETAIL_SOURCE_CHARS]
+    return _LITELLM_PREFIX_RE.sub("", text)
+
+
+def _is_provider_response(error: BaseException) -> bool:
+    """True for an HTTP error or a litellm error quoting the provider
+    ("BedrockException - ..."). A local failure (e.g. an OSError saying
+    "Access is denied") that litellm wraps is neither."""
+    from litellm.exceptions import APIConnectionError
+
+    # litellm's catch-all always claims status 500, even for local failures.
+    if not isinstance(error, APIConnectionError) and _http_status_code(error):
+        return True
+    return _PROVIDER_PREFIX_RE.match(_error_text(error)) is not None
+
+
+def provider_error_detail(error: BaseException) -> str:
+    """The provider's own error message, without litellm's type prefixes, the
+    ``b'...'`` wrapper of a raw response body, or a JSON envelope."""
+    text = _PROVIDER_PREFIX_RE.sub("", _error_text(error)).strip()
+    if _BYTES_REPR_RE.match(text):
+        try:
+            body = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            body = None
+        text = (
+            body.decode("utf-8", errors="replace")
+            if isinstance(body, bytes)
+            else text[2:-1]
+        )
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            nested = parsed.get("error")
+            for candidate in (
+                parsed.get("message"),
+                parsed.get("Message"),
+                nested.get("message") if isinstance(nested, dict) else nested,
+                parsed.get("detail"),
+            ):
+                if isinstance(candidate, str) and candidate.strip():
+                    text = candidate
+                    break
+    text = " ".join(text.split())
+    if len(text) > _MAX_PROVIDER_DETAIL_CHARS:
+        text = text[: _MAX_PROVIDER_DETAIL_CHARS - 1].rstrip() + "…"
+    return text
+
+
+def find_access_denial(error: BaseException) -> tuple[str, str] | None:
+    """``(error_code, provider detail)`` when the error, or one it was raised
+    from, is an HTTP 401/403 or a provider access denial, else None.
+
+    litellm maps unmapped provider errors to ``APIConnectionError``. A Bedrock
+    403 raised while streaming (e.g. no AWS Marketplace subscription for the
+    model) arrives that way, so the error type alone cannot tell it apart from
+    a network failure."""
+    chain = _exception_chain(error)
+    for link in chain:
+        status = _http_status_code(link)
+        if status in _ACCESS_DENIED_STATUS_CODES:
+            code = "AUTH_ERROR" if status == 401 else "PERMISSION_DENIED"
+            return code, provider_error_detail(link)
+    for link in chain:
+        if not _is_provider_response(link):
+            continue
+        detail = provider_error_detail(link)
+        if any(marker in detail.lower() for marker in _ACCESS_DENIED_MARKERS):
+            return "PERMISSION_DENIED", detail
+    return None
+
+
+def _permission_denied_msg(detail: str) -> str:
+    if detail:
+        return f"Permission denied: {detail}"
+    return "Permission denied: Ensure you have access to this model."
+
+
+def _access_denial_error(code: str, detail: str) -> tuple[str, str, bool]:
+    """(error_message, error_code, is_retryable) for a find_access_denial hit."""
+    if code == "AUTH_ERROR":
+        error_msg = (
+            "Authentication failed: Please check your API key and credentials."
+            + (f" Provider error: {detail}" if detail else "")
+        )
+    else:
+        error_msg = _permission_denied_msg(detail)
+    return error_msg, code, False
 
 
 def litellm_exception_to_error_msg(
@@ -130,6 +286,10 @@ def litellm_exception_to_error_msg(
             - error_message: User-friendly error description
             - error_code: Categorized error code for frontend display
             - is_retryable: Whether the user should try again
+
+    A reloaded chat has only the saved message text, so the web app infers the
+    error heading from these message prefixes (``inferSavedErrorCode`` in
+    web/src/sections/chat/chainEndError.ts). Keep the two in sync.
     """
     from litellm.exceptions import (
         APIConnectionError,
@@ -147,7 +307,8 @@ def litellm_exception_to_error_msg(
         UnprocessableEntityError,
     )
 
-    core_exception = _unwrap_nested_exception(e)
+    unwrap_path = _unwrap_path(e)
+    core_exception = unwrap_path[-1]
     error_msg = str(core_exception)
     error_code = "UNKNOWN_ERROR"
     is_retryable = True
@@ -165,6 +326,15 @@ def litellm_exception_to_error_msg(
         for error_msg_pattern, custom_error_msg in custom_error_msg_mappings.items():
             if error_msg_pattern in error_msg:
                 return custom_error_msg, "CUSTOM_ERROR", True
+
+    # litellm's catch-all APIConnectionError can carry a provider 401/403 as
+    # its __context__, or as its __cause__, which the unwrap steps past to the
+    # bare provider error. So check each APIConnectionError on the way down.
+    for link in unwrap_path:
+        if isinstance(link, APIConnectionError):
+            denial = find_access_denial(link)
+            if denial is not None:
+                return _access_denial_error(*denial)
 
     # Both subclass BadRequestError, so they must precede the BadRequestError
     # branch or they'd be misclassified as BAD_REQUEST.
@@ -198,10 +368,7 @@ def litellm_exception_to_error_msg(
         error_code = "AUTH_ERROR"
         is_retryable = False
     elif isinstance(core_exception, PermissionDeniedError):
-        error_msg = (
-            f"Permission denied: {str(core_exception)}"
-            "Ensure you have access to this model."
-        )
+        error_msg = _permission_denied_msg(provider_error_detail(core_exception))
         error_code = "PERMISSION_DENIED"
         is_retryable = False
     elif isinstance(core_exception, NotFoundError):

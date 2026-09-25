@@ -10179,6 +10179,9 @@
         }
       },
       "resubmit": {
+        "pickAnotherModel": {
+          "text": "Wählen Sie ein anderes Modell aus und versuchen Sie es dann erneut."
+        },
         "regenerateButton": {
           "label": "Neu generieren"
         },

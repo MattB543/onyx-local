@@ -4,6 +4,7 @@ import { SvgChevronDown, SvgChevronRight } from "@opal/icons";
 import { Button } from "@opal/components";
 import { CopyButton } from "@opal/components";
 import { getErrorIcon, getErrorTitle } from "./errorHelpers";
+import { inferSavedErrorCode } from "@/sections/chat/chainEndError";
 import {
   RateLimitDetails,
   RATE_LIMITED_ERROR_CODE,
@@ -133,19 +134,30 @@ function RateLimitBanner({
 
 interface ResubmitProps {
   resubmit: () => void;
+  // Replaces the generic "error with the response" line.
+  text?: string;
 }
 
-export const Resubmit: React.FC<ResubmitProps> = ({ resubmit }) => {
+export const Resubmit: React.FC<ResubmitProps> = ({ resubmit, text }) => {
   const t = useTranslations("chat.messages");
   return (
     <div className="flex flex-col items-center justify-center gap-y-2 mt-4">
       <p className="text-sm text-neutral-700 dark:text-neutral-300">
-        {t("resubmit.responseError.text")}
+        {text ?? t("resubmit.responseError.text")}
       </p>
       <Button onClick={resubmit}>{t("resubmit.regenerateButton.label")}</Button>
     </div>
   );
 };
+
+// Errors about the chosen model or its access. Sending the same request again
+// fails (they are not retryable), but resubmitting after picking another model
+// can work, so they keep the resubmit button.
+const MODEL_SWITCH_ERROR_CODES: ReadonlySet<string> = new Set([
+  "PERMISSION_DENIED",
+  "AUTH_ERROR",
+  "NOT_FOUND",
+]);
 
 export const ErrorBanner = ({
   error,
@@ -165,8 +177,14 @@ export const ErrorBanner = ({
 }) => {
   const t = useTranslations("chat.messages");
   const [isStackTraceExpanded, setIsStackTraceExpanded] = useState(false);
+  // A reloaded error has no code, only its saved text.
+  const code = errorCode ?? inferSavedErrorCode(error);
+  // Decided by the code, not isRetryable: a reloaded error has no
+  // isRetryable, so live and reloaded errors get the same button this way.
+  const canSwitchModel =
+    code !== undefined && MODEL_SWITCH_ERROR_CODES.has(code);
 
-  const title = getErrorTitle(errorCode, {
+  const title = getErrorTitle(code, {
     RATE_LIMIT: t("errorBanner.rateLimitExceeded.title"),
     RATE_LIMITED: t("errorBanner.usageLimitReached.title"),
     AUTH_ERROR: t("errorBanner.authError.title"),
@@ -186,11 +204,11 @@ export const ErrorBanner = ({
     default: t("errorBanner.genericError.title"),
   });
 
-  if (errorCode === RATE_LIMITED_ERROR_CODE) {
+  if (code === RATE_LIMITED_ERROR_CODE) {
     return (
       <RateLimitBanner
         error={error}
-        errorCode={errorCode}
+        errorCode={code}
         title={title}
         details={(details as RateLimitDetails) ?? {}}
       />
@@ -200,7 +218,7 @@ export const ErrorBanner = ({
   return (
     <div className="text-red-700 mt-4 text-sm my-auto">
       <Alert variant="broken">
-        {getErrorIcon(errorCode)}
+        {getErrorIcon(code)}
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription className="flex flex-col gap-y-1">
           <span>{error}</span>
@@ -243,7 +261,14 @@ export const ErrorBanner = ({
           )}
         </AlertDescription>
       </Alert>
-      {isRetryable && resubmit && <Resubmit resubmit={resubmit} />}
+      {resubmit && (canSwitchModel || isRetryable) && (
+        <Resubmit
+          resubmit={resubmit}
+          text={
+            canSwitchModel ? t("resubmit.pickAnotherModel.text") : undefined
+          }
+        />
+      )}
     </div>
   );
 };

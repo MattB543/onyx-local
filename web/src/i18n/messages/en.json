@@ -10179,6 +10179,9 @@
         }
       },
       "resubmit": {
+        "pickAnotherModel": {
+          "text": "Pick another model, then try again."
+        },
         "regenerateButton": {
           "label": "Regenerate"
         },
