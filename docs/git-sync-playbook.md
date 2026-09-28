@@ -293,6 +293,21 @@ Upstream may change method signatures (e.g., adding `.unique()` to query results
 
 Run prettier on modified custom files, ruff on modified Python files. These are cosmetic but should be clean before pushing.
 
+### 6. Tunnel compose drift (prod boxes)
+
+FLF and FLI run `deployment/docker_compose/docker-compose.prod-tunnel.yml`, a fork-only file that upstream does not have, so **a sync never updates it**. When upstream changes a third-party image (MinIO, Postgres, Redis, Vespa, nginx) or its settings in `docker-compose.prod.yml`, copy the change into the tunnel file by hand.
+
+```bash
+# Image lines that differ between upstream's prod compose and our tunnel compose
+diff <(grep -E '^\s+image:' deployment/docker_compose/docker-compose.prod.yml | sed -E 's#\$\{BASE_IMAGE_REGISTRY:-docker.io\}/##; s#image: library/#image: #' | sort) \
+     <(grep -E '^\s+image:' deployment/docker_compose/docker-compose.prod-tunnel.yml | sort)
+git log <merge-base>..upstream/main --format='%h %s' -- deployment/docker_compose/docker-compose.prod.yml
+```
+
+Known, intended differences (as of 2026-09-25): the Onyx app images (we pull `ghcr.io/mattb543/*`), no `certbot` (Cloudflare terminates TLS), `vespaengine/vespa` instead of `opensearch`, and `code-interpreter:latest`. Every other difference needs a decision.
+
+Why: on 2026-09-25 the FLI deploy went down because the tunnel file still pulled MinIO from `quay.io`, which MinIO had made private. Upstream had already switched to its own mirror, `onyxdotapp/minio` (#15086, 9/24). FLF kept working only because it had the image cached from 9/23. A box without a cached image (Wrenly, a fresh install) fails with `unauthorized` on `docker compose up`, after the restart's `down` has removed the old containers.
+
 ## Type-check Gate (ty)
 
 Upstream runs `ty` only on pull requests and merge queues. The fork pushes straight to `main`, so `scripts/ty_baseline_gate.py` fails on any **new** ty diagnostic in `backend/`. The known diagnostics are in two committed baselines, `scripts/ty_baseline/production.txt` and `scripts/ty_baseline/tests.txt`. Each line is `path<TAB>description`, with no line numbers, so edits do not churn the baseline.
@@ -336,6 +351,7 @@ Known baseline (as of 2026-07-29, ruff-clean tree):
 [ ] python scripts/ty_baseline_gate.py        → PASS (no new ty diagnostics)
 [ ] npx prettier --check "src/**"             → clean on custom files
 [ ] python -m alembic heads                   → single head
+[ ] Tunnel compose image diff (Post-Sync Fix 6) → only the ghcr.io/mattb543 app images differ; every tunnel image pulls anonymously
 [ ] git diff origin/main..HEAD | grep -iE "AKIA|aws_secret|password=" → no real secrets
 [ ] Custom features functional: CRM, KMS, Calendar, custom jobs, deployment
 ```
