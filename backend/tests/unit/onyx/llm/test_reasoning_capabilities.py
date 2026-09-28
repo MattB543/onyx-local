@@ -276,6 +276,9 @@ def test_supported_reasoning_efforts(
         ("claude-fable-5-1", True),
         ("claude-5-mythos", True),
         ("claude-opus-5", False),
+        # Opus 5.5 rejects thinking.type=disabled at every effort level.
+        ("claude-opus-5-5", True),
+        ("us.anthropic.claude-opus-5-5", True),
         ("claude-sonnet-5", False),
         ("claude-opus-4-7", False),
         # Pre-adaptive Claude only thinks when the param asks for it.

@@ -49,16 +49,24 @@ CUSTOM_LITELLM_MODEL_OVERRIDES: dict[str, dict[str, Any]] = {
     for model_name in _TWELVE_LABS_PEGASUS_MODEL_NAMES
 }
 
-# Claude Opus 5 is missing from the pinned LiteLLM's model registry, so token
-# limit lookups fall through to GEN_AI_MODEL_FALLBACK_MAX_TOKENS. Mirror the
-# claude-opus-4-8 registry entry (1M context, 128K output) until a LiteLLM bump
-# includes it — get_model_map() prefers the real registry entry once it exists.
+# Claude Opus 5 and 5.5 are missing from the pinned LiteLLM's model registry, so
+# token limit lookups fall through to GEN_AI_MODEL_FALLBACK_MAX_TOKENS: a 32K
+# context window, and no explicit max_tokens (Bedrock's 4096 default). Mirror
+# the claude-opus-4-8 registry entry (1M context, 128K output) until a LiteLLM
+# bump includes them — get_model_map() prefers the real registry entry once it
+# exists.
 _CLAUDE_OPUS_5_MODEL_NAMES = [
-    "claude-opus-5",
-    "anthropic.claude-opus-5",
-    "us.anthropic.claude-opus-5",
-    "eu.anthropic.claude-opus-5",
-    "global.anthropic.claude-opus-5",
+    f"{prefix}claude-opus-{version}"
+    for version in ("5", "5-5")
+    for prefix in (
+        "",
+        "anthropic.",
+        "us.anthropic.",
+        "eu.anthropic.",
+        "au.anthropic.",
+        "jp.anthropic.",
+        "global.anthropic.",
+    )
 ]
 CUSTOM_LITELLM_MODEL_OVERRIDES.update(
     {
@@ -616,6 +624,10 @@ _ANTHROPIC_THINKING_MIN_VERSION = (3, 7)
 # "off" is not a level they can be asked for.
 _ANTHROPIC_ALWAYS_THINKING_TIERS = ("fable", "mythos")
 
+# Tiers that always think from a given version on: Claude Opus 5.5 rejects
+# thinking.type=disabled at every effort level, where Opus 5 still accepts it.
+_ANTHROPIC_ALWAYS_THINKING_MIN_VERSION_BY_TIER = {"opus": (5, 5)}
+
 
 def _normalize_anthropic_name(model_name: str) -> str | None:
     """A Claude name cut down to the part that carries tier and version.
@@ -702,10 +714,13 @@ def anthropic_identity_is_always_thinking(model_names: Sequence[str]) -> bool:
 def anthropic_thinking_is_always_on(model_name: str) -> bool:
     """True for the tiers that reason no matter what. Adaptive thinking is
     checked first so a tier word elsewhere ("fable-writer-v2") can't match."""
-    return (
-        anthropic_uses_adaptive_thinking(model_name)
-        and _anthropic_tier(model_name) in _ANTHROPIC_ALWAYS_THINKING_TIERS
-    )
+    if not anthropic_uses_adaptive_thinking(model_name):
+        return False
+    tier = _anthropic_tier(model_name)
+    if tier in _ANTHROPIC_ALWAYS_THINKING_TIERS:
+        return True
+    min_version = _ANTHROPIC_ALWAYS_THINKING_MIN_VERSION_BY_TIER.get(tier or "")
+    return min_version is not None and _anthropic_meets_version(model_name, min_version)
 
 
 def anthropic_omits_sampling_params(model_name: str) -> bool:

@@ -227,6 +227,30 @@ class TestGetLlmMaxOutputTokens:
             == 128_000
         )
 
+    def test_claude_opus_5_5_resolves_via_override(self) -> None:
+        # Same gap as Opus 5: the 32K fallback left Opus 5.5 chats failing with
+        # "Not enough tokens to include the last user message".
+        from onyx.llm.model_capabilities import get_bedrock_token_limit, get_model_map
+
+        model_map = get_model_map()
+        assert (
+            get_llm_max_output_tokens(
+                model_map=model_map,
+                model_name="us.anthropic.claude-opus-5-5",
+                model_provider="bedrock",
+            )
+            == 128_000
+        )
+        assert (
+            llm_max_input_tokens(
+                model_map=model_map,
+                model_name="us.anthropic.claude-opus-5-5",
+                model_provider="bedrock",
+            )
+            == 1_000_000
+        )
+        assert get_bedrock_token_limit("us.anthropic.claude-opus-5-5") == 1_000_000
+
 
 class TestGetMaxInputTokens:
     def test_subtracts_reserved_output_tokens(self) -> None:
